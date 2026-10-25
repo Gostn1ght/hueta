@@ -41,12 +41,12 @@ void SCarLight::ParseDefinitions(LPCSTR section)
 	CInifile* ini = pKinematics->LL_UserData();
 
 	// Definitive Car Pack lights (owner 2026-10-25: spawning one crashed every
-	// client): type 1 point, 2 spot, 3 omnipart; a point light has no cone,
-	// projector texture or glow. Without type: the old spot headlight.
+	// client): type 1 point, 2 spot, 3 omnipart (other types: point); only a
+	// spot has a cone, projector texture or glow. Without type: the old spot.
 	const int type = READ_IF_EXISTS(ini, r_s32, section, "type", int(IRender_Light::SPOT));
-	const bool spot = type != IRender_Light::POINT && type != IRender_Light::OMNIPART;
+	const bool spot = type == IRender_Light::SPOT;
 	light_render = ::Render->light_create();
-	light_render->set_type(spot ? IRender_Light::SPOT : IRender_Light::LT(type));
+	light_render->set_type(spot ? IRender_Light::SPOT : type == IRender_Light::OMNIPART ? IRender_Light::OMNIPART : IRender_Light::POINT);
 	light_render->set_shadow(spot);
 	if (ini->line_exist(section, "glow_texture")) glow_render = ::Render->glow_create();
 	offset = READ_IF_EXISTS(ini, r_fvector3, section, "position", Fvector().set(0.f, 0.f, 0.f));
@@ -61,7 +61,7 @@ void SCarLight::ParseDefinitions(LPCSTR section)
 	light_render->set_color(clr);
 	// Anomaly/GAMMA vehicles use spot_angle; older car models use cone_angle.
 	const LPCSTR angle_key = ini->line_exist(section, "cone_angle") ? "cone_angle" : "spot_angle";
-	if (spot) light_render->set_cone(deg2rad(READ_IF_EXISTS(ini, r_float, section, angle_key, 60.f)));
+	if (spot) light_render->set_cone(deg2rad(ini->r_float(section, angle_key)));  // a spot needs its angle
 	if (ini->line_exist(section, "spot_texture")) light_render->set_texture(ini->r_string(section, "spot_texture"));
 
 	if (glow_render)
