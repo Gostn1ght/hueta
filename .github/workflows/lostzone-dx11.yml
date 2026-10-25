@@ -2,7 +2,7 @@ name: Lost Zone DX11
 
 on:
   push:
-    branches: [menu-3d-hideout]
+    branches: [menu-3d-hideout, engine-restructure, 'arena/**']
     paths-ignore:
       - 'backend/**'
       - 'docs/**'
