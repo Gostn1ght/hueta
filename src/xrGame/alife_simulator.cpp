@@ -33,6 +33,7 @@ void restart_all()
 		return;
 
 	destroy_lua_wpn_params();
+	netcoop::lua_functors_reset();
 	MainMenu()->DestroyInternal(true);
 	xr_delete(g_object_factory);
 	ai().script_engine().init();
@@ -96,6 +97,7 @@ CALifeSimulator::CALifeSimulator(xrServer* server, shared_str* command_line) :
 	functor();
 
 	load(p.m_game_or_spawn, !xr_strcmp(p.m_new_or_load, "load") ? false : true, !xr_strcmp(p.m_new_or_load, "new"));
+	netcoop::world_store_cleanup_loaded();
 	if (netcoop_world::local_world_authority().active())
 		netcoop_world::local_world_authority().complete_bootstrap();
 }

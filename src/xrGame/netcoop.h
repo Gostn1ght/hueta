@@ -256,6 +256,13 @@ Fvector script_vehicle_prompt_point(); // where the last prompt stands (Dot Mark
 void script_box_anchor(u16 box, u16 anchor);
 bool box_anchor_within_reach(u16 box, const Fvector& from);
 void vehicles_reset(); // object IDs, anchors and pending opens belong to one level
+void client_vehicle_sounds_reset();
+void items_reset();
+void pda_reset();
+void marks_reset();
+void client_map_positions_reset();
+void client_session_reset();
+void lua_functors_reset();
 
 // Network smoothness (doc 38, stages 0 and 1).
 bool smooth();
@@ -272,6 +279,8 @@ void server_frame_update(xrServer* server);
 // 5 minutes and when the last player leaves, and starts from the newest save.
 // Called by the ALife constructor; true when it switched the start to a load.
 bool world_store_choose_start(LPSTR game_or_spawn, u32 game_size, LPSTR new_or_load, u32 mode_size);
+void world_store_cleanup_loaded();
+bool world_store_cleanup_pending();
 // Lua (server): netcoop_world_save(reason) - save the world now.
 bool world_store_save_now(LPCSTR reason);
 // Campfires (netcoop_campfire.inc): the server lights and puts them out and

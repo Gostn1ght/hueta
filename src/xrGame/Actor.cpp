@@ -1465,8 +1465,11 @@ void CActor::set_safemode(bool status)
 	if (is_safemode() != status)
 	{
 		m_bSafemode = status;
-		g_player_hud->OnMovementChanged(mcAnyMove);
-		g_player_hud->updateMovementLayerState();
+		if (g_player_hud && this == Actor())
+		{
+			g_player_hud->OnMovementChanged(mcAnyMove);
+			g_player_hud->updateMovementLayerState();
+		}
 
 		CWeapon* wep = smart_cast<CWeapon*>(inventory().ActiveItem());
 		status ? callback(GameObject::eOnWeaponLowered)(wep ? wep->lua_game_object(): nullptr) : callback(GameObject::eOnWeaponRaised)(wep ? wep->lua_game_object() : nullptr);

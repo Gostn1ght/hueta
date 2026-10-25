@@ -171,11 +171,11 @@ void add_online_impl(CSE_ALifeDynamicObject* object, const bool& update_registri
 	for (; I != E; ++I)
 	{
 		//Alundaio:
-		if (*I == ai().alife().graph().actor()->ID)
+		if (ai().alife().graph().actor() && *I == ai().alife().graph().actor()->ID)
 			continue;
 		//-Alundaio
 
-		CSE_ALifeDynamicObject* l_tpALifeDynamicObject = ai().alife().objects().object(*I);
+		CSE_ALifeDynamicObject* l_tpALifeDynamicObject = ai().alife().objects().object(*I, true);
 		if (!l_tpALifeDynamicObject)
 			continue;
 
@@ -244,6 +244,8 @@ void add_offline_impl(CSE_ALifeDynamicObject* object, const xr_vector<ALife::_OB
 
 		CSE_ALifeInventoryItem* inventory_item = smart_cast<CSE_ALifeInventoryItem*>(child);
 		VERIFY2(inventory_item, "Non inventory item object has parent?!");
+		if (!inventory_item)
+			continue;
 #ifdef DEBUG
 		//		if (psAI_Flags.test(aiALife))
 //			Msg					("[LSS] Destroying item [%s][%s][%d]",inventory_item->base()->name_replace(),*inventory_item->base()->s_name,inventory_item->base()->ID);

@@ -528,6 +528,16 @@ struct AdmissionCoordinator::State
         }
         for(;;)
         {
+            if(opened)
+            {
+                const auto ws=worker.status();
+                if(ws.authority_lost || ws.configuration_error)
+                {
+                    opened=false;
+                    std::lock_guard<std::mutex> guard(lock);
+                    ready=false;failed=true;wake.notify_all();
+                }
+            }
             if(opened) try{accounts_sync();}catch(...){}
             Job job;
             bool idle=false;

@@ -275,7 +275,12 @@ bool world_store_choose_start(LPSTR game_or_spawn, u32 game_size, LPSTR new_or_l
 
 // Living player Actors saved with the world (they were online then) are
 // released with their inventories: the players come back from their files.
-static void world_store_cleanup_loaded()
+bool world_store_cleanup_pending()
+{
+	return s_world_cleanup_pending;
+}
+
+void world_store_cleanup_loaded()
 {
 	if (!s_world_cleanup_pending || !ai().get_alife()) return;
 	s_world_cleanup_pending = false;
@@ -292,6 +297,8 @@ static void world_store_cleanup_loaded()
 	for (CSE_ALifeDynamicObject* actor : players)
 	{
 		Msg("[NetAnomaly][world] released player Actor %u from the saved world (%u items)", actor->ID, u32(actor->children.size()));
+		if (actor->m_bOnline)
+			sim->switch_offline(actor);
 		sim->release(actor, true);
 	}
 }
@@ -395,7 +402,7 @@ bool world_store_save_now(LPCSTR reason)
 bool world_store_admission_open()
 {
 	string64 world;
-	return !world_store_name(world) || s_world_committed;
+	return !world_store_name(world) || (s_world_committed && !s_world_cleanup_pending);
 }
 
 static void world_store_update(xrServer* server)

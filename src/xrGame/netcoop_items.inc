@@ -551,6 +551,20 @@ void client_item_forget(u16 id)
 	s_client_item_reports.erase(id);
 }
 
+void items_reset()
+{
+	s_client_items.clear();
+	s_client_item_pending.clear();
+	s_client_item_reports.clear();
+	s_client_item_stale = 0;
+	s_client_item_applied = 0;
+	s_item_records.clear();
+	s_item_restore.clear();
+	s_item_offline.clear();
+	s_item_resync.clear();
+	s_item_cursor = 0;
+}
+
 static bool client_own_item(CObject* object)
 {
 	CActor* actor = Actor();

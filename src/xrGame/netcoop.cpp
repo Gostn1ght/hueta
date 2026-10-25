@@ -138,6 +138,8 @@ void client_map_position_set(u16 id, const Fvector& position, LPCSTR level)
 
 void client_map_position_clear(u16 id) { s_client_map_positions.erase(id); }
 
+void client_map_positions_reset() { s_client_map_positions.clear(); }
+
 bool client_map_position(u16 id, Fvector& position, shared_str& level)
 {
 	const auto found = s_client_map_positions.find(id);

@@ -26,6 +26,7 @@
 
 #include "sound_collection_storage.h"
 #include "relation_registry.h"
+#include "netcoop.h"
 
 typedef xr_vector<std::pair<shared_str, int>> STORY_PAIRS;
 extern STORY_PAIRS story_ids;
@@ -77,6 +78,7 @@ extern void destroy_lua_wpn_params();
 void clean_game_globals()
 {
 	destroy_lua_wpn_params();
+	netcoop::lua_functors_reset();
 	// destroy ai space
 	xr_delete(g_ai_space);
 	// destroy object factory

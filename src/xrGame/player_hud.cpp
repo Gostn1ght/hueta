@@ -943,7 +943,7 @@ void player_hud::render_item_ui()
 	UIRender->CacheSetCullMode(IUIRender::cmCCW);
 	UI().m_currentPointType = bk;
 
-	if (g_actor->GetAttachments()->size())
+	if (g_actor && g_actor->GetAttachments()->size())
 	{
 		for (auto& pair : *g_actor->GetAttachments())
 			if (pair.second->GetType() == eSA_HUD)
@@ -978,7 +978,7 @@ void player_hud::render_hud()
 		::Render->add_Visual(script_anim_item_model->dcast_RenderVisual());
 	}
 
-	if (g_actor->GetAttachments()->size())
+	if (g_actor && g_actor->GetAttachments()->size())
 	{
 		for (auto& pair : *g_actor->GetAttachments())
 		{
@@ -1075,6 +1075,8 @@ extern float psHUD_FOV;
 
 void player_hud::update(const Fmatrix& cam_trans)
 {
+	if (!Actor())
+		return;
 	Fmatrix trans = cam_trans;
 	Fmatrix trans_b = cam_trans;
 	CWeapon* wep = smart_cast<CWeapon*>(Actor()->inventory().ActiveItem());

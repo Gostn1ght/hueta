@@ -209,9 +209,18 @@ void CSE_ALifeInventoryBox::add_online(const bool& update_registries)
 	ALife::OBJECT_IT E = object->children.end();
 	for (; I != E; ++I)
 	{
-		CSE_ALifeDynamicObject* l_tpALifeDynamicObject = ai().alife().objects().object(*I);
+		CSE_ALifeDynamicObject* l_tpALifeDynamicObject = ai().alife().objects().object(*I, true);
+		if (!l_tpALifeDynamicObject)
+		{
+			Msg("! [DO] box [%d][%s] skipping missing child [%d] on switch online", ID, name_replace(), *I);
+			continue;
+		}
 		CSE_ALifeInventoryItem* l_tpALifeInventoryItem = smart_cast<CSE_ALifeInventoryItem*>(l_tpALifeDynamicObject);
-		R_ASSERT2(l_tpALifeInventoryItem, "Non inventory item object has parent?!");
+		if (!l_tpALifeInventoryItem)
+		{
+			Msg("! [DO] box [%d][%s] skipping non-item child [%d] on switch online", ID, name_replace(), *I);
+			continue;
+		}
 		l_tpALifeInventoryItem->base()->s_flags.or(M_SPAWN_UPDATE);
 		CSE_Abstract* l_tpAbstract = smart_cast<CSE_Abstract*>(l_tpALifeInventoryItem);
 		object->alife().server().entity_Destroy(l_tpAbstract);
@@ -260,6 +269,8 @@ void CSE_ALifeInventoryBox::add_offline(const xr_vector<ALife::_OBJECT_ID>& save
 
 		CSE_ALifeInventoryItem* inventory_item = smart_cast<CSE_ALifeInventoryItem*>(child);
 		VERIFY2(inventory_item, "Non inventory item object has parent?!");
+		if (!inventory_item)
+			continue;
 #ifdef DEBUG
 		//		if (psAI_Flags.test(aiALife))
 //			Msg					("[LSS] Destroying item [%s][%s][%d]",inventory_item->base()->name_replace(),*inventory_item->base()->s_name,inventory_item->base()->ID);
@@ -281,8 +292,6 @@ void CSE_ALifeInventoryBox::add_offline(const xr_vector<ALife::_OBJECT_ID>& save
 		if (!child->can_save())
 		{
 			object->alife().release(child);
-			--i;
-			--n;
 			continue;
 		}
 		child->clear_client_data();

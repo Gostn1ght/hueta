@@ -272,12 +272,14 @@ void xrServer::Update()
 
 		// 
 		CSE_Abstract* E = ID_to_entity(R.phantom);
+		if (!E)
+			continue;
 		E->Spawn_Write(Packet,FALSE);
 		u16 ID;
 		Packet.r_begin(ID);
 		R_ASSERT(M_SPAWN==ID);
 		ClientID clientID;
-		clientID.set(0xffff);
+		clientID.set(SV_Client ? SV_Client->ID.value() : 0xffff);
 		Process_spawn(Packet, clientID);
 	}
 

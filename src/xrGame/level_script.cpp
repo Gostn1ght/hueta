@@ -1746,7 +1746,7 @@ void remove_hud_model(LPCSTR section)
 
 const u32 ActorMovingState()
 {
-	return g_actor->MovingState();
+	return g_actor ? g_actor->MovingState() : 0;
 }
 
 void AddBullet(Fvector pos, Fvector dir, float speed, float power, float impulse, u16 sender, ALife::EHitType hit_type, float max_dist, LPCSTR ammo_sect, float air_resistance)

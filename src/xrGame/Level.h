@@ -14,6 +14,7 @@
 #include "Level_network_map_sync.h"
 #include "secure_messaging.h"
 #include "traffic_optimization.h"
+#include <atomic>
 
 class CHUDManager;
 class CParticlesObject;
@@ -247,8 +248,11 @@ public:
 	void ProcessSpawnEvents();
 	static void ProcessPrefetchEvents(void* args);
 	void SortSpawnEventsQueue();
+	void StopPrefetchThread();
 private:
-	bool closeSignal = false;
+	std::atomic<bool> closeSignal{false};
+	HANDLE prefetch_signal = nullptr;
+	void* prefetch_worker = nullptr;
 	int GetSpawnEventPriority(const NET_Event& e) const;
 	bool PostponedSpawnFind(u16 id, const NET_Event& E) const;
 	bool PostponedSpawnFind(u16 id, NET_Packet& P) const;
@@ -256,6 +260,7 @@ private:
 #endif	
 
 public:
+	bool m_netcoop_game_started = false;
 	//-AVO
 	void ProcessGameEvents();
 	void ProcessGameSpawns();

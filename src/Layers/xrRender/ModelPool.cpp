@@ -242,12 +242,12 @@ dxRender_Visual* CModelPool::Create(const char* name, IReader* data, bool assert
 			bAllowChildrenDuplicate = FALSE;
 			if (data) Base = Instance_Load(low_name, data, TRUE);
 			else Base = Instance_Load(low_name, TRUE, assert);
+			bAllowChildrenDuplicate = TRUE;
 			if (!Base)
 			{
 				// If not found and assert is false, return nullptr
 				return nullptr;
 			}
-			bAllowChildrenDuplicate = TRUE;
 		}
 		// 3. If found - return (cloned) reference
 		dxRender_Visual* Model = Instance_Duplicate(Base);

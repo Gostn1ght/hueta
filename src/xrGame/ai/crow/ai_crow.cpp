@@ -438,6 +438,7 @@ void CAI_Crow::shedule_Update(u32 DT)
 				}
 			}
 
+			Fvector const fallback_target = Actor() ? Actor()->Position() : Device.vCameraPosition;
 			Fvector vP;
 			if (!deadNPCs.empty()) 
 			{
@@ -447,7 +448,7 @@ void CAI_Crow::shedule_Update(u32 DT)
 			}
 			else 
 			{
-				vP = Actor()->Position();
+				vP = fallback_target;
 				float distanceToActor = Position().distance_to(vP);
 				if (distanceToActor > 500.0f) 
 				{
@@ -456,9 +457,12 @@ void CAI_Crow::shedule_Update(u32 DT)
 			}
 
 			Fvector dest_dir;
-			dest_dir.sub(Actor()->Position(), Position());
+			dest_dir.sub(fallback_target, Position());
 			float range = dest_dir.magnitude();
-			dest_dir.normalize();
+			if (range > EPS_S)
+				dest_dir.div(range);
+			else
+				dest_dir.set(Direction());
 
 			collide::rq_result RQ = GetPickResult(Position(), dest_dir, range, this);
 			if (RQ.element >= 0)

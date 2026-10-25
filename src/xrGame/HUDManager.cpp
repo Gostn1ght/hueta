@@ -236,6 +236,8 @@ void CHUDManager::RenderActiveItemUI()
 
 void CHUDManager::RenderCamAttachedUI()
 {
+	if (!g_actor)
+		return;
 	for (auto& pair : *g_actor->GetAttachments())
 	{
 		script_attachment* att = pair.second;

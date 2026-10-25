@@ -910,7 +910,7 @@ function netcoop_login_wnd:TrackFieldClick()
 end
 function netcoop_login_wnd:FieldError(field, id)
     self:SetNotice(tr(id), "error")
-    for i, f in ipairs(self.fields or {}) do if f == field then self:FocusField(i) end end
+    for i, f in ipairs(self.fields or {}) do if rawequal(f, field) then self:FocusField(i) end end
 end
 function netcoop_login_wnd:LockForm()
     for _, f in ipairs(self.fields or {}) do f:Enable(false) end

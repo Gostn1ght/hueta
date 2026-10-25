@@ -42,7 +42,8 @@ function Widget:SetStretchTexture() end
 function Widget:SetFont() end
 function Widget:SetTextColor() end
 function Widget:InitMessageBox(template) self.template=template end
-local function widget(id) local w=setmetatable({shown=true}, {__index=Widget}); if id then controls[id]=w end; return w end
+local widget_mt={__index=Widget,__eq=function() error('No such operator [__eq] defined in class [CUIEditBox]') end}
+local function widget(id) local w=setmetatable({shown=true}, widget_mt); if id then controls[id]=w end; return w end
 CUIScriptWnd=Widget
 function class(name)
  _G[name]={}
@@ -219,6 +220,8 @@ assert(not controls.input_addr.shown and not controls.input_addr.enabled)
 callbacks.tab_login();assert(last_window.screen=='login' and not controls.input_login.shown and not controls.input_pass2.shown)
 assert(controls.input_email.enabled and controls.input_pass.enabled and controls.btn_reset.shown and not controls.btn_reg.shown)
 callbacks.tab_register();assert(last_window.screen=='register' and controls.input_login.enabled and #last_window.fields==4)
+last_window:FieldError(controls.input_pass2,'passwords_mismatch');assert(last_window.focus_index==4)
+last_window:FieldError(controls.input_email,'email_invalid');assert(last_window.focus_index==1)
 controls.input_email:SetText('user@example.invalid'); controls.input_login:SetText('cloud_user')
 controls.input_pass:SetText('tiny'); callbacks.btn_reg()
 assert(#cloud_requests==0 and last_window.msg.text=='st_netcoop_cloud_password_invalid' and last_window.focus_index==3)

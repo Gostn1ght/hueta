@@ -4,6 +4,8 @@
 #include "xrserver_objects.h"
 #include "xrServer_Objects_Alife_Monsters.h"
 #include "Level.h"
+#include "Actor.h"
+#include "netcoop.h"
 
 // Join admission (doc 43 M05). Every joining player gets the whole world
 // (about 1700 spawn messages) at once; 60+ players joining together queued
@@ -15,6 +17,14 @@ static const u32 join_slots = 4, join_slot_ms = 20000;
 static xr_vector<u32> s_join_queue;          // client ids waiting
 static xr_map<u32, u32> s_join_started;       // client id -> time it got the world
 
+static bool server_host_ready(xrServer* server)
+{
+	if (!strstr(Core.Params, "-netcoop"))
+		return true;
+	xrClientData* host = server->GetServerClient();
+	return host && host->net_Accepted && host->owner && g_pGameLevel && Actor() && !netcoop::world_store_cleanup_pending();
+}
+
 static u32 joins_in_progress(xrServer* server)
 {
 	const u32 now = Device.dwTimeGlobal;
@@ -23,7 +33,7 @@ static u32 joins_in_progress(xrServer* server)
 		ClientID id;
 		id.set(it->first);
 		xrClientData* CL = static_cast<xrClientData*>(server->ID_to_client(id));
-		if (!CL || CL->owner || now - it->second > join_slot_ms) it = s_join_started.erase(it);
+		if (!CL || CL->owner || now < it->second || now - it->second > join_slot_ms) it = s_join_started.erase(it);
 		else ++it;
 	}
 	return u32(s_join_started.size());
@@ -32,6 +42,8 @@ static u32 joins_in_progress(xrServer* server)
 // xrServer::Update: the next waiting players get the world when slots free up.
 void netcoop_join_pump(xrServer* server)
 {
+	if (!server_host_ready(server))
+		return;
 	while (!s_join_queue.empty() && joins_in_progress(server) < join_slots)
 	{
 		ClientID id;
@@ -69,7 +81,7 @@ void xrServer::Perform_connect_spawn(CSE_Abstract* E, xrClientData* CL, NET_Pack
 	Flags16 save = E->s_flags;
 	//-------------------------------------------------
 	E->s_flags.set(M_SPAWN_UPDATE,TRUE);
-	if (0 == E->owner)
+	if (0 == E->owner && (!strstr(Core.Params, "-netcoop") || CL == SV_Client))
 	{
 		// PROCESS NAME; Name this entity
 		if (E->s_flags.is(M_SPAWN_OBJECT_ASPLAYER))
@@ -143,7 +155,7 @@ void xrServer::OnCL_Connected(IClient* _CL)
 	}
 	if (strstr(Core.Params, "-netcoop") && CL != GetServerClient())
 	{
-		if (joins_in_progress(this) >= join_slots)
+		if (!server_host_ready(this) || joins_in_progress(this) >= join_slots)
 		{
 			if (std::find(s_join_queue.begin(), s_join_queue.end(), CL->ID.value()) == s_join_queue.end())
 			{

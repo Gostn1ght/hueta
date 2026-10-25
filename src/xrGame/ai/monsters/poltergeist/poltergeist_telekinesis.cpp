@@ -50,7 +50,7 @@ void CPolterTele::update_schedule()
 {
 	inherited::update_schedule();
 
-	if (!m_object->g_Alive() || m_object->get_actor_ignore())
+	if (!m_object->g_Alive() || m_object->get_actor_ignore() || !Actor())
 		return;
 
 	Fvector const actor_pos = Actor()->Position();
@@ -214,6 +214,9 @@ void CPolterTele::tele_find_objects(xr_vector<CObject*>& objects, const Fvector&
 			continue;
 
 
+		if (!Actor())
+			continue;
+
 		Fvector center;
 		Actor()->Center(center);
 
@@ -224,6 +227,9 @@ void CPolterTele::tele_find_objects(xr_vector<CObject*>& objects, const Fvector&
 
 bool CPolterTele::tele_raise_objects()
 {
+	if (!Actor())
+		return false;
+
 	// find objects near actor
 	xr_vector<CObject*> tele_objects;
 	tele_objects.reserve(20);
@@ -327,6 +333,8 @@ void CPolterTele::tele_fire_objects()
 		//if (tele_object.get_state() != TS_Fire) {
 		if ((tele_object.get_state() == TS_Raise) || (tele_object.get_state() == TS_Keep))
 		{
+			if (!Actor())
+				return;
 			CPhysicsShellHolder* hobj = tele_object.get_object();
 			VERIFY(hobj);
 

@@ -56,6 +56,9 @@ bool CControllerPsyHit::check_start_conditions()
 	if (m_man->is_captured_pure())
 		return false;
 
+	if (!Actor())
+		return false;
+
 	if (Actor()->Cameras().GetCamEffector(eCEControllerPsyHit))
 		return false;
 
@@ -73,6 +76,9 @@ bool CControllerPsyHit::check_start_conditions()
 
 void CControllerPsyHit::activate()
 {
+	if (!Actor())
+		return;
+
 	m_man->capture_pure(this);
 	m_man->subscribe(this, ControlCom::eventAnimationEnd);
 
@@ -100,7 +106,7 @@ void CControllerPsyHit::deactivate()
 	m_man->release_pure(this);
 	m_man->unsubscribe(this, ControlCom::eventAnimationEnd);
 
-	if (m_blocked)
+	if (m_blocked && Actor())
 	{
 		NET_Packet P;
 
@@ -179,7 +185,7 @@ extern CActor* g_actor;
 
 bool CControllerPsyHit::see_enemy()
 {
-	return m_object->EnemyMan.see_enemy_now(Actor());
+	return Actor() && m_object->EnemyMan.see_enemy_now(Actor());
 	// 	using namespace detail;
 	// 	Fvector const self_head = get_head_position(m_object);
 	// 	Fvector actor_center;
@@ -223,7 +229,7 @@ bool CControllerPsyHit::check_conditions_final()
 
 void CControllerPsyHit::death_glide_start()
 {
-	if (!check_conditions_final())
+	if (!check_conditions_final() || !Actor() || !Actor()->cam_Active())
 	{
 		m_man->deactivate(this);
 		return;
@@ -316,10 +322,13 @@ void CControllerPsyHit::death_glide_end()
 	CController* monster = smart_cast<CController *>(m_object);
 	monster->draw_fire_particles();
 
-	monster->m_sound_tube_hit_left.play_at_pos(Actor(), Fvector().set(-1.f, 0.f, 1.f), sm_2D);
-	monster->m_sound_tube_hit_right.play_at_pos(Actor(), Fvector().set(1.f, 0.f, 1.f), sm_2D);
+	if (Actor())
+	{
+		monster->m_sound_tube_hit_left.play_at_pos(Actor(), Fvector().set(-1.f, 0.f, 1.f), sm_2D);
+		monster->m_sound_tube_hit_right.play_at_pos(Actor(), Fvector().set(1.f, 0.f, 1.f), sm_2D);
 
-	m_object->Hit_Psy(Actor(), monster->m_tube_damage);
+		m_object->Hit_Psy(Actor(), monster->m_tube_damage);
+	}
 
 	m_time_last_tube = Device.dwTimeGlobal;
 	stop();
@@ -341,14 +350,18 @@ void CControllerPsyHit::set_sound_state(ESoundState state)
 	CController* monster = smart_cast<CController *>(m_object);
 	if (state == ePrepare)
 	{
-		monster->m_sound_tube_prepare.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
+		if (Actor())
+			monster->m_sound_tube_prepare.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
 	}
 	else if (state == eStart)
 	{
 		if (monster->m_sound_tube_prepare._feedback()) monster->m_sound_tube_prepare.stop();
 
-		monster->m_sound_tube_start.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
-		monster->m_sound_tube_pull.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
+		if (Actor())
+		{
+			monster->m_sound_tube_start.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
+			monster->m_sound_tube_pull.play_at_pos(Actor(), Fvector().set(0.f, 0.f, 0.f), sm_2D);
+		}
 	}
 	else if (state == eHit)
 	{
@@ -385,9 +398,12 @@ void CControllerPsyHit::stop()
 			controller->CControlledActor::release();
 
 	// Stop camera effector
-	CEffectorCam* ce = Actor()->Cameras().GetCamEffector(eCEControllerPsyHit);
-	if (ce)
-		Actor()->Cameras().RemoveCamEffector(eCEControllerPsyHit);
+	if (Actor())
+	{
+		CEffectorCam* ce = Actor()->Cameras().GetCamEffector(eCEControllerPsyHit);
+		if (ce)
+			Actor()->Cameras().RemoveCamEffector(eCEControllerPsyHit);
+	}
 }
 
 void CControllerPsyHit::on_death()

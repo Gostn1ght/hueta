@@ -58,7 +58,19 @@ static void admission_update()
 	if (status.failed && !s_admission_failed_logged)
 	{
 		s_admission_failed_logged = true;
-		Msg("! [Lost Zone][master] the location could not take its lease from the world master: logins are refused until a restart");
+		Msg("! [Lost Zone][master] the location lost or could not take its lease from the world master; will retry when idle");
+	}
+	if (status.failed && status.characters == 0 && status.pending == 0)
+	{
+		const u64 now = GetTickCount64();
+		if (now - s_admission_retry >= 15000)
+		{
+			s_admission.stop();
+			s_admission_started = false;
+			s_admission_ready_logged = false;
+			s_admission_failed_logged = false;
+			s_admission_retry = now;
+		}
 	}
 }
 

@@ -136,12 +136,20 @@ void CLevel::net_Stop()
 
 	bReady = false;
 	m_bGameConfigStarted = FALSE;
+	m_netcoop_game_started = false;
 
+#ifdef SPAWN_ANTIFREEZE
+	StopPrefetchThread();
+#endif
 
 	remove_objects();
 
 	//WARNING ! remove_objects() uses this flag, so position of this line must e here ..
 	game_configured = FALSE;
+
+	netcoop::client_voice_reset();
+	netcoop::client_vehicle_sounds_reset();
+	netcoop::lua_functors_reset();
 
 	IGame_Level::net_Stop();
 	IPureClient::Disconnect();
@@ -155,6 +163,11 @@ void CLevel::net_Stop()
 	netcoop::zones_reset();
 	netcoop::vehicles_reset();
 	netcoop::map_players_reset();
+	netcoop::client_map_positions_reset();
+	netcoop::items_reset();
+	netcoop::pda_reset();
+	netcoop::marks_reset();
+	netcoop::client_session_reset();
 
     Msg("Device.LuaGC clear");
     Device.LuaGC.clear();

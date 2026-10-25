@@ -184,6 +184,8 @@ bool vehicle_gun_view_point(CActor* actor, Fvector& point)
 	return true;
 }
 
+static xr_map<u16, ref_sound> s_vehicle_gun_sounds;
+
 // A shot of a car's gun (any client): the tracer, the flash and the sound.
 // The server's bullet does the damage; this one only shows it.
 static void client_gun_shot(u16 car_id, const Fvector& muzzle, const Fvector& dir)
@@ -210,14 +212,24 @@ static void client_gun_shot(u16 car_id, const Fvector& muzzle, const Fvector& di
 	}
 	if (poses->gun_sound.size())
 	{
-		static xr_map<u16, ref_sound> sounds;
-		ref_sound& snd = sounds[car_id];
+		ref_sound& snd = s_vehicle_gun_sounds[car_id];
 		if (!snd._handle())
 			snd.create(poses->gun_sound.c_str(), st_Effect, sg_SourceType);
 		Fvector at = muzzle;
 		if (snd._handle())
 			snd.play_no_feedback(car, 0, 0.f, &at);
 	}
+}
+
+void client_vehicle_sounds_reset()
+{
+	for (auto& kv : s_vehicle_gun_sounds)
+		kv.second.destroy();
+	s_vehicle_gun_sounds.clear();
+	s_gun_view = false;
+	s_gun_fire = false;
+	s_gun_next = 0;
+	s_run_over_last.clear();
 }
 
 // Keys of a seated player: the driver's pedals and wheel go to the server,

@@ -24,6 +24,15 @@ void client_marks_reset()
     s_pending_marks.clear(); s_received_mark = 0;
 }
 
+void marks_reset()
+{
+    s_marks.clear();
+    s_mark_cursor.clear();
+    s_pending_marks.clear();
+    s_mark_sequence = 0;
+    s_received_mark = 0;
+}
+
 void replicate_mark(CObject* object, u32 element, const Fvector& position,
     const Fvector& direction, float size, LPCSTR textures)
 {

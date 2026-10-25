@@ -258,9 +258,11 @@ IC BOOL is_empty_line_now(IReader* F)
 };
 
 // Regex pattern cache (added before Load function)
-static const std::regex& GetCachedRegex(const xr_string& pattern)
+static std::regex GetCachedRegex(const xr_string& pattern)
 {
-	static xr_unordered_flat_map<xr_string, std::regex> g_RegexCache;
+	static xrCriticalSection s_RegexCS;
+	static std::unordered_map<xr_string, std::regex> g_RegexCache;
+	xrCriticalSectionGuard guard(s_RegexCS);
 	auto it = g_RegexCache.find(pattern);
 	if (it == g_RegexCache.end())
 	{

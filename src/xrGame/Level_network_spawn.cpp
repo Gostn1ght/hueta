@@ -20,10 +20,9 @@
 // server spawns, when the game (and its time) is already configured.
 static void netcoop_client_start_game(CLevel* level)
 {
-	static CLevel* started = NULL;
-	if (started == level || !strstr(Core.Params, "-netcoop") || level->Server || ai().get_alife() || !level->game)
+	if (!level || level->m_netcoop_game_started || !strstr(Core.Params, "-netcoop") || level->Server || ai().get_alife() || !level->game)
 		return;
-	started = level;
+	level->m_netcoop_game_started = true;
 	::luabind::functor<void> start_game;
 	LPCSTR callback = pSettings->r_string("alife", "start_game_callback");
 	if (ai().script_engine().functor(callback, start_game))

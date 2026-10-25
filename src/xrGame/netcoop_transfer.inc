@@ -152,6 +152,12 @@ void server_on_transfer(xrServer* server, xrClientData* CL, NET_Packet& P)
 // ---- client -------------------------------------------------------------------
 static u32 s_transfer_pending = 0;
 
+void client_session_reset()
+{
+	s_transfer_pending = 0;
+	s_trade_refresh = false;
+}
+
 bool client_transfer(u16 from, u16 to, u16 item)
 {
 	if (!pure_client()) return false;

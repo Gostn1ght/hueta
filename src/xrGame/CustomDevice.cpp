@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "customdevice.h"
 #include "inventory.h"
 #include "actor.h"
@@ -468,6 +468,8 @@ bool CCustomDevice::IsWorking()
 
 void CCustomDevice::UpdateVisibility()
 {
+	if (!Actor() || !g_player_hud)
+		return;
 	bool bClimb = ((Actor()->MovingState() & mcClimb) != 0);
 
 	//check visibility
@@ -481,7 +483,7 @@ void CCustomDevice::UpdateVisibility()
 		}
 		else
 		{
-			CInventoryItem* itm = g_actor->inventory().ActiveItem();
+			CInventoryItem* itm = Actor()->inventory().ActiveItem();
 			CWeapon* wpn = smart_cast<CWeapon*>(itm);
 			CMissile* msl = smart_cast<CMissile*>(itm);
 			if (msl && m_bThrowAnm)

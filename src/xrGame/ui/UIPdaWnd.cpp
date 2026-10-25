@@ -186,7 +186,7 @@ void CUIPdaWnd::SendMessage(CUIWindow* pWnd, s16 msg, void* pData)
 		{
 			if (pWnd == m_btn_close)
 			{
-				if (smart_cast<CPda*>(Actor()->inventory().ActiveItem()))
+				if (Actor() && smart_cast<CPda*>(Actor()->inventory().ActiveItem()))
 					Actor()->inventory().Activate(NO_ACTIVE_SLOT);
 			}
 			break;
@@ -208,7 +208,7 @@ bool CUIPdaWnd::OnMouseAction(float x, float y, EUIMessages mouse_action)
 	case WINDOW_LBUTTON_UP:
 	case WINDOW_RBUTTON_UP:
 	{
-		CPda* pda = smart_cast<CPda*>(Actor()->inventory().ActiveItem());
+		CPda* pda = Actor() ? smart_cast<CPda*>(Actor()->inventory().ActiveItem()) : nullptr;
 		if (pda)
 		{
 			if (pda->IsPending())
@@ -232,6 +232,8 @@ bool CUIPdaWnd::OnMouseAction(float x, float y, EUIMessages mouse_action)
 
 void CUIPdaWnd::MouseMovement(float x, float y)
 {
+	if (!Actor())
+		return;
 	CPda* pda = smart_cast<CPda*>(Actor()->inventory().ActiveItem());
 	if (!pda) return;
 
@@ -530,7 +532,7 @@ bool CUIPdaWnd::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 			return inherited::OnKeyboardAction(dik, keyboard_action);
 		}
 
-		CPda* pda = smart_cast<CPda*>(Actor()->inventory().ActiveItem());
+		CPda* pda = Actor() ? smart_cast<CPda*>(Actor()->inventory().ActiveItem()) : nullptr;
 
 		if (!pda)
 			return inherited::OnKeyboardAction(dik, keyboard_action);

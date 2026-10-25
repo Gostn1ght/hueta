@@ -44,15 +44,27 @@ static NET_Packet pda_packet(u16 id, const PdaFrame& frame, u32 chunk)
     return packet;
 }
 
+static u32 s_pda_capture_last = 0, s_pda_capture_sequence = 0, s_pda_capture_crc = 0, s_pda_capture_id = 0xffff, s_pda_capture_unchanged = 0;
+
+void pda_reset()
+{
+    s_pda_server.clear();
+    s_pda_client.clear();
+    s_pda_capture_last = 0;
+    s_pda_capture_sequence = 0;
+    s_pda_capture_crc = 0;
+    s_pda_capture_id = 0xffff;
+    s_pda_capture_unchanged = 0;
+}
+
 void client_capture_pda()
 {
     if (!pure_client() || !Actor()) return;
     CPda* device = smart_cast<CPda*>(Actor()->inventory().ActiveItem());
     if (!device || device->IsHidden() || !device->m_PdaEnabled) return;
-    static u32 last = 0, sequence = 0, previous_crc = 0, previous_id = 0xffff, unchanged = 0;
     const u32 now = real_time_ms();
-    if (last && now - last < 334) return;
-    last = now;
+    if (s_pda_capture_last && now - s_pda_capture_last < 334) return;
+    s_pda_capture_last = now;
     xr_vector<u8> pixels(pda_bytes);
     if (!CurrentGameUI()) return;
     const Frect& rect = CurrentGameUI()->GetPdaMenu().m_cursor_box;
@@ -60,10 +72,10 @@ void client_capture_pda()
                            rect.right / UI_BASE_WIDTH, rect.bottom / UI_BASE_HEIGHT);
     if (!Render->CapturePdaPixels(pda_width, pda_height, pixels.data(), crop)) return;
     const u32 crc = crc32(pixels.data(), pda_bytes);
-    if (device->ID() == previous_id && crc == previous_crc && now - unchanged < 2000) return;
-    if (previous_id != device->ID()) Msg("[Lost Zone][PDA] owner frame device=%u", device->ID());
-    previous_id = device->ID(); previous_crc = crc; unchanged = now;
-    PdaFrame frame; frame.sequence = ++sequence;
+    if (device->ID() == s_pda_capture_id && crc == s_pda_capture_crc && now - s_pda_capture_unchanged < 2000) return;
+    if (s_pda_capture_id != device->ID()) Msg("[Lost Zone][PDA] owner frame device=%u", device->ID());
+    s_pda_capture_id = device->ID(); s_pda_capture_crc = crc; s_pda_capture_unchanged = now;
+    PdaFrame frame; frame.sequence = ++s_pda_capture_sequence;
     frame.data.resize(rtc_csize(pda_bytes));
     frame.data.resize(rtc_compress(frame.data.data(), u32(frame.data.size()), pixels.data(), pda_bytes));
     if (frame.data.size() > pda_limit) return;

@@ -104,24 +104,52 @@ static void bind_engine_actor(CActor* actor)
 
 // GAMMA dialogue scripts use db.actor; point it at the player being served.
 static CActor* s_bound_actor = NULL;
+static lua_State* s_bind_actor_lua = NULL;
+static ::luabind::functor<void>* s_bind_actor_fn = NULL;
+
+static void reset_bind_actor_functor(lua_State* current_lua)
+{
+	if (s_bind_actor_fn)
+	{
+		if (current_lua && current_lua == s_bind_actor_lua)
+			xr_delete(s_bind_actor_fn);
+		else
+		{
+			void* raw = s_bind_actor_fn;
+			xr_free(raw);
+			s_bind_actor_fn = NULL;
+		}
+	}
+	s_bind_actor_lua = NULL;
+}
 
 static void bind_script_actor(CActor* actor)
 {
 	s_bound_actor = actor;
 	bind_engine_actor(actor);
-	// Called for every server-side object script update; resolve the Lua function once.
-	static ::luabind::functor<void> f;
-	static bool resolved = false;
-	if (!resolved)
-		resolved = ai().script_engine().functor("netcoop_server_compat.bind_actor", f);
-	if (!resolved)
+	// Called for every server-side object script update; resolve once per Lua state.
+	lua_State* lua = ai().script_engine().lua();
+	if (!lua)
+	{
+		reset_bind_actor_functor(NULL);
+		return;
+	}
+	if (s_bind_actor_lua != lua)
+	{
+		reset_bind_actor_functor(NULL);
+		s_bind_actor_lua = lua;
+		::luabind::functor<void> resolved;
+		if (ai().script_engine().functor("netcoop_server_compat.bind_actor", resolved))
+			s_bind_actor_fn = xr_new<::luabind::functor<void>>(resolved);
+	}
+	if (!s_bind_actor_fn)
 		return;
 	try
 	{
 		if (actor)
-			f(actor->lua_game_object());
+			(*s_bind_actor_fn)(actor->lua_game_object());
 		else
-			f();
+			(*s_bind_actor_fn)();
 	}
 	catch (...)
 	{

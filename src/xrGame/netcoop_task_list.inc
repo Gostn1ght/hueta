@@ -7,6 +7,32 @@
 static const u32 tasks_update_interval = 500; // ms
 static const u32 tasks_packet_budget = 12000;
 static xr_map<u32, u32> s_sent_tasks_crc; // client id -> crc of the last list sent
+static lua_State* s_task_update_lua = NULL;
+static ::luabind::functor<void>* s_task_update_fn = NULL;
+
+static void reset_task_update_functor(lua_State* current_lua)
+{
+	if (s_task_update_fn)
+	{
+		if (current_lua && current_lua == s_task_update_lua)
+			xr_delete(s_task_update_fn);
+		else
+		{
+			void* raw = s_task_update_fn;
+			xr_free(raw);
+			s_task_update_fn = NULL;
+		}
+	}
+	s_task_update_lua = NULL;
+}
+
+void lua_functors_reset()
+{
+	lua_State* current_lua = g_ai_space ? ai().script_engine().lua() : NULL;
+	reset_bind_actor_functor(current_lua);
+	reset_task_update_functor(current_lua);
+}
+
 
 struct TaskPlayer
 {
@@ -143,10 +169,19 @@ void server_tasks_update(xrServer* server)
 	collect.players = &players;
 	server->ForEachClientDo(collect);
 
-	static ::luabind::functor<void> lua_update;
-	static bool lua_resolved = false;
-	if (!lua_resolved)
-		lua_resolved = ai().script_engine().functor("netcoop_server_compat.update_player_tasks", lua_update);
+	lua_State* lua = ai().script_engine().lua();
+	if (!lua)
+	{
+		reset_task_update_functor(NULL);
+	}
+	else if (s_task_update_lua != lua)
+	{
+		reset_task_update_functor(NULL);
+		s_task_update_lua = lua;
+		::luabind::functor<void> resolved;
+		if (ai().script_engine().functor("netcoop_server_compat.update_player_tasks", resolved))
+			s_task_update_fn = xr_new<::luabind::functor<void>>(resolved);
+	}
 
 	for (u32 i = 0; i < players.size(); ++i)
 	{
@@ -159,11 +194,11 @@ void server_tasks_update(xrServer* server)
 		if (manager)
 		{
 			manager->UpdateTasks();
-			if (lua_resolved)
+			if (s_task_update_fn)
 			{
 				try
 				{
-					lua_update();
+					(*s_task_update_fn)();
 				}
 				catch (...)
 				{

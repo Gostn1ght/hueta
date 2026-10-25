@@ -254,7 +254,7 @@ void CEntity::KillEntity(u16 whoID, BOOL bypass_actor_check /*AVO: added for act
 	//IMPORTANT: if you wish to kill actor you need to call db.actor:kill(level:object_by_id(whoID), true) in actor_before_death callback, to ensure all objects are properly destroyed
 	// this will bypass below if block and go to normal KillEntity routine.
 #ifdef ACTOR_BEFORE_DEATH_CALLBACK
-	if ((this->ID() == Actor()->ID()) && (bypass_actor_check != TRUE))
+	if (Actor() && (this->ID() == Actor()->ID()) && (bypass_actor_check != TRUE))
 	{
 		Actor()->use_HolderEx(NULL, false);
 		Actor()->callback(GameObject::eActorBeforeDeath)(whoID);
