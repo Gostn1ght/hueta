@@ -12,6 +12,7 @@ struct SCarLight
 	ref_light light_render;
 	ref_glow glow_render;
 	u16 bone_id;
+	Fvector offset; // DCP: the light's position in its bone's space
 	CCarLights* m_holder;
 	SCarLight();
 	~SCarLight();

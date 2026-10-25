@@ -18,6 +18,7 @@ SCarLight::SCarLight()
 	light_render = NULL;
 	glow_render = NULL;
 	bone_id = BI_NONE;
+	offset.set(0.f, 0.f, 0.f);
 	m_holder = NULL;
 }
 
@@ -35,16 +36,22 @@ void SCarLight::Init(CCarLights* holder)
 
 void SCarLight::ParseDefinitions(LPCSTR section)
 {
-	light_render = ::Render->light_create();
-	light_render->set_type(IRender_Light::SPOT);
-	light_render->set_shadow(true);
-	glow_render = ::Render->glow_create();
-	//	lanim					= 0;
-	//	time2hide				= 0;
-
 	// set bone id
 	IKinematics* pKinematics = smart_cast<IKinematics*>(m_holder->PCar()->Visual());
 	CInifile* ini = pKinematics->LL_UserData();
+
+	// Definitive Car Pack lights (owner 2026-10-25: spawning one crashed every
+	// client): type 1 point, 2 spot, 3 omnipart; a point light has no cone,
+	// projector texture or glow. Without type: the old spot headlight.
+	const int type = READ_IF_EXISTS(ini, r_s32, section, "type", int(IRender_Light::SPOT));
+	const bool spot = type != IRender_Light::POINT && type != IRender_Light::OMNIPART;
+	light_render = ::Render->light_create();
+	light_render->set_type(spot ? IRender_Light::SPOT : IRender_Light::LT(type));
+	light_render->set_shadow(spot);
+	if (ini->line_exist(section, "glow_texture")) glow_render = ::Render->glow_create();
+	offset = READ_IF_EXISTS(ini, r_fvector3, section, "position", Fvector().set(0.f, 0.f, 0.f));
+	//	lanim					= 0;
+	//	time2hide				= 0;
 
 	Fcolor clr;
 	clr.set(ini->r_fcolor(section, "color"));
@@ -54,15 +61,18 @@ void SCarLight::ParseDefinitions(LPCSTR section)
 	light_render->set_color(clr);
 	// Anomaly/GAMMA vehicles use spot_angle; older car models use cone_angle.
 	const LPCSTR angle_key = ini->line_exist(section, "cone_angle") ? "cone_angle" : "spot_angle";
-	light_render->set_cone(deg2rad(ini->r_float(section, angle_key)));
-	light_render->set_texture(ini->r_string(section, "spot_texture"));
+	if (spot) light_render->set_cone(deg2rad(READ_IF_EXISTS(ini, r_float, section, angle_key, 60.f)));
+	if (ini->line_exist(section, "spot_texture")) light_render->set_texture(ini->r_string(section, "spot_texture"));
 
-	glow_render->set_texture(ini->r_string(section, "glow_texture"));
-	glow_render->set_color(clr);
-	glow_render->set_radius(ini->r_float(section, "glow_radius"));
+	if (glow_render)
+	{
+		glow_render->set_texture(ini->r_string(section, "glow_texture"));
+		glow_render->set_color(clr);
+		glow_render->set_radius(READ_IF_EXISTS(ini, r_float, section, "glow_radius", 0.1f));
+		glow_render->set_active(false);
+	}
 
 	bone_id = pKinematics->LL_BoneID(ini->r_string(section, "bone"));
-	glow_render->set_active(false);
 	light_render->set_active(false);
 	pKinematics->LL_SetBoneVisible(bone_id,FALSE,TRUE);
 
@@ -84,7 +94,7 @@ void SCarLight::TurnOn()
 	K->LL_SetBoneVisible(bone_id,TRUE,TRUE);
 	K->CalculateBones_Invalidate();
 	K->CalculateBones(TRUE);
-	glow_render->set_active(true);
+	if (glow_render) glow_render->set_active(true);
 	light_render->set_active(true);
 	Update();
 }
@@ -93,7 +103,7 @@ void SCarLight::TurnOff()
 {
 	VERIFY(!physics_world()->Processing());
 	if (!isOn()) return;
-	glow_render->set_active(false);
+	if (glow_render) glow_render->set_active(false);
 	light_render->set_active(false);
 	smart_cast<IKinematics*>(m_holder->PCar()->Visual())->LL_SetBoneVisible(bone_id,FALSE,TRUE);
 }
@@ -101,7 +111,7 @@ void SCarLight::TurnOff()
 bool SCarLight::isOn()
 {
 	VERIFY(!physics_world()->Processing());
-	VERIFY(light_render->get_active()==glow_render->get_active());
+	VERIFY(!glow_render || light_render->get_active()==glow_render->get_active());
 	return light_render->get_active();
 }
 
@@ -113,9 +123,15 @@ void SCarLight::Update()
 	CBoneInstance& BI = smart_cast<IKinematics*>(pcar->Visual())->LL_GetBoneInstance(bone_id);
 	Fmatrix M;
 	M.mul(pcar->XFORM(), BI.mTransform);
+	Fvector at;
+	M.transform_tiny(at, offset);
+	M.c.set(at);
 	light_render->set_rotation(M.k, M.i);
-	glow_render->set_direction(M.k);
-	glow_render->set_position(M.c);
+	if (glow_render)
+	{
+		glow_render->set_direction(M.k);
+		glow_render->set_position(M.c);
+	}
 	light_render->set_position(M.c);
 }
 
@@ -135,7 +151,7 @@ void CCarLights::ParseDefinitions()
 {
 	CInifile* ini = smart_cast<IKinematics*>(m_pcar->Visual())->LL_UserData();
 	if (!ini->section_exist("lights")) return;
-	LPCSTR S = ini->r_string("lights", "headlights");
+	LPCSTR S = READ_IF_EXISTS(ini, r_string, "lights", "headlights", "");  // veh_lada_dead: [lights] without any
 	string64 S1;
 	int count = _GetItemCount(S);
 	for (int i = 0; i < count; ++i)

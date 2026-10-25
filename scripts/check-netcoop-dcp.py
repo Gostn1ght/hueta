@@ -59,4 +59,12 @@ for side in (CLIENT, SERVER):
     ignore = black.split("[ignore_sections]", 1)[1]
     for car in old:
         assert re.search(r"^" + car + r"\s*$", ignore, re.M), (side.name, car)
+# DCP lights (owner 2026-10-25: spawning a car crashed every client on
+# [f1o] without spot_angle): point lights have no cone, texture or glow.
+lights = (Path(__file__).resolve().parents[1] / "src/xrGame/CarLights.cpp").read_text(encoding="utf-8")
+for need in ('READ_IF_EXISTS(ini, r_float, section, angle_key', 'ini->line_exist(section, "spot_texture")',
+             'ini->line_exist(section, "glow_texture")', 'READ_IF_EXISTS(ini, r_s32, section, "type"',
+             'READ_IF_EXISTS(ini, r_string, "lights", "headlights", "")'):
+    assert need in lights, need
+assert 'r_float(section, angle_key)' not in lights.replace('READ_IF_EXISTS(ini, r_float, section, angle_key', '')
 print("PASS DCP: %d cars with models, profiles on client and server, seat bones and names; %d old cars cut" % (len(cars), len(old)))
