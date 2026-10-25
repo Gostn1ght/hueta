@@ -22,7 +22,7 @@ static bool server_host_ready(xrServer* server)
 {
 	if (!strstr(Core.Params, "-netcoop"))
 		return true;
-	xrClientData* host = server->GetServerClient();
+	xrClientData* host = static_cast<xrClientData*>(server->GetServerClient());
 	return host && host->net_Accepted && host->owner && g_pGameLevel && g_actor && !netcoop::world_store_cleanup_pending();
 }
 

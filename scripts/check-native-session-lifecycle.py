@@ -413,7 +413,7 @@ struct xrServer {
     GameSvMock game_inst;
     GameSvMock* game = &game_inst;
 
-    xrClientData* GetServerClient() const { return SV_Client; }
+    IClient* GetServerClient() const { return SV_Client; }
     IClient* ID_to_client(ClientID id) const {
         auto it = clients.find(id.value());
         return it == clients.end() ? nullptr : it->second;
