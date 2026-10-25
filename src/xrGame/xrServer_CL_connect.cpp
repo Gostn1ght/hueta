@@ -4,8 +4,9 @@
 #include "xrserver_objects.h"
 #include "xrServer_Objects_Alife_Monsters.h"
 #include "Level.h"
-#include "Actor.h"
 #include "netcoop.h"
+
+extern CActor* g_actor;
 
 // Join admission (doc 43 M05). Every joining player gets the whole world
 // (about 1700 spawn messages) at once; 60+ players joining together queued
@@ -22,7 +23,7 @@ static bool server_host_ready(xrServer* server)
 	if (!strstr(Core.Params, "-netcoop"))
 		return true;
 	xrClientData* host = server->GetServerClient();
-	return host && host->net_Accepted && host->owner && g_pGameLevel && Actor() && !netcoop::world_store_cleanup_pending();
+	return host && host->net_Accepted && host->owner && g_pGameLevel && g_actor && !netcoop::world_store_cleanup_pending();
 }
 
 static u32 joins_in_progress(xrServer* server)

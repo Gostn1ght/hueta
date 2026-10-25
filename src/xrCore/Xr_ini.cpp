@@ -261,7 +261,7 @@ IC BOOL is_empty_line_now(IReader* F)
 static std::regex GetCachedRegex(const xr_string& pattern)
 {
 	static xrCriticalSection s_RegexCS;
-	static std::unordered_map<xr_string, std::regex> g_RegexCache;
+	static xr_unordered_flat_map<xr_string, std::regex> g_RegexCache;
 	xrCriticalSectionGuard guard(s_RegexCS);
 	auto it = g_RegexCache.find(pattern);
 	if (it == g_RegexCache.end())

@@ -339,7 +339,12 @@ jobs:
         run: |
           if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Build must run on GitHub Actions' }
           msbuild src/engine-vs2022.sln /m:2 /p:Configuration=DX11 /p:Platform=x64 /p:MultiProcessorCompilation=false /bl:lostzone-build.binlog /fl /flp:logfile=lostzone-build.log /v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "MSBuild failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) {
+            if (Test-Path lostzone-build.log) {
+              Select-String -Path lostzone-build.log -Pattern ': (fatal )?error [A-Z0-9]+' | Select-Object -First 20 | ForEach-Object { Write-Host "::error::$($_.Line)" }
+            }
+            throw "MSBuild failed: $LASTEXITCODE"
+          }
       - name: Package matching client, server and overlays
         shell: pwsh
         run: |

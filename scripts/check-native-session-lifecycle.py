@@ -303,8 +303,8 @@ struct GameSvMock {
 };
 
 struct CActor {};
-CActor* g_test_actor = nullptr;
-CActor* Actor() { return g_test_actor; }
+CActor* g_actor = nullptr;
+CActor* Actor() { return g_actor; }
 
 struct CLevel {
     bool m_netcoop_game_started = false;
@@ -512,7 +512,7 @@ int main() {
     // 4. Server-restart join race: remote client arrives BEFORE SV_Client owns story actor
     xrServer srv;
     g_pGameLevel = second_level;
-    g_test_actor = nullptr;
+    g_actor = nullptr;
 
     CSE_ALifeCreatureActor world_actor;
     world_actor.ID = 0;
@@ -561,7 +561,7 @@ int main() {
     assert(world_actor.client_data.empty() && stash_box.client_data.empty());
 
     CActor spawned_host_actor;
-    g_test_actor = &spawned_host_actor;
+    g_actor = &spawned_host_actor;
 
     // Nextserver tick pumps remote_cl cleanly without stealing host entities
     netcoop_join_pump(&srv);
