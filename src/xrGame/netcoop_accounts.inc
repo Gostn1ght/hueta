@@ -133,6 +133,110 @@ static void accounts_read(Accounts& out)
 	fclose(f);
 }
 
+// The world master keeps the accounts (owner 2026-10-25, doc 154: "the
+// database belongs to the master"): with a location writer this server
+// mirrors them and sends what it changes. The old netcoop_accounts.txt is
+// imported once (the records the master lacks) and no longer written. An
+// older master without accounts leaves the file in charge.
+static bool admission_active(); // netcoop_admission.inc
+static bool admission_accounts_take(std::vector<netcoop_world::AccountRecord>& changed, netcoop_world::AccountsState& state);
+static bool admission_accounts_put(const std::vector<netcoop_world::AccountRecord>& records, bool only_new);
+static bool s_accounts_master = false, s_accounts_fallback = false;
+static xr_set<xr_string> s_accounts_master_keys; // logins the master has
+
+static bool accounts_in_master() { return admission_active() && !s_accounts_fallback; }
+
+template <size_t N> static void account_copy(char (&target)[N], LPCSTR text)
+{
+	const size_t length = _min(size_t(xr_strlen(text)), N - 1); // longer fields are refused by the master
+	memcpy(target, text, length);
+	target[length] = 0;
+}
+
+static netcoop_world::AccountRecord account_record(const Account& a)
+{
+	netcoop_world::AccountRecord r;
+	account_copy(r.login, a.login.c_str());
+	account_copy(r.role, role_name(a.role));
+	account_copy(r.approval, a.approval == 0 ? "pending" : a.approval == 2 ? "rejected" : "approved");
+	account_copy(r.salt, a.salt.c_str());
+	account_copy(r.hash, a.hash.c_str());
+	account_copy(r.device, a.device.c_str());
+	account_copy(r.firebase, a.firebase_uid.c_str());
+	r.has_money = a.has_money;
+	r.money = a.money;
+	return r;
+}
+
+static bool account_from_record(const netcoop_world::AccountRecord& r, Account& a)
+{
+	if (!login_valid(r.login)) return false;
+	a = Account();
+	a.login = r.login;
+	a.role = !xr_strcmp(r.role, "admin") ? u8(role_admin) : u8(role_player);
+	a.approval = !xr_strcmp(r.approval, "pending") ? 0 : !xr_strcmp(r.approval, "rejected") ? 2 : 1;
+	a.salt = r.salt;
+	a.hash = r.hash;
+	a.device = key_valid(r.device) ? r.device : "";
+	a.firebase_uid = r.firebase;
+	a.has_money = r.has_money;
+	a.money = r.money;
+	a.failures = 0;
+	a.locked_until = 0;
+	return true;
+}
+
+// The master's changes since the last call; the first complete copy imports
+// the old file's records it lacks.
+static void accounts_master_refresh()
+{
+	std::vector<netcoop_world::AccountRecord> changed;
+	netcoop_world::AccountsState state = netcoop_world::AccountsState::Waiting;
+	if (!admission_accounts_take(changed, state)) return;
+	if (state == netcoop_world::AccountsState::Unsupported && !s_accounts_master)
+	{
+		s_accounts_fallback = true;
+		Msg("! [Lost Zone][master] the world master keeps no accounts (an older master): accounts stay in netcoop_accounts.txt");
+		return;
+	}
+	for (const auto& r : changed)
+	{
+		Account a;
+		if (!account_from_record(r, a)) continue;
+		xr_string key = a.login;
+		to_lower(key);
+		s_accounts_master_keys.insert(key);
+		auto it = s_accounts.find(key);
+		if (it != s_accounts.end() && it->second.touched) continue; // ours is on its way to the master
+		if (it != s_accounts.end()) { a.failures = it->second.failures; a.locked_until = it->second.locked_until; }
+		s_accounts[key] = a;
+	}
+	if (state != netcoop_world::AccountsState::Synced || s_accounts_master) return;
+	s_accounts_master = true;
+	Accounts file;
+	accounts_read(file);
+	std::vector<netcoop_world::AccountRecord> missing;
+	for (auto& entry : file)
+	{
+		if (s_accounts_master_keys.count(entry.first)) continue;
+		missing.push_back(account_record(entry.second));
+		if (!s_accounts.count(entry.first)) s_accounts[entry.first] = entry.second;
+	}
+	if (!missing.empty() && admission_accounts_put(missing, true))
+		Msg("[Lost Zone][master] %u account(s) of netcoop_accounts.txt imported into the world master", (u32)missing.size());
+	Msg("[Lost Zone][master] accounts are kept by the world master (%u)", (u32)s_accounts.size());
+}
+
+// Logins wait for the master's accounts: a login unknown only to an
+// incomplete copy must not register again.
+static void accounts_load();
+static bool accounts_available()
+{
+	if (!accounts_in_master()) return true;
+	accounts_load();
+	return s_accounts_master || s_accounts_fallback;
+}
+
 // Another location server may have written the file (registration, money of
 // a player who is there now): adopt its records except our unsaved changes.
 static void accounts_refresh()
@@ -155,6 +259,11 @@ static void accounts_refresh()
 
 static void accounts_load()
 {
+	if (accounts_in_master())
+	{
+		accounts_master_refresh();
+		if (!s_accounts_fallback) return;
+	}
 	if (s_accounts_loaded)
 	{
 		accounts_refresh();
@@ -170,6 +279,26 @@ static bool accounts_save()
 {
 	if (!s_accounts_dirty)
 		return true;
+	if (accounts_in_master() && s_accounts_master)
+	{
+		std::vector<netcoop_world::AccountRecord> changed;
+		for (auto& entry : s_accounts)
+			if (entry.second.touched) changed.push_back(account_record(entry.second));
+		if (!changed.empty() && !admission_accounts_put(changed, false))
+		{
+			Msg("! [Lost Zone][master] account changes held: the world master queue is full");
+			return false;
+		}
+		for (auto& entry : s_accounts)
+			if (entry.second.touched) { entry.second.touched = false; s_accounts_master_keys.insert(entry.first); }
+		s_accounts_dirty = false;
+		return true;
+	}
+	if (accounts_in_master())
+	{
+		Msg("! [Lost Zone][master] account change held: the world master's accounts are not loaded yet");
+		return false;
+	}
 
 	AccountsFileLock lock;
 	if (!lock.held)

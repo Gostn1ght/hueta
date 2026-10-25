@@ -228,6 +228,13 @@ Store::Store(const std::wstring& file) : path(file)
         if (!db.one("PRAGMA foreign_key_check").is_null()) throw Unavailable("database ownership references are inconsistent");
         db.exec("CREATE INDEX IF NOT EXISTS entity_writer_cursor ON entity(location,writer,fence,id)");
         db.exec("CREATE INDEX IF NOT EXISTS item_inventory_cursor ON item(holder,id) WHERE kind NOT IN ('WORLD','DESTROYED')");
+        // Accounts (owner 2026-10-25, doc 154): the master is their only store,
+        // the locations keep a mirror. Beside the world schema, not in its
+        // version: the Python service ignores the table.
+        db.exec("CREATE TABLE IF NOT EXISTS account(key TEXT PRIMARY KEY, login TEXT NOT NULL, role TEXT NOT NULL,"
+                " salt TEXT NOT NULL, hash TEXT NOT NULL, money INTEGER, device TEXT NOT NULL, approval TEXT NOT NULL,"
+                " firebase_uid TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>0))");
+        db.exec("CREATE INDEX IF NOT EXISTS account_revision ON account(revision)");
     }
     catch (...)
     {

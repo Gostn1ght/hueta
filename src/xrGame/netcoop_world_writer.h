@@ -81,7 +81,8 @@ inline bool writer_request(const WriterConfig& config, const std::string& instan
             operation!="transfer_claim" && operation!="transfer_commit" && operation!="transfer_abort" &&
             operation!="session_disconnect" && operation!="session_resume" &&
             operation!="native_save_begin" && operation!="native_save_append" &&
-            operation!="native_save_finish" && operation!="native_save_cancel") return false;
+            operation!="native_save_finish" && operation!="native_save_cancel" &&
+            operation!="account_list" && operation!="account_put") return false;
     }
     else if (!payload.empty() || (path!="/v1/engine-bootstrap" && path!="/v1/clock" &&
              path.rfind("/v1/location?",0)!=0 && path.rfind("/v1/location-bootstrap?",0)!=0 &&

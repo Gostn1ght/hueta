@@ -43,6 +43,7 @@ struct xrServer {
 void to_lower(xr_string& value){for(char& c:value)c=char(std::tolower(static_cast<unsigned char>(c)));}
 Account* account_find(LPCSTR name){xr_string key=name;to_lower(key);auto i=s_accounts.find(key);return i==s_accounts.end()?nullptr:&i->second;}
 void accounts_save(){++saves;s_accounts_dirty=false;}
+bool accounts_available(){return true;}
 void reject(xrServer*,xrClientData*,LPCSTR reason){rejection=reason;}
 bool constant_time_equal(const xr_string& a,const xr_string& b){return a==b;}
 bool server_banned(const xr_string&,const xr_string&){return banned;}

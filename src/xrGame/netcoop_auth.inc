@@ -252,6 +252,12 @@ void server_on_auth(xrServer* server, xrClientData* CL, NET_Packet& P)
         pending->loadout = "device_pda_1";
     }
 
+	if (!accounts_available())
+	{
+		xr_delete(pending);
+		reject(server, CL, "The world master is unavailable; try again in a minute");
+		return;
+	}
 	Account* a = account_find(login);
 	pending->create = mode == auth_register || ((mode == auth_auto || pending->firebase) && !a);
 	if (pending->create)
@@ -335,6 +341,11 @@ static bool finish_auth(xrServer* server, PendingAuth* pending)
 		return false;
 	}
 
+	if (!accounts_available())
+	{
+		reject(server, CL, "The world master is unavailable; try again in a minute");
+		return false;
+	}
 	Account* a = account_find(pending->login.c_str());
 	bool link_firebase = false;
 	if (pending->create)

@@ -48,6 +48,34 @@ template<std::size_t N> void put(char (&target)[N],const std::string& value)
     const auto count=std::min(value.size(),N-1);std::memcpy(target,value.data(),count);target[count]=0;
 }
 std::string key(const std::string& account,unsigned slot){return lower(account)+":"+std::to_string(slot);}
+// The master's account row; false: a malformed one (skipped).
+bool account_from(const BridgeJson& row,AccountRecord& out)
+{
+    const auto take=[&](const char* name,char* target,std::size_t size)
+    {
+        if(!row.contains(name) || !row[name].is_string()) return false;
+        const auto& value=row[name].get_ref<const std::string&>();
+        if(value.size()>=size) return false;
+        std::memcpy(target,value.data(),value.size());target[value.size()]=0;
+        return true;
+    };
+    out=AccountRecord();
+    if(!row.is_object() || !take("login",out.login,sizeof(out.login)) || !take("role",out.role,sizeof(out.role)) ||
+       !take("approval",out.approval,sizeof(out.approval)) || !take("salt",out.salt,sizeof(out.salt)) ||
+       !take("hash",out.hash,sizeof(out.hash)) || !take("device",out.device,sizeof(out.device)) ||
+       !take("firebase_uid",out.firebase,sizeof(out.firebase)) || !row.contains("money")) return false;
+    const auto& money=row["money"];
+    if(money.is_null()) return true;
+    if(!money.is_number_unsigned() || money.get<std::uint64_t>()>0xffffffffULL) return false;
+    out.has_money=true;out.money=std::uint32_t(money.get<std::uint64_t>());
+    return true;
+}
+BridgeJson account_json(const AccountRecord& record)
+{
+    return BridgeJson{{"login",record.login},{"role",record.role},{"salt",record.salt},{"hash",record.hash},
+        {"money",record.has_money ? BridgeJson(record.money):BridgeJson()},{"device",record.device},
+        {"approval",record.approval},{"firebase_uid",record.firebase}};
+}
 }
 
 struct AdmissionCoordinator::State
@@ -89,6 +117,12 @@ struct AdmissionCoordinator::State
     std::deque<Job> jobs;
     std::map<std::uint64_t,Outcome> outcomes;
     std::map<std::string,Character> characters; // key(account,slot)
+    // Accounts (doc 154): puts keep their command ID across retries.
+    struct AccountPut { std::string id; BridgeJson records; bool only_new=false; };
+    std::deque<AccountPut> account_puts;
+    std::vector<AccountRecord> account_changes;
+    std::uint64_t account_revision=0,account_polled=0;
+    AccountsState accounts_state=AccountsState::Waiting;
     std::uint64_t next_ticket=1,epoch=0,fence=0;
     bool stopping=false,ready=false,failed=false;
     std::thread thread;
@@ -431,6 +465,59 @@ struct AdmissionCoordinator::State
         finish(job.ticket,std::move(outcome));
     }
 
+    // What this location changed goes first (a login on another map reads it
+    // next), then the master's changes since the last revision, once a second.
+    void accounts_sync()
+    {
+        for(;;)
+        {
+            AccountPut put;
+            {
+                std::lock_guard<std::mutex> guard(lock);
+                if(account_puts.empty() || accounts_state==AccountsState::Unsupported) break;
+                put=account_puts.front();
+            }
+            const auto payload=BridgeJson{{"command_id",put.id},{"operation","account_put"},
+                {"arguments",{{"accounts",put.records},{"only_new",put.only_new}}}}.dump();
+            BridgeJson result;unsigned status=0;
+            if(!request("POST","/v1/command",payload,result,status) && checkpoint_failure(status)==CheckpointStep::Retry) return;
+            std::lock_guard<std::mutex> guard(lock);
+            account_puts.pop_front(); // done, or a record the master refuses for good
+        }
+        const auto now=GetTickCount64();
+        if(account_polled && now-account_polled<1000) return;
+        account_polled=now;
+        for(int page=0;page<64;++page)
+        {
+            const auto payload=BridgeJson{{"command_id",random_hex()},{"operation","account_list"},
+                {"arguments",{{"after",account_revision}}}}.dump();
+            BridgeJson result;unsigned status=0;
+            if(!request("POST","/v1/command",payload,result,status))
+            {
+                if(checkpoint_failure(status)==CheckpointStep::Rejected)
+                {
+                    std::lock_guard<std::mutex> guard(lock);
+                    if(accounts_state==AccountsState::Waiting) accounts_state=AccountsState::Unsupported;
+                }
+                return;
+            }
+            if(!result.contains("accounts") || !result["accounts"].is_array() || !result.contains("revision") ||
+               !result["revision"].is_number_unsigned()) return;
+            std::vector<AccountRecord> rows;
+            for(const auto& row:result["accounts"])
+            {
+                AccountRecord record;
+                if(account_from(row,record)) rows.push_back(record);
+            }
+            const auto revision=result["revision"].get<std::uint64_t>();
+            const bool last=result["accounts"].size()<1000;
+            std::lock_guard<std::mutex> guard(lock);
+            account_changes.insert(account_changes.end(),rows.begin(),rows.end());
+            account_revision=std::max(account_revision,revision);
+            if(last) { accounts_state=AccountsState::Synced;break; }
+        }
+    }
+
     void run() noexcept
     {
         bool opened=false;
@@ -441,6 +528,7 @@ struct AdmissionCoordinator::State
         }
         for(;;)
         {
+            if(opened) try{accounts_sync();}catch(...){}
             Job job;
             bool idle=false;
             {
@@ -482,6 +570,39 @@ struct AdmissionCoordinator::State
 };
 
 AdmissionCoordinator::~AdmissionCoordinator(){stop();}
+bool AdmissionCoordinator::accounts_take(std::vector<AccountRecord>& changed,AccountsState& state) noexcept
+{
+    changed.clear();state=AccountsState::Waiting;
+    if(!state_) return false;
+    try
+    {
+        std::lock_guard<std::mutex> guard(state_->lock);
+        state=state_->failed ? AccountsState::Unsupported:state_->accounts_state;
+        changed.swap(state_->account_changes);
+        return true;
+    }
+    catch(...){return false;}
+}
+bool AdmissionCoordinator::accounts_put(const AccountRecord* records,std::size_t count,bool only_new) noexcept
+{
+    if(!state_ || !records || !count) return false;
+    try
+    {
+        std::vector<State::AccountPut> batches;
+        for(std::size_t first=0;first<count;first+=100) // the master takes 64 KiB a request
+        {
+            State::AccountPut put;put.id=random_hex();put.only_new=only_new;put.records=BridgeJson::array();
+            for(std::size_t i=first;i<count && i<first+100;++i) put.records.push_back(account_json(records[i]));
+            batches.push_back(std::move(put));
+        }
+        std::lock_guard<std::mutex> guard(state_->lock);
+        if(state_->stopping || state_->account_puts.size()+batches.size()>4096) return false;
+        for(auto& put:batches) state_->account_puts.push_back(std::move(put));
+        state_->wake.notify_all();
+        return true;
+    }
+    catch(...){return false;}
+}
 bool AdmissionCoordinator::start(const char* config_path,const char* location,const wchar_t* spool_path) noexcept
 {
     stop();
@@ -670,6 +791,9 @@ bool AdmissionCoordinator::poll_departure(std::uint64_t,DepartureResult& result)
 bool AdmissionCoordinator::admitted(const char*,unsigned) noexcept{return false;}
 std::uint64_t AdmissionCoordinator::world_order(const char*,WorldOrder,const char*,const char*,const double*,unsigned) noexcept{return 0;}
 bool AdmissionCoordinator::poll_order(std::uint64_t,OrderResult& result) noexcept{result={};result.state=OrderState::Refused;return true;}
+bool AdmissionCoordinator::accounts_take(std::vector<AccountRecord>& changed,AccountsState& state) noexcept
+{changed.clear();state=AccountsState::Unsupported;return false;}
+bool AdmissionCoordinator::accounts_put(const AccountRecord*,std::size_t,bool) noexcept{return false;}
 void AdmissionCoordinator::stop() noexcept{}
 #endif
 }

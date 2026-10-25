@@ -43,6 +43,18 @@ struct OrderResult
     OrderState state=OrderState::Pending;
     char reason[160]{};
 };
+// One account as the world master keeps it (owner 2026-10-25, doc 154: the
+// master is the only store; a location keeps a mirror).
+struct AccountRecord
+{
+    char login[21]{},role[8]{},approval[10]{};
+    char salt[257]{},hash[257]{},device[129]{},firebase[129]{};
+    bool has_money=false;
+    std::uint32_t money=0;
+};
+// Waiting: no complete copy yet. Unsupported: the master has no accounts
+// (an older one): the location keeps its file.
+enum class AccountsState : unsigned { Waiting, Synced, Unsupported };
 struct CoordinatorStatus
 {
     bool started=false,ready=false,failed=false;
@@ -84,6 +96,10 @@ public:
     std::uint64_t world_order(const char* account,WorldOrder order,const char* source,const char* target,
                               const double* values,unsigned count) noexcept;
     bool poll_order(std::uint64_t ticket,OrderResult& result) noexcept;
+    // The records the master changed since the last call (all of them first).
+    bool accounts_take(std::vector<AccountRecord>& changed,AccountsState& state) noexcept;
+    // Queues records for the master; only_new keeps the ones it has (import).
+    bool accounts_put(const AccountRecord* records,std::size_t count,bool only_new) noexcept;
     void stop() noexcept;
 };
 }

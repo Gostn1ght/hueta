@@ -343,6 +343,37 @@ def main():
             elif query == "?account=Tester&slot=1" and answers[0]["location"] != "l01_escape":
                 failures.append("entry home")
                 print("entry home is not the character's map", answers[0])
+        # Accounts (doc 154): the C++ master only keeps them (the Python service has none).
+        if EXE is not None:
+            cpp = clients[1]
+
+            def account_call(operation, arguments, actor="location:k00_marsh"):
+                status, body = cpp.call("POST", "/v1/command", {"command_id": uuid.uuid4().hex, "operation": operation, "arguments": arguments},
+                                        actor=actor, instance=(INSTANCE_B if actor.endswith("escape") else INSTANCE_A) if actor.startswith("location:") else None,
+                                        bound=cpp.epoch if actor.startswith("location:") else False)
+                return status, json.loads(body) if body else None
+            tester = {"login": "Tester", "role": "player", "salt": "a" * 32, "hash": "b" * 64, "money": 500,
+                      "device": "", "approval": "approved", "firebase_uid": ""}
+            google = dict(tester, login="Ghost", hash="firebase", money=None, firebase_uid="u" * 28)
+            checks = [
+                ("account put", account_call("account_put", {"accounts": [tester, google], "only_new": False}),
+                 lambda s, b: s == 200 and b["result"]["changed"] == 2),
+                ("account import keeps", account_call("account_put", {"accounts": [dict(tester, money=1)], "only_new": True}),
+                 lambda s, b: s == 200 and b["result"]["changed"] == 0),
+                ("account update", account_call("account_put", {"accounts": [dict(tester, money=750)], "only_new": False}),
+                 lambda s, b: s == 200 and b["result"]["changed"] == 1),
+                ("account list", account_call("account_list", {"after": 0}, "location:l01_escape"),
+                 lambda s, b: s == 200 and sorted((a["login"], a["money"]) for a in b["result"]["accounts"]) == [("Ghost", None), ("Tester", 750)]),
+                ("account list after", account_call("account_list", {"after": 1}),
+                 lambda s, b: s == 200 and [a["login"] for a in b["result"]["accounts"]] == ["Tester"] and b["result"]["revision"] == 2),
+                ("account bad login", account_call("account_put", {"accounts": [dict(tester, login="a|b")], "only_new": False}),
+                 lambda s, b: s == 400),
+                ("account by admin", account_call("account_list", {"after": 0}, "admin"), lambda s, b: s == 403),
+            ]
+            for name, (status, body), good in checks:
+                if not good(status, body):
+                    failures.append(name)
+                    print("FAIL", name, status, json.dumps(body)[:400])
         print(f"compared {len(results[0])} steps, {len(failures)} differ")
         if EXE is None:
             for name, status, body in results[0]:

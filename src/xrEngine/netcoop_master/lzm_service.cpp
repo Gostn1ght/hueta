@@ -404,6 +404,8 @@ json Service::execute(const Principal& principal, const json& request)
         { "native_save_finish", { { "character_id", "fence", "session_fence", "upload_id" }, {} } },
         { "native_save_cancel", { { "character_id", "fence", "session_fence", "upload_id" }, {} } },
         { "admin_relay", { { "account", "order", "values" }, {} } },
+        { "account_list", { { "after" }, {} } },
+        { "account_put", { { "accounts", "only_new" }, {} } },
     };
     json bound;
     if (administrative.count(operation))
@@ -415,6 +417,8 @@ json Service::execute(const Principal& principal, const json& request)
     {
         if (operation == "admin_relay" && principal.role != "location")
             throw Forbidden("administrator orders are relayed by a location authority");
+        if (operation.rfind("account_", 0) == 0 && principal.role != "location")
+            throw Forbidden("accounts are kept for the location authorities");
         if (operation.rfind("native_save_", 0) == 0)
         {
             if (principal.role != "location") throw Forbidden("native checkpoints require a location authority");
@@ -467,6 +471,8 @@ json Service::execute(const Principal& principal, const json& request)
     if (operation == "native_save_append") return saves_->append(actor, command_id, bound);
     if (operation == "native_save_finish") return saves_->finish(actor, command_id, bound);
     if (operation == "admin_relay") return admin_relay(actor, command_id, bound);
+    if (operation == "account_list") return account_list(bound);
+    if (operation == "account_put") return account_put(bound);
     return saves_->cancel(actor, command_id, bound);
 }
 
@@ -474,6 +480,74 @@ json Service::execute(const Principal& principal, const json& request)
 // location that verified his account (owner 2026-10-23: time and weather set
 // from the admin menu or the weather editor reached one map only). It goes to
 // the operations the master console uses, so every location follows it.
+// Accounts (owner 2026-10-25, doc 154: "the database belongs to the master
+// only"): login, role, salt and PBKDF2 hash, money, device digest, approval and
+// Firebase UID, the fields of the old netcoop_accounts.txt. A location mirrors
+// them (account_list after its last revision) and sends what it changed
+// (account_put; only_new: the one-time import of an old file).
+static std::string account_field(const json& account, const char* name, size_t limit, bool empty_ok)
+{
+    if (!account.contains(name) || !account[name].is_string()) throw Invalid("invalid account field");
+    std::string text = account[name].get<std::string>();
+    if ((!empty_ok && text.empty()) || text.size() > limit) throw Invalid("invalid account field");
+    for (unsigned char c : text)
+        if (c < 33 || c >= 127 || c == '|') throw Invalid("invalid account field");
+    return text;
+}
+
+json Service::account_list(const json& args)
+{
+    const json& after = args["after"];
+    if (!after.is_number_integer() || after.get<int64_t>() < 0) throw Invalid("invalid account revision");
+    std::lock_guard<std::recursive_mutex> guard(store_->lock);
+    const int64_t limit = 1000;
+    json accounts = json::array();
+    for (auto& row : store_->db.all("SELECT login,role,salt,hash,money,device,approval,firebase_uid,revision FROM account"
+                                    " WHERE revision>? ORDER BY revision LIMIT ?", { after, json(limit) }))
+        accounts.push_back(row);
+    // A full page: the next request continues after its last row.
+    json revision = int64_t(accounts.size()) == limit ? accounts.back()["revision"]
+                                                      : store_->db.scalar("SELECT COALESCE(MAX(revision),0) FROM account");
+    return { { "revision", revision }, { "accounts", accounts } };
+}
+
+json Service::account_put(const json& args)
+{
+    const json& list = args["accounts"];
+    if (!list.is_array() || list.empty() || list.size() > 200 || !args["only_new"].is_boolean()) throw Invalid("invalid account batch");
+    const bool only_new = args["only_new"].get<bool>();
+    std::vector<Db::Params> rows;
+    for (const json& account : list)
+    {
+        if (!account.is_object() || account.size() != 8 || !account.contains("money")) throw Invalid("invalid account record");
+        std::string login = account_field(account, "login", 20, false);
+        if (login.size() < 3 || !std::all_of(login.begin(), login.end(), [](char c) { return isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.'; }))
+            throw Invalid("invalid account login");
+        std::string role = account_field(account, "role", 16, false), approval = account_field(account, "approval", 16, false);
+        if ((role != "admin" && role != "player") || (approval != "pending" && approval != "approved" && approval != "rejected"))
+            throw Invalid("invalid account state");
+        const json& money = account["money"];
+        if (!money.is_null() && (!money.is_number_integer() || money.get<int64_t>() < 0 || money.get<int64_t>() > 4294967295LL))
+            throw Invalid("invalid account money");
+        rows.push_back({ lower(login), login, role, account_field(account, "salt", 256, false), account_field(account, "hash", 256, false),
+                         money, account_field(account, "device", 128, true), approval, account_field(account, "firebase_uid", 128, true) });
+    }
+    return store_->transaction([&](Db& tx) -> json {
+        const int64_t revision = tx.scalar("SELECT COALESCE(MAX(revision),0) FROM account").get<int64_t>() + 1;
+        int64_t changed = 0;
+        for (auto& row : rows)
+        {
+            row.push_back(revision);
+            changed += tx.exec(only_new ? "INSERT OR IGNORE INTO account VALUES(?,?,?,?,?,?,?,?,?,?)"
+                                        : "INSERT INTO account VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET"
+                                          " login=excluded.login,role=excluded.role,salt=excluded.salt,hash=excluded.hash,money=excluded.money,"
+                                          "device=excluded.device,approval=excluded.approval,firebase_uid=excluded.firebase_uid,revision=excluded.revision",
+                               row);
+        }
+        return json{ { "revision", revision }, { "changed", changed } };
+    });
+}
+
 json Service::admin_relay(const std::string& actor, const std::string& command_id, const json& args)
 {
     const json& account = args["account"];

@@ -7,6 +7,19 @@ static bool s_admission_started = false, s_admission_ready_logged = false, s_adm
 static u64 s_admission_retry = 0;
 
 static bool admission_active() { return s_admission_started; }
+
+// accounts.inc: the world master's accounts (doc 154).
+static bool admission_accounts_take(std::vector<netcoop_world::AccountRecord>& changed, netcoop_world::AccountsState& state)
+{
+	changed.clear();
+	state = netcoop_world::AccountsState::Waiting;
+	return s_admission_started && s_admission.accounts_take(changed, state);
+}
+
+static bool admission_accounts_put(const std::vector<netcoop_world::AccountRecord>& records, bool only_new)
+{
+	return s_admission_started && !records.empty() && s_admission.accounts_put(records.data(), records.size(), only_new);
+}
 static void world_orders_update();
 
 static void admission_update()

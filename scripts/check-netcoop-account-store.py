@@ -26,6 +26,8 @@ source=r'''
 #include <map>
 #include <string>
 #include <iostream>
+#include <set>
+#include <vector>
 using u8=unsigned char;using u32=unsigned int;using LPCSTR=const char*;using string_path=char[260];
 template<size_t N>void xr_sprintf(char(&out)[N],const char* format,...) {va_list args;va_start(args,format);vsnprintf(out,N,format,args);va_end(args);}
 void Msg(const char*,...){}
@@ -54,6 +56,12 @@ void accounts_path(char* out){std::snprintf(out,260,"accounts.txt");}
 void accounts_refresh(){++refreshes;}
 void accounts_file_stamp(FILETIME& stamp){stamp.dwLowDateTime=1;}
 const char* role_name(u8){return "player";}
+// The world master keeps the accounts (doc 154): touched records go to it, the file stays.
+namespace netcoop_world{struct AccountRecord{std::string login;};}
+bool in_master=false,s_accounts_master=false,put_ok=true;int puts=0;std::set<std::string> s_accounts_master_keys;
+bool accounts_in_master(){return in_master;}
+netcoop_world::AccountRecord account_record(const Account& a){return {a.login};}
+bool admission_accounts_put(const std::vector<netcoop_world::AccountRecord>& records,bool only_new){assert(!only_new && records.size()==1 && records[0].login=="player");++puts;return put_ok;}
 '''+lock+save+r'''
 std::string read_file(){std::ifstream file("accounts.txt",std::ios::binary);std::ostringstream out;out<<file.rdbuf();return out.str();}
 void reset(){s_accounts_dirty=true;s_accounts["player"].touched=true;std::ofstream("accounts.txt")<<"old committed";}
@@ -70,6 +78,9 @@ int main(){
  accounts_save();
  assert(!s_accounts_dirty && !s_accounts["player"].touched && read_file().find("player|player|salt|hash|123|device|approved|uid")!=std::string::npos);
  const auto saved=read_file();const auto refreshed=refreshes;accounts_save();assert(read_file()==saved && refreshes==refreshed);
+ in_master=true;reset();accounts_save();assert(s_accounts_dirty && puts==0 && read_file()=="old committed"); // not loaded yet: held
+ s_accounts_master=true;put_ok=false;accounts_save();assert(s_accounts_dirty && s_accounts["player"].touched && puts==1);
+ put_ok=true;accounts_save();assert(!s_accounts_dirty && !s_accounts["player"].touched && puts==2 && s_accounts_master_keys.count("player") && read_file()=="old committed");
  std::cout<<"PASS actual account persistence: lock timeout/mutex failure do not write/release unowned lock; fsync/rename failure preserve committed file and dirty state; retry commits\n";
 }
 '''

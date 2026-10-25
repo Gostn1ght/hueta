@@ -83,6 +83,8 @@ private:
     HttpResponse handle_entry(HttpRequest& request);
     std::string timeline_command(const std::string& name, const std::vector<std::string>& args);
     json admin_relay(const std::string& actor, const std::string& command_id, const json& args);
+    json account_list(const json& args);
+    json account_put(const json& args);
     std::optional<std::string> home(const std::string& account, int64_t slot);
 };
 
