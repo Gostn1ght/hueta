@@ -34,8 +34,16 @@ if not exist "appdata\server\logs" mkdir "appdata\server\logs"
 if not exist "appdata\server\netcoop_cluster.ltx" copy "hoster\netcoop_cluster.ltx.six" "appdata\server\netcoop_cluster.ltx" >nul
 
 rem Без мастера карты не пускают игроков: он ведёт календарь, погоду и выбросы.
+rem Мастер всегда в своём окне (владелец 2026-10-25: из этого батника он
+rem запускался скрыто): движковый мастер открывает окно сам, в старых папках
+rem открывается окно панели с вкладкой мастера.
 echo Запуск мастера. Лог: appdata\server\logs\start_locations.log
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "hoster\netcoop_master_control.ps1" -MasterRoot "%~dp0." -StartMaster >"appdata\server\logs\start_locations.log" 2>&1
+if exist "dedicated\sqlite3.dll" (
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "hoster\netcoop_master_control.ps1" -MasterRoot "%~dp0." -StartMaster >"appdata\server\logs\start_locations.log" 2>&1
+) else (
+  start "Lost Zone - мастер" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "hoster\netcoop_cluster_panel.ps1" -Runtime "%~dp0." -StartMaster -Tab console
+  powershell.exe -NoProfile -Command "for ($i = 0; $i -lt 60; $i++) { $c = [Net.Sockets.TcpClient]::new(); try { if ($c.ConnectAsync('127.0.0.1', 38477).Wait(500) -and $c.Connected) { 'Мастер мира работает (окно панели, вкладка мастера).'; exit 0 } } catch {} finally { $c.Dispose() }; Start-Sleep 1 }; 'Мастер не ответил за 60 с.'; exit 1" >"appdata\server\logs\start_locations.log" 2>&1
+)
 if errorlevel 1 (
   type "appdata\server\logs\start_locations.log"
   echo Мастер мира не запустился - карты не будут пускать игроков.

@@ -600,7 +600,21 @@ void CActor::netcoop_tp_item_render()
 	Fmatrix hand, item;
 	hand.mul_43(XFORM(), body->LL_GetTransform(m_netcoop_tp_bone));
 	item.mul_43(hand, m_netcoop_tp_offset);
-	if (IKinematics* k = smart_cast<IKinematics*>(m_netcoop_tp_item)) k->CalculateBones(TRUE);
+	if (model)
+	{
+		// The model's own rest pose: an animated item with no motion playing
+		// gets zero rotations from the engine (owner 2026-10-25: food and
+		// medicine showed nothing, the water bottle hung off the hand).
+		model->CalculateBones(TRUE);
+		static xr_vector<Fmatrix> rest;
+		model->LL_GetBindTransform(rest);
+		for (u16 id = 0; id < model->LL_BoneCount(); ++id)
+		{
+			CBoneInstance& bone = model->LL_GetBoneInstance(id);
+			bone.mTransform = rest[id];
+			bone.mRenderTransform.mul_43(bone.mTransform, model->LL_GetData(id).m2b_transform);
+		}
+	}
 	::Render->set_Transform(&item);
 	::Render->add_Visual(m_netcoop_tp_item);
 }

@@ -814,7 +814,7 @@ static void cluster_clock_update(bool observed)
 		// a reconnect while the clock caught up slowly). Never backwards.
 		if (behind > 60000.0 && behind < 30.0 * 86400000.0 && time.netcoop_catch_up(u64(behind)))
 		{
-			if (g_pGamePersistent && g_pGamePersistent->pEnvironment) g_pGamePersistent->Environment().ChangeGameTime(float(behind / 1000.0));
+			if (g_pGamePersistent && g_pGamePersistent->pEnvironment) g_pGamePersistent->Environment().ChangeGameTime(float(fmod(behind / 1000.0, 86400.0)));  // the time of day only: whole days do not move the sun
 			Msg("[Lost Zone][master] calendar caught up %.0f s with the master", behind / 1000.0);
 			behind = master_ms - double(time.game_time());
 		}

@@ -286,9 +286,12 @@ void CEnvironment::SetGameTime(float game_time, float time_factor)
 
 float CEnvironment::NormalizeTime(float tm)
 {
-	if (tm < 0.f) return tm + DAY_LENGTH;
-	else if (tm > DAY_LENGTH) return tm - DAY_LENGTH;
-	else return tm;
+	// Any number of days: the netcoop master's calendar catch-up moves the
+	// time by days at once (2026-10-25: a map 6 days behind crashed in
+	// calculate_config_sun_dir, the time of day left past 24 hours).
+	if (!_valid(tm)) return 0.f;
+	tm = fmodf(tm, DAY_LENGTH);
+	return tm < 0.f ? tm + DAY_LENGTH : tm;
 }
 
 void CEnvironment::SetWeather(shared_str name, bool forced)
@@ -631,9 +634,9 @@ void CEnvironment::OnFrame()
 
 void CEnvironment::calculate_config_sun_dir()
 {
-	float current_time = fGameTime / (DAY_LENGTH / 24);
-	int weather_time = floor(current_time);
-	float s_weight = current_time - weather_time;
+	float current_time = NormalizeTime(fGameTime) / (DAY_LENGTH / 24);
+	int weather_time = clampr(iFloor(current_time), 0, 23);  // sun_hp holds 24 hours
+	float s_weight = clampr(current_time - weather_time, 0.f, 1.f);
 
 	float real_sun_alt, real_sun_long;
 	float s_alt = sun_hp[weather_time].x;
