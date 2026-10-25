@@ -136,10 +136,15 @@ int read_entry_port(const std::wstring& path)
         {
             std::string value = trim(line.substr(eq + 1));
             if (!value.empty() && value.size() < 7 && std::all_of(value.begin(), value.end(), [](char c) { return c >= '0' && c <= '9'; }))
-                return std::stoi(value);
+            {
+                // 1267 was the default (Marsh's UDP number); the entry is 5446 now.
+                const int port = std::stoi(value);
+                return port == 1267 ? 5446 : port;
+            }
         }
     }
-    return 1267;
+    // Owner 2026-10-25: players always enter on port 5446.
+    return 5446;
 }
 
 // -- the service (__main__.run) -----------------------------------------------------------------------------------

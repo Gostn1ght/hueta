@@ -173,7 +173,7 @@ function netcoop_firebase_identity() return cloud_identity end
 function netcoop_firebase_request(action,email,password,username)
  cloud_requests[#cloud_requests+1]={action=action,email=email,password=password,username=username,code=action=='verify' and password or nil}; return true
 end
-draft_stores={}; draft_scope='127.0.0.1:1267'; draft_stores[draft_scope]=drafts
+draft_stores={}; draft_scope='127.0.0.1:5446'; draft_stores[draft_scope]=drafts
 draft_owners={[cloud_identity]=draft_stores}; current_draft_owner=cloud_identity
 function netcoop_draft_server(address)
  if current_draft_owner~=cloud_identity then
@@ -357,8 +357,8 @@ ui_options.UIOptions=options_factory
 finish_camera()
 controls.server_edit:SetText('Other-Server.example:1268');callbacks.server_save()
 assert(draft_scope=='other-server.example:1268' and (last_window.names[1] or '')=='' and previews[#previews].pose==-2)
-assert(draft_stores['127.0.0.1:1267'][1].name=='Loner One')
-controls.server_edit:SetText('127.0.0.1:1267');callbacks.server_save();assert(last_window.names[1]=='Loner One' and previews[#previews].pose==-2)
+assert(draft_stores['127.0.0.1:5446'][1].name=='Loner One')
+controls.server_edit:SetText('127.0.0.1:5446');callbacks.server_save();assert(last_window.names[1]=='Loner One' and previews[#previews].pose==-2)
 last_window:ActivateObject(0); finish_camera();assert(controls.server_panel.shown,'server panel');callbacks.server_connect(); assert(cloud_requests[#cloud_requests].action=='refresh' and #commands==0,'server refresh')
 on_cloud_result(false,'NETWORK_ERROR','cloud_user',true); assert(#commands==0)
 callbacks.server_connect(); on_cloud_result(true,'','cloud_user',true)

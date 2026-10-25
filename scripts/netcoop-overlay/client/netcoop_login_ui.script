@@ -3,7 +3,7 @@
 -- The native layer remembers a protected refresh token, never the password.
 
 local LAST_FILE = "netcoop_last_server.txt"
-local DEF_ADDR  = "127.0.0.1:1267"
+local DEF_ADDR  = "127.0.0.1:5446"
 local auth_return, auth_message
 local wnd
 local autojoin_done = false
@@ -135,7 +135,7 @@ local function parse_addr(addr)
 	local ip, port = string.match(addr, "^%s*([%w%.%-]+):(%d+)%s*$")
 	if not ip then
 		ip = string.match(addr, "^%s*([%w%.%-]+)%s*$")
-		port = "1267"
+		port = "5446" -- the world master's entry (owner 2026-10-25)
 	end
 	return ip, port
 end
@@ -147,8 +147,14 @@ end
 -- remembered one.
 local function route_addr(ip, port, login, slot)
 	local to = netcoop_master_entry and netcoop_master_entry(ip .. ":" .. port, login or "", tonumber(slot) or 0) or ""
+	-- an address remembered from before 2026-10-25: the entry moved from 1267 to 5446
+	if to == "" and port == "1267" and netcoop_master_entry then
+		to = netcoop_master_entry(ip .. ":5446", login or "", tonumber(slot) or 0) or ""
+	end
 	local rip, rport = string.match(to, "^([%w%.%-]+):(%d+)$")
 	if rip then return rip, rport end
+	-- no master answers on its entry: the first map's port, as before 5446
+	if port == "5446" then return ip, "1267" end
 	return ip, port
 end
 

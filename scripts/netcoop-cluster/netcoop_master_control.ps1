@@ -119,17 +119,21 @@ function Initialize-Master([string]$RuntimeRoot, [string[]]$Locations) {
     }
 }
 # Players enter only this machine's address (owner 2026-10-17): the master's
-# public entry (TCP, [cluster] entry_port, default 1267 = the first map's UDP
-# port number; 0 = off) sends them to a running location.
+# public entry (TCP, [cluster] entry_port, default 5446 - owner 2026-10-25;
+# 0 = off) sends them to their map. 1267, the old default, means 5446.
 function Entry-Port([string]$RuntimeRoot) {
     $plan = Join-Path $RuntimeRoot 'appdata\server\netcoop_cluster.ltx'
     $section = ''
     foreach ($line in @(Get-Content -LiteralPath $plan -Encoding Default -ErrorAction SilentlyContinue)) {
         $text = ($line -split ';',2)[0].Trim()
         if ($text -match '^\[(.+)\]$') { $section = $Matches[1]; continue }
-        if ($section -eq 'cluster' -and $text -match '^entry_port\s*=\s*(\d+)$') { return [int]$Matches[1] }
+        if ($section -eq 'cluster' -and $text -match '^entry_port\s*=\s*(\d+)$') {
+            $port = [int]$Matches[1]
+            if ($port -eq 1267) { return 5446 }
+            return $port
+        }
     }
-    return 1267
+    return 5446
 }
 function Start-Master([string]$RuntimeRoot, [string[]]$Locations) {
     if (@(Master-Processes).Count) { return 'Мастер уже работает.' }

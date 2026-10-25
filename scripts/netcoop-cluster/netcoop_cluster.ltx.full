@@ -5,9 +5,9 @@
 max_players = 512
 per_server = 128
 ; Players enter only this computer's address: the world master answers on
-; this TCP port (default 1267, 0 = off) and sends them to their map. Open
+; this TCP port (default 5446, 0 = off) and sends them to their map. Open
 ; it in the router (TCP) together with the maps' UDP ports.
-entry_port = 1267
+entry_port = 5446
 
 [locations]
 jupiter = 127.0.0.1:1301

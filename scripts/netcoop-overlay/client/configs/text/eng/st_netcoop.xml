@@ -67,7 +67,7 @@
     <text>Login: 3-20 letters, numbers, dots, hyphens or underscores.</text>
   </string>
   <string id="st_netcoop_server_invalid">
-    <text>Server address: host:port, for example 127.0.0.1:1267.</text>
+    <text>Server address: host:port, for example 127.0.0.1:5446.</text>
   </string>
   <string id="st_netcoop_key_failed">
     <text>Cannot prepare remembered sign-in. Check your password and the game log.</text>

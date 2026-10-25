@@ -374,8 +374,8 @@ int script_role() { return client_role(); }
 LPCSTR script_account() { return client_login(); }
 
 // Owner 2026-10-17: players enter only the world master's address. Its public
-// entry (backend/lostzone/gateway.py, TCP, by default the same number as the
-// first map's UDP port) names the location to connect to: for the account and
+// entry (TCP, port 5446 by default - owner 2026-10-25) names the location to
+// connect to: for the account and
 // slot (owner 2026-10-24) the map the character was on last, Cordon for a new
 // one. "" when no master answers there (a location address, an older host):
 // the address is then used as it is. At most ~1.5 s, on a button press only.
@@ -385,7 +385,7 @@ LPCSTR script_master_entry(LPCSTR address, LPCSTR account, int slot)
 	answer[0] = 0;
 	if (!address || xr_strlen(address) > 200) return answer;
 	xr_string text = address, host;
-	u32 port = 1267;
+	u32 port = 5446;
 	const size_t colon = text.rfind(':');
 	if (colon != xr_string::npos)
 	{
