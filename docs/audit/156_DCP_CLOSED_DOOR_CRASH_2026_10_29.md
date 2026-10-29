@@ -36,6 +36,11 @@ the shell's whole-object query then dereferences every body unconditionally.
   changed models use default part state rather than reading past a vector or
   applying part of an incompatible layout. Invalid door enum falls back closed.
 - Missing door map lookup cannot dereference end().
+- The expanded driving-profile audit found DT-75 has no steering-wheel joint.
+  Its ordinary physics tick dereferenced the empty list. Guard that query and
+  test the actual expression with empty and ordinary lists. This prevents the
+  additional crash; DT-75's absent differential-steering implementation is not
+  solved by pretending it has an automobile's steerable axle.
 
 ## Validation / delivery
 

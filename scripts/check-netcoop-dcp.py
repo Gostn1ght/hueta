@@ -109,6 +109,10 @@ for name, keys in cars.items():
     bones = model_physics(data)
     profile = dcp_import.sections(profile_text(CLIENT / 'configs' / include.group(1).replace('\\', '/')))
     definition = profile['car_definition']
+    for field in ('reference_radius', 'fuel_tank', 'max_engine_rpm', 'idling_engine_rpm', 'main_gear_ratio'):
+        if field in definition:
+            value = float(definition[field])
+            assert math.isfinite(value) and value > 0, (name, field, definition[field])
     for field in ('driving_wheels', 'steering_wheels', 'breaking_wheels', 'doors', 'exhausts', 'driver_place', 'steer'):
         for bone_name in filter(None, map(str.strip, definition.get(field, '').split(','))):
             assert bone_name in bones, (name, field, bone_name)
@@ -123,6 +127,8 @@ for name, keys in cars.items():
         bone = seat.strip().split(":")[0]
         assert re.match(r"^seat_", bone) and (bone.encode() + b"\0") in data, (name, bone)
     assert '<string id="%s">' % keys["inv_name"] in names, (name, keys["inv_name"])
+car_source = (ROOT / 'src/xrGame/Car.cpp').read_text(encoding='utf-8')
+assert 'm_steer_angle = m_steering_wheels.empty() ? 0.f :' in car_source
 old = re.search(r"OLD_CARS = \{(.*?)\}", (SERVER / "netcoop_vehicles.script").read_text(encoding="utf-8"), re.S).group(1)
 old = re.findall(r"(veh_[a-z0-9_]+) = true", old)
 assert len(old) == 17 and "veh_mi2_heli" not in old and "veh_mi24_heli" not in old

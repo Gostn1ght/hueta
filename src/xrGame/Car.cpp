@@ -2090,7 +2090,10 @@ void CCar::PhDataUpdate(float step)
 		}
 	}
 
-	m_steer_angle = m_steering_wheels.begin()->GetSteerAngle() * 0.1f + m_steer_angle * 0.9f;
+	// DCP's DT-75 has drive/brake wheels but no steering-wheel joint.
+	// The wheel list is optional (as for helicopters): never dereference end.
+	m_steer_angle = m_steering_wheels.empty() ? 0.f :
+		m_steering_wheels.begin()->GetSteerAngle() * 0.1f + m_steer_angle * 0.9f;
 	VERIFY(_valid(m_steer_angle));
 }
 

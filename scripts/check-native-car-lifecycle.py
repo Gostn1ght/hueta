@@ -19,6 +19,9 @@ interpolate = between('src/xrPhysics/PHShell.cpp', 'void CPHShell::InterpolateGl
 state = between('src/xrPhysics/PHElementNetState.cpp', 'void CPHElement::get_State(', 'void CPHElement::net_Export(')
 fix = between('src/xrPhysics/PHElement.cpp', 'void CPHElement::Fix()', 'void CPHElement::SetAnimated(')
 restore = between('src/xrGame/Car.cpp', 'void CCar::RestoreNetState(', 'void CCar::SetDefaultNetState(')
+car_source = (ROOT / 'src/xrGame/Car.cpp').read_text(encoding='utf-8')
+steer_start = car_source.index('m_steer_angle = m_steering_wheels.empty()')
+steer = car_source[steer_start:car_source.index(';', steer_start)+1]
 source = r'''
 #include <cassert>
 #include <vector>
@@ -103,7 +106,13 @@ struct CCar:CPHSkeleton{
  void RestoreNetState(CSE_PHSkeleton*);
 };
 ''' + restore + r'''
+struct SteeringWheel{float GetSteerAngle(){return .5f;}};
+float steering(std::vector<SteeringWheel> m_steering_wheels,float m_steer_angle){
+''' + steer + r'''
+ return m_steer_angle;
+}
 int main(){
+ assert(steering({},99.f)==0.f);assert(steering({{}},0.f)==.05f);
  CPHShell shell;CPHElement root,door;root.m_shell=&shell;door.m_shell=&shell;
  door.active=false;door.m_body=nullptr;door.mXFORM.c.x=7;door.m_mass_center.x=2;
  shell.elements={&root,&door};shell.k.pose.c.x=4;shell.m_object_in_root.c.x=1;
