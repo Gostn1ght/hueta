@@ -894,6 +894,7 @@ u32 CMissile::ef_weapon_type() const
 
 bool CMissile::render_item_ui_query()
 {
+	if (!m_pInventory || getDestroy() || !smart_cast<CActor*>(H_Parent())) return false;
 	bool b_is_active_item = m_pInventory->ActiveItem() == this;
 	return b_is_active_item && (GetState() == eReady) && !m_throw && smart_cast<CActor*>(H_Parent());
 }

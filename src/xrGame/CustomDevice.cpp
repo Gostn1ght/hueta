@@ -468,7 +468,9 @@ bool CCustomDevice::IsWorking()
 
 void CCustomDevice::UpdateVisibility()
 {
-	bool bClimb = ((Actor()->MovingState() & mcClimb) != 0);
+	CActor* actor = smart_cast<CActor*>(H_Parent());
+	if (!actor || actor != Actor() || !g_player_hud) return;
+	bool bClimb = ((actor->MovingState() & mcClimb) != 0);
 
 	//check visibility
 	attachable_hud_item* i0 = g_player_hud->attached_item(0);
@@ -481,7 +483,7 @@ void CCustomDevice::UpdateVisibility()
 		}
 		else
 		{
-			CInventoryItem* itm = g_actor->inventory().ActiveItem();
+			CInventoryItem* itm = actor->inventory().ActiveItem();
 			CWeapon* wpn = smart_cast<CWeapon*>(itm);
 			CMissile* msl = smart_cast<CMissile*>(itm);
 			if (msl && m_bThrowAnm)
@@ -594,7 +596,9 @@ void CCustomDevice::UpdateCL()
 {
 	inherited::UpdateCL();
 
-	if (H_Parent() != Level().CurrentEntity()) return;
+	// During a passage both the parent and CurrentEntity may be null. Equal
+	// null pointers do not make a detached device the player's HUD device.
+	if (!H_Parent() || H_Parent() != Level().CurrentEntity()) return;
 
 	UpdateVisibility();
 

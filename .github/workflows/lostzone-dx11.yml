@@ -118,6 +118,8 @@ jobs:
         run: python scripts/check-netcoop-physics.py
       - name: Check actual car closed-door spawn and physics state
         run: python scripts/check-native-car-lifecycle.py
+      - name: Check actual detached item and replica teardown paths
+        run: python scripts/check-native-detached-objects.py
       - name: Check actual startup menu audio
         run: python scripts/check-menu-audio.py
       - name: Check actual Firebase verification links

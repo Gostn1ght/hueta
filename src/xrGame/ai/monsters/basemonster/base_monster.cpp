@@ -831,7 +831,9 @@ void CBaseMonster::net_Relcase(CObject* O)
 		EnemyMan.remove_links(O);
 		CorpseMan.remove_links(O);
 
-		UpdateMemory();
+		// A replica only drops links. Running tactical AI here during a
+		// disconnect/level teardown sees partially detached group members.
+		if (!netcoop::pure_client()) UpdateMemory();
 
 		monster_squad().remove_links(O);
 	}

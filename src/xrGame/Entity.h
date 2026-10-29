@@ -86,7 +86,7 @@ public:
 	virtual void  OnChangeVisual();		//--DSR-- HeatVision
 
 	/*virtual*/
-	IC BOOL g_Alive() const { return GetfHealth() > 0; }
+	IC BOOL g_Alive() const { return m_entity_condition && GetfHealth() > 0; }
 	virtual BOOL g_State(SEntityState&) const { return FALSE; }
 
 	bool AlreadyDie() { return 0 != GetLevelDeathTime() ? true : false; }
