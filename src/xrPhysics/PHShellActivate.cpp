@@ -263,11 +263,11 @@ void CPHShell::Deactivate()
 
 	ELEMENT_I i;
 	for (i = elements.begin(); elements.end() != i; ++i)
-		(*i)->Deactivate();
+		if ((*i)->isActive()) (*i)->Deactivate();
 
 	JOINT_I j;
 	for (j = joints.begin(); joints.end() != j; ++j)
-		(*j)->Deactivate();
+		if ((*j)->bActive) (*j)->Deactivate();
 
 
 	if (m_space)

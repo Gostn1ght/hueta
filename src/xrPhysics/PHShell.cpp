@@ -1247,7 +1247,8 @@ void CPHShell::InterpolateGlobalTransform(Fmatrix* m)
 	i = elements.begin();
 	e = elements.end();
 	for (; i != e; ++i)
-		(*i)->InterpolateGlobalTransform(&(*i)->mXFORM);
+		if ((*i)->isActive())
+			(*i)->InterpolateGlobalTransform(&(*i)->mXFORM);
 
 	m->set(root_element().mXFORM);
 
@@ -1272,7 +1273,10 @@ void CPHShell::GetGlobalTransformDynamic(Fmatrix* m)
 	i = elements.begin();
 	e = elements.end();
 	for (; i != e; ++i)
-		(*i)->GetGlobalTransformDynamic(&(*i)->mXFORM);
+		// Closed car doors remain in the shell but have no ODE body. Their
+		// pose belongs to the skeleton until ClosedToOpening activates them.
+		if ((*i)->isActive())
+			(*i)->GetGlobalTransformDynamic(&(*i)->mXFORM);
 	m->set((*elements.begin())->mXFORM);
 
 	m->mulB_43(m_object_in_root);

@@ -1646,7 +1646,7 @@ bool CPHElement::get_ApplyByGravity()
 void CPHElement::Fix()
 {
 	m_flags.set(flFixed,TRUE);
-	FixBody(m_body);
+	if (m_body) FixBody(m_body);
 }
 
 void CPHElement::SetAnimated(bool v)

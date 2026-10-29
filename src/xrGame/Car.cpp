@@ -396,6 +396,7 @@ void CCar::net_Destroy()
 	m_driving_wheels.clear();
 	m_exhausts.clear();
 	m_breaking_wheels.clear();
+	m_doors_update.clear();
 	m_doors.clear();
 	m_gear_ratious.clear();
 	m_car_sound->Destroy();
@@ -460,6 +461,16 @@ void CCar::RestoreNetState(CSE_PHSkeleton* po)
 	CPHSkeleton::RestoreNetState(po);
 
 	CSE_ALifeCar* co = smart_cast<CSE_ALifeCar*>(po);
+	if (!co) return;
+	// A replaced DCP model can have a different number of doors/wheels.
+	// The legacy save stores indices, not bone IDs: do not apply a partial
+	// list to different bones or dereference the end of the saved vector.
+	if (co->door_states.size() != m_doors.size() || co->wheel_states.size() != m_wheels_map.size())
+	{
+		Msg("! Car [%s]: saved door/wheel layout differs from model; using default parts", cNameSect().c_str());
+		SetDefaultNetState(po);
+		return;
+	}
 
 	{
 		xr_map<u16, SDoor>::iterator i, e;

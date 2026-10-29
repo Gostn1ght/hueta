@@ -25,7 +25,7 @@ jobs:
   checks:
     if: ${{ !inputs.analyze }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -116,6 +116,8 @@ jobs:
           python scripts/check-netcoop-voice.py
       - name: Check actual item interpolation
         run: python scripts/check-netcoop-physics.py
+      - name: Check actual car closed-door spawn and physics state
+        run: python scripts/check-native-car-lifecycle.py
       - name: Check actual startup menu audio
         run: python scripts/check-menu-audio.py
       - name: Check actual Firebase verification links

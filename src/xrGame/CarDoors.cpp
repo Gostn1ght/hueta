@@ -30,7 +30,8 @@ bool CCar::DoorHit(float P, s16 element, ALife::EHitType hit_type)
 void CCar::SDoor::Init()
 {
 	update = false;
-	joint = bone_map.find(bone_id)->second.joint;
+	const auto bone = bone_map.find(bone_id);
+	joint = bone != bone_map.end() ? bone->second.joint : nullptr;
 	if (!joint) return;
 	//R_ASSERT2(dJointGetType(joint->GetDJoint())==dJointTypeHinge,"Wrong door joint!!! Only simple joint valid for a door and only one axis can be active, check other axes are zerro limited !!!");
 	R_ASSERT2(joint->IsHingeJoint(),
@@ -377,6 +378,7 @@ void CCar::SDoor::ClosingToClosed()
 {
 	state = closed;
 	if (!joint) return;
+	if (!joint->bActive) return;
 	smart_cast<IKinematics*>(pcar->Visual())->CalculateBones();
 
 	//	Fmatrix door_form;
@@ -645,7 +647,7 @@ void CCar::SDoor::SaveNetState(NET_Packet& P)
 
 void CCar::SDoor::RestoreNetState(const CSE_ALifeCar::SDoorState& a_state)
 {
-	eState lstate = eState(a_state.open_state);
+	eState lstate = a_state.open_state <= u8(broken) ? eState(a_state.open_state) : closed;
 	if (lstate == closed) ClosingToClosed();
 	state = lstate;
 	SetHealth(a_state.health);
