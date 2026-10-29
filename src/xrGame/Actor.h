@@ -644,6 +644,7 @@ public:
 	void rp_finish();
 	bool rp_play_motion(const shared_str& name);
 	void rp_send(u8 index);
+	void rp_attach_item(const netcoop::RpAnim& a);
 
 	// Netcoop vehicle seat (netcoop_vehicles.inc, doc 100): on the server, the
 	// own client and every other client the seated player is placed at the

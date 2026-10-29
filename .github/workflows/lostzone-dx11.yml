@@ -61,6 +61,7 @@ jobs:
           python scripts/check-netcoop-distant-battles.py
           python scripts/check-netcoop-world-events.py
           python scripts/check-netcoop-respawn-state.py
+          python scripts/check-netcoop-player-state.py
           python scripts/check-netcoop-full-map-plan.py
           python scripts/check-dist-windows-batch.py
           python scripts/check-netcoop-legacy-dialog.py
@@ -237,6 +238,8 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-rp-input.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-rp-motion.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-physics-replica.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-admin-god.py
@@ -246,6 +249,8 @@ jobs:
           python scripts/check-native-relation-null.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-environment-clock.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-condition-clock.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-level-transition.py
           if errorlevel 1 exit /b %errorlevel%

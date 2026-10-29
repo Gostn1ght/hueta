@@ -23,6 +23,7 @@
 #include "IKLimbsController.h"
 #include "player_hud.h"
 #include "WeaponKnife.h"
+#include "WeaponPistol.h"
 #include "Pda.h"
 #include "CustomDevice.h"
 #include "Flashlight.h"
@@ -570,7 +571,7 @@ const CActor::NetcoopTpTrack* CActor::netcoop_tp_track_load(LPCSTR file)
 // it where New Way's track puts it at this point of the motion.
 void CActor::netcoop_tp_item_render()
 {
-	if (!m_netcoop_tp_item || m_netcoop_tp_bone == BI_NONE || !m_netcoop_consumption_until) return;
+	if (!m_netcoop_tp_item || m_netcoop_tp_bone == BI_NONE || (!m_netcoop_consumption_until && m_rp_index < 0)) return;
 	IKinematics* body = smart_cast<IKinematics*>(Visual());
 	if (!body) return;
 	IKinematics* model = smart_cast<IKinematics*>(m_netcoop_tp_item);
@@ -1254,6 +1255,58 @@ void CActor::rp_send(u8 index)
 	u_EventSend(P, net_flags(TRUE, TRUE));
 }
 
+static bool rp_weapon_matches(PIItem item, u8 kind)
+{
+	CWeapon* weapon = smart_cast<CWeapon*>(item);
+	if (!weapon || smart_cast<CWeaponKnife*>(item) || weapon->GetAmmoMagSize() <= 0) return false;
+	const bool pistol = smart_cast<CWeaponPistol*>(item) != nullptr;
+	return kind == 2 ? pistol : !pistol;
+}
+
+// A GAMMA firearm can occupy either weapon slot. Never accept a PDA, knife
+// or rifle in place of the pistol just because it shares a numeric slot.
+static u16 rp_weapon_slot(CInventory& inventory, const netcoop::RpAnim& a)
+{
+	if (!a.weapon) return NO_ACTIVE_SLOT;
+	if (rp_weapon_matches(inventory.ActiveItem(), a.weapon)) return inventory.GetActiveSlot();
+	if (a.slot && rp_weapon_matches(inventory.ItemFromSlot(a.slot), a.weapon)) return a.slot;
+	for (u16 slot = inventory.FirstSlot(); slot <= inventory.LastSlot(); ++slot)
+		if (rp_weapon_matches(inventory.ItemFromSlot(slot), a.weapon)) return slot;
+	return NO_ACTIVE_SLOT;
+}
+
+static bool rp_has_item(CInventory& inventory, const netcoop::RpAnim& a)
+{
+	if (a.items.empty()) return true;
+	for (PIItem item : inventory.m_all)
+		for (const shared_str& section : a.items)
+			if (item->object().cNameSect() == section) return true;
+	return false;
+}
+
+void CActor::rp_attach_item(const netcoop::RpAnim& a)
+{
+	netcoop_tp_item_release();
+	if (a.items.empty()) return;
+	// Remote players' rucksacks are private. Show the configured prop of
+	// this kind; possession is checked on the owning client's inventory.
+	const shared_str& section = a.items.front();
+	if (!pSettings->section_exist(section) || !pSettings->line_exist(section, "visual")) return;
+	const LPCSTR visual = pSettings->r_string(section, "visual");
+	string_path file; xr_strcpy(file, visual);
+	if (!strext(file)) xr_strcat(file, ".ogf");
+	IKinematics* body = smart_cast<IKinematics*>(Visual());
+	const LPCSTR bone = READ_IF_EXISTS(pSettings, r_string, section, "attach_bone_name", "bip01_r_hand");
+	m_netcoop_tp_bone = body ? body->LL_BoneID(bone) : BI_NONE;
+	if (m_netcoop_tp_bone == BI_NONE || !FS.exist("$game_meshes$", file)) return;
+	m_netcoop_tp_item = ::Render->model_Create(visual);
+	Fvector position, rotation; position.set(0.f, 0.f, 0.f); rotation.set(0.f, 0.f, 0.f);
+	if (pSettings->line_exist(section, "attach_position_offset")) position = pSettings->r_fvector3(section, "attach_position_offset");
+	if (pSettings->line_exist(section, "attach_angle_offset")) rotation = pSettings->r_fvector3(section, "attach_angle_offset");
+	m_netcoop_tp_offset.setHPB(rotation.x, rotation.y, rotation.z);
+	m_netcoop_tp_offset.translate_over(position);
+}
+
 bool CActor::rp_start(int index, bool own)
 {
 	if (index < 0 || index >= int(netcoop::rp_anims().size()) || !g_Alive())
@@ -1261,11 +1314,10 @@ bool CActor::rp_start(int index, bool own)
 	if (m_rp_index == index && !m_rp_stopping)
 		return true;
 	const netcoop::RpAnim& a = netcoop::rp_anims()[index];
-	// A weapon pose needs that slot's item; the owner's client decides, the
-	// others show the weapon it took.
-	if (own && a.slot && !inventory().ItemFromSlot(a.slot))
+	const u16 slot = rp_weapon_slot(inventory(), a);
+	if (own && ((a.weapon && slot == NO_ACTIVE_SLOT) || !rp_has_item(inventory(), a)))
 	{
-		Msg("[Lost Zone] rp: %s needs an item in slot %u", a.name.c_str(), u32(a.slot));
+		Msg("[Lost Zone] rp: %s refused: required item is absent or its weapon is not equipped", a.name.c_str());
 		return false;
 	}
 	if (m_rp_index >= 0)
@@ -1279,13 +1331,15 @@ bool CActor::rp_start(int index, bool own)
 	m_rp_motion_done = true;
 	m_rp_walk_legs.invalidate();
 	m_rp_walk_torso.invalidate();
+	m_netcoop_consumption_until = 0;
+	rp_attach_item(a);
 	if (own)
 	{
 		// Keep the player in first person; gameplay input is locked until stop.
 		inventory().Action(kWPN_FIRE, CMD_STOP);
 		mstate_wishful &= ~(mcAnyMove | mcJump | mcSprint | mcCrouch | mcLookout);
 		m_jump_input_pending = false;
-		inventory().Activate(a.slot ? u16(a.slot) : NO_ACTIVE_SLOT);
+		inventory().Activate(slot);
 		cam_Set(eacFirstEye);
 		rp_send(u8(index));
 		m_rp_resend = Device.dwTimeGlobal + 2000;
@@ -1312,12 +1366,16 @@ void CActor::rp_walk(const netcoop::RpAnim& a, u32 mstate_rl)
 	const u16 legs_part = k->LL_PartID("legs"), torso_part = k->LL_PartID("torso");
 	if (legs.valid() && legs != m_rp_walk_legs && legs_part != BI_NONE)
 	{
-		k->PlayCycle(legs_part, legs, TRUE);
+		// The partition overload defaults speed to ZERO. Use the low-level
+		// call with the motion's speed and force looping for walking poses.
+		CMotionDef* def = k->LL_GetMotionDef(legs);
+		if (!def || !k->LL_PlayCycle(legs_part, legs, TRUE, def->Accrue(), def->Falloff(), def->Speed(), FALSE, nullptr, nullptr)) return;
 		m_rp_walk_legs = legs;
 	}
 	if (torso.valid() && torso != m_rp_walk_torso && torso_part != BI_NONE)
 	{
-		k->PlayCycle(torso_part, torso, TRUE);
+		CMotionDef* def = k->LL_GetMotionDef(torso);
+		if (!def || !k->LL_PlayCycle(torso_part, torso, TRUE, def->Accrue(), def->Falloff(), def->Speed(), FALSE, nullptr, nullptr)) return;
 		m_rp_walk_torso = torso;
 	}
 }
@@ -1353,6 +1411,7 @@ void CActor::rp_finish()
 	m_current_torso.invalidate();
 	m_current_legs.invalidate();
 	m_current_head.invalidate();
+	netcoop_tp_item_release();
 	if (m_rp_camera_switched)
 	{
 		m_rp_camera_switched = false;
@@ -1381,6 +1440,19 @@ bool CActor::rp_update(u32 mstate_rl)
 		}
 	}
 	const netcoop::RpAnim& a = anims[m_rp_index];
+	if (own && !m_rp_stopping)
+	{
+		if (!rp_has_item(inventory(), a) || (a.weapon && rp_weapon_slot(inventory(), a) == NO_ACTIVE_SLOT))
+			rp_request_stop(true);
+		else if (a.weapon && m_rp_phase == 0 &&
+			(!rp_weapon_matches(inventory().ActiveItem(), a.weapon) || inventory().ActiveItem()->cast_hud_item()->IsHidden()))
+		{
+			// Inventory activation completes asynchronously. Do not play the
+			// pistol/weapon pose with empty hands while the old item holsters.
+			if (u32(Device.dwTimeGlobal - m_rp_started) < 5000) return true;
+			rp_request_stop(true);
+		}
+	}
 	if (a.walk)
 	{
 		// Leaving a walking pose has no "out" chain.

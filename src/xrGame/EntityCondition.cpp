@@ -14,6 +14,7 @@
 #include "object_broker.h"
 #include "ActorHelmet.h"
 #include "ActorBackpack.h"
+#include "netcoop.h"
 
 // demonized: add lua callback before hit but after calculations
 #include "script_hit.h"
@@ -255,6 +256,11 @@ void CEntityCondition::UpdateConditionTime()
 		if (_cur_time > m_iLastTimeCalled)
 		{
 			float x = float(_cur_time - m_iLastTimeCalled) / 1000.0f;
+			// A new location catches its calendar up to the master. That is
+			// not time this body spent bleeding, starving or regenerating.
+			// Retain ordinary scheduled updates (including accelerated time),
+			// but rebase after a discontinuity instead of applying days at once.
+			if (netcoop::enabled() && x > _max(60.f, Level().GetGameTimeFactor() * 10.f)) x = 0.f;
 			SetConditionDeltaTime(x);
 		}
 		else

@@ -544,6 +544,14 @@ static xr_map<u16, ClientItemPending> s_client_item_pending;
 static xr_map<u16, ClientItemReport> s_client_item_reports; // last reported state of own items
 static u32 s_client_item_stale = 0, s_client_item_applied = 0;
 
+void client_items_reset()
+{
+	s_client_items.clear();
+	s_client_item_pending.clear();
+	s_client_item_reports.clear();
+	s_client_item_stale = s_client_item_applied = 0;
+}
+
 void client_item_forget(u16 id)
 {
 	s_client_items.erase(id);

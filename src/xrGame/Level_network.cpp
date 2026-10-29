@@ -155,6 +155,7 @@ void CLevel::net_Stop()
 	netcoop::zones_reset();
 	netcoop::vehicles_reset();
 	netcoop::map_players_reset();
+	netcoop::client_items_reset();
 
     Msg("Device.LuaGC clear");
     Device.LuaGC.clear();

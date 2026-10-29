@@ -70,13 +70,18 @@ void server_admission_stop()
 }
 
 // characters.inc: every complete local snapshot of an admitted character.
-static void admission_capture(const Character& character, const xr_vector<u8>& snapshot)
+static bool admission_capture(const Character& character, const xr_vector<u8>& snapshot)
 {
-	if (!s_admission_started || snapshot.empty()) return;
-	if (!s_admission.admitted(character.account.c_str(), character.slot)) return;
+	if (!s_admission_started) return true;
+	if (snapshot.empty()) return false;
+	if (!s_admission.admitted(character.account.c_str(), character.slot)) return true; // initial draft / legacy import
 	if (!s_admission.capture(character.account.c_str(), character.slot, snapshot.data(), snapshot.size()))
-		Msg("! [Lost Zone][master] save of %s slot %u was not passed to the world master (kept locally)",
+	{
+		Msg("! [Lost Zone][master] save of %s slot %u was not queued by the world master; handoff refused",
 			character.account.c_str(), character.slot);
+		return false;
+	}
+	return true;
 }
 
 static bool admission_read_file(LPCSTR path, xr_vector<u8>& bytes, u32 limit)
@@ -120,32 +125,13 @@ static bool admission_write_token(LPCSTR login, u8 slot, LPCSTR token)
 	return ok && MoveFileExA(temp, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
 }
 
-// The master's durable image replaces the local file (the old one is kept
-// next to it) before the character is read for spawning.
+// Decode a complete master checkpoint in memory. A malformed image never
+// overwrites a good local backup or half-replaces the cached character.
 static bool admission_apply_master_bytes(LPCSTR login, u8 slot, const std::vector<unsigned char>& bytes)
 {
-	string_path path, temp, backup;
-	character_path(login, slot, path);
-	character_commits_flush(path);
-	xr_sprintf(backup, "%s.before_master", path);
-	if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) CopyFileA(path, backup, FALSE);
-	if (!character_temp_path(path, false, temp)) return false;
-	CharacterCommit commit;
-	commit.path = path; commit.temp = temp;
-	commit.snapshot.assign(bytes.begin(), bytes.end());
-	commit.bytes = u64(commit.snapshot.size());
-	if (!character_commit_file(commit)) return false;
-	s_characters.erase(character_key(login, slot));
-	if (!character_load(login, slot))
-	{
-		// Unreadable here: put the previous local file back.
-		if (GetFileAttributesA(backup) != INVALID_FILE_ATTRIBUTES) CopyFileA(backup, path, FALSE);
-		s_characters.erase(character_key(login, slot));
-		character_load(login, slot);
-		return false;
-	}
-	Msg("[Lost Zone][master] %s slot %u: the world master's newer save is used (%u bytes)", login, slot, u32(bytes.size()));
-	return true;
+ if (!character_load_image(login, slot, bytes.data(), bytes.size())) return false;
+ Msg("[Lost Zone][master] %s slot %u: the world master's save loaded in memory (%u bytes)", login, slot, u32(bytes.size()));
+ return true;
 }
 
 // The player left this location (not through a level changer).

@@ -22,10 +22,13 @@ struct CharacterRestore
 	xr_vector<std::pair<u16, u16>> places, entities; // runtime item -> expected parent
 	bool inventory_complete = false, attempted = false;
 	u32 last_attempt = 0;
+	u32 since = 0;
+	bool clock_started = false, rejected = false;
 };
 static xr_map<u16, CharacterRestore> s_character_restore;
 static bool character_capture_progress(Character& character, CActor* actor);
 static bool character_restore_progress(Character& character, CActor* actor);
+static void character_restore_timeout(u16 actor_id);
 
 bool server_character_accepts(xrClientData* CL, u16 type)
 {
@@ -85,12 +88,32 @@ bool script_character(int slot, LPCSTR name, LPCSTR faction, int economy, LPCSTR
 	return true;
 }
 
-static bool character_read_string(FILE* f, xr_string& value, u32 max_size)
+struct CharacterInput
+{
+ const u8* data;
+ size_t remaining;
+ CharacterInput(const void* bytes, size_t size) : data(static_cast<const u8*>(bytes)), remaining(size) {}
+ size_t read(void* output, size_t size, size_t count)
+ {
+  if (!size || count > remaining / size) return 0;
+  const size_t bytes = size * count;
+  if (bytes) memcpy(output, data, bytes);
+  data += bytes; remaining -= bytes;
+  return count;
+ }
+ int get()
+ {
+  if (!remaining) return EOF;
+  --remaining; return *data++;
+ }
+};
+
+static bool character_read_string(CharacterInput* f, xr_string& value, u32 max_size)
 {
 	value.clear();
 	for (u32 n = 0; n <= max_size; ++n)
 	{
-		const int c = fgetc(f);
+		const int c = f->get();
 		if (c == EOF) return false;
 		if (!c) return true;
 		value += char(c);
@@ -111,13 +134,13 @@ static bool character_checksum_matches(const void* data, u32 size, u32 expected,
 		(legacy_crc && save_checksum::legacy_ieee(data, size) == expected);
 }
 
-static bool character_read_packet(FILE* f, NET_Packet& packet, bool legacy_crc)
+static bool character_read_packet(CharacterInput* f, NET_Packet& packet, bool legacy_crc)
 {
 	u32 size, crc;
-	if (fread(&size, 4, 1, f) != 1 || fread(&crc, 4, 1, f) != 1 || size > sizeof(packet.B.data)) return false;
+	if (f->read(&size, 4, 1) != 1 || f->read(&crc, 4, 1) != 1 || size > sizeof(packet.B.data)) return false;
 	packet.B.count = size;
 	packet.r_pos = 0;
-	return (!size || fread(packet.B.data, 1, size, f) == size) && character_checksum_matches(packet.B.data, size, crc, legacy_crc);
+	return (!size || f->read(packet.B.data, 1, size) == size) && character_checksum_matches(packet.B.data, size, crc, legacy_crc);
 }
 
 // Count first, then allocate and fill one exact immutable NCH image. No FILE,
@@ -159,12 +182,12 @@ static void character_write_state(CharacterSnapshot& output, const xr_vector<u8>
 	output.write(&size, 2); output.write(state.data(), size);
 }
 
-static bool character_read_state(FILE* f, xr_vector<u8>& state)
+static bool character_read_state(CharacterInput* f, xr_vector<u8>& state)
 {
 	u16 size = 0;
-	if (fread(&size, 2, 1, f) != 1 || size > 512) return false;
+	if (f->read(&size, 2, 1) != 1 || size > 512) return false;
 	state.resize(size);
-	return !size || fread(state.data(), 1, size, f) == size;
+	return !size || f->read(state.data(), 1, size) == size;
 }
 
 static bool character_snapshot(const Character& character, xr_vector<u8>& snapshot)
@@ -213,7 +236,7 @@ static bool character_snapshot(const Character& character, xr_vector<u8>& snapsh
 // the temporary file must not block the simulation. An accepted queue entry
 // is pending, not durable acknowledgement. Sync saves retain their barrier.
 struct CharacterCommit { xr_string temp, path; xr_vector<u8> snapshot; u64 bytes = 0; };
-static void admission_capture(const Character& character, const xr_vector<u8>& snapshot); // netcoop_admission.inc
+static bool admission_capture(const Character& character, const xr_vector<u8>& snapshot); // netcoop_admission.inc
 static xrCriticalSection s_commit_lock;
 static xr_deque<CharacterCommit> s_commits;
 static bool s_commit_worker = false;
@@ -375,7 +398,7 @@ static bool character_save(Character& character, bool background = false)
     commit.path = path; commit.temp = temp;
     if (!character_snapshot(character, commit.snapshot)) return false;
     commit.bytes = u64(commit.snapshot.size());
-    admission_capture(character, commit.snapshot); // the same image goes to the world master (doc 135)
+    if (!admission_capture(character, commit.snapshot)) return false; // do not hand off an image the master never queued
     if (background)
     {
         if (!character_commit_enqueue(std::move(commit))) return false;
@@ -388,36 +411,30 @@ static bool character_save(Character& character, bool background = false)
     return true;
 }
 
-static Character* character_load(LPCSTR account, u8 slot)
+static bool character_decode(const void* bytes, size_t byte_count, Character& character)
 {
-	const xr_string key = character_key(account, slot);
-	auto cached = s_characters.find(key);
-	if (cached != s_characters.end()) return &cached->second;
-	string_path path;
-	character_path(account, slot, path);
-	FILE* f = fopen(path, "rb");
-	if (!f) return nullptr;
-	Character character;
-	character.account = account; character.slot = slot;
+ if (!bytes || !byte_count || byte_count > CharacterSnapshot::limit) return false;
+ CharacterInput input(bytes, byte_count);
+ CharacterInput* f = &input;
 	u32 magic = 0, count = 0;
-	bool ok = fread(&magic, 4, 1, f) == 1 && (magic == 0x3348434e || magic == 0x3448434e || magic == 0x3548434e || magic == 0x3648434e || magic == 0x3748434e || magic == 0x3848434e || magic == 0x3948434e) &&
+	bool ok = f->read(&magic, 4, 1) == 1 && (magic == 0x3348434e || magic == 0x3448434e || magic == 0x3548434e || magic == 0x3648434e || magic == 0x3748434e || magic == 0x3848434e || magic == 0x3948434e) &&
 		character_read_string(f, character.name, 63) && character_read_string(f, character.faction, 32) &&
 		character_read_string(f, character.loadout, 4096);
 	if (ok && magic >= 0x3548434e) ok = character_read_string(f, character.description, 512) && character_read_string(f, character.history, 1536);
 	const bool legacy_crc = magic < 0x3848434e;
 	if (ok)
 	{
-		character.economy = u8(fgetc(f));
-		const int initialized = fgetc(f), respawn = fgetc(f);
+		character.economy = u8(f->get());
+		const int initialized = f->get(), respawn = f->get();
 		character.initialized = initialized == 1; character.respawn = respawn == 1;
-		if (initialized < 0 || initialized > 1 || respawn < 0 || respawn > 1) { fclose(f); return nullptr; }
-		ok = character_read_packet(f, character.actor, legacy_crc) && fread(&count, 4, 1, f) == 1 && count <= 512;
+		if (initialized < 0 || initialized > 1 || respawn < 0 || respawn > 1) { return false; }
+		ok = character_read_packet(f, character.actor, legacy_crc) && f->read(&count, 4, 1) == 1 && count <= 512;
 	}
 	for (u32 i = 0; ok && i < count; ++i)
 	{
 		Character::Item item;
-		ok = character_read_string(f, item.section, 128) && fread(&item.parent, 2, 1, f) == 1 &&
-			item.parent <= i && (magic == 0x3348434e || fread(&item.place, 2, 1, f) == 1) &&
+		ok = character_read_string(f, item.section, 128) && f->read(&item.parent, 2, 1) == 1 &&
+			item.parent <= i && (magic == 0x3348434e || f->read(&item.place, 2, 1) == 1) &&
 			character_read_packet(f, item.spawn, legacy_crc) && (magic < 0x3748434e || character_read_state(f, item.state)) &&
 			pSettings->section_exist(item.section.c_str());
 		if (ok) character.items.push_back(std::move(item));
@@ -425,37 +442,62 @@ static Character* character_load(LPCSTR account, u8 slot)
 	if (ok && magic != 0x3348434e)
 	{
 		u32 size = 0, crc = 0;
-		ok = fread(&size, 4, 1, f) == 1 && fread(&crc, 4, 1, f) == 1 && size <= 1048576;
+		ok = f->read(&size, 4, 1) == 1 && f->read(&crc, 4, 1) == 1 && size <= 1048576;
 		if (ok)
 		{
 			character.progress.resize(size);
-			ok = (!size || fread(character.progress.data(), 1, size, f) == size) && character_checksum_matches(character.progress.data(), size, crc, legacy_crc);
+			ok = (!size || f->read(character.progress.data(), 1, size) == size) && character_checksum_matches(character.progress.data(), size, crc, legacy_crc);
 		}
 	}
     if (ok && magic>=0x3648434e)
     {
-        ok=fread(&character.storage_revision,4,1,f)==1 && character.storage_revision &&
+        ok=f->read(&character.storage_revision,4,1)==1 && character.storage_revision &&
             character_read_string(f,character.storage_request,32) && character_read_string(f,character.storage_signature,80) &&
-            fread(&count,4,1,f)==1 && count<=512;
+            f->read(&count,4,1)==1 && count<=512;
         for (u32 i=0;ok && i<count;++i)
         {
             Character::Item item;
-            ok=character_read_string(f,item.section,128) && fread(&item.parent,2,1,f)==1 && item.parent<=i &&
-                fread(&item.place,2,1,f)==1 && character_read_packet(f,item.spawn,legacy_crc) &&
+            ok=character_read_string(f,item.section,128) && f->read(&item.parent,2,1)==1 && item.parent<=i &&
+                f->read(&item.place,2,1)==1 && character_read_packet(f,item.spawn,legacy_crc) &&
                 (magic<0x3748434e || character_read_state(f,item.state)) && pSettings->section_exist(item.section.c_str());
             if (ok) character.safe.push_back(std::move(item));
         }
     }
-    if (ok && magic>=0x3948434e) ok=fread(&character.inventory_cells,4,1,f)==1 && character.inventory_cells<=512;
-    ok=ok && fgetc(f)==EOF && !ferror(f);
-	fclose(f);
-	if (!ok || !character_name_valid(character.name.c_str()))
-	{
-		Msg("! [Lost Zone] cannot read character slot %u for %s", slot, account);
-		return nullptr;
-	}
-	s_characters[key] = std::move(character);
-	return &s_characters[key];
+    if (ok && magic>=0x3948434e) ok=f->read(&character.inventory_cells,4,1)==1 && character.inventory_cells<=512;
+    ok=ok && input.remaining==0;
+
+ return ok && character_name_valid(character.name.c_str());
+}
+
+static bool character_load_image(LPCSTR account, u8 slot, const void* bytes, size_t size)
+{
+ Character character;
+ character.account = account; character.slot = slot;
+ if (!character_decode(bytes, size, character)) return false;
+ s_characters[character_key(account, slot)] = std::move(character);
+ return true;
+}
+
+static Character* character_load(LPCSTR account, u8 slot)
+{
+ const xr_string key = character_key(account, slot);
+ auto cached = s_characters.find(key);
+ if (cached != s_characters.end()) return &cached->second;
+ string_path path; character_path(account, slot, path);
+ FILE* file = fopen(path, "rb");
+ if (!file) return nullptr;
+ bool ok = fseek(file, 0, SEEK_END) == 0;
+ const long size = ok ? ftell(file) : -1;
+ ok = ok && size > 0 && size_t(size) <= CharacterSnapshot::limit && fseek(file, 0, SEEK_SET) == 0;
+ xr_vector<u8> bytes;
+ if (ok) { bytes.resize(size); ok = fread(bytes.data(), 1, bytes.size(), file) == bytes.size() && !ferror(file); }
+ fclose(file);
+ if (!ok || !character_load_image(account, slot, bytes.data(), bytes.size()))
+ {
+  Msg("! [Lost Zone] cannot read character slot %u for %s", slot, account);
+  return nullptr;
+ }
+ return &s_characters[key];
 }
 
 static bool character_validate_loadout(LPCSTR faction, u8 economy, LPCSTR loadout)
@@ -709,6 +751,7 @@ void server_character_spawn_items(xrClientData* CL)
 	if (!CL || !CL->owner || !CL->netcoop_login.size()) return;
 	if (s_actor_character.find(CL->owner->ID) != s_actor_character.end()) return;
 	CharacterRestore& restore = s_character_restore[CL->owner->ID];
+	restore = CharacterRestore(); // IDs may have belonged to an abandoned partial restore
 	Character* character = character_load(CL->netcoop_login.c_str(), CL->netcoop_character_slot);
 	if (!character) return;
 	s_actor_character[CL->owner->ID] = character_key(character->account.c_str(), character->slot);
@@ -909,6 +952,16 @@ static void characters_restore_update()
 {
 	for (auto it = s_character_restore.begin(); it != s_character_restore.end();)
 	{
+		const u32 now = real_time_ms();
+		if (!it->second.clock_started) { it->second.since = now; it->second.clock_started = true; }
+		if (!it->second.rejected && u32(now - it->second.since) >= 60000)
+		{
+			it->second.rejected = true;
+			Msg("! [Lost Zone] character %u restore timed out: inventory_complete=%u, expected_items=%u; keeping previous checkpoint",
+				it->first, u32(it->second.inventory_complete), u32(it->second.entities.size()));
+			character_restore_timeout(it->first);
+		}
+		if (it->second.rejected) { ++it; continue; }
 		CActor* actor = smart_cast<CActor*>(Level().Objects.net_Find(it->first));
 		if (!actor) { ++it; continue; }
 		if (!it->second.inventory_complete) { ++it; continue; }
@@ -924,7 +977,6 @@ static void characters_restore_update()
 		if (key == s_actor_character.end()) { ++it; continue; }
 		const auto character = s_characters.find(key->second);
 		if (character == s_characters.end()) { ++it; continue; }
-		const u32 now = real_time_ms();
 		if (it->second.attempted && u32(now - it->second.last_attempt) < 1000) { ++it; continue; }
 		it->second.attempted = true; it->second.last_attempt = now;
 		if (!character_restore_progress(character->second, actor))

@@ -87,10 +87,10 @@ int main(int argc,char** argv)
     result=admit(cordon,stale,nullptr,bytes);
     assert(result.state==AdmissionState::Admitted && result.master_bytes && result.revision==2);
     assert(std::string(bytes.begin(),bytes.end())==second);
-    // The same image locally: nothing to download.
+    // Even a matching disk backup does not prove the engine cache is current.
     assert(cordon.leave("alice",1));settle(cordon);
     result=admit(cordon,second,nullptr,bytes);
-    assert(result.state==AdmissionState::Admitted && !result.master_bytes && bytes.empty());
+    assert(result.state==AdmissionState::Admitted && result.master_bytes && std::string(bytes.begin(),bytes.end())==second);
     // 4. A login of an admitted (ACTIVE) slot at another location learns
     // where the character lives (the server sends the player there).
     result=admit(garbage,second,nullptr,bytes);

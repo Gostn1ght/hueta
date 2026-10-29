@@ -26,6 +26,9 @@ local controlled_actor_id = nil
 local destroyed_actor_id = nil
 local use_own_actor_id -- defined below
 local install_actor_lifecycle
+local player_state_ready = false
+local next_player_state = 0
+local pending_player_state = nil
 
 -- The locally controlled Actor: set by the engine hook after spawn, or
 -- recovered from the view entity when this script loaded too late for it.
@@ -101,6 +104,8 @@ end
 -- Engine hook (Level_network_spawn.cpp) after the local Actor is assigned.
 function on_actor_spawned(obj)
 	controlled_actor = obj
+	player_state_ready = false
+	next_player_state = 0
 	controlled_actor_id = obj:id()
 	destroyed_actor_id = nil
 	db.actor = obj
@@ -108,6 +113,7 @@ function on_actor_spawned(obj)
 	use_own_actor_id(obj)
 	quiet_busy_hands()
 	CreateTimeEvent("netcoop_client", "equip_pda", 5, equip_pda)
+	if pending_player_state then use_player_state(pending_player_state) end
 end
 
 function on_actor_destroyed(obj)
@@ -117,6 +123,7 @@ function on_actor_destroyed(obj)
 		destroyed_actor_id = controlled_actor_id
 		controlled_actor = nil
 		controlled_actor_id = nil
+		player_state_ready, next_player_state, pending_player_state = false, 0, nil
 		rawset(db, "actor", nil)
 	end
 end
@@ -1080,8 +1087,6 @@ end
 ----------------------------------------------------------------------
 -- Modules whose save_state/load_state hold this player's own state.
 local PLAYER_STATE_MODULES = { "actor_status_thirst" }
-local player_state_ready = false
-local next_player_state = 0
 
 -- Numbers, booleans and nested tables only: "k=1;t={a=2;};b=true;"
 local function state_encode(t, depth)
@@ -1090,7 +1095,7 @@ local function state_encode(t, depth)
 	for k, v in pairs(t) do
 		local key = tostring(k)
 		if string.match(key, "^[%w_]+$") then
-			if type(v) == "number" then out[#out + 1] = key .. "=" .. string.format("%.6g", v) .. ";"
+			if type(v) == "number" and v == v and math.abs(v) < math.huge then out[#out + 1] = key .. "=" .. string.format("%.6g", v) .. ";"
 			elseif type(v) == "boolean" then out[#out + 1] = key .. "=" .. (v and "true" or "false") .. ";"
 			elseif type(v) == "table" then out[#out + 1] = key .. "={" .. state_encode(v, depth + 1) .. "};" end
 		end
@@ -1130,6 +1135,16 @@ local function collect_player_state()
 	local a = db.actor
 	if not a then return nil end
 	local state = { satiety = a.satiety, power = a.power, modules = {} }
+	-- BHS keeps limb health in the client Lua module/pstor, outside the
+	-- native Actor's health. Carry both permanent and temporary healing.
+	local injuries = zzz_player_injuries
+	if injuries and injuries.health and injuries.timedhp then
+		state.injuries = { health = {}, timedhp = {} }
+		for _, limb in ipairs({"head", "torso", "leftarm", "rightarm", "leftleg", "rightleg"}) do
+			state.injuries.health[limb] = injuries.health[limb]
+			state.injuries.timedhp[limb] = injuries.timedhp[limb]
+		end
+	end
 	for _, name in ipairs(PLAYER_STATE_MODULES) do
 		local m = _G[name]
 		if m and type(m.save_state) == "function" then
@@ -1140,26 +1155,52 @@ local function collect_player_state()
 	return state_encode(state, 0)
 end
 
-local function report_player_state()
-	if not (player_state_ready and netcoop_command) or time_global() < next_player_state then return end
-	next_player_state = time_global() + 30000
+local function report_player_state(force)
+	if not (player_state_ready and netcoop_command) or (not force and time_global() < next_player_state) then return end
+	next_player_state = time_global() + 5000
 	local data = collect_player_state()
 	if data and #data < 3000 then netcoop_command("player_state " .. data) end
 end
 
+-- Called before the reliable, ordered level-change request. The source
+-- saves this message before freezing the character for its destination.
+function flush_player_state()
+	report_player_state(true)
+end
+
 -- Global: on_script_message (above) calls it with the server's saved state.
 function use_player_state(data)
-	player_state_ready = true
-	next_player_state = time_global() + 30000
-	if not data or data == "-" then return end
-	local state = state_decode(data)
 	local a = db.actor
-	if not (state and a) then return end
-	if state.satiety then a.satiety = state.satiety end
-	if state.power then a.power = state.power end
-	for name, saved in pairs(state.modules or {}) do
+	if not a then pending_player_state = data; return end
+	local state = (not data or data == "-") and {} or state_decode(data)
+	if not state then return end
+	pending_player_state = nil
+	player_state_ready = true
+	next_player_state = time_global() + 5000
+	if type(state.satiety) == "number" then a.satiety = math.max(0, math.min(1, state.satiety)) end
+	if type(state.power) == "number" then a.power = math.max(0, math.min(1, state.power)) end
+	for name, saved in pairs(type(state.modules) == "table" and state.modules or {}) do
 		local m = _G[name]
 		if m and type(m.load_state) == "function" then pcall(m.load_state, saved) end
+	end
+	local injuries = zzz_player_injuries
+	if injuries and injuries.maxhp and injuries.health and injuries.timedhp then
+		local saved = type(state.injuries) == "table" and state.injuries or {}
+		local storage = db.storage[a:id()]
+		if not storage then storage = {object=a}; db.storage[a:id()] = storage end
+		storage.pstor = storage.pstor or {}
+		for _, limb in ipairs({"head", "torso", "leftarm", "rightarm", "leftleg", "rightleg"}) do
+			local maximum = injuries.maxhp[limb]
+			local hp = type(saved.health) == "table" and saved.health[limb]
+			local temporary = type(saved.timedhp) == "table" and saved.timedhp[limb]
+			if type(maximum) == "number" and maximum > 0 then
+				hp = type(hp) == "number" and hp == hp and math.max(0, math.min(maximum, hp)) or maximum
+				temporary = type(temporary) == "number" and temporary == temporary and math.max(0, math.min(hp, temporary)) or 0
+				injuries.health[limb], injuries.timedhp[limb] = hp, temporary
+				-- BHS's first update reads pstor again; it must see the same state.
+				storage.pstor["health." .. limb], storage.pstor["timedhp." .. limb] = hp, temporary
+			end
+		end
 	end
 	printf("[Lost Zone] player state restored")
 end

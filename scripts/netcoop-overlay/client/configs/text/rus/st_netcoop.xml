@@ -1472,7 +1472,7 @@
     <text>радиоактивное</text>
   </string>
   <string id="st_netcoop_rp_need_weapon">
-    <text>Для этой анимации нужно оружие</text>
+    <text>Для этой анимации нужен подходящий предмет. Оружие должно быть в слоте.</text>
   </string>
   <string id="st_netcoop_rp_back">
     <text>Назад</text>

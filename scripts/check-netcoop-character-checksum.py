@@ -33,13 +33,13 @@ def block(marker):
 actual = characters[characters.index('struct Character\n'):characters.index('static xr_map<xr_string, Character>')]
 for marker in ('static xr_string character_key(', 'static void character_path(', 'static bool character_name_valid('):
     actual += '\n'+block(marker)
-actual += '\n'+characters[characters.index('static bool character_read_string('):characters.index('// Autosaves pass owned bytes')]
+actual += '\n'+characters[characters.index('struct CharacterInput\n'):characters.index('// Autosaves pass owned bytes')]
 actual += '\n'+block('static bool character_sync_commit(')
 actual += '\n'+block('static bool character_commit_file(')
 # The world master mirror (doc 135) receives each image; here it only counts them.
-actual += '\nunsigned fixture_mirrored=0;static void admission_capture(const Character&, const xr_vector<u8>& image){if(!image.empty())++fixture_mirrored;}\n'
+actual += '\nunsigned fixture_mirrored=0;static bool fixture_master_refuses=false;static bool admission_capture(const Character&, const xr_vector<u8>& image){if(fixture_master_refuses)return false;if(!image.empty())++fixture_mirrored;return true;}\n'
 actual += '\n'+block('static bool character_save(Character&')
-actual += '\n'+block('static Character* character_load(')
+actual += '\nstatic xr_map<xr_string, Character> s_characters;\n'+block('static bool character_decode(')+'\n'+block('static bool character_load_image(')+'\n'+block('static Character* character_load(')
 
 def crc32c(data):
     value = 0xffffffff
@@ -225,13 +225,24 @@ int main(){
  const auto good=bytes("v8_sse.bin");
  for(size_t end=0;end<good.size();++end){write_bytes("truncated.bin",{good.begin(),good.begin()+end});assert(!load("truncated.bin",false));}
  auto extra=good;extra.push_back(0);write_bytes("extra.bin",extra);assert(!load("extra.bin",true));
+ // Master replies use the same actual decoder without touching any file.
+ select("no-such-local-character.bin",true);
+ assert(character_load_image("fixture",1,good.data(),good.size()));
+ Character retained=*character_load("fixture",1);
+ for(size_t end=0;end<good.size();++end){
+  assert(!character_load_image("fixture",1,good.data(),end));
+  equal(retained,*character_load("fixture",1));
+ }
+ assert(!character_load_image("fixture",1,nullptr,0));
+ fixture_master_refuses=true;assert(!character_save(retained,true));fixture_master_refuses=false;
+ equal(retained,*character_load("fixture",1));
  // Explicitly reproduce the old loader's opposite-hardware checksum failure.
  assert(save_checksum::crc32c(sample.data(),900)!=save_checksum::legacy_ieee(sample.data(),900));
  std::cout<<"PASS actual NCH3..9 reader/durable writer, both actual CPU CRC paths, independent golden byte images, no autosave producer IO, immutable queued snapshots, refused malformed/overflow payloads, legacy upgrade, opposite CPU, empty progress, inventory/safe/profile preservation, corruption/truncation/unknown-version rejection\n";
 }
 '''
 # The full actual loader caches admitted characters; declare its cache before it.
-source = source.replace('static Character* character_load(', 'static xr_map<xr_string, Character> s_characters;\nstatic Character* character_load(', 1)
+# The cache is declared before both memory and legacy-file loaders.
 
 with TemporaryDirectory(prefix='lostzone-checksum-') as temp:
     folder = Path(temp)

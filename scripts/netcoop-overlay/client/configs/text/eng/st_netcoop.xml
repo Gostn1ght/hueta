@@ -1472,7 +1472,7 @@
     <text>radioactive</text>
   </string>
   <string id="st_netcoop_rp_need_weapon">
-    <text>This animation needs a weapon</text>
+    <text>This animation needs a matching item. Equip the required weapon in a slot.</text>
   </string>
   <string id="st_netcoop_rp_back">
     <text>Back</text>

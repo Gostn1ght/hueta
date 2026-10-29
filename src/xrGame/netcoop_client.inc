@@ -310,6 +310,12 @@ void client_on_auth_result(NET_Packet& P)
 
 static bool s_trade_refresh = false;
 
+void client_flush_player_state()
+{
+	if (pure_client()) call_lua("netcoop_client_compat.flush_player_state", true, role_none, "");
+	client_items_update(true);
+}
+
 void client_on_trade_result(NET_Packet& P)
 {
 	const u8 ok = P.r_u8();

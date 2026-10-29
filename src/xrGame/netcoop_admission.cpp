@@ -373,9 +373,10 @@ struct AdmissionCoordinator::State
         Outcome outcome;
         outcome.admission.state=AdmissionState::Admitted;put(outcome.admission.character,id);
         outcome.admission.revision=character.revision;
-        // The master's durable image wins over a different local file.
-        const auto local_sha=job.local.empty() ? std::string():checkpoint_sha256(job.local);
-        if(character.revision && slot.sha256!=local_sha)
+        // Always return the authoritative image: the engine cache can be
+        // older than a matching disk backup after this map was visited before.
+        // Local files are consulted only when importing a slot with no revision.
+        if(character.revision)
         {
             CheckpointDownload read(id,fence,character.session,character.revision,slot.sha256,std::size_t(slot.bytes));
             auto send=[this](const std::string& method,const std::string& path,const std::string& payload,BridgeJson& reply,unsigned& code)

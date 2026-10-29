@@ -17,7 +17,7 @@ a=b;b=characters.index('static void character_commit_worker(',a)
 commit_file=characters[a:b]
 worker=characters[b:characters.index('// A synchronous save',b)]
 assert 'character_commit_take(commit)' in worker and 'character_commit_finish()' in worker
-save=characters[characters.index('static bool character_save(Character&'):characters.index('static Character* character_load(')]
+save=characters[characters.index('static bool character_save(Character&'):characters.index('static bool character_decode(')]
 assert save.index('character_path(') < save.index('character_commits_flush(path)') < save.index('character_temp_path(') < save.index('character_snapshot(')
 assert save.index('character_snapshot(') < save.index('character_commit_enqueue(std::move(commit))') < save.index('character.last_save = real_time_ms()')
 for operation in ('fopen(', 'fwrite(', 'fflush(', 'DeleteFileA(', '_commit('):

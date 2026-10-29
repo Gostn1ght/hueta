@@ -361,6 +361,8 @@ void client_on_item_upgrade(NET_Packet& P);
 // event that moves an item to someone else.
 void client_items_update(bool flush = false);
 void client_item_forget(u16 id);
+void client_items_reset(); // item IDs/versions belong to one location connection
+void client_flush_player_state();
 LPCSTR script_item_info(u16 id);
 LPCSTR script_item_uid(u16 id);
 LPCSTR script_master_state(); // world master schedules for the server Lua
@@ -512,6 +514,8 @@ struct RpAnim
 	bool walk = false;
 	xr_vector<shared_str> legs, torso;
 	u8 slot = 0; // a weapon pose: this slot's item in the hands (it must be there)
+	u8 weapon = 0; // 1: long firearm, 2: pistol; slot is only a preference
+	xr_vector<shared_str> items; // any listed item must be present, including in the rucksack
 };
 const xr_vector<RpAnim>& rp_anims();
 // Lua: netcoop_rp_list() -> "name=title;...", netcoop_rp_play(name),

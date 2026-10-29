@@ -49,9 +49,16 @@ for name in order:
 assert len(order) >= 61 and walks >= 5 and weapons >= 7, (len(order), walks, weapons)
 
 engine = (ROOT / "src/xrGame/netcoop_rp_anims.inc").read_text(encoding="utf-8")
-for key in ("in", "mid", "out", "loop", "once", "walk", "legs", "torso", "slot"):
+for key in ("in", "mid", "out", "loop", "once", "walk", "legs", "torso", "slot", "weapon", "items"):
     assert '"%s"' % key in engine, key
 animation = (ROOT / "src/xrGame/ActorAnimation.cpp").read_text(encoding="utf-8", errors="replace")
 assert "gop_stop" not in animation  # the weapon comes from the slot, not a name
+assert sections['rp_nw_19']['weapon'] == sections['rp_nw_62']['weapon'] == 'pistol'
+for name in order:
+    a = sections['rp_' + name]
+    if 'slot' in a:
+        assert a.get('weapon') == 'rifle', name
+    if name in {'nw_20', 'nw_28', 'nw_29', 'nw_30', 'nw_31', 'nw_40', 'nw_41', 'nw_42', 'nw_43', 'nw_50', 'nw_51', 'nw_52', 'nw_53'}:
+        assert a.get('items'), (name, 'missing inventory requirement')
 print("PASS RP animations: %d (%d walking, %d with a weapon), every motion in the actor OMFs, all keys the engine reads"
       % (len(order), walks, weapons))

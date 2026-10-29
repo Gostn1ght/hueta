@@ -479,14 +479,14 @@ static bool finish_auth(xrServer* server, PendingAuth* pending)
         reject(server, CL, "Your character's location is starting; log in again in 1-2 minutes");
         return false;
     }
-    if (!character_select(CL, pending->slot, pending->character_name.c_str(), pending->faction.c_str(), pending->economy, pending->loadout.c_str()))
+    if (!admission_active() && !character_select(CL, pending->slot, pending->character_name.c_str(), pending->faction.c_str(), pending->economy, pending->loadout.c_str()))
     {
         cluster_lease_release(a->login.c_str());
         CL->netcoop_login = NULL;
         reject(server, CL, "Character unavailable or starting items exceed the point budget");
         return false;
     }
-    if (Character* character = character_load(CL->netcoop_login.c_str(), pending->slot))
+    if (!admission_active()) if (Character* character = character_load(CL->netcoop_login.c_str(), pending->slot))
         if (!character->initialized && pending->firebase)
         { character->description = pending->description; character->history = pending->history; character_save(*character); }
 	// M2b: the world master admits the character (create / resume /
@@ -585,13 +585,28 @@ static void admission_logins_update(xrServer* server)
 			string_path path; admission_token_path(login.c_str(), pending->slot, path); DeleteFileA(path);
 			Msg("[Lost Zone][master] %s slot %u: an old passage token was dropped", login.c_str(), pending->slot);
 		}
-		bool ok = result.state != netcoop_world::AdmissionState::Refused;
+		// A configured master is authoritative. A timeout must not admit a
+		// stale local body while another map owns the current character.
+		bool ok = result.state == netcoop_world::AdmissionState::Admitted;
 		LPCSTR reason = result.reason[0] ? result.reason : "The world master refused this character";
 		if (ok && result.state == netcoop_world::AdmissionState::Admitted && result.master_bytes &&
 			!admission_apply_master_bytes(login.c_str(), pending->slot, bytes))
 		{
 			ok = false; reason = "The world master's save of this character could not be loaded here";
 			s_admission.leave(login.c_str(), pending->slot);
+		}
+		if (ok)
+		{
+			CL->netcoop_role = a->role;
+			ok = character_select(CL, pending->slot, pending->character_name.c_str(), pending->faction.c_str(), pending->economy, pending->loadout.c_str());
+			if (!ok)
+			{
+				reason = "The admitted character or its starting items could not be loaded";
+				s_admission.leave(login.c_str(), pending->slot);
+			}
+			else if (pending->firebase)
+				if (Character* character = character_load(login.c_str(), pending->slot))
+					if (!character->initialized) { character->description = pending->description; character->history = pending->history; }
 		}
 		if (!ok)
 		{
@@ -602,30 +617,19 @@ static void admission_logins_update(xrServer* server)
 			free_pending(pending);
 			continue;
 		}
-		if (result.state == netcoop_world::AdmissionState::Admitted)
-		{
-			if (waiting.token) { string_path path; admission_token_path(login.c_str(), pending->slot, path); DeleteFileA(path); }
-			// A character the master has no save of yet: its local file is the first.
-			if (!result.revision && !result.master_bytes)
-				if (Character* character = character_load(login.c_str(), pending->slot))
-					character_save(*character, true);
-			Msg("[Lost Zone][master] %s slot %u admitted by the world master%s", login.c_str(), pending->slot,
-				result.master_bytes ? " (its newer save is used)" : "");
-		}
-		else
-		{
-			Msg("! [Lost Zone][master] %s slot %u: %s - local save only", login.c_str(), pending->slot, reason);
-			// No master answer: the local file's map decides, as without one.
-			xr_string redirect;
-			if (cluster_route(server, login.c_str(), pending->slot, redirect))
-			{
-				cluster_lease_release(login.c_str());
-				cluster_send_redirect(server, CL, redirect.c_str());
-				CL->netcoop_login = NULL;
-				free_pending(pending);
-				continue;
-			}
-		}
+		if (waiting.token) { string_path path; admission_token_path(login.c_str(), pending->slot, path); DeleteFileA(path); }
+		if (!result.revision && !result.master_bytes)
+			if (Character* character = character_load(login.c_str(), pending->slot))
+				if (!character_save(*character, true))
+				{
+					s_admission.leave(login.c_str(), pending->slot);
+					cluster_lease_release(login.c_str());
+					CL->netcoop_login = NULL;
+					reject(server, CL, "The initial character checkpoint could not be queued; reconnect to retry.");
+					free_pending(pending);
+					continue;
+				}
+		Msg("[Lost Zone][master] %s slot %u admitted using the master checkpoint", login.c_str(), pending->slot);
 		finish_login(server, CL, a, pending);
 		free_pending(pending);
 	}
@@ -705,6 +709,21 @@ void server_on_client_disconnect(xrClientData* CL)
 	}
 }
 
+static void character_restore_timeout(u16 actor_id)
+{
+	struct Refuse
+	{
+		u16 actor;
+		void operator()(IClient* client) const
+		{
+			xrClientData* CL = static_cast<xrClientData*>(client);
+			if (CL->owner && CL->owner->ID == actor)
+				reject(Level().Server, CL, "Character restoration timed out. Your saved items are preserved; reconnect to retry.");
+		}
+	} refuse = {actor_id};
+	Level().Server->ForEachClientDo(refuse);
+}
+
 // Only main-thread cleanup may read character restore/account maps. The
 // transport callback queues an Actor ID; it must not capture a half-restored
 // wallet or race the character/account caches while disconnecting.
@@ -757,9 +776,10 @@ static void destroy_pending_actors(xrServer* server)
             // changer was saved at the destination already and is not saved
             // here again; the target server owns the lease.
             const bool moved = cluster_actor_leaving(ids[i]);
+            const bool restoring = s_character_restore.find(ids[i]) != s_character_restore.end();
             const auto key = s_actor_character.find(ids[i]);
             const xr_string login = key != s_actor_character.end() ? key->second.substr(0, key->second.rfind(':')) : xr_string();
-            if (!moved && !login.empty())
+            if (!moved && !login.empty() && !restoring)
             {
                 const auto retry = s_actor_destroy_retry.find(ids[i]);
                 if (retry != s_actor_destroy_retry.end() && u32(real_time_ms() - retry->second) < 1000)
@@ -786,13 +806,23 @@ static void destroy_pending_actors(xrServer* server)
                 admission_leave(key->second); // the master session closes after the last save is durable
                 cluster_lease_release(login.c_str());
             }
+            if (restoring && !login.empty())
+            {
+                // These are copies of an unmodified checkpoint, not a live
+                // inventory to save. Retrying that save could never succeed
+                // and used to hold the account forever after disconnect.
+                admission_leave(key->second);
+                cluster_lease_release(login.c_str());
+                s_characters.erase(key->second);
+            }
+            s_character_restore.erase(ids[i]);
             s_actor_destroy_retry.erase(ids[i]);
             s_actor_character.erase(ids[i]);
             for (auto it = s_cluster_leaving.begin(); it != s_cluster_leaving.end();)
                 if (it->second.actor == ids[i]) it = s_cluster_leaving.erase(it); else ++it;
 			give_to_server(server, server->game->get_entity_from_eid(ids[i]), 0);
             // A dead body keeps its loot; a moved player's items went along.
-            if (!moved && !smart_cast<CActor*>(actor_object)->g_Alive()) continue;
+            if (!moved && !restoring && !smart_cast<CActor*>(actor_object)->g_Alive()) continue;
 			Msg("[Lost Zone] removing Actor %u of a disconnected player", ids[i]);
 			// An NPC still talking to this Actor would keep a dangling partner.
 			CActor* leaving = smart_cast<CActor*>(actor_object);

@@ -160,6 +160,7 @@ struct SInvItemPlace {u16 value=0,type=eItemPlaceSlot,slot_id=1;};
 ''' + enums + r'''
 xr_map<xr_string,Character>s_characters;
 xr_map<u16,xr_string>s_actor_character;
+int fixture_timeouts=0;void character_restore_timeout(u16){++fixture_timeouts;}
 ''' + declarations + item_ready + '\nstatic const u32 task_origin_marker=0x524f434e;\n' + progress + gate + spawn + update + tracked + '\nvoid receive_input(NET_Packet& P,xrClientData* CL){switch(M_CL_INPUT){\n' + input_case + '\ndefault:break;}}\n' + r'''
 NET_Packet input_packet(u32 sequence,u16 flags=ACTOR_DEFS::mcJump,float yaw=0,float pitch=0){
  NET_Packet packet;u32 position=2;
@@ -261,6 +262,14 @@ void admission_cases(CActor& actor,xrClientData& client){
  fixture_available=true;fixture_clock+=999u;characters_restore_update();assert(s_character_restore.size()==1);
  fixture_clock+=1u;characters_restore_update();assert(s_character_restore.empty());
 }
+void timeout_cases(CActor& actor){
+ reset(actor);fixture_timeouts=0;s_actor_character[actor.ID()]="tester:1";s_characters["tester:1"].progress=saved();
+ s_character_restore[actor.ID()]={};characters_restore_update();fixture_clock=59999;characters_restore_update();assert(fixture_timeouts==0);
+ fixture_clock=60000;characters_restore_update();assert(fixture_timeouts==1 && s_character_restore[actor.ID()].rejected);
+ fixture_clock=90000;characters_restore_update();assert(fixture_timeouts==1 && fixture_restore_calls==0 && fixture_events.empty());
+ reset(actor);fixture_timeouts=0;s_character_restore[actor.ID()]={};fixture_clock=0xfffffff0u;characters_restore_update();fixture_clock+=60000;
+ characters_restore_update();assert(fixture_timeouts==1);
+}
 void inventory_cases(xrClientData& client){
  Character character;Character::Item first,second;first.place=1;first.state={1,2};second.parent=1;second.state={3,4};character.items={first,second};
  {Game game;xrServer server{&game};CharacterRestore restore;assert(character_spawn_saved_items(&server,&client,character,restore));
@@ -272,7 +281,7 @@ void inventory_cases(xrClientData& client){
  {Game game;xrServer server{&game};CharacterRestore restore;character.items[1].parent=3;assert(!character_spawn_saved_items(&server,&client,character,restore));assert(game.begun==0);}
  {Game game;xrServer server{&game};CharacterRestore restore;character.items.resize(513);assert(!character_spawn_saved_items(&server,&client,character,restore));assert(game.begun==0);}
 }
-int main(){input_cases();CActor actor;CSE_Abstract owner;xrClientData client{&owner,1};save_cache_cases(actor);reset(actor);progress_cases(actor);admission_cases(actor,client);inventory_cases(client);clear_tasks(&fixture_manager);
+int main(){input_cases();CActor actor;CSE_Abstract owner;xrClientData client{&owner,1};save_cache_cases(actor);reset(actor);progress_cases(actor);admission_cases(actor,client);inventory_cases(client);timeout_cases(actor);clear_tasks(&fixture_manager);
  std::cout<<"PASS actual target restore: inventory creation/parent/state completeness, pending gameplay refusal, progress hook failure/retry, task/origin bounds and wrap-safe admission\n";
 }
 '''

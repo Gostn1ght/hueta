@@ -35,6 +35,9 @@ _spec.loader.exec_module(merge)
 sys.argv = _argv
 OMFS = ("stalker_animation", "stalker_scripts_animation", "stalker_smart_cover_animation")
 PREVIEW_FRAME, PREVIEW_COLUMNS = 64, 32
+RP_ITEMS = {20:"wpn_binoc", 28:"kolbasa", 29:"bread", 30:"vodka, vodka2, vodka_quality", 31:"energy_drink",
+            40:"guitar_a", 41:"guitar_a", 42:"harmonica_a", 43:"harmonica_a", 50:"hand_radio",
+            51:"anomaly_scaner, detector_geiger", 52:"anomaly_scaner, detector_geiger", 53:"detector_geiger, detector_radio"}
 
 
 def read_ltx(path):
@@ -111,7 +114,11 @@ def main(nw, client):
             body += ["in = " + chain_in, "mid = " + mid, "out = " + chain_out,
                      "loop = " + ("true" if a.get("anim_loop", "true") == "true" else "false")]
         if slot:
-            body.append("slot = " + slot)
+            body.extend(["slot = " + slot, "weapon = rifle"])
+        if index in (19, 62):
+            body.append("weapon = pistol")
+        if index in RP_ITEMS:
+            body.append("items = " + RP_ITEMS[index])
         for chain in [chain_in, chain_out, mid] + legs + torso:
             needed.update(x.strip() for x in chain.split(",") if x.strip())
         if "anim_%d" % index in previews:

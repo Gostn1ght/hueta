@@ -58,6 +58,9 @@ const xr_vector<RpAnim>& rp_anims()
 		rp_split(ini.line_exist(section, "torso") ? ini.r_string(section, "torso") : NULL, a.torso);
 		const int slot = ini.line_exist(section, "slot") ? ini.r_s32(section, "slot") : 0;
 		a.slot = u8(slot > 0 && slot < 16 ? slot : 0);
+		const LPCSTR weapon = ini.line_exist(section, "weapon") ? ini.r_string(section, "weapon") : "";
+		a.weapon = !xr_strcmp(weapon, "pistol") ? 2 : (!xr_strcmp(weapon, "rifle") || a.slot) ? 1 : 0;
+		rp_split(ini.line_exist(section, "items") ? ini.r_string(section, "items") : NULL, a.items);
 		if (a.walk && (a.legs.size() != 5 || a.torso.size() != 2))
 		{
 			Msg("! [Lost Zone] rp: %s walks but needs 5 legs and 2 torso motions", section);
