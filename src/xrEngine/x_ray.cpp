@@ -809,6 +809,7 @@ void foo()
 #endif // 0
 
 ENGINE_API bool g_dedicated_server = false;
+#include "client_config_migration.h"
 
 #ifndef DEDICATED_SERVER
 
@@ -962,6 +963,7 @@ int APIENTRY WinMain_impl(HINSTANCE hInstance,
     }
 
 	startup_mark("file system");
+	migrate_client_configs();
 	InitSettings();
 	Msg(XRAY_MONOLITH_VERSION);
 	startup_mark("settings");

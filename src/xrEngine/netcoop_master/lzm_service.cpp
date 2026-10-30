@@ -1,4 +1,4 @@
-﻿#include "lzm_service.h"
+#include "lzm_service.h"
 
 #include <windows.h>
 
@@ -853,7 +853,7 @@ HttpResponse Service::handle_entry(HttpRequest& request)
         {
             const std::string& text = query["slot"][0];
             bool digits = !text.empty() && text.size() <= 2 && std::all_of(text.begin(), text.end(), [](char c) { return c >= '0' && c <= '9'; });
-            slot = digits ? std::max<int64_t>(1, std::stoll(text)) : 0;
+            slot = digits ? std::stoll(text) : -1;
         }
         auto plan = read_cluster(cluster_);
         std::lock_guard<std::recursive_mutex> guard(store_->lock);
@@ -865,11 +865,40 @@ HttpResponse Service::handle_entry(HttpRequest& request)
         auto answer = [&](const PlanLocation& location) {
             return respond(200, { { "schema", 1 }, { "location", location.name }, { "host", "" }, { "port", location.port } });
         };
-        if (account && valid_account(*account) && slot >= 1 && slot <= 10)
+        if(!ready()) return respond(503,{{"schema",1},{"state","recovering"},{"location",""},{"retry_seconds",3}});
+        if (account && valid_account(*account) && slot >= 0 && slot <= 10)
         {
-            std::string wanted = home(*account, slot).value_or("l01_escape");
-            for (auto& location : plan)
-                if (location.name == wanted && running(location.name)) return answer(location);
+            // Listing slots needs any healthy location, not the old character's
+            // map. Entering a character must keep that exact map.
+            if(slot==0) {
+                for(const auto& location:plan) if(location.name=="l01_escape" && running(location.name)) return answer(location);
+                for(const auto& location:plan) if(running(location.name)) return answer(location);
+            }
+            const std::string wanted=slot==0 ? "l01_escape":home(*account,slot).value_or("l01_escape");
+            const auto target=std::find_if(plan.begin(),plan.end(),[&](const PlanLocation& location){return location.name==wanted;});
+            if(target==plan.end()) return respond(503,{{"schema",1},{"state","unplanned"},{"location",wanted},{"retry_seconds",0}});
+            if(running(wanted)) return answer(*target);
+            const auto folder=cluster_.substr(0,cluster_.find_last_of(L"\\/")+1)+L"netcoop_cluster";
+            const auto mode=folder+L"\\host_mode_"+widen(wanted)+L".txt";
+            std::ifstream in(mode);std::string selected;in>>selected;
+            in.close();
+            if(selected=="off") return respond(503,{{"schema",1},{"state","disabled"},{"location",wanted},{"retry_seconds",0}});
+            std::string state="starting";int retry=3;
+            try {
+                const auto view=loads(read_file(folder+L"\\host_view_native.json"));
+                if(view.value("updated",int64_t(0))>=int64_t(time(nullptr))-30)
+                    for(const auto& map:view["maps"]) if(map.value("map",std::string())==wanted) {
+                        state=map.value("state",std::string("starting"));
+                        if(state=="failed") retry=0;
+                    }
+            }catch(...) {}
+            if(state!="failed") {
+                const auto wake=folder+L"\\wake_"+widen(wanted)+L".txt",temporary=wake+L".entry."+std::to_wstring(GetCurrentThreadId())+L".tmp";
+                {std::ofstream out(temporary,std::ios::binary|std::ios::trunc);out<<"gateway\n";}
+                if(!MoveFileExW(temporary.c_str(),wake.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) state="control_error";
+            }
+            log_line(format("[diag][entry] target=%s udp=%d state=%s retry_seconds=%d",wanted.c_str(),target->port,state.c_str(),retry));
+            return respond(503,{{"schema",1},{"state",state},{"location",wanted},{"retry_seconds",retry}});
         }
         for (auto& location : plan)
             if (running(location.name)) return answer(location);

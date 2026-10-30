@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from contextlib import closing
 
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('Native checks must run in GitHub Actions')
@@ -20,6 +21,7 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     game = root / 'bootstrap'
     plan = game / 'appdata/server/netcoop_cluster.ltx'
     plan.parent.mkdir(parents=True)
+    (game / 'fsgame_server.template').write_text('$fs_root$ = false | false | {ROOT}\n$game_saves$ = true | false | {ROOT}appdata/server/savedgames/\n')
     plan.write_text('[cluster]\nentry_port=9446\nper_server=42\n[locations]\nk00_marsh=127.0.0.1:18001\n'
                     'l01_escape=127.0.0.1:18003\n[launch]\nl01_escape=custom_start\n[on_demand]\nl01_escape=1\n')
     legacy = game / 'hoster/master/runtime'
@@ -39,13 +41,14 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     actual = json.loads(migrated.read_text())
     assert actual['world_id'] == 71 and actual['seed'] == 9
     assert actual['signing_key'] == original['signing_key']
-    with sqlite3.connect(migrated.parent / 'world.sqlite') as copied:
+    with closing(sqlite3.connect(migrated.parent / 'world.sqlite')) as copied:
         assert copied.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert copied.execute('SELECT value FROM migration_probe').fetchone()[0] == 'live WAL snapshot'
     assert config.exists() and (legacy / 'world.sqlite').exists()
     text = plan.read_text()
     assert 'k00_marsh = 127.0.0.1:18001' in text and 'l01_escape = 127.0.0.1:18003' in text
     assert 'l01_escape = custom_start' in text and 'entry_port = 9446' in text
+    assert 'appdata\\master\\pending\\worlds\\' in (game / 'fsgame_server.ltx').read_text()
     assert 'l08_yantar = 127.0.0.1:1319' in text and 'l13u_warlab = 127.0.0.1:1359' in text
     assert len([c for c in actual['credentials'] if c.startswith('location:')]) == 33
     writer = game / 'appdata/server/netcoop_world_writer_l08_yantar.json'

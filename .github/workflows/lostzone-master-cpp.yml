@@ -49,6 +49,8 @@ jobs:
         run: python scripts/check-master-cpp-parity.py master-test\LostZoneMasterTest.exe
       - name: Native cluster migration, world database and process control without a game
         run: python scripts/check-master-v2.py master-test\LostZoneMasterTest.exe
+      - name: Nonblocking client routing and real entry responses
+        run: python scripts/check-native-entry-route.py
       - name: The master window opens, serves and closes
         shell: pwsh
         run: |

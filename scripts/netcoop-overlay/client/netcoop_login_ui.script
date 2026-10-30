@@ -146,16 +146,13 @@ end
 -- address) the address is used as it is. The typed address stays the
 -- remembered one.
 local function route_addr(ip, port, login, slot)
-	local to = netcoop_master_entry and netcoop_master_entry(ip .. ":" .. port, login or "", tonumber(slot) or 0) or ""
-	-- an address remembered from before 2026-10-25: the entry moved from 1267 to 5446
-	if to == "" and port == "1267" and netcoop_master_entry then
-		to = netcoop_master_entry(ip .. ":5446", login or "", tonumber(slot) or 0) or ""
-	end
-	local rip, rport = string.match(to, "^([%w%.%-]+):(%d+)$")
-	if rip then return rip, rport end
-	-- no master answers on its entry: the first map's port, as before 5446
-	if port == "5446" then return ip, "1267" end
-	return ip, port
+    if not netcoop_master_entry then return ip, port == "5446" and "1267" or port end -- older native binary
+    if port == "1267" then port="5446" end -- remembered pre-gateway address
+    local to = netcoop_master_entry(ip .. ":" .. port, login or "", tonumber(slot) or 0) or ""
+    local rip, rport = string.match(to, "^([%w%.%-]+):(%d+)$")
+    if rip then return rip, rport end
+    local kind, state, location, retry = to:match("^(%a+)|([%a_]+)|([%w_]*)|(%d+)$")
+    return nil, nil, state or "master_unavailable", location or "", math.max(1, math.min(30, tonumber(retry) or 3)), kind == "error"
 end
 
 class "netcoop_login_wnd" (CUIScriptWnd)
@@ -217,6 +214,36 @@ function netcoop_login_wnd:ShowAccountControls(show)
         item:Show(show)
     end
 end
+-- A route is checked asynchronously by the native worker. Never connect to
+-- another map because the desired map is still starting or manually stopped.
+function netcoop_login_wnd:RouteFailure(message)
+    self.route_wait, self.role_probe = nil, nil
+    auth_return = nil
+    self.login_button:Enable(true); self.register_button:Enable(true)
+    self.ed_login:Enable(true); self.ed_pass:Enable(true); self.ed_addr:Enable(true)
+    self:SetMsg(message)
+end
+function netcoop_login_wnd:WithRoute(ip, port, login, slot, ready)
+    local now = device():time_continual()
+    self.route_wait = {ip=ip, port=port, login=login, slot=slot, ready=ready, deadline=now+600000, next_at=now}
+    self:PollRoute()
+end
+function netcoop_login_wnd:PollRoute()
+    local pending = self.route_wait
+    if not pending then return end
+    local now = device():time_continual()
+    if now < pending.next_at then return end
+    if now >= pending.deadline then return self:RouteFailure(tr("route_timeout")) end
+    local ip, port, state, location, retry, failed = route_addr(pending.ip, pending.port, pending.login, pending.slot)
+    if ip then self.route_wait=nil; pending.ready(ip, port); return end
+    if failed then return self:RouteFailure(tr("route_error_" .. state)) end
+    local known = {contacting=true, master_unavailable=true, recovering=true, starting=true, loading=true, running=true,
+                   queued=true, memory=true, retry=true, master_wait=true, master_stopped=true, loading_timeout=true, stopped=true, saving=true}
+    local caption = location ~= "" and tr("map_" .. location) or tr("route_master")
+    self:SetMsg(string.format(tr("route_wait_" .. (known[state] and state or "starting")), caption))
+    pending.next_at = now + retry*1000
+end
+
 function netcoop_login_wnd:CloseRoomView()
     self.room_view, self.room_pending = nil, nil
     if self.view_index ~= -1 then self.view_index = -1; netcoop_preview_focus(-1) end
@@ -239,7 +266,7 @@ end
 -- One action at a time: no clicks while a request runs, a view opens or the
 -- room camera moves.
 function netcoop_login_wnd:Busy()
-    if auth_return == "pending" or self.settings_pending or self.room_pending then return true end
+    if self.route_wait or auth_return == "pending" or self.settings_pending or self.room_pending then return true end
     return self.mode == "characters" and netcoop_preview_ready ~= nil and not netcoop_preview_ready()
 end
 -- Every click is logged, ignored while busy (unless always) and guarded.
@@ -351,6 +378,7 @@ function netcoop_login_wnd:SetMsg(text)
 end
 
 function netcoop_login_wnd:Reset()
+    self.route_wait=nil
     if self.room_view or self.room_pending then self:CloseRoomView() end
 	self.mode = "account"
 	self:ShowAccountControls(true)
@@ -403,15 +431,14 @@ function netcoop_login_wnd:Connect(register)
 	self.pending_login, self.pending_ip, self.pending_port = login, ip, port
 	write_last(login, ip .. ":" .. port)
 	netcoop_character(0, "", "stalker", 1, "")
-	auth_return = "pending"; auth_message = nil
-	local cip, cport = route_addr(ip, port, login, 0)
-	if not netcoop_frontend_auth(string.format("%s/name=%s/port=%s", cip, login, cport)) then
-		auth_return = nil
-		return self:SetMsg(tr("auth_failed"))
-	end
-	self.login_button:Enable(false); self.register_button:Enable(false)
-	self.ed_login:Enable(false); self.ed_pass:Enable(false); self.ed_addr:Enable(false)
-	self:SetMsg(tr("connecting"))
+    auth_return=nil;auth_message=nil
+    self.login_button:Enable(false); self.register_button:Enable(false)
+    self.ed_login:Enable(false); self.ed_pass:Enable(false); self.ed_addr:Enable(false)
+    self:WithRoute(ip,port,login,0,function(cip,cport)
+        auth_return="pending"
+        if not netcoop_frontend_auth(string.format("%s/name=%s/port=%s",cip,login,cport)) then return self:RouteFailure(tr("auth_failed")) end
+        self:SetMsg(tr("connecting"))
+    end)
 end
 
 function netcoop_login_wnd:Update()
@@ -420,6 +447,7 @@ function netcoop_login_wnd:Update()
 	self.update_guard(self)
 end
 function netcoop_login_wnd:UpdateMenu()
+    self:PollRoute()
     if self.room_pending and (not netcoop_preview_ready or netcoop_preview_ready()) then
         local kind = self.room_pending; self.room_pending = nil
         if kind == "server" then
@@ -481,13 +509,11 @@ function netcoop_login_wnd:EnterWorld(slot, name, faction, economy, loadout)
 	local login, ip, port = self.pending_login, self.pending_ip, self.pending_port
 	write_last(login, ip .. ":" .. port)
 
-	printf("[Lost Zone] connecting as %s to %s:%s", login, ip, port)
-	self:HideDialog()
-	netcoop_menu_radio.stop()
-	netcoop_preview_clear()
-	exec_console_cmd("main_menu off")
-	local cip, cport = route_addr(ip, port, login, slot)
-	exec_console_cmd(string.format("start client(%s/name=%s/port=%s)", cip, login, cport))
+    self:WithRoute(ip,port,login,slot,function(cip,cport)
+        printf("[Lost Zone][entry] connecting slot %s to %s:%s",tostring(slot),cip,cport)
+        self:HideDialog();netcoop_menu_radio.stop();netcoop_preview_clear();exec_console_cmd("main_menu off")
+        exec_console_cmd(string.format("start client(%s/name=%s/port=%s)",cip,login,cport))
+    end)
 end
 
 
@@ -1003,6 +1029,7 @@ function netcoop_login_wnd:SignOut()
 end
 
 function netcoop_login_wnd:OnBack()
+    if self.route_wait then self:RouteFailure(tr("route_cancelled"));return end
 	if auth_return == "pending" then return end
     if self.room_view then self:CloseRoomView(); return end
     if cloud_enabled() then
@@ -1310,13 +1337,14 @@ function netcoop_login_wnd:CheckServer()
 end
 function netcoop_login_wnd:StartServerProbe()
     netcoop_character(0, "", "stalker", 1, "")
-    auth_return = "pending"
-    local cip, cport = route_addr(self.pending_ip, self.pending_port, self.pending_login, 0)
-    if not netcoop_frontend_auth(string.format("%s/name=%s/port=%s", cip, self.pending_login, cport)) then
-        self.role_probe = nil; auth_return = nil; self:SetMsg(tr("auth_failed")); return
-    end
-    self:SetMsg(tr("connecting"))
+    auth_return=nil
+    self:WithRoute(self.pending_ip,self.pending_port,self.pending_login,0,function(cip,cport)
+        auth_return="pending"
+        if not netcoop_frontend_auth(string.format("%s/name=%s/port=%s",cip,self.pending_login,cport)) then return self:RouteFailure(tr("auth_failed")) end
+        self:SetMsg(tr("connecting"))
+    end)
 end
+
 function netcoop_login_wnd:SaveServer()
     local ip, port = parse_addr(self.server_edit:GetText())
     if not ip or tonumber(port) < 1 or tonumber(port) > 65535 then return self:SetMsg(tr("server_invalid")) end

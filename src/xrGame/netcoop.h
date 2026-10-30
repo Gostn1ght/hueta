@@ -16,6 +16,7 @@ class xrServer;
 struct GAME_NEWS_DATA;
 class CWeapon;
 class CActor;
+namespace netcoop { void client_entry_stop(); }
 class CSE_Abstract;
 class CZoneCampfire;
 class CCustomZone;

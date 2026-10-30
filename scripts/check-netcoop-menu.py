@@ -558,3 +558,31 @@ netcoop_menu_radio.volume(0.05);netcoop_menu_radio.station(1);netcoop_menu_radio
 assert(music_started==before and not music_sounds[#music_sounds].active)
 """)
 print('Account screens: register with repeat, existing email to sign-in, resend countdown, change email, sign out/switch, forgot password, Tab/Enter, poll ordering PASS')
+lua.execute(r'''
+local calls, completed = {}, 0
+local route = 'wait|loading|l08_yantar|3'
+function netcoop_master_entry(address, account, slot)
+    calls[#calls+1]={address=address, account=account, slot=slot};return route
+end
+local w=last_window
+local before=#commands
+w:WithRoute('route.example','5446','Tester',1,function(ip,port) completed=completed+1;assert(ip=='route.example' and port=='1319') end)
+assert(w.route_wait and completed==0 and #commands==before)
+route='wait|memory|l08_yantar|3';now=now+3000;w:PollRoute();assert(w.route_wait and completed==0)
+route='route.example:1319';now=now+3000;w:PollRoute();assert(not w.route_wait and completed==1)
+route='wait|master_unavailable||3'
+w:WithRoute('route.example','5446','Tester',1,function() completed=completed+1 end)
+w:OnBack();assert(not w.route_wait);now=now+5000;w:PollRoute();assert(completed==1)
+route='error|disabled|l08_yantar|1'
+w:WithRoute('route.example','5446','Tester',1,function() completed=completed+1 end)
+assert(not w.route_wait and completed==1)
+route='wait|queued|l08_yantar|3'
+w:WithRoute('route.example','5446','Tester',1,function() completed=completed+1 end)
+now=now+600001;w:PollRoute();assert(not w.route_wait and completed==1)
+route='wait|contacting||1'
+w:WithRoute('route.example','1267','Tester',1,function() completed=completed+1 end)
+assert(calls[#calls].address=='route.example:5446' and w.route_wait)
+w:OnBack();assert(not w.route_wait and #commands==before)
+netcoop_master_entry=nil
+''')
+print('Actual route UI: no fallback to another map, loading/memory wait, automatic resume, cancellation, terminal disabled state, finite timeout and old-port normalization PASS')

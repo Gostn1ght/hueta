@@ -39,7 +39,13 @@ class HostController
     static void write(const std::wstring& path,const std::string& text) {
         const auto temporary=path+L"."+std::to_wstring(GetCurrentProcessId())+L".tmp";
         {std::ofstream out(temporary,std::ios::binary|std::ios::trunc);if(!out || !(out<<text)) throw Unavailable("host control file cannot be written");}
-        if (!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {
+        bool installed=false;
+        for(unsigned attempt=0;attempt<40;++attempt) {
+            if(MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {installed=true;break;}
+            if(GetLastError()!=ERROR_SHARING_VIOLATION && GetLastError()!=ERROR_ACCESS_DENIED) break;
+            Sleep(10);
+        }
+        if (!installed) {
             DeleteFileW(temporary.c_str());throw Unavailable("host control file cannot be installed");
         }
     }
@@ -123,8 +129,10 @@ class HostController
             transition(m,"running","world is responding; master lease is checked separately");
             if(m.healthy_at && GetTickCount64()-m.healthy_at>300000) m.failures=0;
         }
-        else if(m.loading && !m.expected && GetTickCount64()-m.launched>600000)
-            transition(m,"loading_timeout","no ready heartbeat after 600 seconds; inspect location log");
+        else if(m.loading && !m.expected && GetTickCount64()-m.launched>600000) {
+            m.loading=false; // do not block every other map behind a hung load
+            transition(m,"loading_timeout","no ready heartbeat after 600 seconds; process retained for diagnosis");
+        }
     }
     void budget() {
         MEMORYSTATUSEX memory{sizeof(memory)};if(!GlobalMemoryStatusEx(&memory)) throw Unavailable("memory counters unavailable");

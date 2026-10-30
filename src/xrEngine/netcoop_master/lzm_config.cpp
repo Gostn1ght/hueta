@@ -170,6 +170,26 @@ void create_bridge_config(const std::wstring& config_path, const std::wstring& d
 
 void prepare_engine_cluster(const std::wstring& root, const std::wstring& config_path, const std::wstring& plan_path)
 {
+    auto template_path=root+L"\\dedicated\\fsgame_server.template";
+    if(!exists(template_path)) template_path=root+L"\\fsgame_server.template";
+    if(!exists(template_path)) throw Unavailable("dedicated/fsgame_server.template is missing; install the complete server package");
+    auto filesystem=read_file(template_path);
+    std::wstring absolute_root=root+L"\\";
+    const int root_size=WideCharToMultiByte(CP_ACP,0,absolute_root.data(),int(absolute_root.size()),nullptr,0,nullptr,nullptr);
+    std::string root_bytes(size_t(root_size),'\0');
+    WideCharToMultiByte(CP_ACP,0,absolute_root.data(),int(absolute_root.size()),root_bytes.data(),root_size,nullptr,nullptr);
+    for(size_t at=filesystem.find("{ROOT}");at!=std::string::npos;at=filesystem.find("{ROOT}",at+root_bytes.size())) filesystem.replace(at,6,root_bytes);
+    // Worlds now write a durable outbox owned by the master. Its worker commits
+    // complete engine/Lua pairs into SQLite and restores them before map launch.
+    std::istringstream lines(filesystem);std::string line;std::ostringstream rewritten;
+    while(std::getline(lines,line)) {
+        if(trim(line.substr(0,line.find('=')))=="$game_saves$")
+            line="$game_saves$ = true | false | "+root_bytes+"appdata\\master\\pending\\worlds\\ | | *.scop;*.scoc";
+        rewritten<<line<<"\n";
+    }
+    const auto fsgame=root+L"\\fsgame_server.ltx";
+    if(!exists(fsgame) || read_file(fsgame)!=rewritten.str()) write_new(fsgame,rewritten.str(),true);
+    log_line("[diag][filesystem] dedicated filesystem prepared; A-Life outbox is appdata/master/pending/worlds");
     const std::string old_plan=exists(plan_path) ? read_file(plan_path):"";
     const std::string complete=complete_cluster_plan(old_plan);
     if (complete!=old_plan)

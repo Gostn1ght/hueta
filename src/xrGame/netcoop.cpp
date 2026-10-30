@@ -8,6 +8,8 @@
 
 #include <bcrypt.h>
 #include <algorithm>
+#include <thread>
+#include <mutex>
 #include <io.h>
 #include "netcoop_storage_policy.h"
 #include <wincrypt.h>

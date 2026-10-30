@@ -1,18 +1,12 @@
 $fs_root$ = false | false | {ROOT}
-$game_arch_mp$ = false | false | {ROOT}mp\
+$game_arch_mp$ = false | false | {ROOT}resources\mp\
 ;abbreviation           = recurs| notif	| root			 | add				| ext			| description
 $app_data_root$ = true | false | {ROOT}appdata\player\
-$arch_dir$ = false | false | {ROOT}db\
-$arch_dir_configs$		= false	| false	| $arch_dir$	 | configs\
-$arch_dir_maps$         = false	| false	| $arch_dir$	 | levels\
-$arch_dir_meshes$       = false	| false	| $arch_dir$	 | meshes\
-$arch_dir_sounds$		= false	| false	| $arch_dir$	 | sounds\
-$arch_dir_textures$		= false	| false	| $arch_dir$	 | textures\
-$arch_dir_resource$     = false	| false	| $arch_dir$	 | mods\
-$arch_dir_patches$		= false	| true 	| $arch_dir$	 | patches\
-$arch_dir_addons$		= false	| true 	| $arch_dir$	 | addons\
-; Lost Zone: GAMMA's merged data, after every Anomaly archive, before loose gamedata
-$arch_dir_lostzone$	= false	| false	| $arch_dir$	 | lostzone\
+; Lost Zone: every resource archive in one folder, mounted in name order (a later
+; name overrides an earlier one): 00 base, 10 configs, 20 levels, 30 meshes,
+; 40 sounds, 50 textures, 60 mods, 70 patches, 80 addons, 90 Lost Zone,
+; 99 updates (99_lz_patch_NNNNNN: the higher number wins).
+$arch_dir$ = false | false | {ROOT}resources\
 $game_data$ = true | true | {ROOT}gamedata\
 $game_ai$               = true 	| false	| $game_data$	 | ai\
 $game_spawn$            = true 	| false	| $game_data$	 | spawns\
@@ -24,13 +18,13 @@ $game_shaders$ = true | true | {ROOT}gamedata\shaders\
 $game_particles$        = true 	| true 	| $game_data$	 | particles\		| *.pe;*.pg
 $game_sounds$           = true 	| true 	| $game_data$	 | sounds\
 $game_textures$         = true 	| true 	| $game_data$	 | textures\
-$game_config$ = true | false | {ROOT}client\configs\
+$game_config$ = true | false | $app_data_root$ | configs\
 $game_addons$           = true 	| false	| $game_data$	 | addons\
 $game_weathers$         = true 	| false	| $game_config$	 | environment\weathers
 $game_weather_effects$  = true 	| false	| $game_config$	 | environment\weather_effects
 $textures$              = true 	| true 	| $game_data$	 | textures\
 $level$                 = false	| false	| $game_levels$
-$game_scripts$ = true | false | {ROOT}client\scripts\
+$game_scripts$ = true | false | $game_data$ | scripts\
 $logs$                  = true 	| false	| $app_data_root$| logs\
 $screenshots$           = true 	| false	| $app_data_root$| screenshots\
 $game_saves$            = true 	| false	| $app_data_root$| savedgames\		| *.scop;*.scoc
@@ -40,5 +34,3 @@ $textures_ui$ 			= true 	| true 	| $textures$	 | ui\
 $warfare_presets$		= true 	| false	| $game_config$	 | warfare_presets\	| *.ltx
 $mcmlogs$                  = true 	| false	| $logs$| mcm\
 
-; Versioned fixes override base and loose data, in lexical order.
-$arch_dir_lostzone_updates$ = false | false | $arch_dir$ | lostzone_updates\

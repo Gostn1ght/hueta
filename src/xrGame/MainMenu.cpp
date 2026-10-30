@@ -85,6 +85,7 @@ CMainMenu::CMainMenu()
 
 CMainMenu::~CMainMenu()
 {
+	netcoop::client_entry_stop();
 	netcoop::script_preview_clear();
 	Device.seqFrame.Remove(this);
 	xr_delete(g_btnHint);
