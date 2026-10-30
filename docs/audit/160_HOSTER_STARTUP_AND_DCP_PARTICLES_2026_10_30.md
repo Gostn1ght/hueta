@@ -65,5 +65,28 @@ command replacement race, master argument quoting, menu and DCP references.
 New CI fixture compiles the actual texture retry header and dedicated input
 method; checks unchanged success/non-memory failures, cube flags, available
 mips, mipless resizing, bounded retries, tiny images and invalid LOD bounds.
-Native engine compilation and publication are still pending at creation of
-this document. Do not call this a completed gameplay acceptance.
+These fixtures and the mandatory Windows DX11 engine/package steps passed in
+GitHub Actions run `41089924828`, attempt 1, for native commit
+`8699be6ef8229cd68d15d02138e8bff47fa9d125`. Optional DX8 compilation is independent
+of the DX11 release. Matching client/server executable SHA-256:
+`016ed08b6ef84d0372fadd54e4e74103017f4f8847e9f5fc9877d32cd3e6ef02`.
+
+Launcher version `2026.10.30.2` (patch `000046`) was published and its Ed25519
+signature, BLAKE3 manifest, all 6,982 file records and pack bounds verified.
+Updated client files were reconstructed from the actual published chunks and
+compared byte-for-byte. P2P distribution was online. This patch contains loose
+vehicle profiles plus native/host tools, so existing script archives remain
+client `000045`, server `000042`; there is no new `000046.db0`.
+
+Do not call this a completed gameplay acceptance. The owner's running game
+was not changed or launched for testing; both client and hoster need to install
+the matching update before gameplay validation.
+
+Hoster delivery completed: `J:/LostZone_Work/Lost Zone Server.zip` and the
+adjacent `Lost Zone Server` folder. All 7,029 archive entries were read back
+and checked against the staged SHA-256 manifest; public folder files were
+also verified. Archive size: 3,535,041,050 bytes. Archive SHA-256:
+`7a98cb1eae906ddd8019cdab0f85e5791348f84edb8e11c461462d68afd0b559`.
+The previous archive and replaced public folder files remain under
+`J:/LostZone_Work/_work/server_zip_000046_20261030_195531`.
+Existing hoster world/account data and the owner's game binaries were preserved.
