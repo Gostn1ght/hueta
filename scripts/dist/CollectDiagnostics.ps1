@@ -56,7 +56,7 @@ try {
     $plan = Join-Path $rootPath 'appdata\server\netcoop_cluster.ltx'
     if (Test-Path -LiteralPath $plan) {Save-Text 'cluster-plan.ltx' (Redact-Lines ([IO.File]::ReadAllText($plan)))}
     $logs = @()
-    foreach ($relative in @('appdata\master\logs','appdata\server\logs','appdata\logs','appdata\player\logs')) {
+    foreach ($relative in @('appdata\master\logs','appdata\server\netcoop_cluster','appdata\server\logs','appdata\logs','appdata\player\logs')) {
         $folder = Join-Path $rootPath $relative
         if (Test-Path -LiteralPath $folder) {$logs += Get-ChildItem -LiteralPath $folder -File -Filter '*.log'}
     }

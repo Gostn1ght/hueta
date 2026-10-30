@@ -1068,7 +1068,8 @@ void click(State& s, int id)
     }
     case B_ROLE_ADMIN: case B_ROLE_PLAYER: {
         const int row=ListView_GetNextItem(s.players,-1,LVNI_SELECTED);if(row<0) {set_status(s,"Выберите игрока.",C_AMBER);break;}
-        wchar_t login[128]{};ListView_GetItemText(s.players,row,0,login,128);
+        wchar_t login[128]{};LVITEMW item{};item.pszText=login;item.cchTextMax=128;
+        SendMessageW(s.players,LVM_GETITEMTEXTW,row,reinterpret_cast<LPARAM>(&item));
         command(s,"role "+narrow(login)+(id==B_ROLE_ADMIN ? " admin":" player"));break;
     }
     case B_TOGGLE:

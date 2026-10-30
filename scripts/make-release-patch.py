@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--key", default=r"J:\LostZone_Work\Compressor\private\lzpack-v1.key")
     ap.add_argument("--lzpack", default=r"J:\LostZone_Work\Compressor\lzpack.py")
     a = ap.parse_args()
+    clean=int(a.version)>=47
     out = Path(a.out)
     if out.exists():
         sys.exit(f"{out} exists; patch numbers are never reused")
@@ -63,14 +64,14 @@ def main():
                 dst = out / "input" / role / "scripts" / rel
                 scripts.append(rel)
             elif rel.startswith("configs/"):
-                # GAMMA mods read configs with io.open: they stay loose.
-                dst = out / "loose" / role / rel
-                loose.append(rel)
+                # Native config IO supports archived defaults since 000047.
+                dst = out / ("input" if clean else "loose") / role / rel
+                (scripts if clean else loose).append(rel)
             else:
                 # Sounds, textures, shaders: inside the archive (the launcher
                 # does not ship a gamedata folder).
                 inner = rel[len("gamedata/"):] if rel.startswith("gamedata/") else rel
-                dst = out / "input" / "gamedata" / inner
+                dst = out / "input" / role / "assets" / inner if clean else out / "input" / "gamedata" / inner
                 scripts.append(rel)
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
@@ -79,8 +80,9 @@ def main():
         for rel in deleted:
             print(f"  ! deleted in the overlay (remove by hand if shipped): {rel}")
     if any(summary[role]["scripts"] for role in ("client", "server")):
-        subprocess.run([sys.executable, a.lzpack, "patch", "--key", a.key, "--input", str(out / "input"),
-                        "--output", str(out / "archives"), "--version", a.version, "--role", "both"], check=True)
+        builder=str(ROOT/'tools/lzpack/lzpack.py') if clean else a.lzpack
+        subprocess.run([sys.executable, builder, "patch", "--key", a.key, "--input", str(out / "input"),
+                        "--output", str(out / "archives"), "--version", a.version, "--role", "both"]+(['--layout','v2'] if clean else []), check=True)
     else:
         print("Loose-config/native-only update: no resource archive is needed")
     (out / "source.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

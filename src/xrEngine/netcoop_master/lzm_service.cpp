@@ -880,6 +880,12 @@ HttpResponse Service::handle_entry(HttpRequest& request)
                 if(location==plan.end()) return false;
                 const auto folder=cluster_.substr(0,cluster_.find_last_of(L"\\/")+1)+L"netcoop_cluster\\";
                 const auto state=loads(read_file(folder+L"admission_"+std::to_wstring(location->port)+L".json"));
+                HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,state.value("pid",DWORD(0)));
+                if(!process) return false;
+                DWORD code=0,characters=4096;wchar_t executable[4096]{};
+                const bool live=GetExitCodeProcess(process,&code) && code==STILL_ACTIVE && QueryFullProcessImageNameW(process,0,executable,&characters);
+                CloseHandle(process);
+                if(!live || _wcsicmp(executable,(runtime_root_+L"\\dedicated\\LostZoneServerDX11.exe").c_str())!=0) return false;
                 return state.value("ready",false) && state.value("updated",int64_t(0))>=int64_t(time(nullptr))-30 &&
                     state.value("epoch",int64_t(0))==store_->epoch.value_or(0);
             }catch(...) {return false;}

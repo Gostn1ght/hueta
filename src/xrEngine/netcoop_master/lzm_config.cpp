@@ -4,7 +4,9 @@
 #include "lzm_service.h"
 #include "lzm_cluster_plan.h"
 
+#include <winsock2.h>
 #include <windows.h>
+#include <iphlpapi.h>
 
 #include <fstream>
 #include <set>
@@ -176,6 +178,18 @@ void create_bridge_config(const std::wstring& config_path, const std::wstring& d
 
 void prepare_engine_cluster(const std::wstring& root, const std::wstring& config_path, const std::wstring& plan_path)
 {
+    const auto legacy_config=root+L"\\hoster\\master\\runtime\\config.json";
+    const auto active_config=exists(config_path) ? config_path:legacy_config;
+    if(exists(active_config)) {
+        const auto port=load_config(active_config).value("port",38477);
+        ULONG bytes=0;GetExtendedTcpTable(nullptr,&bytes,FALSE,AF_INET,TCP_TABLE_OWNER_PID_LISTENER,0);
+        std::vector<unsigned char> buffer(bytes);
+        if(bytes && GetExtendedTcpTable(buffer.data(),&bytes,FALSE,AF_INET,TCP_TABLE_OWNER_PID_LISTENER,0)==NO_ERROR) {
+            auto* table=reinterpret_cast<MIB_TCPTABLE_OWNER_PID*>(buffer.data());
+            for(DWORD i=0;i<table->dwNumEntries;++i) if(ntohs(u_short(table->table[i].dwLocalPort))==port)
+                throw Unavailable(format("master API port %d already owned by PID %lu; stop the previous master before migration",port,table->table[i].dwOwningPid));
+        }
+    }
     auto template_path=root+L"\\dedicated\\fsgame_server.template";
     if(!exists(template_path)) template_path=root+L"\\fsgame_server.template";
     if(!exists(template_path)) throw Unavailable("dedicated/fsgame_server.template is missing; install the complete server package");

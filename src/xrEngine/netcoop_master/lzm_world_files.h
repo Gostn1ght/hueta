@@ -173,8 +173,11 @@ class WorldFiles
                 catch(const std::exception& e) {
                     log_line("[diag][world-store] pending snapshot cannot be committed world="+world+" reason="+e.what());
                     const auto backup=root_+L"\\appdata\\master\\recovery\\"+widen(world+"_"+token_hex(8));std::filesystem::create_directories(backup);
-                    for(const auto& f:std::filesystem::directory_iterator(pending_)) if(f.path().filename().wstring().rfind(widen(world),0)==0)
-                        CopyFileW(f.path().c_str(),(backup+L"\\"+f.path().filename().wstring()).c_str(),TRUE);
+                    for(const auto& f:std::filesystem::directory_iterator(pending_)) {
+                        const auto name=f.path().filename().wstring(),prefix=widen(world);
+                        if(name==prefix+L".current" || name==prefix+L".scop" || name==prefix+L".scoc" || name==prefix+L"_a.scop" || name==prefix+L"_a.scoc" || name==prefix+L"_b.scop" || name==prefix+L"_b.scoc")
+                            CopyFileW(f.path().c_str(),(backup+L"\\"+name).c_str(),TRUE);
+                    }
                     if(!restore(world)) throw;bootstrapped_.insert(world);continue;
                 }
             }

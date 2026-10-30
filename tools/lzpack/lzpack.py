@@ -153,6 +153,39 @@ def patch(source, dest, key, version, role='client'):
     output.with_suffix('.manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
     return output
 
+def patch_v2(source, dest, key, version, role='client'):
+    """Role aliases for clean runtimes; numbered deltas sort after the base."""
+    if not version.isdecimal() or len(version)!=6 or int(version)<47: raise ValueError('Clean layout starts at 000047')
+    source,dest=Path(source),Path(dest)
+    all_rows=files_under(source)
+    prefixes=('gamedata\\','client\\scripts\\','server\\scripts\\','client\\configs\\','server\\configs\\','client\\assets\\','server\\assets\\')
+    if any(not name.startswith(prefixes) for name,_ in all_rows): raise ValueError('Unexpected clean patch input')
+    dest.mkdir(parents=True,exist_ok=True)
+    outputs=[]
+    for kind,order,alias in (('assets','20','$game_data$\\'),('configs','30','$game_config$\\'),('scripts','40','$game_scripts$\\')):
+        prefix=role+'\\'+kind+'\\'
+        rows=[(name[len(prefix):],path) for name,path in all_rows if name.startswith(prefix)]
+        if kind=='assets':
+            shared={name[len('gamedata\\'):]:path for name,path in all_rows if name.startswith('gamedata\\')}
+            shared.update(dict(rows));rows=sorted(shared.items())
+        if not rows: continue
+        groups=[];group=[];size=0
+        for name,path in rows:
+            length=path.stat().st_size
+            if length>MAX_VOLUME: raise ValueError('Single patch file exceeds volume limit')
+            if group and size+length>MAX_VOLUME: groups.append(group);group=[];size=0
+            group.append((name,path));size+=length
+        if group: groups.append(group)
+        for index,group in enumerate(groups):
+            stem=f'99_v2_{version}_{order}_{role}_{kind}_{index:03d}.db0'
+            output=dest/stem;raw=dest/(stem+'.raw-building')
+            if output.exists() or raw.exists(): raise FileExistsError('Patch version already exists')
+            try:
+                make_db(group,raw,alias);protect(raw,output,key)
+            finally: raw.unlink(missing_ok=True)
+            outputs.append(output)
+    return outputs
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     sub=parser.add_subparsers(dest='command',required=True)
@@ -162,12 +195,16 @@ def main():
         if command=='patch':
             p.add_argument('--version',required=True)
             p.add_argument('--role',choices=('client','server','both'),default='both')
+            p.add_argument('--layout',choices=('legacy','v2'),default='legacy')
     args=parser.parse_args();key=master(args.key)
     if args.command=='protect':print(protect(args.input,args.output,key))
     elif args.command=='verify':print(verify(args.input,key))
     else:
         roles=('client','server') if args.role=='both' else (args.role,)
         for role in roles:
-            result=patch(args.input,Path(args.output)/role,key,args.version,role)
-            if result:print(result)
+            if args.layout=='v2':
+                for result in patch_v2(args.input,Path(args.output)/role,key,args.version,role): print(result)
+            else:
+                result=patch(args.input,Path(args.output)/role,key,args.version,role)
+                if result:print(result)
 if __name__=='__main__':main()
