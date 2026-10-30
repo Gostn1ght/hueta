@@ -8,6 +8,11 @@ try {
     if ([IO.File]::ReadAllText((Join-Path $testDirectory 'host_command_labx8.txt')) -ne 'restart') { throw 'Request mismatch' }
     Send-ClusterHostCommand $testDirectory 'labx8' 'stop'
     if ([IO.File]::ReadAllText((Join-Path $testDirectory 'host_command_labx8.txt')) -ne 'stop') { throw 'Atomic replacement failed' }
+    $claimed = Claim-ClusterHostCommand $testDirectory 'labx8'
+    Send-ClusterHostCommand $testDirectory 'labx8' 'start'
+    if ([IO.File]::ReadAllText($claimed) -ne 'stop') { throw 'Claim did not keep original request' }
+    Remove-Item -LiteralPath $claimed
+    if ([IO.File]::ReadAllText((Join-Path $testDirectory 'host_command_labx8.txt')) -ne 'start') { throw 'Consuming old request deleted a newer one' }
     Write-ClusterText (Join-Path $testDirectory 'host_mode_labx8.txt') 'off'
     if ((Get-ClusterHostMode $testDirectory 'labx8') -ne 'off') { throw 'Manual stop not persistent' }
     Request-ClusterSavedStop $testDirectory 1361 12345
@@ -19,7 +24,7 @@ try {
     try { Send-ClusterHostCommand $testDirectory 'labx8' 'kill' } catch { $rejected++ }
     try { Request-ClusterSavedStop $testDirectory 0 12345 } catch { $rejected++ }
     if ($rejected -ne 6) { throw 'Invalid host requests admitted' }
-    foreach ($file in @('netcoop_cluster_panel.ps1','netcoop_cluster_watchdog.ps1','netcoop_cluster_controls.ps1')) {
+    foreach ($file in @('netcoop_cluster_panel.ps1','netcoop_cluster_watchdog.ps1','netcoop_cluster_controls.ps1','netcoop_cluster_lifecycle.ps1')) {
         $tokens=$null; $errors=$null
         $null=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot "netcoop-cluster/$file"),[ref]$tokens,[ref]$errors)
         if ($errors.Count) { throw ($errors | Out-String) }

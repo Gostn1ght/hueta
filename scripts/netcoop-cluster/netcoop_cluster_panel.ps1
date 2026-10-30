@@ -230,7 +230,7 @@ foreach ($map in $locations.Keys) {
     $index = $grid.Rows.Add('','',$name,'Нет данных','','—','—',$locations[$map])
     $grid.Rows[$index].Tag = $map; $rowByMap[$map] = $grid.Rows[$index]; $stateByMap[$map] = 'none'; $progressByMap[$map] = 0
 }
-$stateColor = @{ running=$C.green; loading=$C.amber; queued=$C.amber; saving=$C.amber; memory=$C.red; loading_timeout=$C.red; stopped=$C.dim; none=$C.dim; remote=$C.dim }
+$stateColor = @{ running=$C.green; loading=$C.amber; queued=$C.amber; saving=$C.amber; memory=$C.red; loading_timeout=$C.red; retry=$C.amber; failed=$C.red; stopped=$C.dim; none=$C.dim; remote=$C.dim }
 $separator = [Drawing.Pen]::new($C.line)
 $grid.Add_RowPostPaint({
     param($sender, $e)
@@ -626,7 +626,7 @@ New-Tab 'console' 'Консоль мастера' $consolePage
 $layout.Controls.Add($header,0,0); $layout.Controls.Add($masterCard,0,1); $layout.Controls.Add($tabBar,0,2); $layout.Controls.Add($pages,0,3); $layout.Controls.Add($status,0,4)
 $form.Controls.Add($layout)
 
-$states=@{running='Работает';loading='Загружается';queued='В очереди';stopped='Выключена';saving='Сохраняется';memory='Ждёт память';loading_timeout='Загрузка затянулась'}
+$states=@{running='Работает';loading='Загружается';queued='В очереди';stopped='Выключена';saving='Сохраняется';memory='Ждёт память';loading_timeout='Загрузка затянулась';retry='Повтор после сбоя';failed='Остановлена после сбоев'}
 $modes=@{on='Включена';off='Выключена';auto='Автоматически'}
 function Update-Summary {
     $running = @($locations.Keys | Where-Object { $stateByMap[$_] -eq 'running' }).Count
@@ -675,7 +675,7 @@ $refresh = {
                 $state = [string]$item.state
                 $stateByMap[$item.map] = $state
                 $progressByMap[$item.map] = if ($null -ne $item.progress) { [int]$item.progress } else { 0 }
-                $row.Cells[$COL_STATE].Value = if ($states[$state]) { $states[$state] } else { $state }
+                $row.Cells[$COL_STATE].Value = if ($state -eq 'retry') { "Сбой, повтор через $($item.retry_seconds) с" } elseif ($state -eq 'failed' -and $null -ne $item.exit_code) { "Сбой, код $($item.exit_code). Нажмите Запустить" } elseif ($states[$state]) { $states[$state] } else { $state }
                 $row.Cells[$COL_STATE].Style.ForeColor = if ($stateColor[$state]) { $stateColor[$state] } else { $C.text }
                 $row.Cells[$COL_STATE].Style.SelectionForeColor = $row.Cells[$COL_STATE].Style.ForeColor
                 $row.Cells[$COL_PLAYERS].Value = if ($item.processId) { [string]$item.players } else { '0' }

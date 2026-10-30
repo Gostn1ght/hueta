@@ -3,6 +3,7 @@ dcp_* section has its model, the profile the model includes (client and
 server: the server drives), seats on bones the model has, and a name; GAMMA's
 old cars are out of both spawners and removed from worlds (netcoop_vehicles)."""
 import re
+import json
 import struct
 import math
 import importlib.util
@@ -95,6 +96,20 @@ def profile_text(path):
 
 
 cars = sections(CLIENT / "configs/mod_system_lz_dcp_vehicles.ltx")
+particle_catalog = json.loads((ROOT / 'scripts/fixtures/gamma-particle-names.json').read_text(encoding='utf-8'))
+particle_names = set(particle_catalog['names'])
+assert len(particle_names) > 2000 and re.fullmatch('[0-9a-f]{64}', particle_catalog['sha256'])
+old_particle = b'vehiclefx\\exhausts\\exhaust_kamaz'
+new_particle = b'vehiclefx\\exhaust_kamaz'
+assert dcp_import.adapt_particle_paths(b'physics unchanged\nexhaust_particles = ' + old_particle) == b'physics unchanged\nexhaust_particles = ' + new_particle
+assert new_particle.decode() in particle_names and old_particle.decode() not in particle_names
+for side in (CLIENT, SERVER):
+    for path in (side / 'configs/models/vehicles').rglob('*.ltx'):
+        profile = dcp_import.sections(profile_text(path))
+        for section, keys in profile.items():
+            for key, value in keys.items():
+                if 'particle' in key and key.endswith(('particles', 'particles1', 'particles2')) and value:
+                    assert value in particle_names, (side.name, path.name, section, key, 'missing particle', value)
 assert (CLIENT / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes() == (SERVER / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes()
 assert len(cars) >= 40, len(cars)
 names = (CLIENT / "configs/text/rus/st_lz_dcp_vehicles.xml").read_text(encoding="cp1251")

@@ -25,6 +25,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'netcoop_cluster_controls.ps1')
+. (Join-Path $PSScriptRoot 'netcoop_cluster_lifecycle.ps1')
 $Runtime = [IO.Path]::GetFullPath($Runtime)
 $mutexHash = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($Runtime.ToLowerInvariant()))).Replace('-', '')
 $createdMutex = $false
@@ -93,7 +94,7 @@ $loadMilestones = @(
 $readyPattern = 'ALife switch distance|\[world\] saved \S+ \(bootstrap\)'
 function Get-LoadProgress($s) {
     if ($s.State -eq 'running') { return 100 }
-    if ($s.State -ne 'loading' -or -not $s.LoadStarted) { return 0 }
+    if ($s.State -notin @('loading','loading_timeout') -or -not $s.LoadStarted) { return 0 }
     $file = Find-Log $s
     $done = 1; $next = 4
     if ($file -and $file.LastWriteTime -gt $s.LoadStarted) {
@@ -112,10 +113,10 @@ function Get-LoadProgress($s) {
 function Start-Location($s) {
     $oldStop = Join-Path $wakeDir "host_stop_$($s.Port).txt"
     if (Test-Path -LiteralPath $oldStop) { Remove-Item -LiteralPath $oldStop -Force }
-    $s.State = 'loading'; $s.LoadStarted = Get-Date; $s.MilestoneAt = $null
+    $s.State = 'loading'; $s.Loading = $true; $s.LoadStarted = Get-Date; $s.MilestoneAt = $null; $s.HealthySince = $null
     Publish-HostState
     $log = if ($s.Name -eq "k00_marsh") { "srv" } else { "srv_$($s.Name)" }
-    $arguments = "-nosplashwindow -noprefetch -netcoop -multi_instance -logname $log -fsltx fsgame_server.ltx " +
+    $arguments = "-nosplashwindow -noprefetch -netcoop -multi_instance -netcoop_background -logname $log -fsltx fsgame_server.ltx " +
         "-netport $($s.Port) -netcoop_start_location=$($s.Start) -netcoop_world=$($s.World) " +
         # Empty for 2 min: hibernate (world saved, RAM returned, wakes on connect).
         # On-demand maps exit only after 6 h empty, or when Make-Room needs memory.
@@ -129,17 +130,7 @@ function Start-Location($s) {
     Publish-HostState
     try { $p.PriorityClass = "Normal" } catch {}
     Write-Host ("{0:HH:mm:ss} started {1} (port {2}, pid {3})" -f (Get-Date), $s.Name, $s.Port, $p.Id)
-    # Wait until it runs (its clock line) before loading the next one.
-    $since = Get-Date
-    $ready = $false
-    while (((Get-Date) - $since).TotalSeconds -lt $LoadTimeoutSeconds -and -not $p.HasExited) {
-        Publish-HostState
-        $file = Find-Log $s
-        # "loading saved world" is written when loading BEGINS: it is not readiness.
-        if ($file -and $file.LastWriteTime -gt $since -and (Select-String -Path $file.FullName -Pattern $readyPattern -Quiet)) { $ready = $true; break }
-        Start-Sleep -Seconds 5
-    }
-    $s.State = if ($p.HasExited) { 'stopped' } elseif ($ready) { 'running' } else { 'loading_timeout' }
+    # The outer loop monitors readiness. Never block operator commands here.
     return $p
 }
 
@@ -150,9 +141,10 @@ $cores = (Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfLog
 Write-Host ("machine: {0} GB memory, {1} logical cores; reserve {2} GB system + {3} GB game client" -f $totalGB, $cores, $SystemReserveGB, $ClientReserveGB)
 
 function Server-MemoryGB {
-    # Measured from running servers; 1.5 GB until one has started.
-    $ws = Get-Process LostZoneServerDX11 -ErrorAction SilentlyContinue | ForEach-Object { $_.WorkingSet64 }
-    if ($ws) { return [math]::Max(0.5, (($ws | Measure-Object -Average).Average / 1GB)) }
+    # Private commit, not resident RAM: paging a map out does not make the
+    # next load cheaper. Include only the exact location processes we own.
+    $sizes = @($running.Values | Where-Object { $_ -and -not $_.HasExited } | ForEach-Object { $_.Refresh(); $_.PrivateMemorySize64 })
+    if ($sizes.Count) { return [math]::Max(0.5, (($sizes | Measure-Object -Average).Average / 1GB)) }
     return 1.5
 }
 function Free-BudgetGB {
@@ -212,10 +204,10 @@ function Publish-HostStateNow {
         $process = $running[$_.Name]
         [ordered]@{ map=$_.Name; port=$_.Port; processId=$(if ($process -and -not $process.HasExited) { $process.Id } else { 0 });
             state=$(if ($_.State -and $_.State -ne 'stopped') { $_.State } elseif (-not ($process -and -not $process.HasExited) -and ((Get-ClusterHostMode $wakeDir $_.Name) -eq 'on' -or (Pending-Start $_))) { 'queued' } elseif ($_.State) { $_.State } else { 'stopped' }); mode=Get-ClusterHostMode $wakeDir $_.Name;
-            players=Players-On $_; progress=Get-LoadProgress $_ }
+            players=Players-On $_; progress=Get-LoadProgress $_; exit_code=$_.LastExitCode; failures=[int]$_.Failures; retry_seconds=$(if ($_.NextStart -and -not $_.Blocked) { [math]::Max(0, [int]($_.NextStart - (Get-Date)).TotalSeconds) } else { 0 }) }
     })
     $os = Get-CimInstance Win32_OperatingSystem
-    $memory = [ordered]@{ free_gb=[math]::Round($os.FreePhysicalMemory / 1MB, 1); commit_gb=[math]::Round($os.FreeVirtualMemory / 1MB, 1); need_gb=[math]::Round(2 * (Server-MemoryGB), 1) }
+    $memory = [ordered]@{ free_gb=[math]::Round($os.FreePhysicalMemory / 1MB, 1); commit_gb=[math]::Round($os.FreeVirtualMemory / 1MB, 1); need_gb=[math]::Round((Get-ClusterLaunchNeedGB), 1) }
     $view = [ordered]@{ updated=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); watchdog=$PID; memory=$memory; maps=$rows }
     Write-ClusterText (Join-Path $wakeDir $viewFile) ($view | ConvertTo-Json -Depth 4 -Compress)
 }
@@ -227,75 +219,24 @@ foreach ($s in $servers) {
     if ($matchesForMap.Count -gt 1) { throw "Multiple servers already occupy $($s.Name)" }
     if ($matchesForMap.Count -eq 1) {
         $running[$s.Name] = Get-Process -Id $matchesForMap[0].ProcessId
-        $s.State = 'running'
+        $s.State = 'loading'; $s.Loading = $true; $s.LoadStarted = $running[$s.Name].StartTime
     }
 }
-# Always-on maps start now; on-demand maps when a server asks for them
-# (wake_<map>.txt: a player is heading there) and exit by themselves when idle.
+# Establish manual-only defaults without launching anything. All startup and
+# restart requests use the same responsive, memory-budgeted queue below.
 foreach ($s in $servers) {
     $mode = Get-ClusterHostMode $wakeDir $s.Name
-    if ($NoAutoStart -and $mode -eq "auto" -and -not $running[$s.Name]) {
-        Write-ClusterText (Join-Path $wakeDir "host_mode_$($s.Name).txt") "off"; $mode = "off"
-    }
-    if (-not $running[$s.Name] -and ($mode -eq 'on' -or ($mode -eq 'auto' -and -not $NoAutoStart -and -not $s.OnDemand))) {
-        $running[$s.Name] = Start-Location $s
+    if ($NoAutoStart -and $mode -eq 'auto' -and -not $running[$s.Name]) {
+        Write-ClusterText (Join-Path $wakeDir "host_mode_$($s.Name).txt") 'off'
     }
 }
 Publish-HostState
 while ($true) {
-    Start-Sleep -Seconds 5
     foreach ($s in $servers) {
-        $p = $running[$s.Name]
-        $command = Join-Path $wakeDir "host_command_$($s.Name).txt"
-        if (Test-Path -LiteralPath $command) {
-            $action = [IO.File]::ReadAllText($command).Trim()
-            if ($action -notin @('start','stop','restart','auto')) { throw "Invalid host command for $($s.Name)" }
-            $mode = switch ($action) { 'stop' { 'off' } 'auto' { 'auto' } default { 'on' } }
-            Write-ClusterText (Join-Path $wakeDir "host_mode_$($s.Name).txt") $mode
-            if ($action -in @('stop','restart') -and $p -and -not $p.HasExited) {
-                Request-ClusterSavedStop $wakeDir $s.Port $p.Id
-                $s.State = 'saving'; $s.Restarting = $action -eq 'restart'
-            }
-            Remove-Item -LiteralPath $command -Force
-        }
-        $mode = Get-ClusterHostMode $wakeDir $s.Name
-        if ($p -and $p.HasExited) { $running.Remove($s.Name); $p = $null; $s.Restarting = $false; $s.State = 'stopped' }
-        if ($s.Restarting) { continue }
-        if ($mode -eq 'off') {
-            if ($p) { Request-ClusterSavedStop $wakeDir $s.Port $p.Id; $s.State = 'saving' }
-            continue
-        }
-        if ($mode -eq 'on' -and -not $p) {
-            # The hoster asked for this map: start it when RAM plus the page file
-            # can hold it, even if free RAM alone is short (it used to wait forever).
-            if ((Make-Room (2 * (Server-MemoryGB))) -or (Free-CommitGB) -ge 2 * (Server-MemoryGB)) { $s.State = $null; $running[$s.Name] = Start-Location $s }
-            else { $s.State = 'memory' }
-            continue
-        }
-        $wake = Join-Path $wakeDir "wake_$($s.Name).txt"
-        if ($p -and -not $p.HasExited) {
-            if ((Players-On $s) -gt 0) { $idleSince.Remove($s.Name) } elseif (-not $idleSince[$s.Name]) { $idleSince[$s.Name] = Get-Date }
-        }
-        if ($s.OnDemand) {
-            if ((-not $p -or $p.HasExited) -and (Test-Path $wake)) {
-                # A loading server briefly needs about twice its running size.
-                if (-not (Make-Room (2 * (Server-MemoryGB)))) {
-                    if (-not $s.Waiting) { Write-Host ("{0:HH:mm:ss} {1} requested, but memory is short and no map is empty" -f (Get-Date), $s.Name) }
-                    $s.Waiting = $true
-                    continue
-                }
-                $s.Waiting = $false
-                Remove-Item $wake -Force -ErrorAction SilentlyContinue
-                Write-Host ("{0:HH:mm:ss} {1} requested" -f (Get-Date), $s.Name)
-                $running[$s.Name] = Start-Location $s
-            } elseif ($p -and $p.HasExited) {
-                Write-Host ("{0:HH:mm:ss} {1} stopped (code {2}); starts again on demand" -f (Get-Date), $s.Name, $p.ExitCode)
-                $running.Remove($s.Name)
-            } elseif (Test-Path $wake) { Remove-Item $wake -Force -ErrorAction SilentlyContinue }
-        } elseif (-not $p -or $p.HasExited) {
-            Write-Host ("{0:HH:mm:ss} {1} exited with code {2}; restarting" -f (Get-Date), $s.Name, $p.ExitCode)
-            $running[$s.Name] = Start-Location $s
-        }
+        try { Update-ClusterLocation $s }
+        catch { Write-Host ("{0:HH:mm:ss} control error for {1}: {2}" -f (Get-Date), $s.Name, $_.Exception.Message) }
     }
+    Start-ClusterQueuedLocation
     Publish-HostState
+    Start-Sleep -Seconds 1
 }

@@ -12,6 +12,19 @@
 #include <D3DX10Tex.h>
 
 #include "../xrRender/dxRenderDeviceRender.h"
+#include "../xrRender/texture_memory_retry.h"
+
+#ifdef USE_DX11
+static HRESULT create_texture_with_memory_retry(IReader* source, D3DX11_IMAGE_INFO& image,
+    D3DX11_IMAGE_LOAD_INFO& info, ID3DBaseTexture*& texture, int& lod, LPCSTR name)
+{
+    return create_texture_with_mip_retry(info, image.Width, image.Height, image.MipLevels, lod,
+        [&]() { return D3DX11CreateTextureFromMemory(HW.pDevice, source->pointer(), source->length(), &info, nullptr, &texture, nullptr); },
+        [&]() { _RELEASE(texture); },
+        [](HRESULT result) { return result == E_OUTOFMEMORY || result == HRESULT_FROM_WIN32(ERROR_NOT_ENOUGH_MEMORY); },
+        [&]() { Msg("! [Lost Zone] texture memory pressure: %s; retry mip %d (%ux%u)", name, lod, info.Width, info.Height); });
+}
+#endif
 
 // #include "std_classes.h"
 // #include "xr_avi.h"
@@ -441,14 +454,7 @@ _DDS:
 			LoadInfo.pSrcInfo = &IMG;
 
 #ifdef USE_DX11
-			R_CHK(D3DX11CreateTextureFromMemory(
-				HW.pDevice,
-				S->pointer(),S->length(),
-				&LoadInfo,
-				0,
-				&pTexture2D,
-				0
-			));
+            R_CHK2(create_texture_with_memory_retry(S, IMG, LoadInfo, pTexture2D, img_loaded_lod, fn), fn);
 #else
 			R_CHK(D3DX10CreateTextureFromMemory(
 				HW.pDevice,
@@ -488,7 +494,8 @@ _DDS:
 			//	&T_sysmem
 			//	), fn);
 
-			img_loaded_lod = get_texture_load_lod(fn);
+            img_loaded_lod = get_texture_load_lod(fn);
+            if (IMG.MipLevels) img_loaded_lod = _min(img_loaded_lod, int(IMG.MipLevels - 1));
 
 			//	Inited to default by provided default constructor
 #ifdef USE_DX11
@@ -521,14 +528,7 @@ _DDS:
 			LoadInfo.pSrcInfo = &IMG;
 
 #ifdef USE_DX11
-			R_CHK2(D3DX11CreateTextureFromMemory
-			       (
-				       HW.pDevice,S->pointer(),S->length(),
-				       &LoadInfo,
-				       0,
-				       &pTexture2D,
-				       0
-			       ), fn);
+            R_CHK2(create_texture_with_memory_retry(S, IMG, LoadInfo, pTexture2D, img_loaded_lod, fn), fn);
 #else
 			R_CHK2(D3DX10CreateTextureFromMemory
 			       (

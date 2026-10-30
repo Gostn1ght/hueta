@@ -121,6 +121,8 @@ jobs:
         run: python scripts/check-native-car-lifecycle.py
       - name: Check actual detached item and replica teardown paths
         run: python scripts/check-native-detached-objects.py
+      - name: Check texture memory recovery and dedicated input
+        run: python scripts/check-native-texture-memory.py
       - name: Check actual startup menu audio
         run: python scripts/check-menu-audio.py
       - name: Check actual Firebase verification links
@@ -146,6 +148,7 @@ jobs:
         run: |
           ./scripts/check-netcoop-load-harness.ps1
           ./scripts/check-netcoop-host-controls.ps1
+          ./scripts/check-netcoop-watchdog.ps1
           ./scripts/check-netcoop-master-arguments.ps1
           ./scripts/check-netcoop-launch-unblock.ps1
           python -m pip install lupa==2.8 cryptography==46.0.2

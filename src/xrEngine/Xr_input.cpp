@@ -24,6 +24,7 @@ int KEYBOARDBUFFERSIZE = 128;
 
 static bool g_exclusive = false;
 extern u32 g_screenmode;
+extern ENGINE_API bool g_dedicated_server;
 
 static void on_error_dialog(bool before)
 {
@@ -713,6 +714,9 @@ void CInput::DeactivateSoft()
 
 void CInput::OnFrame(void)
 {
+	// The server console uses ordinary Win32 controls. Gameplay keyboard input
+	// must not turn a key held during a map launch into an Alt+F4 server quit.
+	if (g_dedicated_server) return;
 	RDEVICE.Statistic->Input.Begin();
 	dwCurTime = RDEVICE.TimerAsync_MMT();
 	if (pKeyboard) KeyUpdate();

@@ -178,6 +178,7 @@ PROTECT_API void CRenderDevice::Create()
 	// of everything, with no frame to move it (owner 2026-10-12). Several
 	// maps run at once: each window is offset by its port.
 	int server_x = monX, server_y = monY;
+	const bool background_server = g_dedicated_server && strstr(Core.Params, "-netcoop_background");
 	if (g_dedicated_server)
 	{
 		g_screenmode = 0;
@@ -219,7 +220,8 @@ PROTECT_API void CRenderDevice::Create()
 		RECT frame = {0, 0, LONG(w), LONG(h)};
 		AdjustWindowRect(&frame, style, FALSE);
 		SetWindowPos(m_hWnd, HWND_NOTOPMOST, server_x, server_y, frame.right - frame.left, frame.bottom - frame.top,
-		             SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+		             SWP_FRAMECHANGED | SWP_NOACTIVATE | (background_server ? 0 : SWP_SHOWWINDOW));
+		if (background_server) ShowWindow(m_hWnd, SW_HIDE);
 	}
 	else
 		SetWindowPos(m_hWnd, HWND_TOP, monX, monY, w, h, SWP_FRAMECHANGED);
@@ -260,7 +262,7 @@ PROTECT_API void CRenderDevice::Create()
 		ClipCursor(nullptr);
 	else
 		ClipCursor(&winRect);
-	SetActiveWindow(m_hWnd);
+	if (!g_dedicated_server) SetActiveWindow(m_hWnd);
 
 	string_path fname;
 	FS.update_path(fname, "$game_data$", "shaders.xr");

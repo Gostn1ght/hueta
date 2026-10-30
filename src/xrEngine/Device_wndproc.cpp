@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "MonitorList.h"
+extern ENGINE_API bool g_dedicated_server;
 
 bool CRenderDevice::on_message(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT& result)
 {
@@ -37,6 +38,7 @@ bool CRenderDevice::on_message(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 	case WM_CLOSE:
 		{
+			if (g_dedicated_server) Msg("[Lost Zone] dedicated window close requested");
 			Engine.Event.Defer("KERNEL:disconnect");
 			Engine.Event.Defer("KERNEL:quit");								 
 

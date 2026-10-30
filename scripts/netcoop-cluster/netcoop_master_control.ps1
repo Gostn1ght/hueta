@@ -136,7 +136,11 @@ function Entry-Port([string]$RuntimeRoot) {
     return 5446
 }
 function Start-Master([string]$RuntimeRoot, [string[]]$Locations) {
-    if (@(Master-Processes).Count) { return 'Мастер уже работает.' }
+    $pauseFile = Join-Path $RuntimeRoot 'appdata\server\netcoop_cluster\host_master_paused.txt'
+    if (@(Master-Processes).Count) {
+        if (Test-Path -LiteralPath $pauseFile) { throw 'Мастер открыт, но остановлен. Нажмите «Включить мастер» в его окне.' }
+        return 'Мастер уже работает.'
+    }
     Initialize-Master $RuntimeRoot $Locations
     $plan = Join-Path $RuntimeRoot 'appdata\server\netcoop_cluster.ltx'
     $entry = Entry-Port $RuntimeRoot
@@ -163,6 +167,7 @@ function Start-Master([string]$RuntimeRoot, [string[]]$Locations) {
     } else {
         Start-Process -FilePath $masterPython -WorkingDirectory $masterDir -ArgumentList ('-m lostzone serve --config runtime\config.json' + $extra) -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err
     }
+    if (Test-Path -LiteralPath $pauseFile) { Remove-Item -LiteralPath $pauseFile -Force }
     return 'Мастер запускается: его консоль — в окне «Lost Zone — мастер».'
 }
 function Master-LogPath([string]$RuntimeRoot) {
@@ -196,6 +201,9 @@ function Master-Console([string]$Line) {
     }
 }
 function Stop-Master {
+    $pauseFile = Join-Path (Split-Path $PSScriptRoot -Parent) 'appdata\server\netcoop_cluster\host_master_paused.txt'
+    [IO.Directory]::CreateDirectory((Split-Path $pauseFile -Parent)) | Out-Null
+    [IO.File]::WriteAllText($pauseFile, "paused`n", [Text.UTF8Encoding]::new($false))
     $processes = @(Master-Processes)
     if (-not $processes.Count) { return 'Мастер не запущен.' }
     # Every change is an SQLite transaction (WAL, synchronous FULL): stopping

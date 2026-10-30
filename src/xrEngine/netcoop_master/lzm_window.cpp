@@ -201,7 +201,7 @@ std::vector<PlayerRow> read_rosters(const std::wstring& folder, const std::map<i
 // state - in the cluster folder, the mailbox the hoster's panel uses too. The
 // master's Locations tab switches maps there without a restart; the state it
 // shows comes back from the watchdog and from the maps' leases.
-struct HostMap { std::string state, mode; int progress = -1; };
+struct HostMap { std::string state, mode; int progress = -1, retry_seconds = 0; int64_t exit_code = 0; bool has_exit_code = false; };
 struct HostView { bool fresh = false; std::map<std::string, HostMap> maps; };
 
 HostView read_host_view(const std::wstring& folder)
@@ -221,7 +221,10 @@ HostView read_host_view(const std::wstring& folder)
         try
         {
             json view = loads(body);
-            if (view.contains("updated") && view["updated"].is_number() && now - view["updated"].get<int64_t>() <= 30) v.fresh = true;
+            if (!view.contains("updated") || !view["updated"].is_number()) continue;
+            const int64_t updated = view["updated"].get<int64_t>();
+            if (updated < now - 30 || updated > now + 5) continue;
+            v.fresh = true;
             if (!view.contains("maps") || !view["maps"].is_array()) continue;
             for (const json& m : view["maps"])
             {
@@ -230,6 +233,8 @@ HostView read_host_view(const std::wstring& folder)
                 if (m.contains("state") && m["state"].is_string()) row.state = m["state"].get<std::string>();
                 if (m.contains("mode") && m["mode"].is_string()) row.mode = m["mode"].get<std::string>();
                 if (m.contains("progress") && m["progress"].is_number()) row.progress = int(m["progress"].get<double>());
+                if (m.contains("retry_seconds") && m["retry_seconds"].is_number()) row.retry_seconds = std::max(0, std::min(300, m["retry_seconds"].get<int>()));
+                if (m.contains("exit_code") && m["exit_code"].is_number()) { row.exit_code = m["exit_code"].get<int64_t>(); row.has_exit_code = true; }
                 v.maps[m["map"].get<std::string>()] = row;
             }
         }
@@ -357,12 +362,17 @@ View build_view(Service& service, const WindowOptions& options)
         row.online = it != expiry.end() && it->second > real;
         auto h = host.maps.find(n.first);
         const std::string state = h != host.maps.end() ? h->second.state : "";
+        if (h != host.maps.end() && state != "running" && state != "saving") row.online = false;
         if (row.online) row.state = state == "saving" ? L"сохраняет мир…" : L"в сети";
         else if (state == "loading")
             row.state = L"загружается" + (h->second.progress > 0 ? L" · " + std::to_wstring(h->second.progress) + L"%" : L"");
         else if (state == "running") row.state = L"запускается";
         else if (state == "queued") row.state = L"в очереди на запуск";
         else if (state == "memory") row.state = L"ждёт память";
+        else if (state == "master_stopped") row.state = L"мастер остановлен";
+        else if (state == "loading_timeout") row.state = L"загрузка затянулась";
+        else if (state == "retry") row.state = L"сбой · повтор через " + std::to_wstring(h->second.retry_seconds) + L" с";
+        else if (state == "failed") row.state = L"остановлена после сбоев" + (h->second.has_exit_code ? L" · код " + std::to_wstring(h->second.exit_code) : L"");
         else if (state == "saving") row.state = L"сохраняет мир…";
         else if (it != expiry.end()) row.state = L"не отвечает";
         else row.state = row.planned ? L"выключена" : L"нет в плане хостера";
@@ -851,12 +861,27 @@ void command(State& s, const std::string& line, const wchar_t* confirm = nullptr
     set_status(s, split(answer, '\n')[0], failed ? C_RED : C_GREEN);
 }
 
+void pause_host_launches(State& s, bool pause)
+{
+    if (s.options.roster_folder.empty()) return;
+    const std::wstring path = s.options.roster_folder + L"\\host_master_paused.txt";
+    if (pause)
+    {
+        CreateDirectoryW(s.options.roster_folder.c_str(), nullptr);
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        if (out) out << "paused\n";
+        else log_line("Не удалось приостановить очередь запуска локаций.");
+    }
+    else DeleteFileW(path.c_str());
+}
+
 void start_service(State& s)
 {
     std::lock_guard<std::mutex> guard(s.service_lock);
     try
     {
         s.service = std::make_unique<Service>(s.options.service);
+        pause_host_launches(s, false);
         s.service_error.clear();
         s.started_ns = monotonic_ns();
     }
@@ -873,6 +898,7 @@ void stop_service(State& s)
     std::lock_guard<std::mutex> guard(s.service_lock);
     if (s.service)
     {
+        pause_host_launches(s, true);
         HCURSOR cursor = SetCursor(LoadCursor(nullptr, IDC_WAIT));
         s.service->stop();
         s.service.reset();
@@ -896,6 +922,11 @@ std::vector<std::string> selected_maps(State& s)
 
 void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
 {
+    if (on && (!s.service || !s.service->running()))
+    {
+        set_status(s, "Сначала включите мастер, затем запускайте локации.", C_AMBER);
+        return;
+    }
     if (maps.empty())
     {
         set_status(s, "Выберите локации в списке (несколько - с Ctrl или Shift).", C_AMBER);

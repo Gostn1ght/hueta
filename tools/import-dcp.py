@@ -128,6 +128,12 @@ def strings(dcp, lang):
     return dict(re.findall(r'<string id="([^"]+)">\s*<text>(.*?)</text>', text, re.S))
 
 
+def adapt_particle_paths(data):
+    # Lost Alpha DCP adds an "exhausts" folder absent from GAMMA's library.
+    # The same KamAZ effect already exists in the installed particles.xr.
+    return data.replace(b'vehiclefx\\exhausts\\exhaust_kamaz', b'vehiclefx\\exhaust_kamaz')
+
+
 def main(dcp, overlay, gamma):
     dcp, overlay, gamma = Path(dcp), Path(overlay), Path(gamma)
     client = overlay / "client"
@@ -186,7 +192,10 @@ def main(dcp, overlay, gamma):
                 if f.is_file():
                     target = dst / f.relative_to(src)
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(f, target)
+                    if folder == "configs/models/vehicles":
+                        target.write_bytes(adapt_particle_paths(f.read_bytes()))
+                    else:
+                        shutil.copyfile(f, target)
     jobs = []
     for f in (dcp / "textures").rglob("*"):
         if not f.is_file():

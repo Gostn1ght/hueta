@@ -36,6 +36,16 @@ function Send-ClusterHostCommand([string]$Directory, [string]$Map, [string]$Acti
     Write-ClusterText (Join-Path $Directory "host_command_$Map.txt") $Action
 }
 
+# Claim by rename, then consume only the claimed file. A newer command can
+# replace the mailbox while this one is being handled and must not be deleted.
+function Claim-ClusterHostCommand([string]$Directory, [string]$Map) {
+    if ($Map -notmatch '^\w+$') { throw 'Invalid map key' }
+    $file = Join-Path $Directory "host_command_$Map.txt"
+    $claimed = "$file.$PID.$([Guid]::NewGuid().ToString('N')).claimed"
+    try { [IO.File]::Move($file, $claimed); return $claimed }
+    catch [IO.IOException] { return $null }
+}
+
 function Request-ClusterSavedStop([string]$Directory, [int]$Port, [int]$ProcessId) {
     if ($Port -lt 1 -or $Port -gt 65534 -or $ProcessId -lt 1) { throw 'Invalid server identity' }
     Write-ClusterText (Join-Path $Directory "host_stop_$Port.txt") "stop|$ProcessId"

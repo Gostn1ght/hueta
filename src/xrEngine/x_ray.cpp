@@ -1291,8 +1291,19 @@ void CApplication::OnEvent(EVENT E, u64 P1, u64 P2)
 
 			if ((FALSE == Engine.Event.Peek("KERNEL:quit")) && (FALSE == Engine.Event.Peek("KERNEL:start")))
 			{
-				Console->Execute("main_menu off");
-				Console->Execute("main_menu on");
+				if (g_dedicated_server)
+				{
+					// A process without a level is not a running map. Returning it to
+					// the 3D menu leaves the hoster waiting forever for readiness.
+					Msg("! [Lost Zone] dedicated lost its level; exiting instead of opening the menu");
+					FlushLog();
+					Engine.Event.Defer("KERNEL:quit");
+				}
+				else
+				{
+					Console->Execute("main_menu off");
+					Console->Execute("main_menu on");
+				}
 			}
 		}
 		R_ASSERT(0 != g_pGamePersistent);

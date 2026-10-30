@@ -1198,8 +1198,11 @@ void CHW::updateWindowProps(HWND m_hWnd)
 	if (g_dedicated_server)
 	{
 		const LONG style = GetWindowLong(m_hWnd, GWL_STYLE);
-		SetWindowLong(m_hWnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE);
-		SetWindowPos(m_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+		const bool background = strstr(Core.Params, "-netcoop_background") != nullptr;
+		const LONG wanted = style | WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN;
+		SetWindowLong(m_hWnd, GWL_STYLE, background ? wanted & ~WS_VISIBLE : wanted | WS_VISIBLE);
+		SetWindowPos(m_hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+		if (background) ShowWindow(m_hWnd, SW_HIDE);
 		ClipCursor(nullptr);
 		return;
 	}
