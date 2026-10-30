@@ -34,7 +34,7 @@ class WorldFiles
         }
     };
     static bool exists(const std::wstring& path) {return GetFileAttributesW(path.c_str())!=INVALID_FILE_ATTRIBUTES;}
-    static std::string small(const std::wstring& path) {
+    static std::string read_pointer_text(const std::wstring& path) {
         if(!exists(path)) return "";
         Input in(path);const auto bytes=in.next();if(bytes.size()>1024) throw Invalid("world pointer exceeds its budget");
         return std::string(bytes.begin(),bytes.end());
@@ -68,7 +68,7 @@ class WorldFiles
         if(!ok || !MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) throw Unavailable("cannot install restored world pointer");
     }
     bool ingest(const std::string& world) {
-        const auto image=small(pointer(world));if(image.empty()) return false;
+        const auto image=read_pointer_text(pointer(world));if(image.empty()) return false;
         const auto digest=sha256_hex(image);
         if(seen_[world]==digest) return false;
         {
@@ -95,7 +95,7 @@ class WorldFiles
                 manifest.push_back({{"file",name},{"bytes",count},{"fnv",hash},{"chunks",index}});
             }
             verify_pointer(image,manifest);
-            if(small(pointer(world))!=image) throw Unavailable("world pointer changed during capture; retry the next complete version");
+            if(read_pointer_text(pointer(world))!=image) throw Unavailable("world pointer changed during capture; retry the next complete version");
             store_.transaction([&](Db& tx) {
                 store_.require_epoch(tx);
                 tx.exec("UPDATE master_world_revision SET manifest=?,complete=1 WHERE id=?",{canonical(manifest),capture});
@@ -198,7 +198,7 @@ public:
         std::filesystem::create_directories(pending_);
         const auto identity=store_.db.one("SELECT world_id,seed FROM world WHERE singleton=1");
         const auto authority=pending_+L"\\_authority.json";
-        if(exists(authority)) {if(loads(small(authority))!=identity) throw Invalid("world outbox belongs to a different master identity");}
+        if(exists(authority)) {if(loads(read_pointer_text(authority))!=identity) throw Invalid("world outbox belongs to a different master identity");}
         else atomic(authority,canonical(identity));
         store_.db.script("CREATE TABLE IF NOT EXISTS master_world_revision(sequence INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,world TEXT NOT NULL,pointer TEXT NOT NULL,pointer_hash TEXT NOT NULL,manifest TEXT NOT NULL,complete INTEGER NOT NULL);"
             "CREATE TABLE IF NOT EXISTS master_world_head(world TEXT PRIMARY KEY,capture TEXT NOT NULL);"

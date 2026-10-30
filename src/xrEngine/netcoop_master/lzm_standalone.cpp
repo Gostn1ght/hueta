@@ -46,6 +46,12 @@ int wmain(int argc, wchar_t** argv)
 {
     SetUnhandledExceptionFilter(report);
     std::vector<std::wstring> args(argv + 1, argv + argc);
+#ifdef LZM_TEST_FIXTURES
+    int lzm_host_fixture(const std::wstring&);
+    int lzm_storage_fixture(const std::wstring&);
+    if(args.size()==2 && args[0]==L"host-selftest") return lzm_host_fixture(args[1]);
+    if(args.size()==2 && args[0]==L"storage-selftest") return lzm_storage_fixture(args[1]);
+#endif
     if (!args.empty() && args[0] == L"-netcoop_master") args.erase(args.begin());
     return lzm::master_main(args);
 }

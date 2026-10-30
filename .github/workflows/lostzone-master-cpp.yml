@@ -36,7 +36,7 @@ jobs:
         shell: cmd
         run: |
           mkdir master-test
-          cl /nologo /std:c++17 /EHsc /O2 /Zi /utf-8 /W3 /permissive- /DWIN32 /D_WINDOWS /D_CRT_SECURE_NO_WARNINGS ^
+          cl /nologo /std:c++17 /EHsc /O2 /Zi /utf-8 /W3 /permissive- /DWIN32 /D_WINDOWS /D_CRT_SECURE_NO_WARNINGS /DLZM_TEST_FIXTURES ^
              src\xrEngine\netcoop_master\*.cpp /Fomaster-test\ /Fdmaster-test\ /Fe:master-test\LostZoneMasterTest.exe ^
              /link /DEBUG user32.lib gdi32.lib shell32.lib comctl32.lib uxtheme.lib dwmapi.lib ws2_32.lib bcrypt.lib
       - name: Ship the SQLite library next to it
@@ -47,6 +47,8 @@ jobs:
           python -c "import sqlite3; print('sqlite', sqlite3.sqlite_version)"
       - name: Same answers as the Python World Service
         run: python scripts/check-master-cpp-parity.py master-test\LostZoneMasterTest.exe
+      - name: Native cluster migration, world database and process control without a game
+        run: python scripts/check-master-v2.py master-test\LostZoneMasterTest.exe
       - name: The master window opens, serves and closes
         shell: pwsh
         run: |

@@ -17,6 +17,7 @@
 namespace lzm {
 class HostController
 {
+    friend struct HostControllerFixture;
     struct Map {
         PlanLocation plan;std::string start,world,mode="auto",state="stopped",detail;
         bool demand=true,loading=false,expected=false,blocked=false;
