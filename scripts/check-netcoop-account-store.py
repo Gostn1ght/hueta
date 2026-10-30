@@ -48,7 +48,7 @@ BOOL checked_move(LPCSTR from,LPCSTR to,DWORD flags){return fail_rename?FALSE:Mo
 #define MoveFileExA checked_move
 struct Account{
  std::string login="player",salt="salt",hash="hash",device="device",firebase_uid="uid";
- bool has_money=true,touched=true;u32 money=123;u8 role=1,approval=1;
+ bool has_money=true,touched=true;u32 money=123,change_fields=0;u8 role=1,approval=1;
 };
 using Accounts=std::map<std::string,Account>;
 Accounts s_accounts;bool s_accounts_dirty=true;FILETIME s_accounts_stamp={};

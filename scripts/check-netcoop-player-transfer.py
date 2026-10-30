@@ -194,7 +194,7 @@ struct CSE_ALifeTraderAbstract:CSE_Abstract {u32 m_dwMoney=50;};
 template<class T>T smart_cast(CSE_Abstract* entity){return dynamic_cast<T>(entity);}
 struct Game {CSE_Abstract* entity=nullptr;CSE_Abstract* get_entity_from_eid(u16){return entity;}};
 struct xrServer {Game* game;};
-struct Account {bool has_money=false,touched=false;u32 money=20;};
+struct Account {bool has_money=false,touched=false;u32 money=20,change_fields=0;};
 Account wallet;bool s_accounts_dirty=false;int commits=0;
 Account* account_find(const char* login){assert(std::string(login)=="tester");return has_account?&wallet:nullptr;}
 bool accounts_save(){++commits;if(commit_ok){wallet.touched=false;s_accounts_dirty=false;}return commit_ok;}
@@ -320,7 +320,7 @@ std::map<u16,int>s_character_restore,s_actor_character;
 bool cluster_ticket_write(const char*,u8,const char*){events+='T';return ticket_ok;}
 void cluster_file(const char*,const char*,u8,char* out){std::snprintf(out,260,"ticket");}
 void DeleteFileA(const char*){events+='D';}
-struct Account {bool has_money=false,touched=false;u32 money=0;};
+struct Account {bool has_money=false,touched=false;u32 money=0,change_fields=0;};
 Account account;bool s_accounts_dirty=false;
 Account* account_find(const char*){return &account;}
 bool server_client_leaving(xrClientData* client){return s_cluster_leaving.count(client->ID.value())!=0;}

@@ -25,7 +25,7 @@ using u32=unsigned;using LPCSTR=const char*;using xr_string=std::string;
 enum Role {role_none,role_player,role_admin};
 struct Account {
  xr_string login,salt,hash,device,firebase_uid;Role role=role_player;
- unsigned approval=1,money=0,failures=0,locked_until=0;bool touched=false,has_money=false;
+ unsigned approval=1,money=0,failures=0,locked_until=0,change_fields=0;bool touched=false,has_money=false;
 };
 struct xrClientData {unsigned ID=1;xr_string netcoop_login;Role netcoop_role=role_none;};
 struct PendingAuth {
