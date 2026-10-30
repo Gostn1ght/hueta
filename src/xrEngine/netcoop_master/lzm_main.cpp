@@ -156,6 +156,7 @@ Args parse(const std::vector<std::wstring>& argv)
 
 int master_main(const std::vector<std::wstring>& argv)
 {
+    bool show_error=argv.empty() || argv[0]==L"window" || argv[0]==L"console" || argv[0].rfind(L"--",0)==0;
     try
     {
         Args a = parse(argv);
@@ -210,7 +211,7 @@ int master_main(const std::vector<std::wstring>& argv)
             Service running(service);
             std::unique_ptr<HostController> host;
             if(!a.config && !a.selftest) host=std::make_unique<HostController>(root,plan);
-            while (running.running()) {if(host) host->enabled(running.ready());Sleep(1000);}
+            while (running.running()) {if(host) {host->epoch(uint64_t(*running.store().epoch));host->enabled(running.ready());}Sleep(1000);}
             return 0;
         }
         WindowOptions window;
@@ -224,6 +225,12 @@ int master_main(const std::vector<std::wstring>& argv)
     {
         // Private config/checkpoint exception text is never echoed.
         log_line("[diag][master] stopped type=" + exception_type(error) + " reason=" + error.what());
+        if(show_error) {
+            std::string reason=error.what();
+            static const std::regex sensitive("password|passwd|token|secret|signing_key|authorization",std::regex::icase);
+            if(std::regex_search(reason,sensitive)) reason="Приватная конфигурация недействительна; проверьте журнал мастера.";
+            MessageBoxW(nullptr,(L"Мастер не запустился.\n\n"+widen(reason)+L"\n\nЖурнал: appdata\\server\\netcoop_cluster\\master_*.log").c_str(),L"Lost Zone — мастер сервера",MB_OK|MB_ICONERROR);
+        }
         HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
         if (err && err != INVALID_HANDLE_VALUE)
         {
@@ -243,11 +250,21 @@ int netcoop_master_entry()
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &count);
     std::vector<std::wstring> args;
     bool after = false;
+    wchar_t executable[4096];GetModuleFileNameW(nullptr,executable,4096);
+    const auto slash=wcsrchr(executable,L'\\');
+    if(_wcsicmp(slash ? slash+1:executable,L"LostZoneMaster.exe")==0) after=true;
     for (int i = 1; i < count; ++i)
     {
-        if (after) args.push_back(argv[i]);
-        else if (std::wstring(argv[i]) == L"-netcoop_master") after = true;
+        if (std::wstring(argv[i]) == L"-netcoop_master") after = true;
+        else if (after) args.push_back(argv[i]);
     }
     LocalFree(argv);
     return lzm::master_main(args);
+}
+
+bool netcoop_master_named_entry()
+{
+    wchar_t executable[4096];GetModuleFileNameW(nullptr,executable,4096);
+    const auto slash=wcsrchr(executable,L'\\');
+    return _wcsicmp(slash ? slash+1:executable,L"LostZoneMaster.exe")==0;
 }

@@ -21,6 +21,7 @@ struct Account
 	// Changed here and not yet written. Location servers share the file:
 	// everything else is re-read from it (accounts_refresh).
 	bool touched = false;
+	u32 change_fields = 0; // auth=1, money=2, role=4, approval=8
 };
 
 typedef xr_map<xr_string, Account> Accounts;
@@ -139,6 +140,7 @@ static void accounts_read(Accounts& out)
 // imported once (the records the master lacks) and no longer written. An
 // older master without accounts leaves the file in charge.
 static bool admission_active(); // netcoop_admission.inc
+static bool admission_ready();
 static bool admission_accounts_take(std::vector<netcoop_world::AccountRecord>& changed, netcoop_world::AccountsState& state);
 static bool admission_accounts_put(const std::vector<netcoop_world::AccountRecord>& records, bool only_new);
 static bool s_accounts_master = false, s_accounts_fallback = false;
@@ -165,6 +167,7 @@ static netcoop_world::AccountRecord account_record(const Account& a)
 	account_copy(r.firebase, a.firebase_uid.c_str());
 	r.has_money = a.has_money;
 	r.money = a.money;
+	r.fields=a.change_fields ? a.change_fields:15;
 	return r;
 }
 
@@ -195,6 +198,9 @@ static void accounts_master_refresh()
 	if (!admission_accounts_take(changed, state)) return;
 	if (state == netcoop_world::AccountsState::Unsupported && !s_accounts_master)
 	{
+		if(master_required()) {
+			Msg("! [diag][accounts] this master has no compatible account API; local fallback is disabled for a managed cluster");return;
+		}
 		s_accounts_fallback = true;
 		Msg("! [Lost Zone][master] the world master keeps no accounts (an older master): accounts stay in netcoop_accounts.txt");
 		return;
@@ -208,11 +214,15 @@ static void accounts_master_refresh()
 		s_accounts_master_keys.insert(key);
 		auto it = s_accounts.find(key);
 		if (it != s_accounts.end() && it->second.touched) continue; // ours is on its way to the master
-		if (it != s_accounts.end()) { a.failures = it->second.failures; a.locked_until = it->second.locked_until; }
+		if (it != s_accounts.end()) {
+			a.failures = it->second.failures; a.locked_until = it->second.locked_until;
+			if(a.role!=it->second.role) server_apply_role_online(a.login.c_str(),a.role);
+		}
 		s_accounts[key] = a;
 	}
 	if (state != netcoop_world::AccountsState::Synced || s_accounts_master) return;
 	s_accounts_master = true;
+	s_accounts_loaded = true;
 	Accounts file;
 	accounts_read(file);
 	std::vector<netcoop_world::AccountRecord> missing;
@@ -232,6 +242,7 @@ static void accounts_master_refresh()
 static void accounts_load();
 static bool accounts_available()
 {
+	if((master_required() || master_cluster_plan()) && !admission_ready()) return false;
 	if (!accounts_in_master()) return true;
 	accounts_load();
 	return s_accounts_master || s_accounts_fallback;
@@ -290,7 +301,7 @@ static bool accounts_save()
 			return false;
 		}
 		for (auto& entry : s_accounts)
-			if (entry.second.touched) { entry.second.touched = false; s_accounts_master_keys.insert(entry.first); }
+			if (entry.second.touched) { entry.second.touched = false;entry.second.change_fields=0; s_accounts_master_keys.insert(entry.first); }
 		s_accounts_dirty = false;
 		return true;
 	}
@@ -357,7 +368,7 @@ bool server_reset_device(LPCSTR login)
 {
     Account* account = account_find(login);
     if (!account) return false;
-    account->device.clear(); account->touched = true; s_accounts_dirty = true; accounts_save();
+    account->device.clear(); account->touched = true;account->change_fields|=1; s_accounts_dirty = true; accounts_save();
     return true;
 }
 
@@ -398,6 +409,7 @@ bool server_set_role(LPCSTR login, u8 role, xr_string& message)
 		return false;
 	}
 	a->role = role;
+	a->change_fields|=12;
 	if (role == role_admin) a->approval = 1; // console bootstrap of the first administrator
 	a->touched = true;
 	s_accounts_dirty = true;

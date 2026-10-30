@@ -23,7 +23,9 @@ void Service::initialize_records(const std::wstring& root)
         if(!file.is_regular_file() || file.path().extension()!=L".txt") continue;
         const auto relative=file.path().lexically_relative(legacy);
         if(std::distance(relative.begin(),relative.end())!=2) continue;
-        const auto bucket=record_name(narrow(relative.begin()->wstring())),key=record_name(narrow(file.path().stem().wstring()));
+        std::string bucket,key;
+        try {bucket=record_name(narrow(relative.begin()->wstring()));key=record_name(narrow(file.path().stem().wstring()));}
+        catch(const Invalid&) {log_line("[diag][migration] skipped legacy file with an invalid shared-record name");continue;}
         if(file.file_size()>65536) throw Invalid("legacy shared record exceeds the supported size");
         std::ifstream in(file.path(),std::ios::binary);std::ostringstream bytes;bytes<<in.rdbuf();
         if(!in || bytes.str().size()>65536) throw Unavailable("legacy shared record cannot be imported");

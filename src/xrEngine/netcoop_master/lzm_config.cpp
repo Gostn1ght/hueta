@@ -51,7 +51,13 @@ static void write_new(const std::wstring& path, const std::string& data, bool re
         DeleteFileW(replace ? temporary.c_str() : path.c_str());
         throw Unavailable("configuration file cannot be written");
     }
-    if (replace && !MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    bool installed=!replace;
+    for(int attempt=0;replace && attempt<40;++attempt) {
+        if(MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {installed=true;break;}
+        if(GetLastError()!=ERROR_SHARING_VIOLATION && GetLastError()!=ERROR_ACCESS_DENIED) break;
+        Sleep(10);
+    }
+    if (!installed)
     {
         DeleteFileW(temporary.c_str());
         throw Unavailable("configuration file cannot be replaced");
@@ -215,8 +221,16 @@ void prepare_engine_cluster(const std::wstring& root, const std::wstring& config
             const auto old_db=legacy.substr(0,legacy.find_last_of(L"\\/")+1)+widen(database);
             const auto new_db=config_path.substr(0,config_path.find_last_of(L"\\/")+1)+L"world.sqlite";
             make_parent(new_db);
-            if (exists(new_db)) throw Invalid("master migration destination already has a database; check the saved migration state");
-            if (exists(old_db))
+            const auto origin=sha256_hex(narrow(legacy)+"\n"+read_file(legacy));
+            if (exists(new_db)) {
+                Db verify;verify.open(new_db,true);
+                if(verify.scalar("PRAGMA integrity_check")!="ok" ||
+                    verify.scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='native_migration_origin'")!=1 ||
+                    verify.scalar("SELECT fingerprint FROM native_migration_origin LIMIT 1")!=origin)
+                    throw Invalid("master migration destination is not this verified migration; original files retained");
+                log_line("[diag][migration] resuming verified database migration before config installation");
+            }
+            else if (exists(old_db))
             {
                 const auto temporary=new_db+L"."+widen(token_hex(8))+L".tmp";
                 try
@@ -224,8 +238,10 @@ void prepare_engine_cluster(const std::wstring& root, const std::wstring& config
                     Db source;source.open(old_db,true);
                     source.exec("VACUUM INTO ?",{narrow(temporary)});
                     source.close();
-                    Db verify;verify.open(temporary,true);
+                    Db verify;verify.open(temporary);
                     if (verify.scalar("PRAGMA integrity_check")!="ok") throw Invalid("migrated master database failed integrity check");
+                    verify.script("CREATE TABLE IF NOT EXISTS native_migration_origin(fingerprint TEXT NOT NULL); DELETE FROM native_migration_origin;");
+                    verify.exec("INSERT INTO native_migration_origin VALUES(?)",{origin});
                     verify.close();
                     if (!MoveFileExW(temporary.c_str(),new_db.c_str(),MOVEFILE_WRITE_THROUGH)) throw Unavailable("cannot install migrated master database");
                 }

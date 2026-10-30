@@ -368,6 +368,7 @@ static bool finish_auth(xrServer* server, PendingAuth* pending)
 		created.failures = 0;
 		created.locked_until = 0;
 		created.touched = true;
+		created.change_fields=15;
 		s_accounts[in_use.login] = created;
 		s_accounts_dirty = true;
 		accounts_save();
@@ -411,18 +412,19 @@ static bool finish_auth(xrServer* server, PendingAuth* pending)
 	if (link_firebase)
 	{
 		a->firebase_uid = pending->firebase_uid;
+		a->change_fields|=1;
 		a->touched = true;
 		s_accounts_dirty = true;
 		accounts_save();
 		Msg("[Lost Zone] account '%s' linked to Google after password proof", a->login.c_str());
 	}
     if (a->device.empty() && !pending->device.empty())
-    { a->device = pending->device; a->touched = true; s_accounts_dirty = true; accounts_save(); }
+    { a->device = pending->device; a->touched = true;a->change_fields|=1; s_accounts_dirty = true; accounts_save(); }
     // Retain the old column for save-format compatibility, but it is no
     // longer an admission gate. Migrate only AFTER credentials, device and
     // explicit bans have been checked; failed logins cannot edit accounts.
     if (a->approval != 1)
-    { a->approval = 1; a->touched = true; s_accounts_dirty = true; accounts_save(); }
+    { a->approval = 1; a->touched = true;a->change_fields|=8; s_accounts_dirty = true; accounts_save(); }
 	CL->netcoop_login = a->login.c_str();
     CL->netcoop_role = a->role;
     // Slot zero authenticates the front-end and fetches slots without creating
@@ -688,6 +690,7 @@ static void store_money(xrClientData* CL)
 	{
 		a->has_money = true;
 		a->money = trader->m_dwMoney;
+		a->change_fields|=2;
 		a->touched = true;
 		s_accounts_dirty = true;
 	}
@@ -739,6 +742,7 @@ static bool character_account_money_commit(xrServer* server, u16 actor_id)
 	{
 		account_record->has_money = true;
 		account_record->money = trader->m_dwMoney;
+		account_record->change_fields|=2;
 		account_record->touched = true;
 		s_accounts_dirty = true;
 	}
@@ -858,6 +862,7 @@ void server_update(xrServer* server)
 	world_store_update(server);
 	server_world_bridge_update();
 	admission_update();
+	if(admission_active()) accounts_load(); // initialize/synchronize before the first login
 	admission_departures_update(server);
 	server_talk_prune(server);
 	characters_update(server);

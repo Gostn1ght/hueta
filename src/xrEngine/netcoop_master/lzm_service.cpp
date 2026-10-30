@@ -150,7 +150,7 @@ int read_entry_port(const std::wstring& path)
 }
 
 // -- the service (__main__.run) -----------------------------------------------------------------------------------
-Service::Service(const Options& options) : cluster_(options.cluster)
+Service::Service(const Options& options) : cluster_(options.cluster), runtime_root_(options.runtime_root)
 {
     json config = loads(read_file(options.config));
     if (!config.is_object() || !config.contains("schema") || config["schema"] != 1) throw Invalid("unsupported service configuration");
@@ -535,9 +535,13 @@ json Service::account_put(const json& args)
     if (!list.is_array() || list.empty() || list.size() > 200 || !args["only_new"].is_boolean()) throw Invalid("invalid account batch");
     const bool only_new = args["only_new"].get<bool>();
     std::vector<Db::Params> rows;
+    std::vector<int64_t> masks;
     for (const json& account : list)
     {
-        if (!account.is_object() || account.size() != 8 || !account.contains("money")) throw Invalid("invalid account record");
+        if (!account.is_object() || (account.size() != 8 && account.size() != 9) || !account.contains("money")) throw Invalid("invalid account record");
+        const auto fields=account.value("fields",json(15));
+        if(!fields.is_number_integer() || fields.get<int64_t>()<1 || fields.get<int64_t>()>15) throw Invalid("invalid account fields");
+        masks.push_back(fields.get<int64_t>());
         std::string login = account_field(account, "login", 20, false);
         if (login.size() < 3 || !std::all_of(login.begin(), login.end(), [](char c) { return isalnum((unsigned char)c) || c == '_' || c == '-' || c == '.'; }))
             throw Invalid("invalid account login");
@@ -553,13 +557,21 @@ json Service::account_put(const json& args)
     return store_->transaction([&](Db& tx) -> json {
         const int64_t revision = tx.scalar("SELECT COALESCE(MAX(revision),0) FROM account").get<int64_t>() + 1;
         int64_t changed = 0;
+        size_t index=0;
         for (auto& row : rows)
         {
             row.push_back(revision);
+            if(!only_new) row.push_back(masks[index]);
+            ++index;
             changed += tx.exec(only_new ? "INSERT OR IGNORE INTO account VALUES(?,?,?,?,?,?,?,?,?,?)"
-                                        : "INSERT INTO account VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET"
-                                          " login=excluded.login,role=excluded.role,salt=excluded.salt,hash=excluded.hash,money=excluded.money,"
-                                          "device=excluded.device,approval=excluded.approval,firebase_uid=excluded.firebase_uid,revision=excluded.revision",
+                                        : "INSERT INTO account VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(key) DO UPDATE SET"
+                                          " role=CASE WHEN (?11 & 4)!=0 THEN excluded.role ELSE account.role END,"
+                                          " salt=CASE WHEN (?11 & 1)!=0 THEN excluded.salt ELSE account.salt END,"
+                                          " hash=CASE WHEN (?11 & 1)!=0 THEN excluded.hash ELSE account.hash END,"
+                                          " money=CASE WHEN (?11 & 2)!=0 THEN excluded.money ELSE account.money END,"
+                                          " device=CASE WHEN (?11 & 1)!=0 THEN excluded.device ELSE account.device END,"
+                                          " approval=CASE WHEN (?11 & 8)!=0 THEN excluded.approval ELSE account.approval END,"
+                                          " firebase_uid=CASE WHEN (?11 & 1)!=0 THEN excluded.firebase_uid ELSE account.firebase_uid END,revision=excluded.revision",
                                row);
         }
         return json{ { "revision", revision }, { "changed", changed } };
@@ -860,12 +872,25 @@ HttpResponse Service::handle_entry(HttpRequest& request)
         int64_t now = world_->real_ms();
         std::vector<std::string> alive;
         for (auto& row : store_->db.all("SELECT location FROM location_lease WHERE expires_ms>?", { now })) alive.push_back(row["location"].get<std::string>());
-        auto running = [&](const std::string& name) { return std::find(alive.begin(), alive.end(), name) != alive.end(); };
+        auto running = [&](const std::string& name) {
+            if(std::find(alive.begin(),alive.end(),name)==alive.end()) return false;
+            if(runtime_root_.empty()) return true;
+            try {
+                auto location=std::find_if(plan.begin(),plan.end(),[&](const PlanLocation& p){return p.name==name;});
+                if(location==plan.end()) return false;
+                const auto folder=cluster_.substr(0,cluster_.find_last_of(L"\\/")+1)+L"netcoop_cluster\\";
+                const auto state=loads(read_file(folder+L"admission_"+std::to_wstring(location->port)+L".json"));
+                return state.value("ready",false) && state.value("updated",int64_t(0))>=int64_t(time(nullptr))-30 &&
+                    state.value("epoch",int64_t(0))==store_->epoch.value_or(0);
+            }catch(...) {return false;}
+        };
         // The client keeps the address it reached the master with (Radmin VPN players).
         auto answer = [&](const PlanLocation& location) {
             return respond(200, { { "schema", 1 }, { "location", location.name }, { "host", "" }, { "port", location.port } });
         };
         if(!ready()) return respond(503,{{"schema",1},{"state","recovering"},{"location",""},{"retry_seconds",3}});
+        if(!runtime_root_.empty() && GetFileAttributesW((runtime_root_+L"\\appdata\\server\\netcoop_cluster\\host_master_paused.txt").c_str())!=INVALID_FILE_ATTRIBUTES)
+            return respond(503,{{"schema",1},{"state","disabled"},{"location",""},{"retry_seconds",0}});
         if (account && valid_account(*account) && slot >= 0 && slot <= 10)
         {
             // Listing slots needs any healthy location, not the old character's

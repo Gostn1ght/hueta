@@ -396,7 +396,21 @@ static bool config_io_path(LPCSTR requested,LPCSTR mode,string_path& resolved,bo
 	for(char* c=full;*c;++c) if(*c=='/') *c='\\';
 	for(char* c=base;*c;++c) if(*c=='/') *c='\\';
 	const size_t n=xr_strlen(base);
-	if(!n || base[n-1]!='\\' || _strnicmp(full,base,n)!=0 || !full[n]) return false;
+	if(!n || base[n-1]!='\\') return false;
+	if(_strnicmp(full,base,n)!=0) {
+		// Some mods retain their old physical path instead of calling game_ini().
+		// Redirect those aliases too, so writes cannot recreate client/configs.
+		bool matched=false;
+		for(LPCSTR legacy:{"client\\configs\\","server\\configs\\","gamedata\\configs\\"}) {
+			string_path path,canonical;FS.update_path(path,"$fs_root$",legacy);
+			const DWORD length=GetFullPathNameA(path,sizeof(canonical),canonical,nullptr);
+			if(!length || length>=sizeof(canonical) || canonical[length-1]!='\\' || _strnicmp(full,canonical,length)!=0 || !full[length]) continue;
+			if(n+xr_strlen(full+length)>=sizeof(full)) return false;
+			xr_string relative=full+length;xr_sprintf(full,"%s%s",base,relative.c_str());matched=true;break;
+		}
+		if(!matched) return false;
+	}
+	if(!full[n]) return false;
 	writing=mode && (strchr(mode,'w') || strchr(mode,'a') || strchr(mode,'+'));
 	if(writing) config_io_parent(full);
 	if(GetFileAttributesA(full)!=INVALID_FILE_ATTRIBUTES) {xr_strcpy(resolved,full);return true;}

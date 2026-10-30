@@ -74,7 +74,7 @@ BridgeJson account_json(const AccountRecord& record)
 {
     return BridgeJson{{"login",record.login},{"role",record.role},{"salt",record.salt},{"hash",record.hash},
         {"money",record.has_money ? BridgeJson(record.money):BridgeJson()},{"device",record.device},
-        {"approval",record.approval},{"firebase_uid",record.firebase}};
+        {"approval",record.approval},{"firebase_uid",record.firebase},{"fields",record.fields}};
 }
 }
 
@@ -679,6 +679,8 @@ CoordinatorStatus AdmissionCoordinator::status() noexcept
         result.characters=unsigned(state_->characters.size());result.pending=unsigned(state_->jobs.size());
         result.http_status=state_->last_http_status;result.attempts=state_->open_attempts;
         put(result.phase,state_->phase);
+        const auto checkpoint=state_->worker.status();
+        if(checkpoint.authority_lost || checkpoint.configuration_error) {result.ready=false;result.failed=true;put(result.phase,"checkpoint_authority_lost");}
     }
     catch(...){}
     return result;

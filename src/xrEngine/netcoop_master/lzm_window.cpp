@@ -16,6 +16,8 @@
 #include <atomic>
 #include <fstream>
 #include <sstream>
+#include <set>
+#include <filesystem>
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "dwmapi.lib")
@@ -49,7 +51,7 @@ namespace
 {
 COLORREF rgb(int r, int g, int b) { return RGB(r, g, b); }
 const COLORREF C_BG = rgb(15, 20, 29), C_SURFACE = rgb(20, 27, 38), C_RAISED = rgb(28, 37, 50), C_HOVER = rgb(38, 50, 66),
-               C_LINE = rgb(38, 38, 42), C_TEXT = rgb(232, 230, 225), C_MUTED = rgb(140, 140, 145), C_DIM = rgb(90, 90, 95),
+               C_LINE = rgb(46, 59, 78), C_TEXT = rgb(232, 237, 245), C_MUTED = rgb(170, 183, 202), C_DIM = rgb(146, 160, 180),
                C_ACCENT = rgb(116, 180, 255), C_ACCENT_HOVER = rgb(148, 198, 255), C_GREEN = rgb(76, 195, 138), C_AMBER = rgb(224, 168, 74),
                C_RED = rgb(229, 83, 75);
 
@@ -107,7 +109,7 @@ struct View
 };
 
 struct Button { int id; std::wstring text; RECT rc{}; bool accent = false; COLORREF color = 0; };
-enum { B_EMISSION = 1, B_PSI, B_WEATHER, B_SPEED, B_LOGS, B_TOGGLE, B_RUN, B_LOC_ON, B_LOC_OFF, T_LOCATIONS = 100, T_PLAYERS, T_JOURNAL, T_CONSOLE };
+enum { B_EMISSION = 1, B_PSI, B_WEATHER, B_SPEED, B_LOGS, B_TOGGLE, B_RUN, B_LOC_ON, B_LOC_OFF, B_NODE_LOG, B_DIAGNOSTICS, B_ROLE_ADMIN, B_ROLE_PLAYER, T_LOCATIONS = 100, T_PLAYERS, T_JOURNAL, T_CONSOLE };
 
 struct State
 {
@@ -127,7 +129,8 @@ struct State
     std::vector<std::pair<std::string, std::string>> lines;
     std::mutex view_lock;
     std::optional<View> view;
-    std::atomic<bool> closing{ false };
+    std::atomic<bool> closing{ false }, stop_pending{false};
+    bool close_after_stop=false;
     std::thread poller;
     std::wstring status_text;
     COLORREF status_color = C_MUTED;
@@ -396,7 +399,7 @@ void poll(State* s)
         {
             std::lock_guard<std::mutex> guard(s->service_lock);
             if (s->service && s->service->running()) {
-                if(s->host) s->host->enabled(s->service->ready());
+                if(s->host) s->host->enabled(s->service->ready() && !s->stop_pending);
                 view = build_view(*s->service, s->options);
             }
         }
@@ -538,7 +541,9 @@ void layout(State& s)
         MoveWindow(s.locations, s.content.left, s.content.top, w, h - line - px(s, 8), TRUE);
         int bx = s.content.left;
         for (auto [bid, label, color] : { std::make_tuple(int(B_LOC_ON), std::wstring(L"Включить выбранные"), C_GREEN),
-                                          std::make_tuple(int(B_LOC_OFF), std::wstring(L"Выключить выбранные"), C_RED) })
+                                          std::make_tuple(int(B_LOC_OFF), std::wstring(L"Выключить выбранные"), C_RED),
+                                          std::make_tuple(int(B_NODE_LOG), std::wstring(L"Лог локации"), C_ACCENT),
+                                          std::make_tuple(int(B_DIAGNOSTICS), std::wstring(L"Собрать диагностику"), C_MUTED) })
         {
             HDC dc = GetDC(s.hwnd);
             SelectObject(dc, s.f_bold);
@@ -558,6 +563,15 @@ void layout(State& s)
         run.rc = { s.content.right - px(s, 132), s.content.bottom - line, s.content.right, s.content.bottom };
         run.accent = true;
         s.buttons.push_back(run);
+    }
+    if(s.tab==1) {
+        MoveWindow(s.players,s.content.left,s.content.top,w,h-line-px(s,8),TRUE);
+        int x=s.content.left;
+        for(auto id:{B_ROLE_ADMIN,B_ROLE_PLAYER}) {
+            Button b{id,id==B_ROLE_ADMIN ? L"Выдать администратора":L"Снять администратора"};
+            b.rc={x,s.content.bottom-line,x+px(s,244),s.content.bottom};b.color=C_ACCENT;
+            s.buttons.push_back(b);x=b.rc.right+px(s,8);
+        }
     }
     for (HWND list : { s.locations, s.players })
     {
@@ -754,9 +768,8 @@ HWND make_list(State& s, HWND parent, const std::vector<std::pair<std::wstring, 
 
 void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, const std::vector<int>& tags)
 {
-    int selected = ListView_GetNextItem(list, -1, LVNI_SELECTED);
-    std::wstring key;
-    if (selected >= 0)
+    std::set<std::wstring> selected_keys;
+    for(int selected=ListView_GetNextItem(list,-1,LVNI_SELECTED);selected>=0;selected=ListView_GetNextItem(list,selected,LVNI_SELECTED))
     {
         wchar_t buffer[256] = {};
         LVITEMW get{};
@@ -764,7 +777,7 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
         get.pszText = buffer;
         get.cchTextMax = 255;
         SendMessageW(list, LVM_GETITEMTEXTW, WPARAM(selected), (LPARAM)&get);
-        key = buffer;
+        selected_keys.insert(buffer);
     }
     SendMessageW(list, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(list);
@@ -783,7 +796,7 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
             cell.pszText = (LPWSTR)rows[r][c].c_str();
             SendMessageW(list, LVM_SETITEMTEXTW, WPARAM(index), (LPARAM)&cell);
         }
-        if (!key.empty() && rows[r][0] == key) ListView_SetItemState(list, index, LVIS_SELECTED, LVIS_SELECTED);
+        if (selected_keys.count(rows[r][0])) ListView_SetItemState(list, index, LVIS_SELECTED, LVIS_SELECTED);
     }
     SendMessageW(list, WM_SETREDRAW, TRUE, 0);
     InvalidateRect(list, nullptr, TRUE);
@@ -896,7 +909,7 @@ void start_service(State& s)
         s.service = std::make_unique<Service>(s.options.service);
         pause_host_launches(s, false);
         ensure_watchdog(s,false);
-        if(s.host) s.host->enabled(s.service->ready());
+        if(s.host) {s.host->epoch(uint64_t(*s.service->store().epoch));s.host->resume();s.host->enabled(s.service->ready());}
         s.service_error.clear();
         s.started_ns = monotonic_ns();
     }
@@ -908,13 +921,19 @@ void start_service(State& s)
     }
 }
 
-void stop_service(State& s)
+void stop_service(State& s,bool wait_for_maps=true)
 {
     std::lock_guard<std::mutex> guard(s.service_lock);
     if (s.service)
     {
         pause_host_launches(s, true);
         if(s.host) s.host->enabled(false);
+        if(wait_for_maps && s.host && s.host->active()) {
+            s.stop_pending=true;s.host->shutdown_locations();
+            s.status_text=L"Сохраняем и останавливаем локации перед остановкой мастера…";s.status_color=C_AMBER;
+            log_line("[diag][master] graceful stop requested; keeping API alive until location saves finish");return;
+        }
+        s.stop_pending=false;
         HCURSOR cursor = SetCursor(LoadCursor(nullptr, IDC_WAIT));
         s.service->stop();
         s.service.reset();
@@ -938,7 +957,7 @@ std::vector<std::string> selected_maps(State& s)
 
 void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
 {
-    if (on && (!s.service || !s.service->running()))
+    if (on && (s.stop_pending || !s.service || !s.service->running()))
     {
         set_status(s, "Сначала включите мастер, затем запускайте локации.", C_AMBER);
         return;
@@ -1014,10 +1033,49 @@ void click(State& s, int id)
     case B_LOGS: ShellExecuteW(s.hwnd, L"open", s.options.log_folder.c_str(), nullptr, nullptr, SW_SHOWNORMAL); break;
     case B_LOC_ON: switch_locations(s, true, selected_maps(s)); break;
     case B_LOC_OFF: switch_locations(s, false, selected_maps(s)); break;
+    case B_NODE_LOG: {
+        const auto maps=selected_maps(s);if(maps.empty()) {set_status(s,"Выберите локацию в списке.",C_AMBER);break;}
+        const auto root=std::filesystem::path(s.options.roster_folder).parent_path().parent_path().parent_path();
+        std::filesystem::path chosen;std::filesystem::file_time_type newest=std::filesystem::file_time_type::min();
+        std::error_code error;
+        for(const auto& directory:{root/L"appdata"/L"server"/L"logs",root/L"appdata"/L"logs"})
+            for(const auto& file:std::filesystem::directory_iterator(directory,error)) {
+                const auto name=lower(narrow(file.path().filename().wstring()));
+                if(file.path().extension()!=L".log" || !file.is_regular_file(error)) continue;
+                if(name.find(maps.front())==std::string::npos && !(maps.front()=="k00_marsh" && name.rfind("xray_srv_",0)==0 && name.find("_l0")==std::string::npos && name.find("_y04_")==std::string::npos)) continue;
+                const auto stamp=file.last_write_time(error);if(!error && stamp>newest) {chosen=file.path();newest=stamp;}
+            }
+        if(chosen.empty()) {set_status(s,"Журнал этой локации ещё не создан.",C_AMBER);break;}
+        std::ifstream in(chosen,std::ios::binary|std::ios::ate);const auto end=in.tellg();
+        if(end<0) {set_status(s,"Не удалось прочитать журнал.",C_RED);break;}
+        const auto count=(std::min)(std::streamoff(end),std::streamoff(128*1024));in.seekg(end-count);
+        std::string tail(size_t(count),'\0');in.read(tail.data(),count);
+        if(std::streamoff(end)>count) {const auto start=tail.find('\n');if(start!=std::string::npos) tail.erase(0,start+1);}
+        // The engine journal is CP1251; master diagnostics are UTF-8.
+        const int chars=MultiByteToWideChar(1251,0,tail.data(),int(tail.size()),nullptr,0);std::wstring wide(size_t(chars),'\0');
+        MultiByteToWideChar(1251,0,tail.data(),int(tail.size()),wide.data(),chars);
+        SetWindowTextW(s.output,(L"Последние 128 КБ · "+chosen.filename().wstring()+L"\r\n\r\n"+wide).c_str());
+        s.tab=3;layout(s);InvalidateRect(s.hwnd,nullptr,FALSE);break;
+    }
+    case B_DIAGNOSTICS: {
+        const auto root=std::filesystem::path(s.options.roster_folder).parent_path().parent_path().parent_path().wstring();
+        std::wstring args=L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \""+root+L"\\dedicated\\CollectDiagnostics.ps1\" -Root \""+root+L"\"";
+        STARTUPINFOW start{sizeof(start)};PROCESS_INFORMATION process{};
+        if(CreateProcessW(nullptr,args.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,root.c_str(),&start,&process)) {
+            CloseHandle(process.hThread);CloseHandle(process.hProcess);set_status(s,"Сбор диагностики запущен. Архив появится в appdata/diagnostics.",C_ACCENT);
+        } else set_status(s,"Не удалось запустить сбор диагностики. Проверьте полный комплект сервера.",C_RED);
+        break;
+    }
+    case B_ROLE_ADMIN: case B_ROLE_PLAYER: {
+        const int row=ListView_GetNextItem(s.players,-1,LVNI_SELECTED);if(row<0) {set_status(s,"Выберите игрока.",C_AMBER);break;}
+        wchar_t login[128]{};ListView_GetItemText(s.players,row,0,login,128);
+        command(s,"role "+narrow(login)+(id==B_ROLE_ADMIN ? " admin":" player"));break;
+    }
     case B_TOGGLE:
+        if(s.stop_pending) {set_status(s,"Ожидаем сохранения локаций. Подробности — в их журналах.",C_AMBER);break;}
         if (s.service && s.service->running())
         {
-            if (MessageBoxW(s.hwnd, L"Без мастера карты перестанут пускать игроков, погода и выбросы остановятся. Остановить мастер?",
+            if (MessageBoxW(s.hwnd, L"Сохранить и остановить локации, затем остановить мастер?",
                             L"Lost Zone — мастер", MB_YESNO | MB_ICONWARNING) == IDYES)
                 stop_service(s);
         }
@@ -1055,6 +1113,20 @@ void finish_selftest(State& s, bool ok, const std::string& error)
     json result = s.selftest;
     result["ok"] = ok;
     if (!error.empty()) result["error"] = error;
+    RECT area{};GetWindowRect(s.hwnd,&area);const int width=area.right-area.left,height=area.bottom-area.top;
+    HDC screen=GetDC(s.hwnd),memory=CreateCompatibleDC(screen);HBITMAP bitmap=CreateCompatibleBitmap(screen,width,height);
+    auto previous=SelectObject(memory,bitmap);RedrawWindow(s.hwnd,nullptr,nullptr,RDW_UPDATENOW|RDW_ALLCHILDREN);
+    const bool captured=PrintWindow(s.hwnd,memory,0)!=FALSE;
+    SelectObject(memory,previous);
+    BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=width;info.bmiHeader.biHeight=height;
+    info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+    std::vector<unsigned char> pixels(size_t(width)*height*4);
+    if(captured && GetDIBits(memory,bitmap,0,height,pixels.data(),&info,DIB_RGB_COLORS)) {
+        BITMAPFILEHEADER header{};header.bfType=0x4d42;header.bfOffBits=sizeof(header)+sizeof(info.bmiHeader);header.bfSize=header.bfOffBits+DWORD(pixels.size());
+        std::ofstream capture(s.options.selftest+L".bmp",std::ios::binary);capture.write((char*)&header,sizeof(header));capture.write((char*)&info.bmiHeader,sizeof(info.bmiHeader));capture.write((char*)pixels.data(),pixels.size());
+        result["screenshot"]=bool(capture);
+    }
+    DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(s.hwnd,screen);
     stop_service(s);
     result["stopped"] = !s.service;
     std::ofstream out(s.options.selftest, std::ios::binary);
@@ -1111,6 +1183,10 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         {
             drain_journal(*s);
             return 0;
+        }
+        if(s->stop_pending && s->host && !s->host->active()) {
+            stop_service(*s,false);
+            if(s->close_after_stop) {s->closing=true;DestroyWindow(hwnd);return 0;}
         }
         refresh_lists(*s);
         layout(*s);
@@ -1203,11 +1279,13 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
     }
     case WM_CLOSE:
         if (s->service && s->service->running() && s->options.selftest.empty() &&
-            MessageBoxW(hwnd, L"Закрыть окно и остановить мастер? Карты перестанут пускать игроков.", L"Lost Zone — мастер",
+            MessageBoxW(hwnd, L"Сохранить и остановить локации, затем закрыть мастер?", L"Lost Zone — мастер",
                         MB_YESNO | MB_ICONWARNING) != IDYES)
             return 0;
-        s->closing = true;
+        s->close_after_stop=true;
         stop_service(*s);
+        if(s->stop_pending) {InvalidateRect(hwnd,nullptr,FALSE);return 0;}
+        s->closing = true;
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
@@ -1276,7 +1354,7 @@ int run_window(const WindowOptions& options)
     }
     state->closing = true;
     if (state->poller.joinable()) state->poller.join();
-    stop_service(*state);
+    stop_service(*state,false);
     {
         std::lock_guard<std::mutex> guard(g_state_lock);
         g_state = nullptr;

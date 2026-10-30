@@ -95,6 +95,17 @@ std::string Service::console(const std::string& line)
             json result = execute(admin, { { "command_id", uuid4_hex() }, { "operation", "world_scale" }, { "arguments", { { "value", py_float(args[0]) } } } });
             return "Масштаб времени: " + number_text(result["scale"]) + "; календарь: " + number_text(result["world_ms"]) + " мс.";
         }
+        if(command=="role") {
+            if(args.size()!=2 || (args[1]!="admin" && args[1]!="player")) throw Invalid("role <login> admin|player");
+            const auto login=lower(args[0]);
+            const auto changed=store_->transaction([&](Db& tx)->json {
+                store_->require_epoch(tx);
+                const auto revision=tx.scalar("SELECT COALESCE(MAX(revision),0)+1 FROM account");
+                return tx.exec("UPDATE account SET role=?,revision=? WHERE key=?",{args[1],revision,login});
+            });
+            log_line(format("[diag][accounts] operator role=%s matched=%s",args[1].c_str(),changed.dump().c_str()));
+            return changed==0 ? "Аккаунт не найден.":"Роль сохранена. Подключённые карты применят её без перезахода.";
+        }
         if (!args.empty()) throw Invalid("command does not take arguments");
         if (command == "help") return HELP;
         if (command == "quit" || command == "exit") return "Мастер останавливается кнопкой «Остановить».";
@@ -103,6 +114,12 @@ std::string Service::console(const std::string& line)
             store_->require_epoch(store_->db);
             return store_->db.all(sql);
         };
+        if(command=="accounts") {
+            std::string text;
+            for(const auto& row:rows("SELECT login,role,approval FROM account ORDER BY key LIMIT 513"))
+                text+=row["login"].get<std::string>()+" | "+row["role"].get<std::string>()+" | "+row["approval"].get<std::string>()+"\n";
+            return text.empty() ? "Аккаунтов пока нет.":text;
+        }
         if (command == "status")
         {
             json status = recovery_status();

@@ -320,6 +320,16 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-character-checksum.py
       - name: Check actor packet compatibility
+        # Archive-only configs must exercise the actual native resolver before
+        # removing the old physical client directory from an update.
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          python scripts/check-native-config-layout.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-entry-route.py
+          if errorlevel 1 exit /b %errorlevel%
+      - name: Check actor packet compatibility (network)
         shell: pwsh
         run: ./scripts/check-actor-packet.ps1
       - name: Check item instance state model

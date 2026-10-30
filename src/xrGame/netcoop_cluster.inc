@@ -487,7 +487,7 @@ static bool cluster_on_login(xrClientData* CL, LPCSTR login, u8 slot, xr_string&
 	}
 	// The master is the world's authority (owner 2026-10-12): without it
 	// weather, emissions and the calendar would split between the maps.
-	if (master_required() && !master_ready())
+	if (master_required() && (!master_ready() || !admission_ready()))
 	{
 		error = "The world master is unavailable; try again in a minute";
 		return false;

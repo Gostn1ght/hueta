@@ -52,6 +52,7 @@ struct AccountRecord
     char salt[257]{},hash[257]{},device[129]{},firebase[129]{};
     bool has_money=false;
     std::uint32_t money=0;
+    unsigned fields=15;
 };
 // Waiting: no complete copy yet. Unsupported: the master has no accounts
 // (an older one): the location keeps its file.

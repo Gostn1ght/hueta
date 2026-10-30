@@ -58,5 +58,10 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     subprocess.run([str(exe), 'bootstrap', '--root', str(game)], check=True, timeout=30)
     assert json.loads(writer.read_text())['token'] == actual['credentials']['location:l08_yantar']['token']
     assert (plan.with_name(plan.name + '.before-native-completion.bak')).exists()
+    migrated.unlink() # crash after DB installation, before config installation
+    subprocess.run([str(exe), 'bootstrap', '--root', str(game)], check=True, timeout=30)
+    assert json.loads(migrated.read_text())['world_id']==71
+    with closing(sqlite3.connect(migrated.parent / 'world.sqlite')) as copied:
+        assert copied.execute('SELECT value FROM migration_probe').fetchone()[0]=='live WAL snapshot'
     connection.close()
 print('PASS actual native bootstrap: all 33 ports, custom settings retained, stale credentials repaired, consistent live-WAL migration, idempotent rerun; no game started')

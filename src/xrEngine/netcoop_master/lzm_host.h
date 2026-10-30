@@ -28,6 +28,9 @@ class HostController
     std::vector<Map> maps_;
     HANDLE mutex_=nullptr;
     std::atomic<bool> stopping_{false},enabled_{false};
+    std::atomic<bool> stop_all_{false};
+    std::atomic<unsigned> active_{0};
+    std::atomic<uint64_t> master_epoch_{0};
     std::thread worker_;
     double free_ram_=0,free_commit_=0,need_=6;
     uint64_t last_heartbeat_=0;
@@ -123,6 +126,15 @@ class HostController
             m.expected=false;return;
         }
         if(m.mode=="off" && !m.expected) stop_map(m);
+        if(!m.expected && master_epoch_) {
+            try {
+                const auto diagnostic=loads(read(folder_+L"\\admission_"+std::to_wstring(m.plan.port)+L".json"));
+                const auto epoch=diagnostic.value("epoch",uint64_t(0));
+                if(diagnostic.value("pid",0u)==m.pid && diagnostic.value("updated",int64_t(0))>=int64_t(time(nullptr))-45 && epoch && epoch!=master_epoch_) {
+                    log_line("[diag][host] old master epoch at map="+m.plan.name+"; requesting saved restart");stop_map(m);
+                }
+            }catch(...) {}
+        }
         const bool ready=status(m);
         if(ready && !m.expected) {
             if(m.loading) {m.loading=false;m.healthy_at=GetTickCount64();DeleteFileW(file("wake_",m).c_str());}
@@ -178,6 +190,7 @@ class HostController
     }
     void publish() {
         json rows=json::array();
+        unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;
         for(const auto& m:maps_) rows.push_back({{"map",m.plan.name},{"port",m.plan.port},{"processId",m.pid},{"state",m.state},{"mode",m.mode},
             {"detail",m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
             {"retry_seconds",m.retry_at>GetTickCount64() ? int((m.retry_at-GetTickCount64()+999)/1000):0},
@@ -189,7 +202,7 @@ class HostController
     }
     void run() noexcept {
         while(!stopping_) {
-            try {for(auto& m:maps_) update(m);budget();queue();publish();}
+            try {for(auto& m:maps_) {update(m);if(stop_all_ && m.process && !m.expected) stop_map(m);}budget();queue();publish();}
             catch(const std::exception& e) {log_line("[diag][host] controller error: "+std::string(e.what()));}
             for(int i=0;i<10 && !stopping_;++i) Sleep(100);
         }
@@ -222,10 +235,15 @@ public:
                 m.mode=mode(m);adopt(m);maps_.push_back(std::move(m));
             }
             log_line(format("[diag][host] native controller owns %zu maps; exe=%s",maps_.size(),narrow(exe_).c_str()));
+            unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;
             worker_=std::thread([this]{run();});
         } catch(...) {for(auto& m:maps_) if(m.process) CloseHandle(m.process);CloseHandle(mutex_);mutex_=nullptr;throw;}
     }
     ~HostController() {stopping_=true;if(worker_.joinable()) worker_.join();for(auto& m:maps_) if(m.process) CloseHandle(m.process);if(mutex_) CloseHandle(mutex_);}
     void enabled(bool value) {enabled_=value;}
+    void epoch(uint64_t value) {master_epoch_=value;}
+    unsigned active() const {return active_;}
+    void shutdown_locations() {enabled_=false;stop_all_=true;}
+    void resume() {stop_all_=false;}
 };
 } // namespace lzm

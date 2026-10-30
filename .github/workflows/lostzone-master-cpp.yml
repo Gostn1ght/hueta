@@ -51,6 +51,8 @@ jobs:
         run: python scripts/check-master-v2.py master-test\LostZoneMasterTest.exe
       - name: Nonblocking client routing and real entry responses
         run: python scripts/check-native-entry-route.py
+      - name: Archived configuration and real client folder migration
+        run: python scripts/check-native-config-layout.py
       - name: The master window opens, serves and closes
         shell: pwsh
         run: |
@@ -69,9 +71,13 @@ jobs:
           Get-Content $result
           $json = Get-Content $result -Raw | ConvertFrom-Json
           if (-not $json.ok) { throw "window selftest failed" }
+          if (-not $json.screenshot) { throw "window screenshot was not captured" }
+          Copy-Item ($result + '.bmp') master-test\master-window.bmp
           Get-Content (Join-Path $work 'appdata\server\netcoop_world_bridge.json') | Select-String -Pattern '"authority"' | Out-Null
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: LostZone-Engine-Master-Test
-          path: master-test/*.exe
+          path: |
+            master-test/*.exe
+            master-test/*.bmp

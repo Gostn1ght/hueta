@@ -61,7 +61,7 @@ private:
     std::unique_ptr<Credentials> credentials_;
     std::unique_ptr<WorldFiles> world_files_;
     std::unique_ptr<HttpServer> http_, gateway_;
-    std::wstring cluster_;
+    std::wstring cluster_, runtime_root_;
     std::atomic<bool> ready_{ true }, stopped_{ false };
     std::mutex status_lock_;
     std::optional<int64_t> last_cycle_ns_;

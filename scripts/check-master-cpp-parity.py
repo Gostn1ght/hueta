@@ -374,6 +374,45 @@ def main():
                 if not good(status, body):
                     failures.append(name)
                     print("FAIL", name, status, json.dumps(body)[:400])
+            # Independent edits must not replay a stale full account image.
+            status, body = cpp.call('POST','/v1/console',{'line':'role Tester admin'})
+            assert status == 200, body
+            status, body = account_call('account_put',{'accounts':[dict(tester,money=975,fields=2)],'only_new':False})
+            assert status == 200, body
+            status, body = account_call('account_put',{'accounts':[dict(tester,device='d'*64,fields=1)],'only_new':False})
+            assert status == 200, body
+            status, body = account_call('account_list',{'after':0})
+            current = next(a for a in body['result']['accounts'] if a['login']=='Tester')
+            assert current['money']==975 and current['role']=='admin' and current['device']=='d'*64, current
+            status, _ = account_call('account_put',{'accounts':[dict(tester,fields=0)],'only_new':False})
+            assert status == 400
+            for runtime in (INSTANCE_A,INSTANCE_B):
+                status, raw = cpp.call('POST','/v1/command',{'command_id':uuid.uuid4().hex,'operation':'location_claim',
+                    'arguments':{'location':'k00_marsh','ttl_ms':60000}}, actor='location:k00_marsh',instance=runtime,bound=cpp.epoch)
+                if status == 200:
+                    fence = json.loads(raw)['result']['fence']
+                    break
+            else:
+                raise AssertionError('Neither fixture runtime can own its map')
+            def record(operation, command_id=None, epoch=None, **args):
+                body={'command_id':command_id or uuid.uuid4().hex,'operation':operation,
+                    'arguments':dict(location='k00_marsh',fence=fence,bucket='groups',**args)}
+                status, raw = cpp.call('POST','/v1/store',body,actor='location:k00_marsh',instance=runtime,bound=epoch or cpp.epoch)
+                return status,json.loads(raw)
+            def encoded(value): return base64.b64encode(value).decode()
+            image=encoded('Отряд сталкеров'.encode('cp1251'))
+            swap=uuid.uuid4().hex
+            assert record('store_swap',swap,key='fixture',expected='',value=image)[1]['result']['swapped']
+            assert record('store_swap',swap,key='fixture',expected='',value=image)[1]['result']['swapped'] # idempotent replay
+            assert not record('store_swap',key='fixture',expected='',value='')[1]['result']['swapped']
+            assert record('store_read',key='fixture')[1]['result']['value']==image
+            assert record('store_keys')[1]['result']['value']==encoded(b'fixture')
+            assert record('store_read',epoch=cpp.epoch+1,key='fixture')[0] in (403,409)
+            assert record('store_swap',key='fixture',expected=image,value='')[1]['result']['swapped']
+            assert record('store_keys')[1]['result']['value']==''
+            assert record('store_read',key='fixture')[1]['result']['value']==''
+            assert record('store_read',key='../unsafe')[0]==400
+            print('PASS native account field masks and operator role; real bound storage RPC, CP1251 bytes, replay, CAS conflict, tombstone and epoch fencing')
         print(f"compared {len(results[0])} steps, {len(failures)} differ")
         if EXE is None:
             for name, status, body in results[0]:

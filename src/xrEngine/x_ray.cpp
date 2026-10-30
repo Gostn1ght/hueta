@@ -1079,6 +1079,7 @@ extern BOOL DllMainXrPhysics(HANDLE hModule, DWORD ul_reason_for_call, LPVOID lp
 // "-netcoop_master" turns this executable into the master with its window
 // (src/xrEngine/netcoop_master); no engine subsystem is started for it.
 int netcoop_master_entry();
+bool netcoop_master_named_entry();
 
 int APIENTRY WinMain(HINSTANCE hInstance,
                      HINSTANCE hPrevInstance,
@@ -1118,7 +1119,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 		}
 	}
   
-	if (strstr(GetCommandLineA(), "-netcoop_master"))
+	if (strstr(GetCommandLineA(), "-netcoop_master") || netcoop_master_named_entry())
 		return netcoop_master_entry();
 
 	//DllMainOpenAL32(NULL, DLL_PROCESS_ATTACH, NULL);

@@ -6,6 +6,7 @@ static netcoop_world::AdmissionCoordinator s_admission;
 static bool s_admission_started = false, s_admission_ready_logged = false, s_admission_failed_logged = false;
 static u64 s_admission_retry = 0;
 static u64 s_admission_diagnostic_at = 0;
+static bool s_admission_announced_ready = false;
 
 static bool admission_store_record(LPCSTR operation,LPCSTR bucket,LPCSTR key,LPCSTR expected,LPCSTR value,xr_string& output,bool& swapped)
 {
@@ -17,6 +18,7 @@ static bool admission_store_record(LPCSTR operation,LPCSTR bucket,LPCSTR key,LPC
 }
 
 static bool admission_active() { return s_admission_started; }
+static bool admission_ready() { return s_admission_started && s_admission.status().ready; }
 
 // accounts.inc: the world master's accounts (doc 154).
 static bool admission_accounts_take(std::vector<netcoop_world::AccountRecord>& changed, netcoop_world::AccountsState& state)
@@ -47,7 +49,9 @@ static void admission_update()
 		string128 name;
 		xr_sprintf(name, "netcoop_world_writer_%s.json", map);
 		FS.update_path(config, "$app_data_root$", name);
-		if (GetFileAttributesA(config) == INVALID_FILE_ATTRIBUTES) return; // the panel writes it with the master
+		if (GetFileAttributesA(config) == INVALID_FILE_ATTRIBUTES) {
+			Msg("! [diag][admission] writer configuration missing map=%s port=%u path=%s; start or repair the native master",map,cluster_port(),config);return;
+		}
 		xr_sprintf(name, "netcoop_checkpoint_spool_%s", map);
 		FS.update_path(spool, "$app_data_root$", name);
 		wchar_t wide[520] = {};
@@ -58,17 +62,20 @@ static void admission_update()
 		return;
 	}
 	const netcoop_world::CoordinatorStatus status = s_admission.status();
+	if(status.ready) accounts_load(); // prime account mirror before advertising this map
+	const bool join_ready=status.ready && s_accounts_master && master_ready() && world_store_admission_open();
 	const u64 diagnostic_now=GetTickCount64();
-	if (!s_admission_diagnostic_at || diagnostic_now-s_admission_diagnostic_at>=15000)
+	if (!s_admission_diagnostic_at || diagnostic_now-s_admission_diagnostic_at>=15000 || s_admission_announced_ready!=join_ready)
 	{
+		s_admission_announced_ready=join_ready;
 		s_admission_diagnostic_at=diagnostic_now;
 		Msg("[diag][admission] map=%s port=%u ready=%u failed=%u phase=%s http=%u attempts=%u epoch=%llu fence=%llu characters=%u pending=%u",
 			*Level().name(),cluster_port(),status.ready,status.failed,status.phase,status.http_status,status.attempts,status.epoch,status.fence,status.characters,status.pending);
 		string_path folder,path;cluster_dir(folder);
 		xr_sprintf(path,"%sadmission_%u.json",folder,cluster_port());
 		string1024 record;
-		xr_sprintf(record,"{\"updated\":%u,\"pid\":%u,\"map\":\"%s\",\"ready\":%s,\"failed\":%s,\"phase\":\"%s\",\"http\":%u,\"attempts\":%u}",
-			cluster_now(),GetCurrentProcessId(),*Level().name(),status.ready ? "true":"false",status.failed ? "true":"false",status.phase,status.http_status,status.attempts);
+		xr_sprintf(record,"{\"updated\":%u,\"pid\":%u,\"map\":\"%s\",\"ready\":%s,\"failed\":%s,\"phase\":\"%s\",\"http\":%u,\"attempts\":%u,\"epoch\":%llu}",
+			cluster_now(),GetCurrentProcessId(),*Level().name(),join_ready ? "true":"false",status.failed ? "true":"false",status.phase,status.http_status,status.attempts,status.epoch);
 		cluster_write_line(path,record,false);
 	}
 	world_orders_update();
@@ -92,6 +99,7 @@ void server_admission_stop()
 	s_admission_started = s_admission_ready_logged = s_admission_failed_logged = false;
 	s_admission_retry = 0;
 	s_admission_diagnostic_at = 0;
+	s_admission_announced_ready = false;
 }
 
 // characters.inc: every complete local snapshot of an admitted character.

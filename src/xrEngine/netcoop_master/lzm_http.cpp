@@ -272,11 +272,24 @@ void HttpServer::serve(uintptr_t handle, std::string address)
         request.body_read = true;
         return request.body.size() == length;
     };
+    const auto started=GetTickCount64();
     HttpResponse response;
     if (request.method != "GET" && request.method != "POST" && !(request.method == "PUT" || request.method == "DELETE" || request.method == "PATCH"))
         response = { 501, "", "text/html;charset=utf-8" };
     else
         response = handler_(request, read_body);
+    static std::atomic<uint64_t> requests{0},errors{0},reported{0},error_at{0};
+    ++requests;if(response.status>=400) ++errors;
+    const auto finished=GetTickCount64();auto previous=reported.load();
+    if(finished-previous>=15000 && reported.compare_exchange_strong(previous,finished))
+        log_line(format("[diag][http] requests=%llu errors=%llu sample_ms=%llu",(unsigned long long)requests.exchange(0),(unsigned long long)errors.exchange(0),(unsigned long long)(finished-started)));
+    previous=error_at.load();
+    if((response.status>=400 || finished-started>500) && finished-previous>=1000 && error_at.compare_exchange_strong(previous,finished)) {
+        const char* route="other";
+        for(const auto* known:{"/v1/entry","/v1/store","/v1/command","/v1/clock","/v1/engine-bootstrap","/v1/player-admission","/v1/checkpoint"})
+            if(request.path==known) route=known;
+        log_line(format("[diag][http] route=%s status=%d duration_ms=%llu bytes=%zu",route,response.status,(unsigned long long)(finished-started),request.body.size()));
+    }
     respond(response);
 }
 } // namespace lzm
