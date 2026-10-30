@@ -178,7 +178,8 @@ void create_bridge_config(const std::wstring& config_path, const std::wstring& d
 
 void prepare_engine_cluster(const std::wstring& root, const std::wstring& config_path, const std::wstring& plan_path)
 {
-    const auto legacy_config=root+L"\\hoster\\master\\runtime\\config.json";
+    const auto relocated_legacy=root+L"\\appdata\\master\\legacy-runtime\\config.json";
+    const auto legacy_config=exists(relocated_legacy) ? relocated_legacy:root+L"\\hoster\\master\\runtime\\config.json";
     const auto active_config=exists(config_path) ? config_path:legacy_config;
     if(exists(active_config)) {
         const auto port=load_config(active_config).value("port",38477);
@@ -225,7 +226,7 @@ void prepare_engine_cluster(const std::wstring& root, const std::wstring& config
     const auto locations=read_cluster(plan_path);
     if (!exists(config_path))
     {
-        const auto legacy=root+L"\\hoster\\master\\runtime\\config.json";
+        const auto legacy=legacy_config;
         if (exists(legacy) && legacy!=config_path)
         {
             auto config=load_config(legacy);

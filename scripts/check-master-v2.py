@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import os
 import sqlite3
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -64,4 +65,10 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     with closing(sqlite3.connect(migrated.parent / 'world.sqlite')) as copied:
         assert copied.execute('SELECT value FROM migration_probe').fetchone()[0]=='live WAL snapshot'
     connection.close()
+    relocated = root/'relocated'
+    shutil.copytree(legacy,relocated/'appdata/master/legacy-runtime')
+    shutil.copy2(game/'fsgame_server.template',relocated/'fsgame_server.template')
+    subprocess.run([str(exe),'bootstrap','--root',str(relocated)],check=True,timeout=30)
+    assert json.loads((relocated/'appdata/master/config.json').read_text())['world_id']==71
+    assert not (relocated/'hoster').exists()
 print('PASS actual native bootstrap: all 33 ports, custom settings retained, stale credentials repaired, consistent live-WAL migration, idempotent rerun; no game started')

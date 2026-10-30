@@ -54,6 +54,22 @@ with TemporaryDirectory() as tmp:
     clientreader=lzpack.Reader(clientpack,key);serverreader=lzpack.Reader(serverpack,key)
     clientdata=clientreader.read(0,clientreader.size);serverdata=serverreader.read(0,serverreader.size)
     assert b'server-only' not in clientdata and b'client\\scripts' not in serverdata
+    (patchdir/'client/configs').mkdir();(patchdir/'client/configs/system.ltx').write_bytes(b'client-config')
+    (patchdir/'server/configs').mkdir();(patchdir/'server/configs/system.ltx').write_bytes(b'server-config')
+    (patchdir/'client/assets').mkdir();(patchdir/'client/assets/fixture.bin').write_bytes(b'client-asset')
+    (patchdir/'server/assets').mkdir();(patchdir/'server/assets/fixture.bin').write_bytes(b'server-asset')
+    for role in ('client','server'):
+        volumes=lzpack.patch_v2(patchdir,folder/('v2-'+role),key,'000048',role)
+        assert len(volumes)==3
+        for archive in volumes:
+            reader=lzpack.Reader(archive,key);data=reader.read(0,reader.size)
+            other='server' if role=='client' else 'client'
+            assert (other+'-asset').encode() not in data and (other+'-config').encode() not in data
+            assert b'client\\scripts' not in data and b'server\\scripts' not in data
+            alias=b'$game_config$\\' if '_configs_' in archive.name else b'$game_scripts$\\' if '_scripts_' in archive.name else b'$game_data$\\'
+            assert b'entry_point = '+alias in data
+            assert '99_v2_000047_40_server_scripts_000.db0' < archive.name
+        rejected(lambda:lzpack.patch_v2(patchdir,folder/('v2-'+role),key,'000048',role))
     (patchdir/'appdata').mkdir();(patchdir/'appdata/account.key').write_bytes(b'private')
     rejected(lambda:lzpack.patch(patchdir,folder/'updates',key,'000003'))
     root=Path(__file__).resolve().parents[1]

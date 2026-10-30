@@ -53,12 +53,18 @@ jobs:
         run: python scripts/check-native-entry-route.py
       - name: Archived configuration and real client folder migration
         run: python scripts/check-native-config-layout.py
+      - name: Bounded diagnostics without private data
+        shell: pwsh
+        run: ./scripts/check-diagnostics.ps1
       - name: The master window opens, serves and closes
         shell: pwsh
         run: |
           $work = Join-Path $env:RUNNER_TEMP 'window'
           New-Item -ItemType Directory -Force (Join-Path $work 'appdata\server') | Out-Null
           Set-Content -Encoding ascii (Join-Path $work 'appdata\server\netcoop_cluster.ltx') "[cluster]`r`nentry_port = 0`r`n[locations]`r`nk00_marsh = 127.0.0.1:1267`r`n"
+          Set-Content -Encoding ascii (Join-Path $work 'fsgame_server.template') '$fs_root$ = false | false | {ROOT}'
+          & master-test\LostZoneMasterTest.exe bootstrap --root $work
+          if ($LASTEXITCODE) { throw 'Native complete plan bootstrap failed' }
           $config = Join-Path $work 'master\runtime\config.json'
           & master-test\LostZoneMasterTest.exe init --config $config --location k00_marsh --world-id 7 --seed 9 --initial-ms 63676137600000 --scale 10
           if ($LASTEXITCODE) { throw "init failed $LASTEXITCODE" }

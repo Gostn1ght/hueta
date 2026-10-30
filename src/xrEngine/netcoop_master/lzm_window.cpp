@@ -90,7 +90,7 @@ std::wstring weather_name(const std::string& id)
 std::wstring span(double ms)
 {
     int64_t minutes = ms > 0 ? int64_t(ms / 60000) : 0;
-    if (minutes >= 60) return std::to_wstring(minutes / 60) + L" ч " + (minutes % 60 < 10 ? L"0" : L"") + std::to_wstring(minutes % 60) + L" мин";
+    if (minutes >= 60) return std::to_wstring(minutes / 60) + L"ч " + (minutes % 60 < 10 ? L"0" : L"") + std::to_wstring(minutes % 60) + L"м";
     return std::to_wstring(minutes) + L" мин";
 }
 
@@ -374,14 +374,19 @@ View build_view(Service& service, const WindowOptions& options)
         else if (it != expiry.end()) row.state = L"не отвечает";
         else row.state = row.planned ? L"выключена" : L"нет в плане хостера";
         if(h!=host.maps.end()) {row.process=h->second.process;row.detail=widen(h->second.detail);}
-        if(row.process && !row.online)
+        if(row.process)
         {
             std::ifstream in(options.roster_folder+L"\\admission_"+std::to_wstring(ports.empty() ? 0:([&] {for(const auto& p:plan) if(p.name==n.first) return p.port;return 0;}()))+L".json");
             std::ostringstream text;text<<in.rdbuf();
             try {
                 const auto diagnostic=loads(text.str());
-                if(diagnostic.value("pid",0u)==row.process && diagnostic.value("updated",int64_t(0))>=int64_t(time(nullptr))-30)
+                if(diagnostic.value("pid",0u)==row.process && diagnostic.value("updated",int64_t(0))>=int64_t(time(nullptr))-30) {
                     row.detail=L"master: "+widen(diagnostic.value("phase",std::string()))+L" · HTTP "+std::to_wstring(diagnostic.value("http",0));
+                    if(!diagnostic.value("ready",false) || diagnostic.value("epoch",int64_t(0))!=v.epoch) {
+                        row.online=false;
+                        if(state=="running") row.state=L"синхронизация с мастером";
+                    }
+                } else if(!options.service.runtime_root.empty()) row.online=false;
             } catch(...) {}
         }
         for (auto& p : players) row.players += p.location == n.first;

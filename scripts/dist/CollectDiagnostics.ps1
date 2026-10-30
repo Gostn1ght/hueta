@@ -68,7 +68,7 @@ try {
             [void]$stream.Seek(-$size, [IO.SeekOrigin]::End)
             $buffer = New-Object byte[] $size
             $got = $stream.Read($buffer, 0, $size)
-            $encoding = if ($file.DirectoryName -match 'master') {$utf8} else {[Text.Encoding]::GetEncoding(1251)}
+            $encoding = if ($file.DirectoryName -match 'master' -or $file.Name -like 'master*') {$utf8} else {[Text.Encoding]::GetEncoding(1251)}
             $tail = $encoding.GetString($buffer,0,$got)
             if ($stream.Length -gt $size) {$tail = $tail.Substring([Math]::Max(0,$tail.IndexOf("`n")+1))}
             Save-Text (('{0:D2}_' -f $index) + $file.Name) (Redact-Lines $tail)
