@@ -114,6 +114,7 @@ jobs:
           python scripts/check-vehicle-source-audit.py
           python scripts/check-netcoop-ground.py
           python scripts/check-netcoop-voice.py
+          python scripts/check-ci-native-package.py
       - name: Check actual item interpolation
         run: python scripts/check-netcoop-physics.py
       - name: Check actual car closed-door spawn and physics state
@@ -131,6 +132,8 @@ jobs:
     needs: checks
     runs-on: windows-2022
     timeout-minutes: 90
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -366,13 +369,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable PE dependency check failed' }
           Set-Content -LiteralPath lostzone-package/built-from.txt -Value $env:GITHUB_SHA
           Get-FileHash lostzone-package/bin/LostZoneClientDX11.exe,lostzone-package/dedicated/LostZoneServerDX11.exe | Format-List | Out-File lostzone-package/sha256.txt
+      - name: Preserve verified runtime and symbols in a private draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish-ci-native.py
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: LostZone-DX11-client-server
-          path: lostzone-package
+          path: native-release/LostZone-native-runtime.zip
+          retention-days: 2
           if-no-files-found: error
       - name: Upload build diagnostics
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: LostZone-DX11-build-log
@@ -380,6 +390,7 @@ jobs:
             lostzone-build.log
             lostzone-build.binlog
           if-no-files-found: ignore
+          retention-days: 2
       # The second renderer the owner keeps (2026-10-20, doc 151): "DX8" = R1,
       # static lighting. Built after the DX11 package so a failure here never
       # holds the DX11 release; shared libraries are reused from the DX11 build.
@@ -398,15 +409,19 @@ jobs:
           Get-FileHash dx8-package/bin/LostZoneClientDX8.exe | Format-List | Out-File dx8-package/sha256.txt
       - uses: actions/upload-artifact@v4
         if: steps.dx8.outcome == 'success'
+        continue-on-error: true
         with:
           name: LostZone-DX8-client
           path: dx8-package
+          retention-days: 2
       - uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: LostZone-DX8-build-log
           path: lostzone-dx8.log
           if-no-files-found: ignore
+          retention-days: 2
 
   analyze:
     if: ${{ inputs.analyze }}
