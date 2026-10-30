@@ -16,9 +16,11 @@ struct BanEntry
 static xr_vector<BanEntry> s_bans;
 static FILETIME s_bans_stamp = {};
 static bool s_bans_loaded = false;
+static xr_string s_bans_image;
 
 static void bans_path(string_path& path)
 {
+	if(master_cluster_plan()) {store_path("_system","bans",path);return;}
 	FS.update_path(path, "$app_data_root$", "netcoop_bans.txt");
 }
 
@@ -26,6 +28,7 @@ static void bans_refresh()
 {
 	string_path path;
 	bans_path(path);
+	if(master_cluster_plan()) {const LPCSTR image=script_store_read("_system","bans");s_bans_image=image ? image:"";}
 	WIN32_FILE_ATTRIBUTE_DATA data;
 	const bool exists = !!GetFileAttributesExA(path, GetFileExInfoStandard, &data);
 	if (s_bans_loaded && exists && !CompareFileTime(&data.ftLastWriteTime, &s_bans_stamp)) return;
@@ -62,6 +65,12 @@ static void bans_refresh()
 
 static bool bans_save()
 {
+	if(master_cluster_plan()) {
+		xr_string image="# Lost Zone bans: login|device-digest|unix-time\n";
+		for(const auto& entry:s_bans) {string256 line;xr_sprintf(line,"%s|%s|%u\n",entry.login.c_str(),entry.device.c_str(),entry.since);image+=line;}
+		if(!script_store_swap("_system","bans",s_bans_image.c_str(),image.c_str())) return false;
+		s_bans_image=image;return true;
+	}
 	string_path path, temp;
 	bans_path(path);
 	xr_sprintf(temp, "%s.%u.tmp", path, GetCurrentProcessId());

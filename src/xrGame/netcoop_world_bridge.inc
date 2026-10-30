@@ -64,6 +64,11 @@ static void server_world_bridge_update()
     if (!const_cast<CALifeSimulator*>(ai().get_alife())->time_manager().export_world_state(local)) return;
     // A missing file is looked for again every 10 s: the panel writes it
     // when the master first starts, possibly after this server.
+    if(s_world_bridge_active && !s_master_ready && now-s_world_bridge_retry>=30000)
+    {
+        s_world_shadow_bridge.stop();s_world_bridge_active=false;
+        Msg("[diag][world-bridge] map=%s reopening configuration after an unavailable authority",location);
+    }
     if (!s_world_bridge_checked || (!s_world_bridge_active && now-s_world_bridge_retry>=10000))
     {
         const bool first=!s_world_bridge_checked;
@@ -114,7 +119,8 @@ static void server_world_bridge_update()
     if (!s_master_ready && s_master_required && (!s_master_wait_log || now-s_master_wait_log>=15000))
     {
         s_master_wait_log=now;
-        Msg("! [Lost Zone][master] waiting for the configured world master: players are not admitted");
+        Msg("! [diag][world-bridge] map=%s api=127.0.0.1:%u ready=%u fetched=%u accepted=%u http=%u win32=%u rtt_ms=%llu; players are not admitted",
+            location,diagnostic.api_port,diagnostic.ready,diagnostic.fetched,diagnostic.accepted,diagnostic.http_status,diagnostic.transport_error,diagnostic.rtt_ms);
     }
     if (s_master_required) return; // the diagnostics below are for the read-only shadow observer
     if (!s_world_bridge_log || now-s_world_bridge_log>=10000)

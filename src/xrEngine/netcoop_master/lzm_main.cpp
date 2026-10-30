@@ -5,6 +5,7 @@
 //   ... init | writer-config | bridge-config                        the configuration files (__main__.py)
 #include "lzm_config.h"
 #include "lzm_window.h"
+#include "lzm_host.h"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -101,25 +102,11 @@ std::wstring new_journal(const std::wstring& folder)
     return folder + L"\\" + widen(format("master_%04d%02d%02d_%02d%02d%02d.log", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond));
 }
 
-// First start from the exe alone: the panel's Initialize-Master writes the
-// private configuration and every map's key (it calls this exe back).
-void initialize(const std::wstring& root)
+struct RootLock
 {
-    std::wstring script = root + L"\\hoster\\netcoop_master_control.ps1";
-    if (!exists(script)) return;
-    std::wstring command = L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + script + L"\" -MasterRoot \"" + root + L"\" -InitMaster";
-    STARTUPINFOW si{ sizeof(si) };
-    PROCESS_INFORMATION pi{};
-    if (CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, root.c_str(), &si, &pi))
-    {
-        WaitForSingleObject(pi.hProcess, 180000);
-        DWORD code = 0;
-        GetExitCodeProcess(pi.hProcess, &code);
-        if (code) log_line(format("Подготовка мастера завершилась с кодом %lu.", code));
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-    }
-}
+    HANDLE handle=nullptr;
+    ~RootLock(){if(handle) CloseHandle(handle);}
+};
 
 struct Args
 {
@@ -174,7 +161,7 @@ int master_main(const std::vector<std::wstring>& argv)
         Args a = parse(argv);
         // <root>\dedicated\LostZoneServerDX11.exe: the server folder is one level up.
         std::wstring root = a.root ? full_path(*a.root) : parent(exe_folder());
-        std::wstring config = a.config ? full_path(*a.config) : root + L"\\hoster\\master\\runtime\\config.json";
+        std::wstring config = a.config ? full_path(*a.config) : root + L"\\appdata\\master\\config.json";
         if (a.mode == L"init")
         {
             if (!a.config) throw Invalid("init requires --config");
@@ -195,25 +182,37 @@ int master_main(const std::vector<std::wstring>& argv)
             create_bridge_config(config, full_path(*a.destination), true, a.replace);
             return 0;
         }
-        if (a.mode != L"serve" && a.mode != L"window" && a.mode != L"console") throw Invalid("unknown master mode");
+        if (a.mode != L"serve" && a.mode != L"window" && a.mode != L"console" && a.mode!=L"bootstrap") throw Invalid("unknown master mode");
+        RootLock instance;
+        const auto lock_name=L"Local\\LostZoneMaster_"+widen(sha256_hex(lower(narrow(full_path(root)))));
+        instance.handle=CreateMutexW(nullptr,FALSE,lock_name.c_str());
+        if (!instance.handle || GetLastError()==ERROR_ALREADY_EXISTS) throw Unavailable("the master for this folder is already open");
         std::wstring plan = a.cluster ? full_path(*a.cluster) : root + L"\\appdata\\server\\netcoop_cluster.ltx";
         Service::Options service;
         service.config = config;
         service.port = a.port;
         service.cluster = plan;
+        if(!a.config && !a.selftest) service.runtime_root=root;
+        const std::wstring journal = a.log_file ? full_path(*a.log_file) : new_journal(root+L"\\appdata\\server\\netcoop_cluster");
+        open_journal(journal,a.mode!=L"serve");
+        if (!a.config && !a.selftest)
+        {
+            // Every start, including an existing installation, completes missing
+            // maps and refreshes stale writer credentials. No PowerShell/Python.
+            prepare_engine_cluster(root,config,plan);
+        }
         service.gateway_port = a.gateway_port ? *a.gateway_port : (exists(plan) ? read_entry_port(plan) : 0);
         if (service.gateway_port < 0 || service.gateway_port > 65535) throw Invalid("the player entry needs a valid port and the location plan");
+        if(a.mode==L"bootstrap") return 0; // preparation only: no listeners or processes
         std::wstring journal_folder = root + L"\\appdata\\server\\netcoop_cluster";
         if (a.mode == L"serve")
         {
-            open_journal(a.log_file ? full_path(*a.log_file) : parent(config) + L"\\logs\\master.log", false);
             Service running(service);
-            while (running.running()) Sleep(1000);
+            std::unique_ptr<HostController> host;
+            if(!a.config && !a.selftest) host=std::make_unique<HostController>(root,plan);
+            while (running.running()) {if(host) host->enabled(running.ready());Sleep(1000);}
             return 0;
         }
-        std::wstring journal = a.log_file ? full_path(*a.log_file) : new_journal(journal_folder);
-        open_journal(journal, true);
-        if (!a.initialized && !a.selftest && !exists(config)) initialize(root);
         WindowOptions window;
         window.service = service;
         window.roster_folder = parent(plan) + L"\\netcoop_cluster";
@@ -224,7 +223,7 @@ int master_main(const std::vector<std::wstring>& argv)
     catch (const std::exception& error)
     {
         // Private config/checkpoint exception text is never echoed.
-        log_line("Master stopped: " + exception_type(error) + ". Check the private configuration and log.");
+        log_line("[diag][master] stopped type=" + exception_type(error) + " reason=" + error.what());
         HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
         if (err && err != INVALID_HANDLE_VALUE)
         {

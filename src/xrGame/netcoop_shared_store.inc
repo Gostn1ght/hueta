@@ -7,6 +7,7 @@
 // Values are opaque strings (the Lua side keeps data-only tables in them).
 
 static const u32 store_value_limit = 65536;
+static bool admission_store_record(LPCSTR operation,LPCSTR bucket,LPCSTR key,LPCSTR expected,LPCSTR value,xr_string& output,bool& swapped);
 
 struct StoreLock
 {
@@ -27,7 +28,7 @@ static bool store_path(LPCSTR bucket, LPCSTR key, string_path& path)
 {
 	if (!store_name_valid(bucket) || (key && !store_name_valid(key))) return false;
 	string_path root;
-	FS.update_path(root, "$app_data_root$", "netcoop_store\\");
+	FS.update_path(root, "$app_data_root$", master_cluster_plan() ? "netcoop_store_cache\\":"netcoop_store\\");
 	CreateDirectoryA(root, nullptr);
 	string_path dir;
 	xr_sprintf(dir, "%s%s\\", root, bucket);
@@ -73,6 +74,13 @@ LPCSTR script_store_read(LPCSTR bucket, LPCSTR key)
 	value.clear();
 	string_path path;
 	if (!enabled() || !store_path(bucket, key, path)) return "";
+	if(master_cluster_plan()) {
+		bool swapped=false;
+		if(admission_store_record("store_read",bucket,key,nullptr,nullptr,value,swapped)) {store_write_file(path,value.c_str());return value.c_str();}
+		// Read-only bootstrap/recovery view exported by the master. Never read
+		// the old authority file or write it while this cluster is managed.
+		store_read_file(path,value);return value.c_str();
+	}
 	StoreLock lock;
 	if (!lock.owned) return "";
 	store_read_file(path, value);
@@ -85,6 +93,11 @@ bool script_store_swap(LPCSTR bucket, LPCSTR key, LPCSTR expected, LPCSTR value)
 {
 	string_path path;
 	if (!enabled() || !expected || !value || xr_strlen(value) > store_value_limit || !store_path(bucket, key, path)) return false;
+	if(master_cluster_plan()) {
+		xr_string ignored;bool swapped=false;
+		if(!admission_store_record("store_swap",bucket,key,expected,value,ignored,swapped) || !swapped) return false;
+		store_write_file(path,value);return true; // derived cache only
+	}
 	StoreLock lock;
 	if (!lock.owned) return false;
 	xr_string current;
@@ -101,6 +114,7 @@ LPCSTR script_store_keys(LPCSTR bucket)
 	keys.clear();
 	string_path dir;
 	if (!enabled() || !store_path(bucket, nullptr, dir)) return "";
+	if(master_cluster_plan()) {bool swapped=false;if(admission_store_record("store_keys",bucket,nullptr,nullptr,nullptr,keys,swapped)) return keys.c_str();}
 	string_path mask;
 	xr_sprintf(mask, "%s*.txt", dir);
 	xr_vector<xr_string> names;
@@ -112,7 +126,10 @@ LPCSTR script_store_keys(LPCSTR bucket)
 		{
 			xr_string name = found.cFileName;
 			if (name.size() > 4) name.resize(name.size() - 4);
-			if (store_name_valid(name.c_str())) names.push_back(name);
+			if (store_name_valid(name.c_str())) {
+				xr_string contents;string_path path;xr_sprintf(path,"%s%s.txt",dir,name.c_str());
+				if(!master_cluster_plan() || (store_read_file(path,contents) && !contents.empty())) names.push_back(name);
+			}
 		} while (FindNextFileA(search, &found));
 		FindClose(search);
 	}

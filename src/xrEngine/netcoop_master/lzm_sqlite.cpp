@@ -20,6 +20,7 @@ struct Api
     int (*finalize)(sqlite3_stmt*);
     int (*step)(sqlite3_stmt*);
     int (*bind_text)(sqlite3_stmt*, int, const char*, int, void (*)(void*));
+    int (*bind_blob)(sqlite3_stmt*, int, const void*, int, void (*)(void*));
     int (*bind_int64)(sqlite3_stmt*, int, long long);
     int (*bind_double)(sqlite3_stmt*, int, double);
     int (*bind_null)(sqlite3_stmt*, int);
@@ -29,6 +30,7 @@ struct Api
     long long (*column_int64)(sqlite3_stmt*, int);
     double (*column_double)(sqlite3_stmt*, int);
     const unsigned char* (*column_text)(sqlite3_stmt*, int);
+    const void* (*column_blob)(sqlite3_stmt*, int);
     int (*column_bytes)(sqlite3_stmt*, int);
     int (*exec)(sqlite3*, const char*, int (*)(void*, int, char**, char**), void*, char**);
     void (*free)(void*);
@@ -74,6 +76,7 @@ bool Db::load_library(std::string& error)
     bind(api.changes, "sqlite3_changes"); bind(api.last_insert_rowid, "sqlite3_last_insert_rowid");
     bind(api.busy_timeout, "sqlite3_busy_timeout"); bind(api.get_autocommit, "sqlite3_get_autocommit");
     bind(api.initialize, "sqlite3_initialize");
+    bind(api.bind_blob,"sqlite3_bind_blob");bind(api.column_blob,"sqlite3_column_blob");
     if (!ok)
     {
         error = "sqlite3.dll is too old";
@@ -136,6 +139,7 @@ void Db::run(const std::string& sql, const Params& params, const std::function<b
             const std::string& s = p.get_ref<const std::string&>();
             api.bind_text(stmt, index, s.data(), int(s.size()), SQLITE_TRANSIENT_FN);
         }
+        else if(p.is_binary()) {const auto& bytes=p.get_binary();api.bind_blob(stmt,index,bytes.data(),int(bytes.size()),SQLITE_TRANSIENT_FN);}
         else throw Invalid("unsupported SQL parameter");
     }
     while (true)
@@ -167,6 +171,11 @@ static json read_row(void* handle)
         case SQLITE_INTEGER: row[name] = int64_t(api.column_int64(stmt, c)); break;
         case SQLITE_FLOAT: row[name] = api.column_double(stmt, c); break;
         case SQLITE_NULL: row[name] = nullptr; break;
+        case SQLITE_BLOB: {
+            const auto* data=static_cast<const uint8_t*>(api.column_blob(stmt,c));
+            const int size=api.column_bytes(stmt,c);
+            row[name]=json::binary(size ? std::vector<uint8_t>(data,data+size):std::vector<uint8_t>());break;
+        }
         default:
         {
             const unsigned char* text = api.column_text(stmt, c);

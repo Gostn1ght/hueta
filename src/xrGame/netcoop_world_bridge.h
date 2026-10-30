@@ -308,8 +308,9 @@ public:
     BridgeHttpHandle& operator=(const BridgeHttpHandle&)=delete;
     HINTERNET get() const { return handle_; }
 };
-inline bool bridge_fetch(const BridgeConfig& config, BridgeBootstrap& result)
+inline bool bridge_fetch(const BridgeConfig& config, BridgeBootstrap& result, unsigned* http_status=nullptr)
 {
+    if(http_status) *http_status=0;
     const auto deadline=GetTickCount64()+2000;
     // No proxy, redirects, remote host, credential-bearing URLs, request body,
     // or mutations. IO runs exclusively on the adapter worker thread.
@@ -331,7 +332,9 @@ inline bool bridge_fetch(const BridgeConfig& config, BridgeBootstrap& result)
         !WinHttpReceiveResponse(request.get(),nullptr)) return false;
     DWORD status=0,bytes=sizeof(status);
     if (!WinHttpQueryHeaders(request.get(),WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,
-        WINHTTP_HEADER_NAME_BY_INDEX,&status,&bytes,WINHTTP_NO_HEADER_INDEX) || status!=200) return false;
+        WINHTTP_HEADER_NAME_BY_INDEX,&status,&bytes,WINHTTP_NO_HEADER_INDEX)) return false;
+    if(http_status) *http_status=status;
+    if(status!=200) return false;
     std::string response;
     char buffer[4096];DWORD got=0;
     do

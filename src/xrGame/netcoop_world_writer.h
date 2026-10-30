@@ -61,16 +61,18 @@ inline bool writer_request(const WriterConfig& config, const std::string& instan
         config.token.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")!=std::string::npos ||
         (method!="GET" && method!="POST") || path.size()>1024 ||
         path.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-/?:&=.%")!=std::string::npos ||
-        payload.size()>64*1024)
+        payload.size()>(path=="/v1/store" ? 256*1024:64*1024))
         return false;
     if (method=="POST")
     {
-        if (!epoch || path!="/v1/command") return false;
-        const auto command=bridge_json(payload,64*1024);
+        if (!epoch || (path!="/v1/command" && path!="/v1/store")) return false;
+        const auto command=bridge_json(payload,path=="/v1/store" ? 256*1024:64*1024);
         if (!command.is_object() || command.size()!=3 || !command.contains("arguments") ||
             !command["arguments"].is_object()) return false;
         bridge_identifier(command,"command_id",true);
         const auto operation=bridge_identifier(command,"operation");
+        const bool storage=operation=="store_read" || operation=="store_keys" || operation=="store_swap";
+        if((path=="/v1/store")!=storage) return false;
         // Administrative planning reaches the master only as an in-game
         // administrator's typed world order (admin_relay), never as a raw
         // administrative operation.
@@ -82,7 +84,7 @@ inline bool writer_request(const WriterConfig& config, const std::string& instan
             operation!="session_disconnect" && operation!="session_resume" &&
             operation!="native_save_begin" && operation!="native_save_append" &&
             operation!="native_save_finish" && operation!="native_save_cancel" &&
-            operation!="account_list" && operation!="account_put") return false;
+            operation!="account_list" && operation!="account_put" && !storage) return false;
     }
     else if (!payload.empty() || (path!="/v1/engine-bootstrap" && path!="/v1/clock" &&
              path.rfind("/v1/location?",0)!=0 && path.rfind("/v1/location-bootstrap?",0)!=0 &&

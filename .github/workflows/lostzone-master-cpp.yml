@@ -5,7 +5,7 @@ name: Lost Zone Engine Master
 # Python World Service it replaces, and its window opened and closed once.
 on:
   push:
-    branches: [master-cpp, menu-3d-hideout]
+    branches: [master-cpp, menu-3d-hideout, engine-restructure]
     paths:
       - 'src/xrEngine/netcoop_master/**'
       - 'scripts/check-master-cpp-parity.py'

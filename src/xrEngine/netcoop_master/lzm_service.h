@@ -22,6 +22,7 @@ public:
 };
 
 struct Snapshot;  // the window's view, see lzm_window.h
+class WorldFiles;
 
 class Service
 {
@@ -32,12 +33,13 @@ public:
         int gateway_port = 0;      // 0 = no public entry
         std::wstring cluster;      // location plan for the entry
         std::optional<int> port;   // --port
+        std::wstring runtime_root; // native host package; empty for API fixtures
     };
     explicit Service(const Options& options);
     ~Service();
     void stop();
     bool running() const { return !stopped_; }
-    bool ready() const { return ready_; }
+    bool ready() const;
 
     // console.py: one operator line (quit/exit are refused: the window stops it).
     std::string console(const std::string& line);
@@ -57,6 +59,7 @@ private:
     std::unique_ptr<Transfers> transfers_;
     std::unique_ptr<PlayerSaves> saves_;
     std::unique_ptr<Credentials> credentials_;
+    std::unique_ptr<WorldFiles> world_files_;
     std::unique_ptr<HttpServer> http_, gateway_;
     std::wstring cluster_;
     std::atomic<bool> ready_{ true }, stopped_{ false };
@@ -85,6 +88,8 @@ private:
     json admin_relay(const std::string& actor, const std::string& command_id, const json& args);
     json account_list(const json& args);
     json account_put(const json& args);
+    void initialize_records(const std::wstring& root);
+    json record_exchange(const std::string& actor,const std::string& command_id,const std::string& operation,const json& args);
     std::optional<std::string> home(const std::string& account, int64_t slot);
 };
 

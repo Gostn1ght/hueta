@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
+#include "lzm_world_files.h"
 
 namespace lzm
 {
@@ -176,9 +178,11 @@ Service::Service(const Options& options) : cluster_(options.cluster)
     ownership_ = std::make_unique<Ownership>(*world_);
     transfers_ = std::make_unique<Transfers>(*world_, *ownership_, key);
     saves_ = std::make_unique<PlayerSaves>(*world_, *ownership_);
+    initialize_records(options.runtime_root);
     check_supported();
     director_ = std::make_unique<Director>(*world_, *timelines_, config.contains("director") ? config["director"] : json());
     worker_succeeded(0);
+    if(!options.runtime_root.empty()) world_files_=std::make_unique<WorldFiles>(*store_,options.runtime_root,options.cluster);
     http_ = std::make_unique<HttpServer>("127.0.0.1", port, 16, [this](HttpRequest& r, const std::function<bool(size_t)>& body) { return handle(r, body); });
     log_line(format("Lost Zone World listening on 127.0.0.1:%d; epoch=%lld", http_->port(), (long long)*store_->epoch));
     if (options.gateway_port > 0)
@@ -193,6 +197,7 @@ Service::Service(const Options& options) : cluster_(options.cluster)
 }
 
 Service::~Service() { stop(); }
+bool Service::ready() const {return ready_ && (!world_files_ || world_files_->ready());}
 
 void Service::stop()
 {
@@ -202,6 +207,7 @@ void Service::stop()
     ready_ = false;
     if (gateway_) gateway_->stop();
     if (http_) http_->stop();
+    if (world_files_) world_files_->stop();
     try
     {
         if (world_ && store_->epoch) world_->sample();
@@ -309,7 +315,7 @@ json Service::recovery_status()
             if (rows[i]["due_world_ms"].get<double>() <= now.get<double>()) ++count;
         due = count;
     }
-    return { { "schema", 1 }, { "admission_ready", ready_.load() }, { "world", durable }, { "observed_world_ms", now },
+    return { { "schema", 1 }, { "admission_ready", ready() }, { "world", durable }, { "observed_world_ms", now },
              { "pending_sample_count", std::min<size_t>(rows.size(), 1024) }, { "pending_has_more", rows.size() > 1024 },
              { "due_sample_count", due }, { "oldest_pending", oldest },
              { "worker_error_type", worker_error_type_.empty() ? json() : json(worker_error_type_) },
@@ -411,6 +417,9 @@ json Service::execute(const Principal& principal, const json& request)
         { "admin_relay", { { "account", "order", "values" }, {} } },
         { "account_list", { { "after" }, {} } },
         { "account_put", { { "accounts", "only_new" }, {} } },
+        { "store_read", { { "location", "fence", "bucket", "key" }, {} } },
+        { "store_keys", { { "location", "fence", "bucket" }, {} } },
+        { "store_swap", { { "location", "fence", "bucket", "key", "expected", "value" }, {} } },
     };
     json bound;
     if (administrative.count(operation))
@@ -424,6 +433,7 @@ json Service::execute(const Principal& principal, const json& request)
             throw Forbidden("administrator orders are relayed by a location authority");
         if (operation.rfind("account_", 0) == 0 && principal.role != "location")
             throw Forbidden("accounts are kept for the location authorities");
+        if (operation.rfind("store_",0)==0 && principal.role!="location") throw Forbidden("shared storage requires a location authority");
         if (operation.rfind("native_save_", 0) == 0)
         {
             if (principal.role != "location") throw Forbidden("native checkpoints require a location authority");
@@ -478,8 +488,11 @@ json Service::execute(const Principal& principal, const json& request)
     if (operation == "admin_relay") return admin_relay(actor, command_id, bound);
     if (operation == "account_list") return account_list(bound);
     if (operation == "account_put") return account_put(bound);
+    if (operation.rfind("store_",0)==0) return record_exchange(actor,command_id,operation,bound);
     return saves_->cancel(actor, command_id, bound);
 }
+
+#include "lzm_records.inc"
 
 // http.py admin_relay: an in-game administrator's world order, relayed by the
 // location that verified his account (owner 2026-10-23: time and weather set
@@ -665,7 +678,7 @@ HttpResponse Service::handle(HttpRequest& request, const std::function<bool(size
             if (principal.role != "admin") throw Forbidden("recovery status is restricted to administrators");
             return reply(200, { { "result", recovery_status() } });
         }
-        if (!ready_) return reply(503, { { "error", "world authority is recovering" } });
+        if (!ready()) return reply(503, { { "error", "world authority is recovering" } });
         json result;
         if (request.method == "GET")
         {
@@ -745,11 +758,19 @@ HttpResponse Service::handle(HttpRequest& request, const std::function<bool(size
         {
             if (request.header("transfer-encoding") || request.all("content-length").size() != 1) throw Invalid("one Content-Length header is required");
             int64_t length = parse_int(*request.header("content-length"));
-            if (length < 1 || length > 65536) return reply(413, { { "error", "request body exceeds limit" } });
+            if (length < 1 || length > (request.path=="/v1/store" ? 256*1024:65536)) return reply(413, { { "error", "request body exceeds limit" } });
             if (request.content_type() != "application/json") throw Invalid("JSON Content-Type is required");
             if (!read_body(size_t(length))) throw Invalid("incomplete request body");
             const std::string& path = request.path;
             if (path == "/v1/command") result = execute(principal, strict_json(request.body));
+            else if(path=="/v1/store")
+            {
+                if(principal.role!="location" || instances.size()!=1 || bindings.size()!=1) throw Forbidden("shared store needs a bound location authority");
+                const auto command=strict_json(request.body);
+                const auto operation=command.value("operation",std::string());
+                if(operation!="store_read" && operation!="store_keys" && operation!="store_swap") throw Invalid("not a shared storage operation");
+                result=execute(principal,command);
+            }
             else if (path == "/v1/console" && principal.role == "admin")
             {
                 json args = strict_json(request.body);

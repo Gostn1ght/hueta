@@ -34,6 +34,7 @@ struct WorldBridgeWorker::State
     bool stopping=false, pending=false, successful=false;
     BridgeBootstrap incoming{};
     std::uint64_t sent=0, received=0;
+    unsigned last_http=0,last_transport=0;
     std::thread worker;
 
     State(BridgeConfig connection, const WorldStateSnapshot& local)
@@ -56,16 +57,20 @@ struct WorldBridgeWorker::State
             BridgeBootstrap result{};
             const auto started=bridge_mono_ms();
             bool ok=false;
+            unsigned http=0,transport=0;
             try
             {
 #ifdef _WIN32
-                ok=bridge_fetch(config,result);
+                SetLastError(0);
+                ok=bridge_fetch(config,result,&http);
+                if(!ok) transport=GetLastError();
 #endif
             }
             catch (...) {} // Fail closed; no payloads or credentials in logs.
             const auto finished=bridge_mono_ms();
             std::unique_lock<std::mutex> guard(lock);
             incoming=std::move(result);successful=ok;sent=started;received=finished;pending=true;
+            last_http=http;last_transport=transport;
             if (wake.wait_for(guard,std::chrono::seconds(5),[this]{return stopping;})) return;
         }
     }
@@ -80,12 +85,15 @@ struct WorldBridgeWorker::State
         BridgeBootstrap sample{};
         bool available=false,ok=false;
         std::uint64_t started=0,finished=0;
+        unsigned http=0,transport=0;
         {
             std::lock_guard<std::mutex> guard(lock);
             if (pending) {sample=incoming;available=true;ok=successful;started=sent;finished=received;pending=false;}
+            http=last_http;transport=last_transport;
         }
         BridgeDiagnostics result;
         result.master_binding=config.bound;
+        result.http_status=http;result.transport_error=transport;result.api_port=config.port;
         result.fetched=available && ok;
         result.rtt_ms=finished>=started ? finished-started : 0;
         if (result.fetched)

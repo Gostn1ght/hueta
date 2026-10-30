@@ -125,6 +125,8 @@ struct AdmissionCoordinator::State
     AccountsState accounts_state=AccountsState::Waiting;
     std::uint64_t next_ticket=1,epoch=0,fence=0;
     bool stopping=false,ready=false,failed=false;
+    unsigned last_http_status=0,open_attempts=0;
+    std::string phase="initializing";
     std::thread thread;
 
     State(std::string file,std::string map,std::wstring directory)
@@ -132,7 +134,12 @@ struct AdmissionCoordinator::State
     { thread=std::thread([this]{run();}); }
 
     bool request(const std::string& method,const std::string& path,const std::string& payload,BridgeJson& result,unsigned& status)
-    { return writer_request(config,instance,epoch,method,path,payload,result,status); }
+    {
+        const bool ok=writer_request(config,instance,epoch,method,path,payload,result,status);
+        {std::lock_guard<std::mutex> guard(lock);last_http_status=status;}
+        return ok;
+    }
+    void set_phase(const char* value) {std::lock_guard<std::mutex> guard(lock);phase=value;}
     // One master command, the SAME command ID on every retry, until a reply,
     // a permanent refusal or the deadline.
     CheckpointStep command(const std::string& operation,const BridgeJson& arguments,BridgeJson& result,std::uint64_t deadline,
@@ -159,6 +166,7 @@ struct AdmissionCoordinator::State
     // Lease, adoption of this location's records, checkpoint worker.
     bool open()
     {
+        {std::lock_guard<std::mutex> guard(lock);++open_attempts;phase="writer_config";}
         {
             std::ifstream file(config_path,std::ios::binary);char encoded[4097];
             if(!file) return false;
@@ -166,14 +174,18 @@ struct AdmissionCoordinator::State
             config=WriterConfig::parse(std::string(encoded,std::size_t(file.gcount())),location);
         }
         const auto deadline=GetTickCount64()+120000; // the master may still be starting
+        set_phase("master_clock");
         BridgeJson clock;
         for(;;)
         {
             unsigned status=0;
-            if(writer_request(config,instance,0,"GET","/v1/clock","",clock,status)) break;
+            const bool ok=writer_request(config,instance,0,"GET","/v1/clock","",clock,status);
+            {std::lock_guard<std::mutex> guard(lock);last_http_status=status;}
+            if(ok) break;
             if(GetTickCount64()>=deadline || halted()) return false;
             pause(1000);
         }
+        set_phase("world_identity");
         if(bridge_unsigned(clock,"world_id")!=config.world || bridge_unsigned(clock,"seed")!=config.seed) return false;
         epoch=bridge_unsigned(clock,"authority_epoch");
         if(!epoch || epoch>maximum) return false;
@@ -182,6 +194,7 @@ struct AdmissionCoordinator::State
         // Another owner's lease of this location (a previous run) expires
         // after its TTL; the claim is retried with the same command ID.
         const auto claim_id=random_hex();
+        set_phase("location_claim");
         for(;;)
         {
             const auto step=command("location_claim",{{"location",location},{"capacity",128},{"ttl_ms",lease_ms}},claim,claim_deadline,claim_id);
@@ -192,6 +205,7 @@ struct AdmissionCoordinator::State
         fence=bridge_unsigned(claim,"fence");
         if(!fence || fence>maximum || claim.value("location",std::string())!=location) return false;
         BridgeJson recovered;
+        set_phase("location_recover");
         if(command("location_recover",{{"location",location},{"fence",fence}},recovered,GetTickCount64()+30000)!=CheckpointStep::Complete)
             return false;
         // A capture spooled by an earlier run (another instance or fence) can
@@ -209,12 +223,13 @@ struct AdmissionCoordinator::State
         CheckpointWorkerScope scope;
         put(scope.location,location);put(scope.instance,instance);
         scope.world=config.world;scope.seed=config.seed;scope.epoch=epoch;scope.fence=fence;scope.lease_ms=lease_ms;
+        set_phase("checkpoint_worker");
         if(!worker.start(config_path.c_str(),directory.c_str(),scope)) return false;
         const auto ready_deadline=GetTickCount64()+30000;
         for(;;)
         {
             const auto worker_status=worker.status();
-            if(worker_status.ready) return true;
+            if(worker_status.ready) {set_phase("ready");return true;}
             if(worker_status.configuration_error || worker_status.authority_lost || GetTickCount64()>=ready_deadline || halted())
                 return false;
             pause(100);
@@ -527,8 +542,19 @@ struct AdmissionCoordinator::State
             std::lock_guard<std::mutex> guard(lock);
             ready=opened;failed=!opened;wake.notify_all();
         }
+        auto retry_at=GetTickCount64()+10000;
         for(;;)
         {
+            // Initial connection failure is recoverable. Keep the coordinator
+            // and queued results alive; never switch to a local account store
+            // merely because the authority is temporarily unreachable.
+            if(!opened && !halted() && GetTickCount64()>=retry_at)
+            {
+                worker.stop();
+                try{opened=open();}catch(...){opened=false;}
+                {std::lock_guard<std::mutex> guard(lock);ready=opened;failed=!opened;wake.notify_all();}
+                retry_at=GetTickCount64()+10000;
+            }
             if(opened) try{accounts_sync();}catch(...){}
             Job job;
             bool idle=false;
@@ -578,7 +604,7 @@ bool AdmissionCoordinator::accounts_take(std::vector<AccountRecord>& changed,Acc
     try
     {
         std::lock_guard<std::mutex> guard(state_->lock);
-        state=state_->failed ? AccountsState::Unsupported:state_->accounts_state;
+        state=state_->accounts_state;
         changed.swap(state_->account_changes);
         return true;
     }
@@ -604,6 +630,28 @@ bool AdmissionCoordinator::accounts_put(const AccountRecord* records,std::size_t
     }
     catch(...){return false;}
 }
+bool AdmissionCoordinator::store_record(const char* operation,const char* bucket,const char* key_name,const char* expected,const char* value,
+                                       std::string& output,bool& swapped) noexcept
+{
+    output.clear();swapped=false;if(!state_) return false;
+    try {
+        const auto op=text(operation,32),b=text(bucket,96),k=text(key_name,96);
+        if(op!="store_read" && op!="store_keys" && op!="store_swap") return false;
+        WriterConfig config;std::string instance,location;std::uint64_t epoch=0,fence=0;
+        {std::lock_guard<std::mutex> guard(state_->lock);if(!state_->ready || state_->stopping) return false;
+            config=state_->config;instance=state_->instance;location=state_->location;epoch=state_->epoch;fence=state_->fence;}
+        BridgeJson args={{"location",location},{"fence",fence},{"bucket",b}};
+        if(op!="store_keys") args["key"]=k;
+        if(op=="store_swap") {args["expected"]=checkpoint_base64(text(expected,65536));args["value"]=checkpoint_base64(text(value,65536));}
+        const auto payload=BridgeJson{{"command_id",random_hex()},{"operation",op},{"arguments",args}}.dump();
+        BridgeJson result;unsigned status=0;
+        if(!writer_request(config,instance,epoch,"POST","/v1/store",payload,result,status)) return false;
+        if(op=="store_swap") {if(!result.contains("swapped") || !result["swapped"].is_boolean()) return false;swapped=result["swapped"].get<bool>();}
+        else output=checkpoint_unbase64(result.at("value").get<std::string>(),op=="store_keys" ? 512*1024:65536);
+        return true;
+    }catch(...){return false;}
+}
+
 bool AdmissionCoordinator::start(const char* config_path,const char* location,const wchar_t* spool_path) noexcept
 {
     stop();
@@ -629,6 +677,8 @@ CoordinatorStatus AdmissionCoordinator::status() noexcept
         result.started=true;result.ready=state_->ready && !state_->stopping;result.failed=state_->failed;
         result.epoch=state_->epoch;result.fence=state_->fence;
         result.characters=unsigned(state_->characters.size());result.pending=unsigned(state_->jobs.size());
+        result.http_status=state_->last_http_status;result.attempts=state_->open_attempts;
+        put(result.phase,state_->phase);
     }
     catch(...){}
     return result;
@@ -795,6 +845,8 @@ bool AdmissionCoordinator::poll_order(std::uint64_t,OrderResult& result) noexcep
 bool AdmissionCoordinator::accounts_take(std::vector<AccountRecord>& changed,AccountsState& state) noexcept
 {changed.clear();state=AccountsState::Unsupported;return false;}
 bool AdmissionCoordinator::accounts_put(const AccountRecord*,std::size_t,bool) noexcept{return false;}
+bool AdmissionCoordinator::store_record(const char*,const char*,const char*,const char*,const char*,std::string& output,bool& swapped) noexcept
+{output.clear();swapped=false;return false;}
 void AdmissionCoordinator::stop() noexcept{}
 #endif
 }

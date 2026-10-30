@@ -2,12 +2,14 @@
 // to the maps (bridge for every map, one writer per map).
 #include "lzm_config.h"
 #include "lzm_service.h"
+#include "lzm_cluster_plan.h"
 
 #include <windows.h>
 
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <filesystem>
 
 namespace lzm
 {
@@ -161,7 +163,84 @@ void create_bridge_config(const std::wstring& config_path, const std::wstring& d
         body = { { "schema", 3 }, { "mode", "authority" }, { "host", "127.0.0.1" }, { "port", port }, { "token", entry["token"] },
                  { "master_world_id", world_id }, { "master_world_seed", seed } };
     }
-    if (replace && authority && exists(destination)) DeleteFileW(destination.c_str());
-    write_new(destination, python_dumps(body), false);
+    const auto encoded=python_dumps(body);
+    if (exists(destination) && read_file(destination)==encoded) return;
+    write_new(destination, encoded, replace);
+}
+
+void prepare_engine_cluster(const std::wstring& root, const std::wstring& config_path, const std::wstring& plan_path)
+{
+    const std::string old_plan=exists(plan_path) ? read_file(plan_path):"";
+    const std::string complete=complete_cluster_plan(old_plan);
+    if (complete!=old_plan)
+    {
+        if (exists(plan_path))
+        {
+            const auto backup=plan_path+L".before-native-completion.bak";
+            if (!exists(backup) && !CopyFileW(plan_path.c_str(),backup.c_str(),TRUE)) throw Unavailable("cannot back up the location plan");
+        }
+        write_new(plan_path,complete,true);
+        log_line("[diag][cluster] plan completed: all 33 maps have UDP ports and launch sections; previous addresses preserved");
+    }
+    const auto locations=read_cluster(plan_path);
+    if (!exists(config_path))
+    {
+        const auto legacy=root+L"\\hoster\\master\\runtime\\config.json";
+        if (exists(legacy) && legacy!=config_path)
+        {
+            auto config=load_config(legacy);
+            const auto database=config.value("database",std::string());
+            if (database.empty() || database.find("..")!=std::string::npos || database.find_first_of(":/\\")!=std::string::npos)
+                throw Invalid("legacy database must be a filename inside the master folder");
+            const auto old_db=legacy.substr(0,legacy.find_last_of(L"\\/")+1)+widen(database);
+            const auto new_db=config_path.substr(0,config_path.find_last_of(L"\\/")+1)+L"world.sqlite";
+            make_parent(new_db);
+            if (exists(new_db)) throw Invalid("master migration destination already has a database; check the saved migration state");
+            if (exists(old_db))
+            {
+                const auto temporary=new_db+L"."+widen(token_hex(8))+L".tmp";
+                try
+                {
+                    Db source;source.open(old_db,true);
+                    source.exec("VACUUM INTO ?",{narrow(temporary)});
+                    source.close();
+                    Db verify;verify.open(temporary,true);
+                    if (verify.scalar("PRAGMA integrity_check")!="ok") throw Invalid("migrated master database failed integrity check");
+                    verify.close();
+                    if (!MoveFileExW(temporary.c_str(),new_db.c_str(),MOVEFILE_WRITE_THROUGH)) throw Unavailable("cannot install migrated master database");
+                }
+                catch (...) {DeleteFileW(temporary.c_str());throw;}
+            }
+            config["database"]="world.sqlite";
+            write_new(config_path,python_dumps(config,false,2),false);
+            log_line("[diag][migration] legacy master copied to appdata/master; SQLite snapshot verified; original retained");
+        }
+        else
+        {
+            std::vector<std::string> maps;for (const auto& map:locations) maps.push_back(map.name);
+            const uint64_t id=std::stoull(token_hex(8),nullptr,16)&0x3fffffffffffffffULL;
+            const uint64_t seed=std::stoull(token_hex(8),nullptr,16)&0x3fffffffffffffffULL;
+            double calendar=63676137600000.0;
+            std::error_code error;
+            for (const auto& f:std::filesystem::directory_iterator(root+L"\\appdata\\server\\netcoop_cluster",error))
+            {
+                const auto name=f.path().filename().string();
+                if (name.rfind("clock_",0)!=0 || f.path().extension()!=L".txt") continue;
+                std::ifstream in(f.path());double stamp=0,game=0;
+                if (in>>stamp>>game && std::isfinite(game) && game>calendar && game<3e17) calendar=game;
+            }
+            create_config(config_path,maps,id ? id:1,seed,calendar,10.0);
+            log_line("[diag][master] new private configuration created in appdata/master");
+        }
+    }
+    for (const auto& map:locations) add_location_credential(config_path,map.name);
+    // Refresh every file from the same final credential set. A stale local key
+    // must not survive merely because its filesystem timestamp is recent.
+    for (const auto& map:locations)
+        create_writer_config(config_path,root+L"\\appdata\\server\\netcoop_world_writer_"+widen(map.name)+L".json",map.name,true);
+    create_bridge_config(config_path,root+L"\\appdata\\server\\netcoop_world_bridge.json",true,true);
+    const auto config=load_config(config_path);
+    log_line(format("[diag][master] bootstrap complete maps=%zu api=127.0.0.1:%lld entry_tcp=%d",locations.size(),
+        (long long)as_int(config["port"]),read_entry_port(plan_path)));
 }
 } // namespace lzm

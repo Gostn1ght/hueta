@@ -5,6 +5,16 @@
 static netcoop_world::AdmissionCoordinator s_admission;
 static bool s_admission_started = false, s_admission_ready_logged = false, s_admission_failed_logged = false;
 static u64 s_admission_retry = 0;
+static u64 s_admission_diagnostic_at = 0;
+
+static bool admission_store_record(LPCSTR operation,LPCSTR bucket,LPCSTR key,LPCSTR expected,LPCSTR value,xr_string& output,bool& swapped)
+{
+	std::string bytes;
+	const bool ok=s_admission.store_record(operation,bucket,key,expected,value,bytes,swapped);
+	if(ok) output.assign(bytes.data(),bytes.size());
+	else Msg("! [diag][storage] operation=%s bucket=%s key=%s unavailable; no local write",operation,bucket,key ? key:"");
+	return ok;
+}
 
 static bool admission_active() { return s_admission_started; }
 
@@ -48,6 +58,19 @@ static void admission_update()
 		return;
 	}
 	const netcoop_world::CoordinatorStatus status = s_admission.status();
+	const u64 diagnostic_now=GetTickCount64();
+	if (!s_admission_diagnostic_at || diagnostic_now-s_admission_diagnostic_at>=15000)
+	{
+		s_admission_diagnostic_at=diagnostic_now;
+		Msg("[diag][admission] map=%s port=%u ready=%u failed=%u phase=%s http=%u attempts=%u epoch=%llu fence=%llu characters=%u pending=%u",
+			*Level().name(),cluster_port(),status.ready,status.failed,status.phase,status.http_status,status.attempts,status.epoch,status.fence,status.characters,status.pending);
+		string_path folder,path;cluster_dir(folder);
+		xr_sprintf(path,"%sadmission_%u.json",folder,cluster_port());
+		string1024 record;
+		xr_sprintf(record,"{\"updated\":%u,\"pid\":%u,\"map\":\"%s\",\"ready\":%s,\"failed\":%s,\"phase\":\"%s\",\"http\":%u,\"attempts\":%u}",
+			cluster_now(),GetCurrentProcessId(),*Level().name(),status.ready ? "true":"false",status.failed ? "true":"false",status.phase,status.http_status,status.attempts);
+		cluster_write_line(path,record,false);
+	}
 	world_orders_update();
 	if (status.ready && !s_admission_ready_logged)
 	{
@@ -58,8 +81,9 @@ static void admission_update()
 	if (status.failed && !s_admission_failed_logged)
 	{
 		s_admission_failed_logged = true;
-		Msg("! [Lost Zone][master] the location could not take its lease from the world master: logins are refused until a restart");
+		Msg("! [Lost Zone][master] the location could not take its lease: phase=%s http=%u; connection will be retried automatically",status.phase,status.http_status);
 	}
+	if (status.ready) s_admission_failed_logged=false;
 }
 
 void server_admission_stop()
@@ -67,6 +91,7 @@ void server_admission_stop()
 	s_admission.stop(); // joins the coordinator and the checkpoint worker (staged captures stay on disk)
 	s_admission_started = s_admission_ready_logged = s_admission_failed_logged = false;
 	s_admission_retry = 0;
+	s_admission_diagnostic_at = 0;
 }
 
 // characters.inc: every complete local snapshot of an admitted character.

@@ -1,4 +1,5 @@
 ﻿#include "lzm_window.h"
+#include "lzm_host.h"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -47,9 +48,9 @@ std::string calendar_text(double world_ms)
 namespace
 {
 COLORREF rgb(int r, int g, int b) { return RGB(r, g, b); }
-const COLORREF C_BG = rgb(10, 10, 11), C_SURFACE = rgb(16, 16, 18), C_RAISED = rgb(24, 24, 27), C_HOVER = rgb(32, 32, 36),
+const COLORREF C_BG = rgb(15, 20, 29), C_SURFACE = rgb(20, 27, 38), C_RAISED = rgb(28, 37, 50), C_HOVER = rgb(38, 50, 66),
                C_LINE = rgb(38, 38, 42), C_TEXT = rgb(232, 230, 225), C_MUTED = rgb(140, 140, 145), C_DIM = rgb(90, 90, 95),
-               C_ACCENT = rgb(217, 164, 65), C_ACCENT_HOVER = rgb(230, 182, 96), C_GREEN = rgb(76, 195, 138), C_AMBER = rgb(224, 168, 74),
+               C_ACCENT = rgb(116, 180, 255), C_ACCENT_HOVER = rgb(148, 198, 255), C_GREEN = rgb(76, 195, 138), C_AMBER = rgb(224, 168, 74),
                C_RED = rgb(229, 83, 75);
 
 const std::map<std::string, std::wstring> MAP_NAMES = {
@@ -91,7 +92,7 @@ std::wstring span(double ms)
     return std::to_wstring(minutes) + L" мин";
 }
 
-struct LocationRow { std::string id; std::wstring name, state, address; int players = 0; bool online = false, planned = false; };
+struct LocationRow { std::string id; std::wstring name, state, address, detail; unsigned process=0; int players = 0; bool online = false, planned = false; };
 struct PlayerRow { std::string login, name, location, faction, role, ping, state; };
 
 struct View
@@ -112,6 +113,7 @@ struct State
 {
     WindowOptions options;
     std::unique_ptr<Service> service;
+    std::unique_ptr<HostController> host;
     std::mutex service_lock;  // the poller reads the service, the UI thread replaces it
     std::string service_error;
     int64_t started_ns = 0;
@@ -201,7 +203,7 @@ std::vector<PlayerRow> read_rosters(const std::wstring& folder, const std::map<i
 // state - in the cluster folder, the mailbox the hoster's panel uses too. The
 // master's Locations tab switches maps there without a restart; the state it
 // shows comes back from the watchdog and from the maps' leases.
-struct HostMap { std::string state, mode; int progress = -1, retry_seconds = 0; int64_t exit_code = 0; bool has_exit_code = false; };
+struct HostMap { std::string state, mode, detail; unsigned process=0; int progress = -1, retry_seconds = 0; int64_t exit_code = 0; bool has_exit_code = false; };
 struct HostView { bool fresh = false; std::map<std::string, HostMap> maps; };
 
 HostView read_host_view(const std::wstring& folder)
@@ -231,6 +233,8 @@ HostView read_host_view(const std::wstring& folder)
                 if (!m.is_object() || !m.contains("map") || !m["map"].is_string()) continue;
                 HostMap row;
                 if (m.contains("state") && m["state"].is_string()) row.state = m["state"].get<std::string>();
+                if(m.contains("processId") && m["processId"].is_number_unsigned()) row.process=m["processId"].get<unsigned>();
+                if(m.contains("detail") && m["detail"].is_string()) row.detail=m["detail"].get<std::string>();
                 if (m.contains("mode") && m["mode"].is_string()) row.mode = m["mode"].get<std::string>();
                 if (m.contains("progress") && m["progress"].is_number()) row.progress = int(m["progress"].get<double>());
                 if (m.contains("retry_seconds") && m["retry_seconds"].is_number()) row.retry_seconds = std::max(0, std::min(300, m["retry_seconds"].get<int>()));
@@ -275,23 +279,12 @@ bool write_host_command(const std::wstring& folder, const std::string& map, cons
 // running (its view is not fresh), at most once a minute.
 bool ensure_watchdog(State& s, bool fresh)
 {
-    if (fresh) return true;
-    if (s.watchdog_started_ns && monotonic_ns() - s.watchdog_started_ns < 60000000000LL) return true;
-    std::wstring root = runtime_root(s.options.roster_folder);
-    std::wstring script = root + L"\\hoster\\netcoop_cluster_watchdog.ps1";
-    if (root.empty() || GetFileAttributesW(script.c_str()) == INVALID_FILE_ATTRIBUTES) return false;
-    std::wstring line = L"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + script + L"\" -Runtime \"" + root + L"\" -NoAutoStart";
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    PROCESS_INFORMATION pi{};
-    std::vector<wchar_t> buffer(line.begin(), line.end());
-    buffer.push_back(0);
-    if (!CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, root.c_str(), &si, &pi)) return false;
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    s.watchdog_started_ns = monotonic_ns();
-    log_line("Запущено управление локациями хостера (watchdog).");
-    return true;
+    if(s.host) return true;
+    if(!s.options.selftest.empty()) return fresh;
+    try {
+        s.host=std::make_unique<HostController>(runtime_root(s.options.roster_folder),s.options.service.cluster);
+        s.host->enabled(s.service && s.service->ready());return true;
+    } catch(const std::exception& error) {log_line("[diag][host] controller unavailable: "+std::string(error.what()));return false;}
 }
 
 View build_view(Service& service, const WindowOptions& options)
@@ -366,16 +359,28 @@ View build_view(Service& service, const WindowOptions& options)
         if (row.online) row.state = state == "saving" ? L"сохраняет мир…" : L"в сети";
         else if (state == "loading")
             row.state = L"загружается" + (h->second.progress > 0 ? L" · " + std::to_wstring(h->second.progress) + L"%" : L"");
-        else if (state == "running") row.state = L"запускается";
+        else if (state == "running") row.state = L"мир готов · мастер не подтвердил";
         else if (state == "queued") row.state = L"в очереди на запуск";
         else if (state == "memory") row.state = L"ждёт память";
         else if (state == "master_stopped") row.state = L"мастер остановлен";
+        else if(state=="master_wait") row.state=L"мастер восстанавливает данные";
         else if (state == "loading_timeout") row.state = L"загрузка затянулась";
         else if (state == "retry") row.state = L"сбой · повтор через " + std::to_wstring(h->second.retry_seconds) + L" с";
         else if (state == "failed") row.state = L"остановлена после сбоев" + (h->second.has_exit_code ? L" · код " + std::to_wstring(h->second.exit_code) : L"");
         else if (state == "saving") row.state = L"сохраняет мир…";
         else if (it != expiry.end()) row.state = L"не отвечает";
         else row.state = row.planned ? L"выключена" : L"нет в плане хостера";
+        if(h!=host.maps.end()) {row.process=h->second.process;row.detail=widen(h->second.detail);}
+        if(row.process && !row.online)
+        {
+            std::ifstream in(options.roster_folder+L"\\admission_"+std::to_wstring(ports.empty() ? 0:([&] {for(const auto& p:plan) if(p.name==n.first) return p.port;return 0;}()))+L".json");
+            std::ostringstream text;text<<in.rdbuf();
+            try {
+                const auto diagnostic=loads(text.str());
+                if(diagnostic.value("pid",0u)==row.process && diagnostic.value("updated",int64_t(0))>=int64_t(time(nullptr))-30)
+                    row.detail=L"master: "+widen(diagnostic.value("phase",std::string()))+L" · HTTP "+std::to_wstring(diagnostic.value("http",0));
+            } catch(...) {}
+        }
         for (auto& p : players) row.players += p.location == n.first;
         v.locations.push_back(row);
     }
@@ -390,9 +395,16 @@ void poll(State* s)
         try
         {
             std::lock_guard<std::mutex> guard(s->service_lock);
-            if (s->service && s->service->running()) view = build_view(*s->service, s->options);
+            if (s->service && s->service->running()) {
+                if(s->host) s->host->enabled(s->service->ready());
+                view = build_view(*s->service, s->options);
+            }
         }
-        catch (...) {}
+        catch (const std::exception& error) {
+            static int64_t logged=0;if(monotonic_ns()-logged>15000000000LL) {
+                logged=monotonic_ns();log_line("[diag][panel] refresh failed type="+exception_type(error)+" reason="+error.what());
+            }
+        }
         {
             std::lock_guard<std::mutex> guard(s->view_lock);
             s->view = view;
@@ -477,6 +489,7 @@ void layout(State& s)
     add(B_PSI, L"Пси-шторм сейчас", x);
     add(B_WEATHER, L"Сменить погоду  ▾", x);
     add(B_SPEED, L"Скорость времени  ▾", x);
+    y+=px(s,44);
     int r = rc.right - m;
     bool running = s.service && s.service->running();
     add(B_TOGGLE, running ? L"Остановить мастер" : L"Запустить мастер", r, true, false, running ? C_RED : C_GREEN);
@@ -563,7 +576,7 @@ void paint(State& s, HDC target)
     fill(dc, rc, C_BG);
     int m = px(s, 24);
     text(dc, L"LOST ZONE", { m, px(s, 14), rc.right / 2, px(s, 52) }, s.f_title, C_TEXT);
-    text(dc, L"Мастер мира · календарь, погода, выбросы и переходы всех локаций", { m, px(s, 52), rc.right / 2 + px(s, 200), px(s, 76) }, s.f_small, C_MUTED);
+    text(dc, L"Управление кластером / локации, игроки и диагностика", { m, px(s, 52), rc.right / 2 + px(s, 200), px(s, 76) }, s.f_small, C_MUTED);
     View view;
     bool have = false;
     {
@@ -776,7 +789,7 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
     InvalidateRect(list, nullptr, TRUE);
 }
 
-bool operator==(const LocationRow& a, const LocationRow& b) { return a.id == b.id && a.state == b.state && a.address == b.address && a.players == b.players; }
+bool operator==(const LocationRow& a, const LocationRow& b) { return a.id == b.id && a.state == b.state && a.address == b.address && a.players == b.players && a.process==b.process && a.detail==b.detail; }
 bool operator==(const PlayerRow& a, const PlayerRow& b)
 {
     return a.login == b.login && a.name == b.name && a.location == b.location && a.faction == b.faction && a.role == b.role && a.ping == b.ping && a.state == b.state;
@@ -796,7 +809,7 @@ void refresh_lists(State& s)
         std::vector<int> tags;
         for (auto& l : view.locations)
         {
-            rows.push_back({ l.name, widen(l.id), l.state, l.address, l.players ? std::to_wstring(l.players) : L"" });
+            rows.push_back({ l.name, l.state, l.address, l.process ? std::to_wstring(l.process):L"—", std::to_wstring(l.players), l.detail.empty() ? widen(l.id):l.detail });
             tags.push_back(l.online ? 1 : 0);
         }
         set_rows(s.locations, rows, tags);
@@ -882,6 +895,8 @@ void start_service(State& s)
     {
         s.service = std::make_unique<Service>(s.options.service);
         pause_host_launches(s, false);
+        ensure_watchdog(s,false);
+        if(s.host) s.host->enabled(s.service->ready());
         s.service_error.clear();
         s.started_ns = monotonic_ns();
     }
@@ -899,6 +914,7 @@ void stop_service(State& s)
     if (s.service)
     {
         pause_host_launches(s, true);
+        if(s.host) s.host->enabled(false);
         HCURSOR cursor = SetCursor(LoadCursor(nullptr, IDC_WAIT));
         s.service->stop();
         s.service.reset();
@@ -947,7 +963,7 @@ void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
     bool managed = ensure_watchdog(s, read_host_view(s.options.roster_folder).fresh);
     log_line(std::string(on ? "Включение" : "Выключение") + " локаций: " + narrow(names));
     if (!failed.empty()) set_status(s, "Не удалось передать команду: " + failed.front(), C_RED);
-    else if (!managed) set_status(s, "Команда записана, но управление хостера (hoster\\netcoop_cluster_watchdog.ps1) не найдено.", C_AMBER);
+    else if (!managed) set_status(s, "Управление локациями недоступно. Причина записана в журнале мастера.", C_AMBER);
     else set_status(s, narrow((on ? L"Включаются: " : L"Выключаются (с сохранением мира): ") + names), C_GREEN);
 }
 
@@ -1057,7 +1073,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         s->hwnd = hwnd;
         BOOL dark = TRUE;
         DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark));
-        s->locations = make_list(*s, hwnd, { { L"ЛОКАЦИЯ", 240 }, { L"КАРТА", 200 }, { L"СОСТОЯНИЕ", 190 }, { L"АДРЕС", 180 }, { L"ИГРОКИ", 80 } }, true);
+        s->locations = make_list(*s, hwnd, { { L"ЛОКАЦИЯ", 175 }, { L"СОСТОЯНИЕ", 240 }, { L"АДРЕС / UDP", 170 }, { L"PID", 65 }, { L"ИГРОКИ", 65 }, { L"ДИАГНОСТИКА", 300 } }, true);
         s->players = make_list(*s, hwnd, { { L"ИГРОК", 160 }, { L"ПЕРСОНАЖ", 180 }, { L"ЛОКАЦИЯ", 200 }, { L"ФРАКЦИЯ", 130 }, { L"РОЛЬ", 90 }, { L"ПИНГ", 80 } });
         s->journal = make_rich(*s, hwnd);
         s->output = make_rich(*s, hwnd);

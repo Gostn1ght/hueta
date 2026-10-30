@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <string>
 
 // M2b native admission coordinator (doc 135): the world master is the primary
 // store of player characters. A location server claims its lease, admits a
@@ -60,6 +61,8 @@ struct CoordinatorStatus
     bool started=false,ready=false,failed=false;
     std::uint64_t epoch=0,fence=0;
     unsigned characters=0,pending=0;
+    unsigned http_status=0, attempts=0;
+    char phase[64]{};
 };
 
 // start/stop: simulation thread. The other calls only queue work or read a
@@ -100,6 +103,10 @@ public:
     bool accounts_take(std::vector<AccountRecord>& changed,AccountsState& state) noexcept;
     // Queues records for the master; only_new keeps the ones it has (import).
     bool accounts_put(const AccountRecord* records,std::size_t count,bool only_new) noexcept;
+    // Rare synchronous Lua shared-record operations, bounded loopback IO.
+    // Values remain opaque bytes; the master performs the atomic CAS.
+    bool store_record(const char* operation,const char* bucket,const char* key,const char* expected,const char* value,
+                      std::string& output,bool& swapped) noexcept;
     void stop() noexcept;
 };
 }

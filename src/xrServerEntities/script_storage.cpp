@@ -376,6 +376,77 @@ static void install_vfs_package_loader(lua_State* L)
 extern lua_CFunction luaopen_socket_core_init();
 extern void pdebug_init_init(lua_State* L);
 
+// io.open/io.lines/io.input normally bypass X-Ray's archive filesystem.
+// Read-only config files use a content-addressed cache; mutable configurations
+// stay under the role's appdata/configs alias and override the archived default.
+static void config_io_parent(LPCSTR path)
+{
+	string_path folder;xr_strcpy(folder,path);
+	for(char* c=folder+3;*c;++c) if(*c=='\\') {*c=0;CreateDirectoryA(folder,nullptr);*c='\\';}
+}
+
+static bool config_io_path(LPCSTR requested,LPCSTR mode,string_path& resolved,bool& writing)
+{
+	writing=false;
+	if(!requested || xr_strlen(requested)>=sizeof(string_path)-1) return false;
+	string_path full,base;
+	const DWORD full_size=GetFullPathNameA(requested,sizeof(full),full,nullptr);
+	const DWORD base_size=GetFullPathNameA(FS.get_path("$game_config$")->m_Path,sizeof(base),base,nullptr);
+	if(!full_size || full_size>=sizeof(full) || !base_size || base_size>=sizeof(base)) return false;
+	for(char* c=full;*c;++c) if(*c=='/') *c='\\';
+	for(char* c=base;*c;++c) if(*c=='/') *c='\\';
+	const size_t n=xr_strlen(base);
+	if(!n || base[n-1]!='\\' || _strnicmp(full,base,n)!=0 || !full[n]) return false;
+	writing=mode && (strchr(mode,'w') || strchr(mode,'a') || strchr(mode,'+'));
+	if(writing) config_io_parent(full);
+	if(GetFileAttributesA(full)!=INVALID_FILE_ATTRIBUTES) {xr_strcpy(resolved,full);return true;}
+	if(writing && strchr(mode,'w')) {xr_strcpy(resolved,full);return true;}
+	IReader* reader=FS.r_open("$game_config$",full+n);
+	if(!reader) {if(writing) {xr_strcpy(resolved,full);return true;}return false;}
+	if(writing) xr_strcpy(resolved,full);
+	else {
+		string128 relative;xr_sprintf(relative,"config_read_cache\\%08x_%08x_%u.cache",path_crc32(full+n,u32(xr_strlen(full+n))),crc32(reader->pointer(),reader->length()),reader->length());
+		FS.update_path(resolved,"$app_data_root$",relative);config_io_parent(resolved);
+	}
+	bool ok=GetFileAttributesA(resolved)!=INVALID_FILE_ATTRIBUTES;
+	if(!ok) {
+		string_path temporary;xr_sprintf(temporary,"%s.%u.%u.tmp",resolved,GetCurrentProcessId(),GetCurrentThreadId());
+		FILE* out=fopen(temporary,"wb");
+		if(out) {ok=fwrite(reader->pointer(),1,reader->length(),out)==reader->length();ok=fclose(out)==0 && ok;
+			if(ok) ok=MoveFileExA(temporary,resolved,MOVEFILE_REPLACE_EXISTING)!=FALSE;}
+		if(!ok) DeleteFileA(temporary);
+	}
+	FS.r_close(reader);return ok;
+}
+
+static int config_io_call(lua_State* L)
+{
+	const int arguments=lua_gettop(L);
+	string_path resolved;bool writing=false,handled=false;
+	if(arguments && lua_type(L,1)==LUA_TSTRING) {
+		const bool open=lua_toboolean(L,lua_upvalueindex(2))!=0;
+		LPCSTR mode=open && arguments>=2 && lua_isstring(L,2) ? lua_tostring(L,2):"r";
+		handled=config_io_path(lua_tostring(L,1),mode,resolved,writing);
+		if(handled) {lua_pushstring(L,resolved);lua_replace(L,1);}
+	}
+	lua_pushvalue(L,lua_upvalueindex(1));lua_insert(L,1);lua_call(L,arguments,LUA_MULTRET);
+	if(handled && writing && lua_gettop(L)>0 && !lua_isnil(L,1)) {
+		char* slash=strrchr(resolved,'\\');if(slash) {slash[1]=0;FS.rescan_path(resolved,FALSE);}
+	}
+	return lua_gettop(L);
+}
+
+static void install_config_io(lua_State* L)
+{
+	lua_getglobal(L,"io");
+	for(LPCSTR name:{"open","lines","input"}) {
+		lua_getfield(L,-1,name);lua_pushboolean(L,!xr_strcmp(name,"open"));
+		lua_pushcclosure(L,config_io_call,2);lua_setfield(L,-2,name);
+	}
+	lua_pop(L,1);
+	Msg("[diag][vfs] Lua config IO reads archives; writable overrides and content cache use appdata");
+}
+
 void disable_os_funcs(lua_State* L)
 {
 	lua_getglobal(L, "os");
@@ -502,6 +573,7 @@ void CScriptStorage::reinit()
 	luaopen_lua_extensions(lua(), isDebugEnabled);
 	disable_os_funcs(lua());
 	install_vfs_package_loader(lua());
+	install_config_io(lua());
 
 	if (isDebugEnabled)
 	{

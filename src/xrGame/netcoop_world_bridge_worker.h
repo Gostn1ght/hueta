@@ -12,6 +12,7 @@ struct BridgeDiagnostics
     double drift_game_ms=0;
     unsigned weather_phase=0,emission_phase=0;
     double weather_blend=0;
+    unsigned http_status=0, transport_error=0, api_port=0;
 };
 
 // Coherent, bounded read-only projection. No credential, JSON or private state
