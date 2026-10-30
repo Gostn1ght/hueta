@@ -50,6 +50,7 @@ def main():
     out = Path(a.out)
     if out.exists():
         sys.exit(f"{out} exists; patch numbers are never reused")
+    out.mkdir(parents=True)
     head = git("rev-parse", "HEAD").strip()
     summary = {"head": head, "client_base": a.client_base, "server_base": a.server_base, "version": a.version,
                "client": {}, "server": {}}
@@ -77,8 +78,11 @@ def main():
         print(f"{role}: {len(scripts)} scripts, {len(loose)} loose files, {len(deleted)} deleted since {base}")
         for rel in deleted:
             print(f"  ! deleted in the overlay (remove by hand if shipped): {rel}")
-    subprocess.run([sys.executable, a.lzpack, "patch", "--key", a.key, "--input", str(out / "input"),
-                    "--output", str(out / "archives"), "--version", a.version, "--role", "both"], check=True)
+    if any(summary[role]["scripts"] for role in ("client", "server")):
+        subprocess.run([sys.executable, a.lzpack, "patch", "--key", a.key, "--input", str(out / "input"),
+                        "--output", str(out / "archives"), "--version", a.version, "--role", "both"], check=True)
+    else:
+        print("Loose-config/native-only update: no resource archive is needed")
     (out / "source.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"patch {a.version} from {head[:9]} in {out}")
 
