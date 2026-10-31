@@ -50,9 +50,9 @@ std::string calendar_text(double world_ms)
 namespace
 {
 COLORREF rgb(int r, int g, int b) { return RGB(r, g, b); }
-const COLORREF C_BG = rgb(15, 20, 29), C_SURFACE = rgb(20, 27, 38), C_RAISED = rgb(28, 37, 50), C_HOVER = rgb(38, 50, 66),
-               C_LINE = rgb(46, 59, 78), C_TEXT = rgb(232, 237, 245), C_MUTED = rgb(170, 183, 202), C_DIM = rgb(146, 160, 180),
-               C_ACCENT = rgb(116, 180, 255), C_ACCENT_HOVER = rgb(148, 198, 255), C_GREEN = rgb(76, 195, 138), C_AMBER = rgb(224, 168, 74),
+const COLORREF C_BG = rgb(0, 0, 0), C_SURFACE = rgb(3, 3, 3), C_RAISED = rgb(18, 18, 18), C_HOVER = rgb(30, 30, 30),
+               C_LINE = rgb(42, 42, 42), C_TEXT = rgb(218, 222, 218), C_MUTED = rgb(155, 163, 155), C_DIM = rgb(106, 114, 106),
+               C_ACCENT = rgb(102, 210, 160), C_ACCENT_HOVER = rgb(138, 230, 190), C_GREEN = rgb(76, 195, 138), C_AMBER = rgb(224, 168, 74),
                C_RED = rgb(229, 83, 75);
 
 const std::map<std::string, std::wstring> MAP_NAMES = {
@@ -120,7 +120,7 @@ struct State
     std::string service_error;
     int64_t started_ns = 0;
     HWND hwnd = nullptr, locations = nullptr, players = nullptr, journal = nullptr, output = nullptr, input = nullptr;
-    int tab = 0;
+    int tab = 2;
     std::vector<Button> buttons, tabs;
     int hover = -1;
     float dpi = 1;
@@ -446,10 +446,10 @@ void card(State& s, HDC dc, RECT rc, const wchar_t* title, const std::wstring& v
     fill(dc, rc, C_LINE);
     RECT inner{ rc.left + 1, rc.top + 1, rc.right - 1, rc.bottom - 1 };
     fill(dc, inner, C_SURFACE);
-    int pad = px(s, 16);
-    text(dc, title, { rc.left + pad, rc.top + px(s, 10), rc.right - pad, rc.top + px(s, 30) }, s.f_small, C_MUTED);
-    text(dc, value, { rc.left + pad, rc.top + px(s, 30), rc.right - pad, rc.top + px(s, 62) }, s.f_value, value_color);
-    text(dc, detail, { rc.left + pad, rc.top + px(s, 62), rc.right - pad, rc.bottom - px(s, 8) }, s.f_small, C_MUTED);
+    int pad = px(s, 10);
+    text(dc, title, { rc.left + pad, rc.top + px(s, 2), rc.right - pad, rc.top + px(s, 20) }, s.f_small, C_MUTED);
+    text(dc, value, { rc.left + pad, rc.top + px(s, 20), rc.right - pad, rc.top + px(s, 40) }, s.f_mono, value_color);
+    text(dc, detail, { rc.left + pad, rc.top + px(s, 40), rc.right - pad, rc.bottom - px(s, 2) }, s.f_small, C_MUTED);
 }
 
 std::pair<std::wstring, std::wstring> weather_text(const json& state)
@@ -480,7 +480,7 @@ void layout(State& s)
     RECT rc;
     GetClientRect(s.hwnd, &rc);
     int m = px(s, 24);
-    int y = px(s, 96 + 96 + 16);  // header + cards + gap
+    int y = px(s, 136);
     s.buttons.clear();
     auto add = [&](int id, const std::wstring& t, int& x, bool right = false, bool accent = false, COLORREF color = C_TEXT) {
         HDC dc = GetDC(s.hwnd);
@@ -517,8 +517,8 @@ void layout(State& s)
     int online = 0;
     for (auto& l : view.locations) online += l.online;
     std::vector<std::wstring> names = { L"Локации · " + std::to_wstring(online) + L"/" + std::to_wstring(view.locations.size()),
-                                        L"Игроки · " + std::to_wstring(view.players.size()), L"Журнал", L"Консоль" };
-    for (int i = 0; i < 4; ++i)
+                                        L"Игроки · " + std::to_wstring(view.players.size()), L"Общая консоль" };
+    for (int i = 0; i < 3; ++i)
     {
         HDC dc = GetDC(s.hwnd);
         SelectObject(dc, s.f_bold);
@@ -542,8 +542,8 @@ void layout(State& s)
     ShowWindow(s.locations, s.tab == 0 ? SW_SHOW : SW_HIDE);
     ShowWindow(s.players, s.tab == 1 ? SW_SHOW : SW_HIDE);
     ShowWindow(s.journal, s.tab == 2 ? SW_SHOW : SW_HIDE);
-    ShowWindow(s.output, s.tab == 3 ? SW_SHOW : SW_HIDE);
-    ShowWindow(s.input, s.tab == 3 ? SW_SHOW : SW_HIDE);
+    ShowWindow(s.output, s.tab == 2 ? SW_SHOW : SW_HIDE);
+    ShowWindow(s.input, s.tab == 2 ? SW_SHOW : SW_HIDE);
     if (s.tab == 0)
     {
         // Switch the selected maps (several with Ctrl / Shift) without restarting anything.
@@ -566,7 +566,7 @@ void layout(State& s)
             s.buttons.push_back(b);
         }
     }
-    if (s.tab == 3)
+    if (s.tab == 2)
     {
         Button run{ B_RUN, L"Выполнить" };
         run.rc = { s.content.right - px(s, 132), s.content.bottom - line, s.content.right, s.content.bottom };
@@ -598,8 +598,8 @@ void paint(State& s, HDC target)
     HGDIOBJ old = SelectObject(dc, bitmap);
     fill(dc, rc, C_BG);
     int m = px(s, 24);
-    text(dc, L"LOST ZONE", { m, px(s, 14), rc.right / 2, px(s, 52) }, s.f_title, C_TEXT);
-    text(dc, L"Управление кластером / локации, игроки и диагностика", { m, px(s, 52), rc.right / 2 + px(s, 200), px(s, 76) }, s.f_small, C_MUTED);
+    text(dc, L"LOST ZONE / MASTER", { m, px(s, 6), rc.right / 2, px(s, 34) }, s.f_mono, C_ACCENT);
+    text(dc, L"Единая консоль мира и серверов локаций", { m, px(s, 34), rc.right / 2 + px(s, 200), px(s, 56) }, s.f_small, C_MUTED);
     View view;
     bool have = false;
     {
@@ -621,10 +621,10 @@ void paint(State& s, HDC target)
     }
     else if (!s.service_error.empty())
         detail = widen(s.service_error);
-    text(dc, state, { rc.right / 2, px(s, 18), rc.right - m, px(s, 50) }, s.f_value, color, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    text(dc, detail, { rc.left + m, px(s, 52), rc.right - m, px(s, 76) }, s.f_small, C_MUTED, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    text(dc, state, { rc.right / 2, px(s, 6), rc.right - m, px(s, 34) }, s.f_mono, color, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    text(dc, detail, { rc.left + m, px(s, 34), rc.right - m, px(s, 56) }, s.f_small, C_MUTED, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     // cards
-    int top = px(s, 96), height = px(s, 96), gap = px(s, 10);
+    int top = px(s, 64), height = px(s, 60), gap = px(s, 10);
     int width = (rc.right - 2 * m - 4 * gap) / 5;
     auto at = [&](int i) { return RECT{ m + i * (width + gap), top, m + i * (width + gap) + width, top + height }; };
     if (have)
@@ -660,7 +660,7 @@ void paint(State& s, HDC target)
         if (selected) fill(dc, { t.rc.left, t.rc.bottom - px(s, 2), t.rc.right, t.rc.bottom }, C_ACCENT);
     }
     fill(dc, { s.content.left, s.content.top - 1, s.content.right, s.content.top }, C_LINE);
-    if (s.tab == 3)
+    if (s.tab == 2)
     {
         int line = px(s, 40);
         RECT bar{ s.content.left, s.content.bottom - line, s.content.right - px(s, 140), s.content.bottom };
@@ -867,7 +867,9 @@ void drain_journal(State& s)
         if (low.find("error") != std::string::npos || low.find("ошибк") != std::string::npos || low.find("остановлен:") != std::string::npos ||
             low.find("failed") != std::string::npos)
             color = C_RED;
-        else if (line.rfind("[мир]", 0) == 0)
+        else if (line.find("warning") != std::string::npos || line.find("retry") != std::string::npos)
+            color = C_AMBER;
+        else if (line.rfind("[мир]", 0) == 0 || line.rfind("[location:",0)==0)
             color = C_ACCENT;
         append(s.journal, widen(stamp) + L"  ", C_DIM);
         append(s.journal, widen(line) + L"\r\n", color);
@@ -891,8 +893,8 @@ void command(State& s, const std::string& line, const wchar_t* confirm = nullptr
     }
     std::string answer = s.service->console(line);
     bool failed = answer.rfind("Команда не выполнена", 0) == 0;
-    append(s.output, L"master › " + widen(line) + L"\r\n", C_ACCENT);
-    append(s.output, widen(answer) + L"\r\n", failed ? C_RED : C_TEXT);
+    log_line("[console] master > "+line);
+    log_line("[console] "+answer);
     set_status(s, split(answer, '\n')[0], failed ? C_RED : C_GREEN);
 }
 
@@ -997,11 +999,11 @@ void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
 
 void click(State& s, int id)
 {
-    if (id >= T_LOCATIONS && id <= T_CONSOLE)
+    if (id >= T_LOCATIONS && id <= T_JOURNAL)
     {
         s.tab = id - T_LOCATIONS;
         layout(s);
-        if (s.tab == 3) SetFocus(s.input);
+        if (s.tab == 2) SetFocus(s.input);
         InvalidateRect(s.hwnd, nullptr, FALSE);
         return;
     }
@@ -1043,28 +1045,10 @@ void click(State& s, int id)
     case B_LOC_ON: switch_locations(s, true, selected_maps(s)); break;
     case B_LOC_OFF: switch_locations(s, false, selected_maps(s)); break;
     case B_NODE_LOG: {
-        const auto maps=selected_maps(s);if(maps.empty()) {set_status(s,"Выберите локацию в списке.",C_AMBER);break;}
-        const auto root=std::filesystem::path(s.options.roster_folder).parent_path().parent_path().parent_path();
-        std::filesystem::path chosen;std::filesystem::file_time_type newest=std::filesystem::file_time_type::min();
-        std::error_code error;
-        for(const auto& directory:{root/L"appdata"/L"server"/L"logs",root/L"appdata"/L"logs"})
-            for(const auto& file:std::filesystem::directory_iterator(directory,error)) {
-                const auto name=lower(narrow(file.path().filename().wstring()));
-                if(file.path().extension()!=L".log" || !file.is_regular_file(error)) continue;
-                if(name.find(maps.front())==std::string::npos && !(maps.front()=="k00_marsh" && name.rfind("xray_srv_",0)==0 && name.find("_l0")==std::string::npos && name.find("_y04_")==std::string::npos)) continue;
-                const auto stamp=file.last_write_time(error);if(!error && stamp>newest) {chosen=file.path();newest=stamp;}
-            }
-        if(chosen.empty()) {set_status(s,"Журнал этой локации ещё не создан.",C_AMBER);break;}
-        std::ifstream in(chosen,std::ios::binary|std::ios::ate);const auto end=in.tellg();
-        if(end<0) {set_status(s,"Не удалось прочитать журнал.",C_RED);break;}
-        const auto count=(std::min)(std::streamoff(end),std::streamoff(128*1024));in.seekg(end-count);
-        std::string tail(size_t(count),'\0');in.read(tail.data(),count);
-        if(std::streamoff(end)>count) {const auto start=tail.find('\n');if(start!=std::string::npos) tail.erase(0,start+1);}
-        // The engine journal is CP1251; master diagnostics are UTF-8.
-        const int chars=MultiByteToWideChar(1251,0,tail.data(),int(tail.size()),nullptr,0);std::wstring wide(size_t(chars),'\0');
-        MultiByteToWideChar(1251,0,tail.data(),int(tail.size()),wide.data(),chars);
-        SetWindowTextW(s.output,(L"Последние 128 КБ · "+chosen.filename().wstring()+L"\r\n\r\n"+wide).c_str());
-        s.tab=3;layout(s);InvalidateRect(s.hwnd,nullptr,FALSE);break;
+        const auto maps=selected_maps(s);
+        if(maps.empty()) {set_status(s,"Выберите локацию в списке.",C_AMBER);break;}
+        log_line("[console] location="+maps.front()+"; live logs are tagged [location:"+maps.front()+"]");
+        s.tab=2;layout(s);SetFocus(s.input);InvalidateRect(s.hwnd,nullptr,FALSE);break;
     }
     case B_DIAGNOSTICS: {
         const auto root=std::filesystem::path(s.options.roster_folder).parent_path().parent_path().parent_path().wstring();
@@ -1158,7 +1142,7 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
         s->locations = make_list(*s, hwnd, { { L"ЛОКАЦИЯ", 175 }, { L"СОСТОЯНИЕ", 240 }, { L"АДРЕС / UDP", 170 }, { L"PID", 65 }, { L"ИГРОКИ", 65 }, { L"ДИАГНОСТИКА", 300 } }, true);
         s->players = make_list(*s, hwnd, { { L"ИГРОК", 160 }, { L"ПЕРСОНАЖ", 180 }, { L"ЛОКАЦИЯ", 200 }, { L"ФРАКЦИЯ", 130 }, { L"РОЛЬ", 90 }, { L"ПИНГ", 80 } });
         s->journal = make_rich(*s, hwnd);
-        s->output = make_rich(*s, hwnd);
+        s->output = s->journal;
         append(s->output, L"help — список команд мастера. Остановка мастера — кнопкой сверху.\r\n", C_MUTED);
         s->input = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | ES_AUTOHSCROLL, 0, 0, 10, 10, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
         SendMessageW(s->input, WM_SETFONT, (WPARAM)s->f_mono, TRUE);

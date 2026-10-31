@@ -158,6 +158,28 @@ struct HostControllerFixture {
         const auto view=loads(controller.read(controller.folder_+L"\\host_view_native.json"));assert(view["maps"].size()==2 && view["controller"]=="native");
         puts("PASS actual native controller: persistent stop/start, cancellation before launch, real memory gate, serialization, paused/recovering master, PID-bound saved stop, live snapshot; no game process started");
         puts("PASS memory regression: 8.68 GiB free can launch; physical and commit shortage blocked; learned peaks; fresh manual mode; cancelled memory wait clears; sufficient budget reaches CreateProcess; no game started");
+        const std::vector<std::string> names={"k00_marsh","l01_escape","l08_yantar","jupiter","jupiter_underground"};
+        assert(LocationLogs::map_for("xray_srv_jupiter_underground_test.log",names)=="jupiter_underground");
+        assert(LocationLogs::map_for("xray_srv_jupiter_test.log",names)=="jupiter");
+        assert(LocationLogs::map_for("xray_srv_test.log",names)=="k00_marsh");
+        assert(LocationLogs::map_for("xray_srv_l02_garbage_test.log",names).empty());
+        assert(LocationLogs::map_for("master.log",names).empty());
+        const auto marsh=root+L"\\appdata\\server\\logs\\xray_srv_test.log";
+        const auto escape=root+L"\\appdata\\logs\\xray_srv_l01_escape_test.log";
+        put_file(marsh,"first\npartial");put_file(escape,"\xCF\xF0\xE8\xE2\xE5\xF2\n");
+        std::vector<std::string> journal;set_log_sink([&](const std::string& line){journal.push_back(line);});
+        LocationLogs logs;logs.poll(root,names);
+        assert(std::find(journal.begin(),journal.end(),"[location:k00_marsh] first")!=journal.end());
+        assert(std::find(journal.begin(),journal.end(),u8"[location:l01_escape] Привет")!=journal.end());
+        auto count=journal.size();logs.poll(root,names);assert(journal.size()==count);
+        {std::ofstream out(marsh,std::ios::binary|std::ios::app);out<<" completed\n";}
+        logs.poll(root,names);assert(journal.size()==count+1 && journal.back()=="[location:k00_marsh] partial completed");
+        put_file(marsh,"rotated\n");logs.poll(root,names);assert(journal.back()=="[location:k00_marsh] rotated");
+        put_file(escape,std::string(20000,'x')+"\nlast bounded line\n");
+        LocationLogs bounded;bounded.poll(root,names);assert(journal.back()=="[location:l01_escape] last bounded line");
+        for(const auto& line:journal) assert(line.size()<8400);
+        set_log_sink({});
+        puts("PASS actual merged location journals: map tags, UTF8/CP1251, incremental reads, partial lines, truncation and bounded startup tail; no game started");
         return 0;
     }
 };

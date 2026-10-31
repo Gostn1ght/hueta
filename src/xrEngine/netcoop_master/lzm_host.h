@@ -3,6 +3,7 @@
 #pragma once
 #include "lzm_service.h"
 #include "lzm_cluster_plan.h"
+#include "lzm_location_logs.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -28,6 +29,7 @@ class HostController
     };
     std::wstring root_,folder_,exe_;
     std::vector<Map> maps_;
+    LocationLogs logs_;
     HANDLE mutex_=nullptr;
     std::atomic<bool> stopping_{false},enabled_{false};
     std::atomic<bool> stop_all_{false};
@@ -252,7 +254,12 @@ class HostController
     }
     void run() noexcept {
         while(!stopping_) {
-            try {for(auto& m:maps_) {update(m);if(stop_all_ && m.process && !m.expected) stop_map(m);}budget();queue();publish();}
+            try {
+                for(auto& m:maps_) {update(m);if(stop_all_ && m.process && !m.expected) stop_map(m);}
+                budget();queue();publish();
+                std::vector<std::string> names;for(const auto& m:maps_) names.push_back(m.plan.name);
+                logs_.poll(root_,names);
+            }
             catch(const std::exception& e) {log_line("[diag][host] controller error: "+std::string(e.what()));}
             for(int i=0;i<10 && !stopping_;++i) Sleep(100);
         }

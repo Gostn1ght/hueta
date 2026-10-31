@@ -61,7 +61,7 @@ void open_journal(const std::wstring& path, bool window)
     if (out && out != INVALID_HANDLE_VALUE && GetFileType(out) != FILE_TYPE_UNKNOWN) g_journal.out = out;
     g_journal.window = window;
     set_log_sink([](const std::string& raw) {
-        static const std::regex sensitive("\\b(?:password|passwd|token|secret|signing_key|authorization)\\b", std::regex::icase);
+        static const std::regex sensitive("(?:password|passwd|token|secret|signing_key|authorization)", std::regex::icase);
         std::string line = std::regex_search(raw, sensitive) ? "[redacted sensitive diagnostic line]" : raw;
         std::lock_guard<std::mutex> guard(g_journal.lock);
         if (g_journal.out)
