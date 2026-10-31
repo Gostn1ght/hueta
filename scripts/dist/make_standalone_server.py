@@ -72,6 +72,10 @@ def main():
             low=relative.lower()
             if low.endswith(('.key','.secret','.sqlite','.sqlite-wal','.sqlite-shm','.pdb','.log')) or '/private/' in low:p.error('Private file in canonical source')
             if low.startswith('resources/') and ('_client_' in low or low.startswith('resources/90_lostzone_lz_scripts')):p.error('Client resource in server source')
+            # The engine mounts the dedicated role directory after the root.
+            # A newer root patch could otherwise lose to an older nested one.
+            if low.startswith('resources/') and '_server_' in path.name.lower() and Path(relative).parent.as_posix().lower()!='resources/server':
+                p.error('Server role archive must be in resources/server: '+relative)
             if path.stat().st_size!=listed[relative]['size']:p.error('File size differs: '+relative)
             if 'sha256' in listed[relative]:
                 with path.open('rb') as stream:

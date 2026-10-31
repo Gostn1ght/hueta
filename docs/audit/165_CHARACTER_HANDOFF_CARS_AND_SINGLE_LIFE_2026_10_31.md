@@ -1,8 +1,8 @@
 # Character handoff, optional vehicle assets and one account/character
 
-Status: source implementation and offline checks; native CI and delivery pending.
-Do not present this as an installed or play-tested release. Previous delivered
-release is 2026.10.31.4 with data patch 000047 (audit 164).
+Status: delivered as **2026.10.31.5**, data patch **000048**. Native DX11 CI and
+offline checks passed; the game was not launched for validation. Previous
+release was 2026.10.31.4 with data patch 000047 (audit 164).
 
 ## Reported failures and changes
 
@@ -79,7 +79,47 @@ wheel/door damage, a missing fallback, headless operation, slot refusal, death
 reset, save-failure rollback and delayed placement/callback admission. Master
 CI additionally checks selection/scroll preservation in real Windows controls.
 
-Required before delivery: passing complete DX11/master CI at exact commits,
-authenticated artifact verification, protected data patch 000048, signed launcher
-manifest, owner runtime and canonical hoster folder/ZIP updates. Do not launch
-owner game/location processes for these tests.
+## Delivery evidence
+
+* DX11 source: `7f2c5635c5535ac757f099bf9de6118c013ef2e4`, mandatory checks/build/package
+  passed in [run 41226798422](https://github.com/Gostn1ght/hueta/actions/runs/41226798422).
+  Client/server executable SHA256:
+  `0cfaaa814babd76e11624dfe4ec50064d2d601ea673f686719b613db6ee360e9`.
+* Production GUI master: `6f9a78f10bc84f0d43ed161009c1e43aba99fde8`,
+  [run 41226015132](https://github.com/Gostn1ght/hueta/actions/runs/41226015132)
+  succeeded, including real Windows list/console preservation checks.
+  SHA256: `1208486b9d3c546ba9d732ffdd4417878a429764b32e605357707a41310ab965`.
+* Signed launcher release: `manifests/2026.10.31.5-517469f0.bin`, 140 files.
+  Ed25519 signature, manifest BLAKE3, file Merkle trees and reconstructed changed
+  payloads verified. The previous resource archive hashes are unchanged; two
+  client delta archives are added. Publisher is running with the existing node.
+* All 35 delta payloads were extracted, compared byte-for-byte to committed
+  inputs, and checked for Lua/XML syntax. The server has two corresponding
+  dedicated delta archives; these do not enter the client manifest.
+* Final hoster folder and ZIP: `J:/LostZone_Work/Lost Zone Server` and
+  `J:/LostZone_Work/Lost Zone Server.zip`, 39 files, 2,718,095,373 bytes.
+  ZIP CRC and every file SHA256 verified. Final ZIP SHA256:
+  `f50a41a3b95a8cc50bef2e2c4bbc473066fcd8ca1ff2dd53c6be68fcca7dc98f`.
+* Owner client, location executable, master and all four delta archives are
+  installed under `J:/LostZone/Lost Zone`. Account/world data were not changed
+  by deployment. No owner game, location or world-master process was launched.
+
+### Dedicated archive precedence regression
+
+Final installation review found that newer server archives placed at the
+resources root could be overwritten by older archives in `resources/server`,
+which the engine mounts afterwards. Both 000048 server deltas are now in
+`resources/server`, alongside 000047, so filename/version order applies within
+the role directory. This matters for overlays onto existing hoster installations.
+
+The actual effective namespace was checked for both the final canonical server
+and the owner game: all 16 changed server files resolve to 000048. The canonical
+packager now refuses server-role archives at the root. A local Python regression
+test exercises refusal before partial output and acceptance in the dedicated
+directory; it is also added to future CI runs. This packaging-only check was
+added after the native build and did not change its C++ source or binaries.
+
+Private byte-verification receipts are in
+`J:/LostZone_Work/_work/character_hotfix_20261031_v5`, including
+`acceptance-reviewed.json`, `publication-reviewed.json`,
+`role-precedence-reviewed.json` and `delivery-reviewed-final.json`.
