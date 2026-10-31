@@ -12,6 +12,15 @@ on:
       - 'backend/**'
       - '.github/workflows/lostzone-master-cpp.yml'
   workflow_dispatch:
+    inputs:
+      native_run:
+        description: Optional successful DX11 run to verify as an actual packaged master
+        type: string
+        default: ''
+      native_commit:
+        description: Exact immutable DX11 commit for native_run
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -22,6 +31,7 @@ concurrency:
 
 jobs:
   master:
+    if: ${{ !inputs.native_run }}
     runs-on: windows-2022
     timeout-minutes: 25
     steps:
@@ -87,3 +97,28 @@ jobs:
           path: |
             master-test/*.exe
             master-test/*.bmp
+  packaged-master:
+    if: ${{ inputs.native_run }}
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write # authenticated reads of private draft assets; no release writes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Actual full engine named master without a game
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_RUN: ${{ inputs.native_run }}
+          NATIVE_COMMIT: ${{ inputs.native_commit }}
+        shell: pwsh
+        run: |
+          python scripts/check-native-master-runtime.py --run $env:NATIVE_RUN --commit $env:NATIVE_COMMIT --out runtime-review
+          if ($LASTEXITCODE) { throw 'Packaged master selftest failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: LostZone-Packaged-Master-Review
+          path: runtime-review/*
