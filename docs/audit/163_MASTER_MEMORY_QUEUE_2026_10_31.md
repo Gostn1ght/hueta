@@ -47,3 +47,35 @@ the game executable are unchanged. The resource extractor follows the same
 role isolation for subsequent builds. The startup-layout regression covers the
 one-pass alias ordering, rejects the previous order, and checks shared-folder
 role precedence without starting a native process.
+
+Physical loose assets and appdata configs are scanned once more after archive
+mounts. Register is last-writer-wins, so defining aliases before archives alone
+would otherwise allow archive defaults to shadow personal settings. The final
+startup-layout fixture verifies this precedence as well.
+
+## Delivered hotfix 2026.10.31.3
+
+- Production master source: `6d6072146d328ee623afdbc084b099341da8fe43`;
+  successful native host/storage/migration/protocol/UI CI `41202075567`.
+  Executable SHA-256:
+  `1da7f2421c1063d486bc270dc49b38334deed33c1ec96bd03da3639dec12fc15`.
+- Final startup templates and override regression source:
+  `09206198bc87cd3176266f470f9ff2dcb1a5b232`, successful CI `41203295856`.
+  No native source differs from the reviewed production-master commit.
+- Game executable and protected archive payloads remain from patch 000047.
+  The client release changes only fsgame.template, README-player.txt and
+  runtime-layout.json. Its other 135 file Merkles match the previously
+  authenticated release. New downloadable data is 1,874 bytes, plus the
+  signed release descriptor and manifest. Signature, manifest/chunk integrity,
+  changed downloadable bytes and P2P online status were checked.
+- Signed client manifest: `manifests/2026.10.31.3-5f77b150.bin`.
+  Verified dedicated-only public server folder: 37 files. The owner runtime
+  was updated with the same master and startup templates. User appdata,
+  accounts, worlds and existing explicit location modes were retained.
+- Local game/master/location processes were not launched for testing.
+  In-game startup and loading actual worlds remain owner acceptance checks.
+
+Private staging and receipts are under
+`J:/LostZone_Work/_work/master_hotfix_20261031_final`. The server publication
+is `J:/LostZone_Work/Lost Zone Server.zip`; `delivery-reviewed.json` records
+the final ZIP checksum/CRC review and the retained previous archive.
