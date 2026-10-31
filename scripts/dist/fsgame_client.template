@@ -36,4 +36,7 @@ $mcmlogs$                  = true 	| false	| $logs$| mcm\
 ; Archive entry points resolve immediately while this file is read.
 ; Register every target alias above before scanning resource archives.
 $arch_dir$ = false | false | {ROOT}resources\
+; Loose assets and personal configs take priority over archive defaults.
+$lz_asset_overrides$ = true | true | $game_data$
+$lz_config_overrides$ = true | false | $game_config$
 

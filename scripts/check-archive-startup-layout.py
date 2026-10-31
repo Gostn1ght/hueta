@@ -13,6 +13,7 @@ BASE='j:\\fixture\\'
 def resolve(text):
     aliases={}
     scans=[]
+    events=[]
     for line in text.replace('{ROOT}',BASE).splitlines():
         if not line.strip() or line.lstrip().startswith(';'):continue
         alias,fields=line.split('=',1)
@@ -21,11 +22,12 @@ def resolve(text):
         if alias in ('$arch_dir$','$lz_server_archives$'):
             assert fields[0]=='false','Nested role archives must not leak into another role'
             scans.append((value,dict(aliases)))
+        events.append((alias,value))
         aliases[alias]=value
-    return aliases,scans
+    return aliases,scans,events
 
 def check(role,text):
-    aliases,scans=resolve(text)
+    aliases,scans,events=resolve(text)
     assert len(scans)==(1 if role=='client' else 2)
     assert scans[0][0]==BASE+'resources\\'
     for _,known in scans:
@@ -33,6 +35,16 @@ def check(role,text):
             assert alias in known,f'{role} scans archives before defining {alias}'
         system=ntpath.join(known['$game_config$'],'system.ltx')
         assert system==BASE+'appdata\\'+('player' if role=='client' else 'server')+'\\configs\\system.ltx'
+    # Registration is last-writer-wins. Defaults must not override physical
+    # user settings or loose mod assets that were discovered earlier.
+    mounted={}
+    for alias,folder in events:
+        if alias in ('$arch_dir$','$lz_server_archives$'):mounted.update(setting='archive',mesh='archive')
+        if alias=='$lz_asset_overrides$':
+            assert folder==aliases['$game_data$'];mounted['mesh']='loose'
+        if alias=='$lz_config_overrides$':
+            assert folder==aliases['$game_config$'];mounted['setting']='personal'
+    assert mounted=={'setting':'personal','mesh':'loose'},'Archives shadow physical overrides'
     return scans
 
 client=(ROOT/'scripts/dist/fsgame_client.template').read_text(encoding='utf-8-sig')

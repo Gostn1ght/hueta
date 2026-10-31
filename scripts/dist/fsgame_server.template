@@ -37,4 +37,7 @@ $mcmlogs$                  = true 	| false	| $logs$| mcm\
 ; overrides. The client scans resources non-recursively and cannot mount these.
 $arch_dir$ = false | false | {ROOT}resources\
 $lz_server_archives$ = false | false | {ROOT}resources\server\
+; Restore loose/custom override precedence after mounting archive defaults.
+$lz_asset_overrides$ = true | true | $game_data$
+$lz_config_overrides$ = true | false | $game_config$
 
