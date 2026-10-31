@@ -66,14 +66,21 @@ class HostController
     // An existing dedicated process is adopted only when both its UDP owner
     // and its full executable path match. A foreign listener is never killed.
     DWORD udp_owner(int port) const {
-        ULONG bytes=0;
-        if(GetExtendedUdpTable(nullptr,&bytes,FALSE,2,UDP_TABLE_OWNER_PID,0)!=ERROR_INSUFFICIENT_BUFFER) return 0;
-        std::vector<unsigned char> data(bytes);
-        if(GetExtendedUdpTable(data.data(),&bytes,FALSE,2,UDP_TABLE_OWNER_PID,0)!=NO_ERROR) return 0;
-        const auto table=reinterpret_cast<const MIB_UDPTABLE_OWNER_PID*>(data.data());
-        for(DWORD i=0;i<table->dwNumEntries;++i) {
-            const DWORD raw=table->table[i].dwLocalPort;
-            if(int(((raw&255)<<8)|((raw>>8)&255))==port) return table->table[i].dwOwningPid;
+        // SteamNetworkingSockets listens on [::] in dual-stack mode by
+        // default. Windows lists that socket only in the IPv6 owner table.
+        for(ULONG family:{2UL,23UL}) {
+            ULONG bytes=0;
+            if(GetExtendedUdpTable(nullptr,&bytes,FALSE,family,UDP_TABLE_OWNER_PID,0)!=ERROR_INSUFFICIENT_BUFFER) continue;
+            std::vector<unsigned char> data(bytes);
+            if(GetExtendedUdpTable(data.data(),&bytes,FALSE,family,UDP_TABLE_OWNER_PID,0)!=NO_ERROR) continue;
+            auto matches=[&](DWORD raw) {return int(((raw&255)<<8)|((raw>>8)&255))==port;};
+            if(family==2) {
+                const auto table=reinterpret_cast<const MIB_UDPTABLE_OWNER_PID*>(data.data());
+                for(DWORD i=0;i<table->dwNumEntries;++i) if(matches(table->table[i].dwLocalPort)) return table->table[i].dwOwningPid;
+            } else {
+                const auto table=reinterpret_cast<const MIB_UDP6TABLE_OWNER_PID*>(data.data());
+                for(DWORD i=0;i<table->dwNumEntries;++i) if(matches(table->table[i].dwLocalPort)) return table->table[i].dwOwningPid;
+            }
         }return 0;
     }
     bool adopt(Map& m) {

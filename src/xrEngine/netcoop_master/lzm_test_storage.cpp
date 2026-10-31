@@ -1,5 +1,7 @@
 // Compiled only in the GitHub test executable, never into the game project.
 #ifdef LZM_TEST_FIXTURES
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include "lzm_world_files.h"
 #include "lzm_world.h"
 #include "lzm_host.h"
@@ -65,6 +67,24 @@ struct HostControllerFixture {
         put_file(plan,"[locations]\nk00_marsh=127.0.0.1:45671\nl01_escape=127.0.0.1:45673\n[launch]\nk00_marsh=hidden_base\nl01_escape=rookie_village\n[on_demand]\nk00_marsh=1\nl01_escape=1\n");
         HostController controller(root,plan);controller.stopping_=true;controller.worker_.join();
         assert(controller.maps_.size()==2);
+        WSADATA winsock{};assert(WSAStartup(MAKEWORD(2,2),&winsock)==0);
+        for(const int family:{AF_INET,AF_INET6}) {
+            SOCKET socket=::socket(family,SOCK_DGRAM,IPPROTO_UDP);assert(socket!=INVALID_SOCKET);
+            sockaddr_storage address{};int length=family==AF_INET ? sizeof(sockaddr_in):sizeof(sockaddr_in6);
+            address.ss_family=ADDRESS_FAMILY(family);
+            if(family==AF_INET6) {DWORD dual=0;assert(setsockopt(socket,IPPROTO_IPV6,IPV6_V6ONLY,(char*)&dual,sizeof(dual))==0);}
+            assert(bind(socket,reinterpret_cast<sockaddr*>(&address),length)==0);
+            assert(getsockname(socket,reinterpret_cast<sockaddr*>(&address),&length)==0);
+            const int port=ntohs(family==AF_INET ? reinterpret_cast<sockaddr_in*>(&address)->sin_port:reinterpret_cast<sockaddr_in6*>(&address)->sin6_port);
+            assert(controller.udp_owner(port)==GetCurrentProcessId());
+            HostController::Map observed;observed.plan.name="k00_marsh";observed.plan.port=port;
+            const auto original=controller.exe_;assert(!controller.adopt(observed) && observed.blocked);
+            wchar_t self[4096]{};GetModuleFileNameW(nullptr,self,4096);controller.exe_=self;observed.blocked=false;
+            assert(controller.adopt(observed) && observed.pid==GetCurrentProcessId());
+            CloseHandle(observed.process);controller.exe_=original;closesocket(socket);
+        }
+        WSACleanup();
+        std::puts("PASS actual IPv4 and dual-stack IPv6 UDP owner lookup, foreign executable rejection and matching process adoption; no game started");
         auto& a=controller.maps_[0];auto& b=controller.maps_[1];
         assert(!a.process && !b.process); // no executable exists in this fixture
         controller.enabled_=true;controller.free_ram_=0;controller.free_commit_=100;controller.need_=6;

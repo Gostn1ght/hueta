@@ -49,6 +49,8 @@ jobs:
           cl /nologo /std:c++17 /EHsc /O2 /Zi /utf-8 /W3 /permissive- /DWIN32 /D_WINDOWS /D_CRT_SECURE_NO_WARNINGS /DLZM_TEST_FIXTURES ^
              src\xrEngine\netcoop_master\*.cpp /Fomaster-test\ /Fdmaster-test\ /Fe:master-test\LostZoneMasterTest.exe ^
              /link /DEBUG user32.lib gdi32.lib shell32.lib comctl32.lib uxtheme.lib dwmapi.lib ws2_32.lib bcrypt.lib
+      - name: Link the production GUI application without fixture code
+        run: python scripts/build-master-production.py
       - name: Ship the SQLite library next to it
         shell: pwsh
         run: |
@@ -56,7 +58,7 @@ jobs:
           Copy-Item (Join-Path $prefix 'DLLs\sqlite3.dll') master-test\
           python -c "import sqlite3; print('sqlite', sqlite3.sqlite_version)"
       - name: Same answers as the Python World Service
-        run: python scripts/check-master-cpp-parity.py master-test\LostZoneMasterTest.exe
+        run: python scripts/check-master-cpp-parity.py master-test\LostZoneMaster.exe
       - name: Native cluster migration, world database and process control without a game
         run: python scripts/check-master-v2.py master-test\LostZoneMasterTest.exe
       - name: Nonblocking client routing and real entry responses
@@ -83,7 +85,7 @@ jobs:
           & master-test\LostZoneMasterTest.exe bridge-config --config $config --destination (Join-Path $work 'appdata\server\netcoop_world_bridge.json') --authority --replace
           if ($LASTEXITCODE) { throw "bridge-config failed $LASTEXITCODE" }
           $result = Join-Path $work 'selftest.json'
-          $p = Start-Process master-test\LostZoneMasterTest.exe -ArgumentList @('window','--config',"`"$config`"",'--root',"`"$work`"",'--gateway-port','0','--initialized','--selftest',"`"$result`"") -PassThru -Wait
+          $p = Start-Process master-test\LostZoneMaster.exe -ArgumentList @('window','--config',"`"$config`"",'--root',"`"$work`"",'--gateway-port','0','--initialized','--selftest',"`"$result`"") -PassThru -Wait
           Get-Content $result
           $json = Get-Content $result -Raw | ConvertFrom-Json
           if (-not $json.ok) { throw "window selftest failed" }
@@ -97,6 +99,7 @@ jobs:
           path: |
             master-test/*.exe
             master-test/*.bmp
+            master-test/master-production.json
   packaged-master:
     if: ${{ inputs.native_run }}
     runs-on: windows-2022
