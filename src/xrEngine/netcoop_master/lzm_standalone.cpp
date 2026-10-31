@@ -12,10 +12,24 @@
 
 static LONG WINAPI report(EXCEPTION_POINTERS* info)
 {
+    FILE* output=stderr;FILE* crash=nullptr;
+    wchar_t executable[4096]{};GetModuleFileNameW(nullptr,executable,4096);
+    wchar_t* basename=wcsrchr(executable,L'\\');
+    if(basename && _wcsicmp(basename+1,L"LostZoneMaster.exe")==0) {
+        *basename=0;wchar_t* parent=wcsrchr(executable,L'\\');
+        if(parent) {
+            *parent=0;std::wstring directory=std::wstring(executable)+L"\\appdata";
+            CreateDirectoryW(directory.c_str(),nullptr);directory+=L"\\master";CreateDirectoryW(directory.c_str(),nullptr);
+            directory+=L"\\logs";CreateDirectoryW(directory.c_str(),nullptr);
+            SYSTEMTIME utc{};GetSystemTime(&utc);wchar_t filename[128];
+            swprintf_s(filename,L"\\master_crash_%04u%02u%02u_%02u%02u%02u_%lu.log",utc.wYear,utc.wMonth,utc.wDay,utc.wHour,utc.wMinute,utc.wSecond,GetCurrentProcessId());
+            crash=_wfopen((directory+filename).c_str(),L"wb");if(crash) output=crash;
+        }
+    }
     HANDLE process = GetCurrentProcess(), thread = GetCurrentThread();
     SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
     SymInitialize(process, nullptr, TRUE);
-    fprintf(stderr, "CRASH 0x%08lx at %p\n", info->ExceptionRecord->ExceptionCode, info->ExceptionRecord->ExceptionAddress);
+    fprintf(output, "[diag][crash] pid=%lu code=0x%08lx address=%p\n", GetCurrentProcessId(),info->ExceptionRecord->ExceptionCode, info->ExceptionRecord->ExceptionAddress);
     CONTEXT context = *info->ContextRecord;
     STACKFRAME64 frame{};
     frame.AddrPC.Offset = context.Rip;
@@ -34,11 +48,11 @@ static LONG WINAPI report(EXCEPTION_POINTERS* info)
         DWORD column = 0;
         const char* name = SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol) ? symbol->Name : "?";
         if (SymGetLineFromAddr64(process, frame.AddrPC.Offset, &column, &line))
-            fprintf(stderr, "  #%d %s  %s:%lu\n", i, name, line.FileName, line.LineNumber);
+            fprintf(output, "  #%d %s  %s:%lu\n", i, name, line.FileName, line.LineNumber);
         else
-            fprintf(stderr, "  #%d %s  %p\n", i, name, (void*)frame.AddrPC.Offset);
+            fprintf(output, "  #%d %s  %p\n", i, name, (void*)frame.AddrPC.Offset);
     }
-    fflush(stderr);
+    fflush(output);if(crash) fclose(crash);
     return EXCEPTION_EXECUTE_HANDLER;
 }
 

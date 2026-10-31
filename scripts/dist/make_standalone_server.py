@@ -63,7 +63,8 @@ def main():
         required={'dedicated/LostZoneMaster.exe','dedicated/LostZoneServerDX11.exe','dedicated/sqlite3.dll',
             'Start Lost Zone Master.cmd','runtime-layout.json'}
         if not required.issubset(listed):p.error('Incomplete canonical native master package')
-        if listed['dedicated/LostZoneMaster.exe']['sha256']!=listed['dedicated/LostZoneServerDX11.exe']['sha256']:p.error('Master alias is not the reviewed native executable')
+        expected_master=metadata.get('master_executable_sha256',listed['dedicated/LostZoneServerDX11.exe']['sha256'])
+        if listed['dedicated/LostZoneMaster.exe']['sha256']!=expected_master:p.error('Master is not the reviewed native executable')
         actual={path.relative_to(source).as_posix():path for path in source.rglob('*') if path.is_file()}
         if set(listed)!=set(actual):p.error('Canonical file list differs from reviewed metadata')
         for relative,path in actual.items():

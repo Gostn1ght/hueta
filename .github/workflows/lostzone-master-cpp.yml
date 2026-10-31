@@ -100,6 +100,7 @@ jobs:
             master-test/*.exe
             master-test/*.bmp
             master-test/master-production.json
+            master-production/LostZoneMaster.pdb
   packaged-master:
     if: ${{ inputs.native_run }}
     runs-on: windows-2022
