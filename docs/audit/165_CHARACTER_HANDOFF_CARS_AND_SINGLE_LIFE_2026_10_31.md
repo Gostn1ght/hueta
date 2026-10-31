@@ -15,8 +15,9 @@ release is 2026.10.31.4 with data patch 000047 (audit 164).
   exhaust, and safely omit it if neither effect exists. Dedicated servers do
   not allocate visual exhaust. Missing exhaust physics elements are reported.
   The importer and both roles' affected profiles use `vehiclefx\exhaust_1`.
-* Character restore used the once-per-100-frame server maintenance path. Poll
-  readiness every 100 ms of real time instead. After restoring progress, wait
+* Character restore, admission, transfer completion and disconnected-account
+  cleanup used the once-per-100-frame maintenance path. Poll these every
+  100 ms of real time instead. After restoring progress, wait
   for actual equipment placement and a successful script-ready callback.
   Restore failures continue to hold gameplay/saving and retain the checkpoint.
 * The old ten-second player-state fallback could send defaults before restore

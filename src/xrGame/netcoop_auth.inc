@@ -859,12 +859,9 @@ void server_update(xrServer* server)
 	// dedicated server has none, and the flag also stopped condition damage
 	// (UpdateCondition, CanBeHarmed). Keep it off here.
 	psActorFlags.set(AF_GODMODE_RT, FALSE);
-	destroy_pending_actors(server);
 	world_store_update(server);
 	server_world_bridge_update();
-	admission_update();
 	if(admission_active()) accounts_load(); // initialize/synchronize before the first login
-	admission_departures_update(server);
 	server_talk_prune(server);
 	characters_update(server);
 	if (!s_accounts_loaded)
@@ -1063,7 +1060,15 @@ void server_frame_update(xrServer* server)
 	if (!enabled() || !g_pGameLevel) return;
 	static u32 restore_checked=0;
 	const u32 restore_now=real_time_ms();
-	if(u32(restore_now-restore_checked)>=100) {restore_checked=restore_now;characters_restore_update();}
+	if(u32(restore_now-restore_checked)>=100) {
+		restore_checked=restore_now;
+		// Admission, transfer completion and disconnect ownership must not
+		// wait 100 simulation frames on a sleeping or overloaded location.
+		admission_update();
+		admission_departures_update(server);
+		destroy_pending_actors(server);
+		characters_restore_update();
+	}
 	server_drop_config_cache();
 	world_store_cleanup_loaded();
 	cache_player_positions();
