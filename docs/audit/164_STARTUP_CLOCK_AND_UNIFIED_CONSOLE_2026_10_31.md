@@ -42,8 +42,8 @@ No private dump, account data or credentials were uploaded.
 
 Engine commit: `c55dd8244e54ea8d4250fb3420fca5217041b7e4`.
 Engine CI: <https://github.com/Gostn1ght/hueta/actions/runs/41207431425>.
-Standalone master commit: `7df3a48a19771689b1415050aff1b510c5d4e65b`.
-Master CI: <https://github.com/Gostn1ght/hueta/actions/runs/41207620505>.
+Standalone master commit: `d2e0639246825747723a36ff470ab64ff99016bd`.
+Master CI: <https://github.com/Gostn1ght/hueta/actions/runs/41208495999>.
 
 Native fixtures run only in GitHub Actions, without a game or location
 process: partial/null simulator and level, configured/leap calendars,
@@ -51,6 +51,8 @@ committed clock priority, teardown, unattended errors, saved request
 cancellation, IPv4/IPv6 process adoption, merged log routing/encoding,
 partial lines, no duplicate reads, truncation and bounded history.
 The master CI also exercises the actual window and captures its screenshot.
+The window selftest checks positive, negative and overflowing PID integers
+through the actual host-view parser.
 
 The .4 candidate keeps protected patch-000047 archives byte-identical;
 only native code, release metadata and accompanying text change. Both
