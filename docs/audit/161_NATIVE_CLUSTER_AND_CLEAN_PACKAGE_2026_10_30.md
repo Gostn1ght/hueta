@@ -1,4 +1,4 @@
-# 161. Native cluster ownership and clean packages — work in progress
+# 161. Native cluster ownership and clean packages
 
 Owner October 30, after release 000046: existing characters remain stuck at
 Yantar, a new account reports the master unavailable, most maps have no port,
@@ -26,7 +26,7 @@ running client. No account/world reset, no silent relocation of characters.
   missing authority lease. The location plan and the legacy master runtime
   are not yet migrated to the desired clean structure.
 
-## In-progress implementation (not released/tested yet)
+## Implemented and verified for 000047
 
 - Pure `lzm_cluster_plan.h`: complete known maps, preserve custom ports,
   allocate unused UDP pairs for missing rows, collision diagnostics.
@@ -45,19 +45,42 @@ running client. No account/world reset, no silent relocation of characters.
   archived config defaults via a content cache; mutable config overrides live
   in role appdata. Needed before removing the loose config folders.
 
-## Still required before delivery
+- Master-owned shared records (stashes/furniture/item state/groups/bans),
+  bound and fenced RPC, atomic compare-and-swap, idempotent replay, tombstones,
+  legacy import and derived read-only cache. Raw CP1251 values survive RPC.
+- Complete engine/Lua A-Life save pairs are checked and chunked into master
+  SQLite. The durable pending folder is an outbox, not an independent map
+  database. Two verified revisions are retained; startup restores database
+  authority, imports legacy files and recovers a damaged pending pair.
+- Gateway waits for the exact map, its live PID, current epoch, initialized
+  accounts and world data. No alternate-map fallback. The client waits without
+  blocking the menu, permits cancellation and reports finite failure states.
+- Account readiness is initialized before the first login. Money/auth/role/
+  approval updates have independent masks, preventing stale location mirrors
+  from undoing operator edits. Online role changes are applied without relogin.
+- Stop keeps the master API alive while locations save and exit, pauses the
+  launch queue and preserves per-map modes. Existing old-epoch processes are
+  asked to save and restart. Conflicting API port reports its owning PID.
+- Clean role-specific complete config/script archives mount through native
+  aliases. Shared assets are consolidated with every payload SHA256/CRC
+  checked: 24,939 files, 2,862,629,814 bytes. No client archives in the server.
+- Client startup preserves customized configs and archives the residual old
+  client folder under appdata; unchanged defaults use archives. Legacy config
+  path aliases are redirected too. Actual native resolver/migration tested.
+- Native master has PID/port/state/reason columns, persistent multiselection,
+  saved stop, role controls, map log viewer and a bounded diagnostic exporter.
+  Actual native GUI screenshots reviewed; all 33 rows have ports after bootstrap.
+- Exact engine commit `71cf107cf06e8abace2b6c11624ee3fa45e9a00b` passed DX11
+  run `41129739664` and master run `41129910022`. The actual packaged full
+  engine renamed `LostZoneMaster.exe` passed bootstrap/window/close in run
+  `41172050460`, without any game data or location launch.
+- Final server master is its own small production GUI application, built from
+  the same master sources without fixture handlers. Source `b63939412`, CI
+  `41173412798` includes real IPv4/dual-stack IPv6 process-owner tests and
+  production API/GUI checks. Canonical startup no longer loads game code.
 
-- Review/fix/fixture all the above. No native build has been dispatched for
-  this work yet. Existing 000046 is the last published release.
-- Finish authoritative persistence for the remaining doc 154 data, with
-  import/restart/transfer fixtures; preserve legacy backups.
-- Switch archive packaging to role-specific complete configs/scripts mounted
-  through `$game_config$`/`$game_scripts$`, consolidate required shared patch
-  assets so removing client-named server archives cannot drop a model/texture.
-- Canonical filesystem templates, one native server start entry, licenses in
-  dedicated, clean staged server/client builds, launcher stale file cleanup.
-- Full meaningful diagnostics: admission/clock/lease/transfer/pickup/trade/
-  spawn/state/network summaries and a bounded diagnostic bundle. Never log
-  credentials or full private payloads. UI visual verification in CI.
-- Successful exact-commit GitHub compilation/fixtures, reviewed staged files,
-  publish launcher and verified hoster ZIP together; document actual delivery.
+Delivery, immutable archive hashes, installation and verification limits are
+recorded in [162](162_NATIVE_CLUSTER_RELEASE_000047.md). These changes target
+the existing same-host cluster; private API remains loopback. Temporary login
+failure counters remain process-local. No multiplayer/in-game acceptance is
+claimed, and unrelated old gameplay reports are not declared resolved here.

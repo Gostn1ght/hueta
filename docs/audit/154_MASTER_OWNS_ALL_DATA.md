@@ -11,7 +11,7 @@ Owner, 2026-10-25 (verbatim):
 > serverv, notices,hoster , client и bin(bin - чисто клиент) папкм client у
 > клиента тоже не должно быть
 
-## What the location servers keep today (appdata\server)
+## Historical baseline (2026-10-25, appdata\server)
 
 | Data | File | Problem |
 |---|---|---|
@@ -62,3 +62,15 @@ Owner, 2026-10-25 (verbatim):
 
 Each stage: fixtures + parity/selftest in CI, then the owner's check. Nothing
 deletes accounts or worlds: migrations copy, the old files stay as backup.
+
+## 2026-10-31 implementation
+
+The native master/controller, central durable storage, exact-map entry and
+clean archive layout are implemented in 000047. See docs 161/162 for actual
+CI runs, migration rules, delivery and remaining acceptance limits. The entry
+file is now `Start Lost Zone Master.cmd`; licenses live under dedicated.
+The loopback deployment remains one host. UDP map ports are still used by
+clients after gateway routing; they are not hidden behind a transport proxy.
+Location logs/caches, the durable world outbox and temporary authentication
+failure counters are local; independent durable account/world stores are not
+used in managed mode. Original legacy files are retained as migration backups.
