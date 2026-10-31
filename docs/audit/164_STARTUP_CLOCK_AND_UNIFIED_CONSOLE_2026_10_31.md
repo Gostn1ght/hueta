@@ -61,6 +61,29 @@ only native code, release metadata and accompanying text change. Both
 client and server require the newly built engine. Do not claim in-game
 acceptance: the owner will test the actual locations and gameplay.
 
+Published and installed: **2026.10.31.4**. Both pinned CI runs succeeded.
+
+- Client signed manifest: `manifests/2026.10.31.4-a0d2e7ba.bin`, 138 files;
+  Ed25519 signature, BLAKE3 manifest/chunks, reconstructed changed files and
+  unchanged protected archive Merkles verified. P2P delivery is online.
+- Engine SHA-256:
+  `a15ad37d1826deb1e0bf13df8fee8d70ecaf23378c168d675ad2dba522b561a5`.
+- Standalone master SHA-256:
+  `1a5c1594e4b1731bd712e468eccc3ace6d278ee82ff1e8c85e8f0b3fd331bfa1`.
+- Public server ZIP: `J:/LostZone_Work/Lost Zone Server.zip`, 37 files,
+  2,717,707,305 bytes. Every archived file's SHA-256 and CRC verified.
+  ZIP SHA-256:
+  `9cb4fd5f659a2bc72c22bad33291e75f66358f54456adcb41c2cb114427e8a12`.
+- Public server folder restored from the reviewed candidate: the owner's
+  previous public folder contained only the old README. Its remainder and
+  the previous ZIP were preserved separately before replacement.
+- Owner runtime `J:/LostZone/Lost Zone` updated with no native process
+  running or started. Worlds/accounts were untouched; changed previous
+  binaries and metadata were retained. Launcher service was reused.
+
+Private preparation, signature/delivery, ZIP and installation receipts are
+under `J:/LostZone_Work/_work/startup_hotfix_20261031_v4`.
+
 ## Remaining feature work from the same conversation
 
 The account/character redesign remains separate work: direct 3D-room entry,
