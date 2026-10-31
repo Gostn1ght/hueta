@@ -12,6 +12,7 @@
 #include <set>
 #include <sstream>
 #include <filesystem>
+#include <regex>
 
 namespace lzm
 {
@@ -176,6 +177,43 @@ void create_bridge_config(const std::wstring& config_path, const std::wstring& d
     write_new(destination, encoded, replace);
 }
 
+static void migrate_server_archives(const std::wstring& root)
+{
+    const std::filesystem::path resources=std::filesystem::path(root)/L"resources";
+    const auto target=resources/L"server";
+    if(!std::filesystem::exists(resources)) return;
+    auto reject_link=[](const std::filesystem::path& path) {
+        const DWORD attributes=GetFileAttributesW(path.c_str());
+        if(attributes!=INVALID_FILE_ATTRIBUTES && (attributes&FILE_ATTRIBUTE_REPARSE_POINT))
+            throw Invalid("archive migration refuses a linked resource path");
+    };
+    reject_link(resources);reject_link(target);
+    const std::wregex name(L"99_v2_[0-9]{6}_[0-9]{2}_server_(assets|configs|scripts)_[0-9]{3}\\.db[0-9a-z]",std::regex::icase);
+    for(const auto& entry:std::filesystem::directory_iterator(resources)) {
+        if(!std::regex_match(entry.path().filename().wstring(),name)) continue;
+        reject_link(entry.path());
+        if(!entry.is_regular_file()) throw Invalid("server archive migration source is not a file");
+        std::filesystem::create_directories(target);
+        const auto destination=target/entry.path().filename();reject_link(destination);
+        if(std::filesystem::exists(destination)) {
+            // Overlay extraction may already have placed the new nested file.
+            // Remove the old name only after a complete byte comparison.
+            bool same=std::filesystem::is_regular_file(destination) && std::filesystem::file_size(entry.path())==std::filesystem::file_size(destination);
+            if(same && !std::filesystem::equivalent(entry.path(),destination)) {
+                std::ifstream a(entry.path(),std::ios::binary),b(destination,std::ios::binary);
+                same=bool(a) && bool(b);char left[65536],right[65536];
+                while(same && a) {a.read(left,sizeof(left));b.read(right,sizeof(right));
+                    same=a.gcount()==b.gcount() && std::equal(left,left+a.gcount(),right);}
+                same=same && !a.bad() && !b.bad();
+            }
+            if(!same) throw Invalid("conflicting server archives; original and nested files retained");
+            if(!DeleteFileW(entry.path().c_str())) throw Unavailable("old server archive is in use; stop location processes before updating");
+        } else if(!MoveFileExW(entry.path().c_str(),destination.c_str(),MOVEFILE_WRITE_THROUGH))
+            throw Unavailable("server archive cannot be relocated; stop locations and check disk permissions");
+        log_line("[diag][migration] isolated server archive "+narrow(entry.path().filename().wstring()));
+    }
+}
+
 void prepare_engine_cluster(const std::wstring& root, const std::wstring& config_path, const std::wstring& plan_path)
 {
     const auto relocated_legacy=root+L"\\appdata\\master\\legacy-runtime\\config.json";
@@ -191,6 +229,7 @@ void prepare_engine_cluster(const std::wstring& root, const std::wstring& config
                 throw Unavailable(format("master API port %d already owned by PID %lu; stop the previous master before migration",port,table->table[i].dwOwningPid));
         }
     }
+    migrate_server_archives(root);
     auto template_path=root+L"\\dedicated\\fsgame_server.template";
     if(!exists(template_path)) template_path=root+L"\\fsgame_server.template";
     if(!exists(template_path)) throw Unavailable("dedicated/fsgame_server.template is missing; install the complete server package");

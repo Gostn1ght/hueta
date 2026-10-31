@@ -22,6 +22,10 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     game = root / 'bootstrap'
     plan = game / 'appdata/server/netcoop_cluster.ltx'
     plan.parent.mkdir(parents=True)
+    resources=game/'resources';resources.mkdir()
+    archive_name='99_v2_000047_30_server_configs_000.db0'
+    (resources/archive_name).write_bytes(b'inert old server archive')
+    (resources/'99_v2_000047_30_client_configs_000.db0').write_bytes(b'inert client archive')
     (game / 'fsgame_server.template').write_text('$fs_root$ = false | false | {ROOT}\n$game_saves$ = true | false | {ROOT}appdata/server/savedgames/\n')
     plan.write_text('[cluster]\nentry_port=9446\nper_server=42\n[locations]\nk00_marsh=127.0.0.1:18001\n'
                     'l01_escape=127.0.0.1:18003\n[launch]\nl01_escape=custom_start\n[on_demand]\nl01_escape=1\n')
@@ -38,6 +42,19 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     connection.execute('INSERT INTO migration_probe VALUES(?)', ('live WAL snapshot',))
     connection.commit()
     subprocess.run([str(exe), 'bootstrap', '--root', str(game)], check=True, timeout=30)
+    assert not (resources/archive_name).exists()
+    assert (resources/'server'/archive_name).read_bytes()==b'inert old server archive'
+    assert (resources/'99_v2_000047_30_client_configs_000.db0').exists()
+    # Overlay reinstall: an identical old root name is safely eliminated.
+    (resources/archive_name).write_bytes(b'inert old server archive')
+    subprocess.run([str(exe), 'bootstrap', '--root', str(game)], check=True, timeout=30)
+    assert not (resources/archive_name).exists()
+    # A different nested file must never be silently overwritten or deleted.
+    (resources/archive_name).write_bytes(b'conflicting archive')
+    conflict=subprocess.run([str(exe),'bootstrap','--root',str(game)],capture_output=True,timeout=30)
+    assert conflict.returncode!=0 and (resources/archive_name).read_bytes()==b'conflicting archive'
+    assert (resources/'server'/archive_name).read_bytes()==b'inert old server archive'
+    (resources/archive_name).unlink() # inert test fixture only
     migrated = game / 'appdata/master/config.json'
     actual = json.loads(migrated.read_text())
     assert actual['world_id'] == 71 and actual['seed'] == 9
@@ -72,3 +89,4 @@ with tempfile.TemporaryDirectory(prefix='lz native v2 ') as temporary:
     assert json.loads((relocated/'appdata/master/config.json').read_text())['world_id']==71
     assert not (relocated/'hoster').exists()
 print('PASS actual native bootstrap: all 33 ports, custom settings retained, stale credentials repaired, consistent live-WAL migration, idempotent rerun; no game started')
+print('PASS actual native archive migration: root server overrides relocated, identical overlay duplicate removed, conflicting files both retained, client archive untouched; no game started')
