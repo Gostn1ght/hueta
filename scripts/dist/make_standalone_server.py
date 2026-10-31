@@ -60,6 +60,10 @@ def main():
         if any((source/name).exists() for name in ('client','server','bin','hoster','notices','appdata')):p.error('Not a canonical public server')
         listed={row['path']:row for row in metadata['files']}
         listed['server-release.json']={'size':(source/'server-release.json').stat().st_size}
+        required={'dedicated/LostZoneMaster.exe','dedicated/LostZoneServerDX11.exe','dedicated/sqlite3.dll',
+            'Start Lost Zone Master.cmd','runtime-layout.json'}
+        if not required.issubset(listed):p.error('Incomplete canonical native master package')
+        if listed['dedicated/LostZoneMaster.exe']['sha256']!=listed['dedicated/LostZoneServerDX11.exe']['sha256']:p.error('Master alias is not the reviewed native executable')
         actual={path.relative_to(source).as_posix():path for path in source.rglob('*') if path.is_file()}
         if set(listed)!=set(actual):p.error('Canonical file list differs from reviewed metadata')
         for relative,path in actual.items():

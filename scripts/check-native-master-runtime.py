@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='lz actual master runtime ') as temporar
         gh('release','download',tag,'--repo',repo,'--pattern',name,'--dir',str(work))
         assert (work/name).stat().st_size==assets[name]['size']
         if assets[name].get('digest'):assert assets[name]['digest']=='sha256:'+sha(work/name)
-    metadata=json.loads((work/'native-ci.json').read_text())
+    metadata=json.loads((work/'native-ci.json').read_text(encoding='utf-8'))
     assert metadata['commit']==args.commit and metadata['run']==args.run and metadata['attempt']==build['run_attempt']
     packed=work/'LostZone-native-runtime.zip'
     assert packed.stat().st_size==metadata['runtime']['size'] and sha(packed)==metadata['runtime']['sha256']
@@ -66,11 +66,11 @@ with tempfile.TemporaryDirectory(prefix='lz actual master runtime ') as temporar
     (dedicated/'fsgame_server.template').write_text('$fs_root$ = false | false | {ROOT}\n',encoding='ascii')
     subprocess.run([str(executable),'bootstrap','--root',str(runtime)],cwd=dedicated,check=True,timeout=45)
     plan=runtime/'appdata/server/netcoop_cluster.ltx'
-    assert 'l08_yantar =' in plan.read_text() and (runtime/'appdata/master/config.json').is_file()
+    assert 'l08_yantar =' in plan.read_text(encoding='utf-8') and (runtime/'appdata/master/config.json').is_file()
     result=work/'selftest.json'
     subprocess.run([str(executable),'window','--root',str(runtime),'--port','0','--gateway-port','0',
         '--initialized','--selftest',str(result)],cwd=dedicated,check=True,timeout=120)
-    tested=json.loads(result.read_text())
+    tested=json.loads(result.read_text(encoding='utf-8'))
     assert tested['ok'] and tested['stopped'] and tested['screenshot'] and tested['locations']==33
     args.out.mkdir(parents=True,exist_ok=True)
     shutil.copy2(str(result)+'.bmp',args.out/'master-runtime-window.bmp')
