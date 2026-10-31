@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "xr_time.h"
 #include "netcoop.h"
 #include "level.h"
 #include "actor.h"
@@ -285,7 +286,7 @@ ESingleGameDifficulty get_game_difficulty()
 u32 get_time_days()
 {
 	u32 year = 0, month = 0, day = 0, hours = 0, mins = 0, secs = 0, milisecs = 0;
-	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : ai().alife().time_manager().game_time(), year,
+	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : __game_time(), year,
 	           month, day, hours, mins, secs, milisecs);
 	return day;
 }
@@ -293,7 +294,7 @@ u32 get_time_days()
 u32 get_time_hours()
 {
 	u32 year = 0, month = 0, day = 0, hours = 0, mins = 0, secs = 0, milisecs = 0;
-	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : ai().alife().time_manager().game_time(), year,
+	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : __game_time(), year,
 	           month, day, hours, mins, secs, milisecs);
 	return hours;
 }
@@ -301,7 +302,7 @@ u32 get_time_hours()
 u32 get_time_minutes()
 {
 	u32 year = 0, month = 0, day = 0, hours = 0, mins = 0, secs = 0, milisecs = 0;
-	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : ai().alife().time_manager().game_time(), year,
+	split_time((g_pGameLevel && Level().game) ? Level().GetGameTime() : __game_time(), year,
 	           month, day, hours, mins, secs, milisecs);
 	return mins;
 }

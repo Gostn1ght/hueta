@@ -12,9 +12,46 @@
 #define hour2ms		60*min2ms
 #define day2ms		24*hour2ms
 
+extern LPCSTR alife_section;
+
 ALife::_TIME_ID __game_time()
 {
-	return (ai().get_alife() ? ai().alife().time().game_time() : Level().GetGameTime());
+	// start_game_callback runs after set_alife(this), but BEFORE reload()
+	// creates the time manager. A non-null simulator alone is not readiness.
+	if (ai().get_alife() && ai().alife().initialized())
+		return ai().alife().time().game_time();
+	if (g_pGameLevel && Level().game)
+		return Level().GetGameTime();
+
+	// Read-only bootstrap calendar: never create/reset the persistent clock
+	// here. Once the world is loaded, its committed time takes precedence.
+	u32 year = 2018, month = 1, day = 1, hour = 12, minute = 0, second = 0;
+	if (pSettings && pSettings->line_exist(alife_section, "start_date"))
+	{
+		u32 y = 0, m = 0, d = 0;
+		if (sscanf(pSettings->r_string(alife_section, "start_date"), "%u.%u.%u", &d, &m, &y) == 3 &&
+			y >= 1 && y <= 9999 && m >= 1 && m <= 12)
+		{
+			const u32 lengths[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+			const bool leap = y % 400 == 0 || (y % 4 == 0 && y % 100 != 0);
+			if (d >= 1 && d <= lengths[m - 1] + (m == 2 && leap ? 1u : 0u))
+			{ year = y; month = m; day = d; }
+		}
+	}
+	if (pSettings && pSettings->line_exist(alife_section, "start_time"))
+	{
+		u32 h = 0, m = 0, s = 0;
+		if (sscanf(pSettings->r_string(alife_section, "start_time"), "%u:%u:%u", &h, &m, &s) == 3 &&
+			h < 24 && m < 60 && s < 60)
+		{ hour = h; minute = m; second = s; }
+	}
+	static bool reported = false;
+	if (!reported)
+	{
+		reported = true;
+		Msg("[diag][clock] script requested time before world initialization; using configured bootstrap calendar");
+	}
+	return generate_time(year, month, day, hour, minute, second);
 }
 
 u32 get_time()

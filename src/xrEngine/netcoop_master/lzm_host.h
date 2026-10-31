@@ -104,6 +104,22 @@ class HostController
         write(folder_+L"\\host_stop_"+std::to_wstring(m.plan.port)+L".txt","stop|"+std::to_string(m.pid));
         m.expected=true;transition(m,"saving","requested saved exit; no forced termination");
     }
+    void reset_startup_request(Map& m,bool adopted) {
+        // Requests belong to an operator session, not to a future window.
+        // Keep running servers and pending STOP requests; discard old starts,
+        // restarts and wake files before the worker can consume them.
+        for(const auto& path:{file("host_command_",m),file("wake_",m)}) {
+            if(path==file("host_command_",m) && read(path)=="stop") continue;
+            if(!DeleteFileW(path.c_str()) && GetLastError()!=ERROR_FILE_NOT_FOUND)
+                throw Unavailable("cannot cancel stale launch request for "+m.plan.name);
+        }
+        if(!adopted) {
+            if(m.mode!="off") log_line("[diag][host] cancelled previous launch session map="+m.plan.name+" mode="+m.mode);
+            m.mode="off";write(file("host_mode_",m),"off");
+        } else if(!exists(file("host_mode_",m))) {
+            m.mode="on";write(file("host_mode_",m),"on");
+        }
+    }
     void command(Map& m) {
         const auto source=file("host_command_",m),claimed=source+L"."+std::to_wstring(GetCurrentProcessId())+L".claimed";
         if(!MoveFileExW(source.c_str(),claimed.c_str(),0)) return;
@@ -267,9 +283,7 @@ public:
                 m.world=p.name=="k00_marsh" ? "zone":p.name=="l01_escape" ? "zone_escape":"zone_"+p.name;
                 auto demand=ini.find("on_demand");m.demand=demand==ini.end() || !demand->second.count(p.name) || demand->second.at(p.name)!="0";
                 m.mode=mode(m);
-                // Fresh installations are manual. Preserve an already running
-                // server when adopting an older installation without mode files.
-                if(adopt(m) && !exists(file("host_mode_",m))) {m.mode="on";write(file("host_mode_",m),"on");}
+                reset_startup_request(m,adopt(m));
                 maps_.push_back(std::move(m));
             }
             log_line(format("[diag][host] native controller owns %zu maps; exe=%s",maps_.size(),narrow(exe_).c_str()));

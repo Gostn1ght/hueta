@@ -68,8 +68,18 @@ struct HostControllerFixture {
         assert(!std::filesystem::exists(root));std::filesystem::create_directories(root);
         const auto plan=root+L"\\plan.ltx";
         put_file(plan,"[locations]\nk00_marsh=127.0.0.1:45671\nl01_escape=127.0.0.1:45673\n[launch]\nk00_marsh=hidden_base\nl01_escape=rookie_village\n[on_demand]\nk00_marsh=1\nl01_escape=1\n");
+        const auto mailbox=root+L"\\appdata\\server\\netcoop_cluster";
+        std::filesystem::create_directories(mailbox);
+        put_file(mailbox+L"\\host_mode_k00_marsh.txt","on");
+        put_file(mailbox+L"\\host_mode_l01_escape.txt","auto");
+        put_file(mailbox+L"\\host_command_k00_marsh.txt","restart");
+        put_file(mailbox+L"\\wake_l01_escape.txt","old route");
         HostController controller(root,plan);controller.stopping_=true;controller.worker_.join();
         assert(controller.maps_.size()==2);
+        for(const auto& map:controller.maps_) {
+            assert(map.mode=="off" && controller.mode(map)=="off" && !map.process);
+            assert(!controller.exists(controller.file("host_command_",map)) && !controller.exists(controller.file("wake_",map)));
+        }
         WSADATA winsock{};assert(WSAStartup(MAKEWORD(2,2),&winsock)==0);
         for(const int family:{AF_INET,AF_INET6}) {
             SOCKET socket=::socket(family,SOCK_DGRAM,IPPROTO_UDP);assert(socket!=INVALID_SOCKET);
@@ -84,10 +94,20 @@ struct HostControllerFixture {
             const auto original=controller.exe_;assert(!controller.adopt(observed) && observed.blocked);
             wchar_t self[4096]{};GetModuleFileNameW(nullptr,self,4096);controller.exe_=self;observed.blocked=false;
             assert(controller.adopt(observed) && observed.pid==GetCurrentProcessId());
+            controller.write(controller.file("host_mode_",observed),"on");observed.mode="on";
+            controller.write(controller.file("host_command_",observed),"restart");
+            controller.reset_startup_request(observed,true);
+            assert(observed.process && observed.mode=="on" && !controller.exists(controller.file("host_command_",observed)));
+            controller.write(controller.file("host_command_",observed),"stop");
+            controller.reset_startup_request(observed,true);
+            assert(controller.read(controller.file("host_command_",observed))=="stop");
+            DeleteFileW(controller.file("host_command_",observed).c_str());
+            controller.write(controller.file("host_mode_",observed),"off");
             CloseHandle(observed.process);controller.exe_=original;closesocket(socket);
         }
         WSACleanup();
         std::puts("PASS actual IPv4 and dual-stack IPv6 UDP owner lookup, foreign executable rejection and matching process adoption; no game started");
+        std::puts("PASS startup cancels old on/auto/restart/wake requests, adopts live processes and preserves pending stop; no game started");
         auto& a=controller.maps_[0];auto& b=controller.maps_[1];
         assert(!a.process && !b.process); // no executable exists in this fixture
         // The screenshot's real 16 GiB PC: 8.68 GiB available used to be

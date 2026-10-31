@@ -44,5 +44,6 @@ public:
 };
 
 
+extern ALife::_TIME_ID __game_time();
 extern u32 get_time();
 extern xrTime get_time_struct();

@@ -17,6 +17,12 @@
 
 extern bool shared_str_initialized;
 
+static bool unattended_errors()
+{
+	return strstr(GetCommandLineA(), "-netcoop_background") ||
+		strstr(GetCommandLineA(), "-silent_error_mode");
+}
+
 #ifdef __BORLANDC__
 # include "d3d9.h"
 # include "d3dx9.h"
@@ -240,7 +246,7 @@ void xrDebug::do_exit(const std::string& message)
 {
 	Msg("! [X-Ray][exit] %s", message.c_str());
 	FlushLog();
-	if (!strstr(GetCommandLine(), "-silent_error_mode"))
+	if (!unattended_errors())
 		MessageBox(NULL, message.c_str(), "Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 	TerminateProcess(GetCurrentProcess(), 1);
 }
@@ -276,6 +282,12 @@ void xrDebug::backend(const char* expression, const char* description, const cha
 	// The error reaches the log first, then the game is saved: a save that
 	// failed in a broken process left no trace of the error (doc 151).
 	crash_saving::save();
+	if (unattended_errors())
+	{
+		FlushLog();
+		TerminateProcess(GetCurrentProcess(), 1);
+		return;
+	}
 
     if (IsDebuggerPresent())
         DebugBreak();
@@ -323,6 +335,13 @@ void xrDebug::backend(const char* expression, const char* description, const cha
 
     if (handler)
         handler();
+
+    if (unattended_errors())
+    {
+        FlushLog();
+        TerminateProcess(GetCurrentProcess(), 1);
+        return;
+    }
 
     if (get_on_dialog())
         get_on_dialog() (true);
@@ -864,6 +883,11 @@ LONG WINAPI UnhandledFilter(_EXCEPTION_POINTERS* pExceptionInfo)
 	save_mini_dump(pExceptionInfo);
 # endif // USE_OWN_MINI_DUMP
 
+    // A background location must release its process handle after recording
+    // the failure, rather than block the master's launch queue in a dialog.
+    if (unattended_errors())
+        ExitProcess(pExceptionInfo->ExceptionRecord->ExceptionCode ? pExceptionInfo->ExceptionRecord->ExceptionCode : 1);
+
     if (IsDebuggerPresent())
         DebugBreak();
 
@@ -934,6 +958,8 @@ LONG WINAPI UnhandledFilter(_EXCEPTION_POINTERS* pExceptionInfo)
     save_mini_dump (pExceptionInfo);
 # endif // USE_OWN_MINI_DUMP
 #else // USE_OWN_ERROR_MESSAGE_WINDOW
+    if (unattended_errors())
+        ExitProcess(pExceptionInfo->ExceptionRecord->ExceptionCode ? pExceptionInfo->ExceptionRecord->ExceptionCode : 1);
     if (!error_after_dialog)
     {
         if (Debug.get_on_dialog())
@@ -948,6 +974,8 @@ LONG WINAPI UnhandledFilter(_EXCEPTION_POINTERS* pExceptionInfo)
 
 #endif // USE_OWN_ERROR_MESSAGE_WINDOW
 
+    if (unattended_errors())
+        ExitProcess(pExceptionInfo->ExceptionRecord->ExceptionCode ? pExceptionInfo->ExceptionRecord->ExceptionCode : 1);
     ReportFault(pExceptionInfo, 0);
 
     if (!previous_filter)

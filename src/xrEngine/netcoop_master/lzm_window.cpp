@@ -236,7 +236,10 @@ HostView read_host_view(const std::wstring& folder)
                 if (!m.is_object() || !m.contains("map") || !m["map"].is_string()) continue;
                 HostMap row;
                 if (m.contains("state") && m["state"].is_string()) row.state = m["state"].get<std::string>();
-                if(m.contains("processId") && m["processId"].is_number_unsigned()) row.process=m["processId"].get<unsigned>();
+                if(m.contains("processId") && m["processId"].is_number_integer()) {
+                    const auto pid=m["processId"].get<int64_t>();
+                    if(pid>0 && pid<=0xffffffffLL) row.process=static_cast<unsigned>(pid);
+                }
                 if(m.contains("detail") && m["detail"].is_string()) row.detail=m["detail"].get<std::string>();
                 if (m.contains("mode") && m["mode"].is_string()) row.mode = m["mode"].get<std::string>();
                 if (m.contains("progress") && m["progress"].is_number()) row.progress = int(m["progress"].get<double>());
