@@ -29,3 +29,21 @@ the actual controller with the observed 8.68 GiB case, independent RAM/commit
 shortage, learned peaks, manual defaults (including a warm map), cancellation,
 and reaching CreateProcess with sufficient budget. The fixture deliberately
 has no game executable. No local game/location test is required or claimed.
+
+## Missing system.ltx on startup
+
+A subsequent owner screenshot and native log confirmed that archives loaded
+(113 archives), but system.ltx at appdata/server/configs could not be opened.
+CLocatorAPI::_initialize scans each path immediately while parsing fsgame;
+the old template scanned resources before game_config/game_scripts existed.
+LoadArchive resolves header entry_point aliases at that moment and cannot
+retroactively remount their files. Both templates now scan archives last.
+
+Server-only config/script archives are under resources/server, scanned after
+the common resources by the server template. The client's resources scan is
+nonrecursive. This also prevents server overrides from replacing client data
+when both packages are extracted into one root. Protected archive payloads and
+the game executable are unchanged. The resource extractor follows the same
+role isolation for subsequent builds. The startup-layout regression covers the
+one-pass alias ordering, rejects the previous order, and checks shared-folder
+role precedence without starting a native process.

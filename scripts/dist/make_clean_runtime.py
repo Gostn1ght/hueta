@@ -139,7 +139,12 @@ def pack(args):
             lzpack.make_db(group,raw,alias);lzpack.protect(raw,protected,key)
             row=dict(path=stem,role=role,kind=kind,files=len(group),size=protected.stat().st_size,sha256=sha(protected))
             report.append(row)
-            for target in ('client','server') if role=='shared' else (role,): link(protected,output/target/'resources'/stem)
+            for target in ('client','server') if role=='shared' else (role,):
+                # Keep server overrides out of the client's nonrecursive scan
+                # when a hoster installs the server alongside an existing game.
+                directory=output/target/'resources'/('server' if role=='server' else '')
+                directory.mkdir(parents=True,exist_ok=True)
+                link(protected,directory/stem)
             print('Verified runtime archive',stem,'files',len(group),'bytes',row['size'],flush=True)
     (output/'layout-archives.json').write_text(json.dumps({'version':args.version,'archives':report},indent=2)+'\n',encoding='utf-8')
 

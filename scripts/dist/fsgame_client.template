@@ -6,7 +6,6 @@ $app_data_root$ = true | false | {ROOT}appdata\player\
 ; name overrides an earlier one): 00 base, 10 configs, 20 levels, 30 meshes,
 ; 40 sounds, 50 textures, 60 mods, 70 patches, 80 addons, 90 Lost Zone,
 ; 99 updates (99_lz_patch_NNNNNN: the higher number wins).
-$arch_dir$ = false | false | {ROOT}resources\
 $game_data$ = true | true | {ROOT}gamedata\
 $game_ai$               = true 	| false	| $game_data$	 | ai\
 $game_spawn$            = true 	| false	| $game_data$	 | spawns\
@@ -33,4 +32,8 @@ $game_text$				= true 	| false	| $game_config$	 | text\
 $textures_ui$ 			= true 	| true 	| $textures$	 | ui\
 $warfare_presets$		= true 	| false	| $game_config$	 | warfare_presets\	| *.ltx
 $mcmlogs$                  = true 	| false	| $logs$| mcm\
+
+; Archive entry points resolve immediately while this file is read.
+; Register every target alias above before scanning resource archives.
+$arch_dir$ = false | false | {ROOT}resources\
 

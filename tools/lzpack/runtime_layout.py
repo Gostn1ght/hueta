@@ -119,7 +119,11 @@ class Archive:
 
 def effective(resources, key, role):
     archives, scripts, assets, configs = [], {}, {}, {}
-    for path in sorted(Path(resources).iterdir(),key=lambda p:p.name.lower()):
+    root=Path(resources)
+    for path in sorted(root.rglob('*'),key=lambda p:(len(p.relative_to(root).parts),p.as_posix().lower())):
+        relative=path.relative_to(root)
+        if len(relative.parts)>1 and (role!='server' or relative.parts[:-1]!=('server',)): continue
+        if path.name.startswith('99_v2_') and ('_client_' in path.name if role=='server' else '_server_' in path.name): continue
         if not path.is_file() or not path.name.startswith(('90_lostzone_lz_misc','90_lostzone_lz_scripts','95_server_','99_')) or not path.suffix.startswith('.db'): continue
         archive = Archive(path,key,role); archives.append(archive)
         for name in archive.files:
