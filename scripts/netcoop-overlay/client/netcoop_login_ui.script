@@ -364,7 +364,24 @@ function netcoop_login_wnd:ActivateObject(object)
     self.key_focus = nil
     self[entry.action](self)
 end
-function netcoop_login_wnd:ShowCharacterView() self:OpenRoomView("character", 2) end
+function netcoop_login_wnd:ShowCharacterView()
+    if not self.account_verified then
+        self.character_requested = true
+        self:OpenAccountForm("login")
+        if cloud_enabled() and account_state() ~= 0 then self:CloudRequest("refresh") end
+        return
+    end
+    if not self.names or not self.names[1] or self.names[1] == "" then return self:ShowProfile(1) end
+    self:OpenRoomView("character", 2)
+end
+function netcoop_login_wnd:ShowRoom()
+    local login, addr = read_last()
+    local ip, port = parse_addr(addr or DEF_ADDR)
+    self.pending_login = cloud_enabled() and netcoop_firebase_account() or netcoop_account()
+    if self.pending_login == "" then self.pending_login = login or "" end
+    self.pending_ip, self.pending_port = ip, port
+    self:ShowCharacters()
+end
 function netcoop_login_wnd:EnterDoor() if not self:Busy() then self:AskQuit() end end
 -- The door is behind the camera: first turn to it, then confirm quitting.
 function netcoop_login_wnd:DoorAction()
@@ -558,22 +575,6 @@ function netcoop_login_wnd:ShowCharacters()
     for visual, faction, items in string.gmatch(previews, "([^|\n]*)|([^|\n]*)|([^\n]*)\n") do
         self.previews[#self.previews + 1] = {visual = visual, faction = faction, items = items}
     end
-    if cloud_enabled() then
-        for slot = 1, self:CharacterLimit() do
-            if not self.names[slot] or self.names[slot] == "" then
-                self.names[slot] = netcoop_draft(slot, "name")
-                local loadout = netcoop_draft(slot, "loadout")
-                local visual = BASE_MODEL
-                for section in string.gmatch(loadout, "[^,]+") do
-                    if ini_sys:section_exist(section) then
-                        local outfit = SYS_GetParam(0, section, "actor_visual", "")
-                        if outfit ~= "" then visual = outfit end
-                    end
-                end
-                self.previews[slot] = {visual=visual, faction=netcoop_draft(slot, "faction") ~= "" and netcoop_draft(slot, "faction") or "stalker", items=loadout}
-            end
-        end
-    end
     if not self.character_panel then
         local xml = CScriptXmlInit(); xml:ParseFile("ui_netcoop_characters.xml")
         self.character_panel = xml:InitStatic("panel", self)
@@ -595,7 +596,7 @@ function netcoop_login_wnd:ShowCharacters()
             self:Register(b, "char_" .. path); self:Bind("char_" .. path, handler, path == "back"); return b
         end
         self.create_button = button("character_create", tr("create_character"), function()
-            if cloud_enabled() then self:ShowProfile(self.slot) else self:ShowLoadout(self.slot) end
+            self:ShowCharacterView()
         end)
         self.room_arrows = {}
         for _, path in ipairs({"previous", "next"}) do
@@ -658,18 +659,12 @@ function netcoop_login_wnd:ShowCharacters()
     self.details_panel:Show(false)
     self:SetMsg(auth_message or "")
     self.account_caption:TextControl():SetText(self.pending_login .. (self:CharacterLimit() == 10 and "  /  �������������" or "  /  �������"))
-    for i = 1, 10 do self.slot_buttons[i]:Show(i <= self:CharacterLimit()) end
+    for i = 1, 10 do self.slot_buttons[i]:Show(false) end
     for i = 1, self:CharacterLimit() do
         self.slot_buttons[i]:TextControl():SetText(string.format("%d   %s", i, self.names[i] and self.names[i] ~= "" and self.names[i] or tr("empty_slot")))
     end
 end
-function netcoop_login_wnd:CharacterLimit()
-    local addr = string.lower(self.pending_ip or "") .. ":" .. (self.pending_port or "")
-    local f = io.open(character_cache_path(self.pending_login or "", addr) .. ".role", "r")
-    local role = f and f:read("*a") or ""; if f then f:close() end
-    -- Remembered allowance is for presentation only; the server enforces its own role.
-    return role == "2" and 10 or 1
-end
+function netcoop_login_wnd:CharacterLimit() return 1 end
 function netcoop_login_wnd:ChangeSlot(delta)
     local limit = self:CharacterLimit()
     self.slot = ((self.slot - 1 + delta) % limit) + 1
@@ -704,10 +699,10 @@ end
 
 function netcoop_login_wnd:SelectCharacter(slot)
     if slot < 1 or slot > self:CharacterLimit() then return end
+    if not self.account_verified then return self:ShowCharacterView() end
     local name = self.names[slot]
     if name and name ~= "" then return self:EnterCharacter(slot, name) end
-    if cloud_enabled() then return self:ShowProfile(slot) end
-    return self:ShowLoadout(slot)
+    return self:ShowProfile(slot)
 end
 
 function netcoop_login_wnd:ShowLoadout(slot)
@@ -865,7 +860,7 @@ function netcoop_login_wnd:ResetCloud()
         y = y + 66
     end
     local form = screen == "login" or screen == "register"
-    self.register_tab:Show(form); self.login_tab:Show(form)
+    self.register_tab:Show(false); self.login_tab:Show(false)
     self.register_tab:Enable(form and not busy); self.login_tab:Enable(form and not busy)
     local function tab_color(tab, on)
         tab:TextControl():SetTextColor(GetARGB(255, on and 231 or 150, on and 213 or 153, on and 181 or 151))
@@ -888,7 +883,13 @@ function netcoop_login_wnd:ResetCloud()
         y = y + 44
     end
     self.reset_button:SetWndPos(vector2():set(282, y)); self.reset_button:SetWndSize(vector2():set(274, 30))
-    self.back_button:SetWndPos(vector2():set(632, y)); self.back_button:TextControl():SetText(tr("exit"))
+    self.back_button:SetWndPos(vector2():set(632, y)); self.back_button:TextControl():SetText(tr("back"))
+    if form then
+        local switch = screen == "login" and self.register_tab or self.login_tab
+        switch:SetWndPos(vector2():set(282, y + 38));switch:SetWndSize(vector2():set(460, 30))
+        switch:TextControl():SetText(tr(screen == "login" and "create_account_link" or "existing_account"))
+        switch:Show(true)
+    end
 
     local text, kind = auth_message, auth_kind
     if screen == "verify" then
@@ -1013,6 +1014,7 @@ end
 -- the session again, so sign-out waits for it.
 function netcoop_login_wnd:SignOut()
     if auth_return == "pending" then return end
+    self.account_verified = false
     if self.verify_poll then self.sign_out_after_poll = true; return self:SetNotice(tr("wait_request"), "info") end
     local email = login_email()
     if netcoop_firebase_logout then
@@ -1033,14 +1035,9 @@ function netcoop_login_wnd:OnBack()
 	if auth_return == "pending" then return end
     if self.room_view then self:CloseRoomView(); return end
     if cloud_enabled() then
-        if self.mode == "profile" then
-            local populated = false
-            for i = 1, self:CharacterLimit() do if netcoop_draft(i, "name") ~= "" or (self.names and self.names[i] and self.names[i] ~= "") then populated = true end end
-            if populated then self:ShowCharacters(); return end
-            self.force_login, self.form_mode = false, nil; auth_message = nil
-            self:Reset(); return
-        end
+        if self.mode == "profile" then self:ShowRoom();return end
         if self.mode == "account" and self.editing_email then return self:OnLogin() end
+        if self.mode == "account" or self.mode == "profile" then self:ShowRoom();return end
         self:AskQuit(); return
     end
 	if netcoop_account_state() == 0 then self:AskQuit(); return end
@@ -1120,6 +1117,7 @@ function show_login(menu, verified)
 	end
     if cloud_enabled() then
         if verified then
+            wnd.account_verified = true
             local _, addr = read_last()
             local ip, port = parse_addr(addr or DEF_ADDR)
             wnd.pending_login, wnd.pending_ip, wnd.pending_port = netcoop_firebase_account(), ip, port
@@ -1127,7 +1125,10 @@ function show_login(menu, verified)
             wnd:ShowCharacters()
             local populated = false
             for i = 1, wnd:CharacterLimit() do if wnd.names[i] and wnd.names[i] ~= "" then populated = true end end
-            if not populated then wnd:ShowProfile(1) end
+            if wnd.character_requested then
+                wnd.character_requested = nil
+                wnd:ShowCharacterView()
+            end
             -- Test entry without clicks (owner 2026-10-12: "start a location and
             -- join it"): -netcoop_autojoin enters the first character of the last
             -- server, or creates a test stalker there.
@@ -1136,22 +1137,22 @@ function show_login(menu, verified)
                 local slot
                 for i = 1, wnd:CharacterLimit() do if wnd.names[i] and wnd.names[i] ~= "" then slot = i; break end end
                 printf("[Lost Zone] autojoin: %s", slot and ("character " .. slot) or "new test character")
-                if slot then wnd:SelectCharacter(slot) else wnd:EnterCharacter(1, "Tester", "stalker", 1, "") end
+                if slot then wnd:SelectCharacter(slot) else wnd:ShowProfile(1) end
             end
         else
-            wnd:Reset()
-            if account_state() ~= 0 then wnd:CloudRequest("refresh") end
+            wnd:ShowRoom()
         end
         wnd:ShowDialog(true); return
     end
 	if netcoop_account_state() == 2 and verified then
+        wnd.account_verified = true
 		local login, addr = read_last()
 		local ip, port = parse_addr(addr or DEF_ADDR)
 		wnd.pending_login, wnd.pending_ip, wnd.pending_port = netcoop_account(), ip, port
 		wnd:ShowCharacters()
+        if wnd.character_requested then wnd.character_requested=nil;wnd:ShowCharacterView() end
 	else
-		wnd:Reset()
-		if netcoop_account_state() == 2 and not verified then wnd:Connect(false) end
+		wnd:ShowRoom()
 	end
 	wnd:ShowDialog(true)
 end
@@ -1173,7 +1174,7 @@ function frontend_update(menu)
     end
     if not menu.netcoop_first_screen then
         menu.netcoop_first_screen = true
-        if cloud_enabled() or netcoop_account_state() ~= 2 then show_login(menu); return true end
+        show_login(menu); return true
     end
     return false
 end
@@ -1353,47 +1354,59 @@ function netcoop_login_wnd:SaveServer()
     self.server_panel:Show(false)
     self:ShowCharacters(); self:SetMsg("")
 end
+local function call_sign_valid(name)
+    if type(name) ~= "string" or #name > 63 then return false end
+    local letters, separator = 0, true
+    for i = 1, #name do
+        local c = string.byte(name, i)
+        if c >= 192 or c == 168 or c == 184 then letters, separator = letters + 1, false
+        elseif (c == 32 or c == 45) and not separator then separator = true
+        else return false end
+    end
+    return letters >= 2 and not separator
+end
 function netcoop_login_wnd:ShowProfile(slot)
-    if slot < 1 or slot > self:CharacterLimit() then return end
-    if self.profile_slot ~= slot then self.profile_data = nil end
+    if slot ~= 1 then return end
     if self.room_view or self.room_pending then self:CloseRoomView() end
-    self.mode = "profile"; self.profile_slot = slot
+    self.mode, self.profile_slot = "profile", 1
     self:ShowAccountControls(false)
-    if self.character_panel then self.character_panel:Show(false) end
-    netcoop_preview_clear()
+    if self.details_panel then self.details_panel:Show(false) end
     if not self.profile_panel then
         local xml = CScriptXmlInit(); xml:ParseFile("ui_netcoop_profile.xml")
         self.profile_panel = xml:InitStatic("panel", self)
-        for path, text in pairs({title="profile_title", nick="character_nick", description="description", history="history", help="profile_help"}) do
-            xml:InitStatic(path, self.profile_panel):TextControl():SetText(tr(text))
-        end
+        xml:InitStatic("title", self.profile_panel):TextControl():SetText(tr("life_title"))
+        xml:InitStatic("help", self.profile_panel):TextControl():SetText(tr("life_help"))
+        xml:InitStatic("nick", self.profile_panel):TextControl():SetText(tr("character_nick"))
         self.profile_name = xml:InitEditBox("input_name", self.profile_panel)
-        self.profile_description = xml:InitEditBox("input_description", self.profile_panel)
-        self.profile_history = xml:InitEditBox("input_history", self.profile_panel)
         self.profile_msg = xml:InitStatic("msg", self.profile_panel)
-        local next = xml:Init3tButton("next", self.profile_panel); next:TextControl():SetText(tr("choose_equipment"))
+        local next = xml:Init3tButton("next", self.profile_panel); next:TextControl():SetText(tr("life_start"))
         self:Register(next, "profile_next"); self:Bind("profile_next", self.ContinueProfile)
         local back = xml:Init3tButton("back", self.profile_panel); back:TextControl():SetText(tr("back"))
-        self:Register(back, "profile_back"); self:Bind("profile_back", self.OnBack, true)
+        self:Register(back, "profile_back"); self:Bind("profile_back", function() self:ShowRoom() end, true)
     end
-    local profile = self.profile_data or {}
-    self.profile_name:SetText(profile.name or "")
-    self.profile_description:SetText(profile.description or "")
-    self.profile_history:SetText(profile.history or "")
+    self.profile_name:SetText("")
     self.profile_msg:TextControl():SetText(""); self.profile_panel:Show(true)
+    self.profile_name:CaptureFocus(true)
 end
 function netcoop_login_wnd:ContinueProfile()
     local name = self.profile_name:GetText() or ""
-    if #name < 2 or #name > 63 or string.find(name, "[|\r\n/\\]") then
-        return self.profile_msg:TextControl():SetText(tr("character_name_invalid"))
+    if not call_sign_valid(name) or name == self.previous_life_name then
+        return self.profile_msg:TextControl():SetText(tr("life_name_invalid"))
     end
-    for i = 1, self:CharacterLimit() do
-        if i ~= self.profile_slot and self.names and self.names[i] == name then
-            return self.profile_msg:TextControl():SetText(tr("character_name_invalid"))
-        end
+    self.profile_data = {name=name, description="", history=""}
+    if netcoop_character_profile then netcoop_character_profile("", "") end
+    self.profile_panel:Show(false)
+    self:EnterCharacter(1, name, "stalker", 1, "")
+end
+
+function on_life_ended()
+    cache_characters("");cache_previews("")
+    if wnd then
+        wnd.previous_life_name = wnd.names and wnd.names[1]
+        wnd.names, wnd.previews = {}, {}
+        wnd.profile_data = nil
+        if wnd.owner then wnd.owner.netcoop_first_screen = nil end
     end
-    self.profile_data = {name=name, description=self.profile_description:GetText(), history=self.profile_history:GetText()}
-    self.profile_panel:Show(false); self:ShowLoadout(self.profile_slot)
 end
 
 -- Native layer callbacks: an error is logged instead of breaking the menu.

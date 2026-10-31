@@ -319,6 +319,7 @@ public:
 
 	// Models
 	virtual IRenderVisual* model_CreateParticles(LPCSTR name) = 0;
+	virtual bool model_ParticlesExists(LPCSTR name) = 0;
 	// virtual IRender_DetailModel* model_CreateDM (IReader* F) = 0;
 	//virtual IRenderDetailModel* model_CreateDM (IReader* F) = 0;
 	//virtual IRenderVisual* model_Create (LPCSTR name, IReader* data=0) = 0;

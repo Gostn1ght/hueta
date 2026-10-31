@@ -14,6 +14,7 @@
 -- char = "login_slot" (netcoop_actor_character).
 
 local MAX_TRIES = 8
+local disguised = {} -- char -> the faction whose outfit he wears
 local cfg
 local function config()
 	cfg = cfg or ini_file("netcoop\\factions.ltx")
@@ -96,7 +97,8 @@ local function char_of(obj) return netcoop_actor_character and netcoop_actor_cha
 function true_faction(obj)
 	local char = char_of(obj)
 	local record = char ~= "" and (deserialize(netcoop_store_read("char_faction", char)) or {}).faction
-	return record or visible_faction(obj)
+	local storage = db and db.storage and db.storage[obj:id()]
+	return record or (storage and storage.pstor and storage.pstor.netcoop_own_faction) or visible_faction(obj)
 end
 local current_faction = true_faction
 local function login_of(obj) return netcoop_actor_login and netcoop_actor_login(obj:id()) or "" end
@@ -144,6 +146,17 @@ local function disguise_of(obj, own)
 	return comm
 end
 
+-- A character snapshot carries its own faction while the shared-store cache
+-- is warming. Recompute disguise only after restored outfit placement.
+function character_ready(obj)
+    local own = true_faction(obj)
+    local st = db.storage[obj:id()]
+    if st then st.pstor = st.pstor or {}; st.pstor.netcoop_own_faction = own end
+    local shown = disguise_of(obj, own)
+    show_faction(obj, shown)
+    if netcoop_send_to_actor then netcoop_send_to_actor(obj:id(), "disguise", shown == own and ("off|" .. own) or ("on|" .. shown)) end
+end
+
 -- Online characters get their faction now; offline ones at their next login
 -- (faction_update and the engine's character load).
 local function apply_now(char)
@@ -168,6 +181,36 @@ local function remove_member(faction, char)
 		data.members[char] = nil
 		return true
 	end)
+end
+
+-- A new life keeps its login, but starts outside the previous faction.
+-- This callback is idempotent: equipment admission retries it on store failure.
+function reset_life(obj)
+	local char = char_of(obj)
+	if char == "" then return false end
+	local previous = store_get("char_faction", char).faction
+	if previous and previous ~= "stalker" then
+		local ok = update("factions", previous, function(data)
+			data.members, data.apps = data.members or {}, data.apps or {}
+			data.members[char], data.apps[char] = nil, nil
+			return true
+		end)
+		if not ok then return false end
+	end
+	for _, bucket in ipairs({"ratings", "bounties", "goodwill"}) do
+		local cleared = update(bucket, char, function(data)
+			for key in pairs(data) do data[key] = nil end
+			return true
+		end)
+		if not cleared then return false end
+	end
+	local ok = update("char_faction", char, function(data) data.faction = "stalker"; return true end)
+	if not ok then return false end
+	disguised[char] = nil
+	if netcoop_set_character_faction then netcoop_set_character_faction(obj:id(), "stalker") end
+	local st = db and db.storage and db.storage[obj:id()]
+	if st then st.pstor = st.pstor or {}; st.pstor.netcoop_own_faction = "stalker" end
+	return true
 end
 
 local function join(faction, char, name, role)
@@ -497,7 +540,6 @@ end
 
 ---------------------------------------------------------------- keeping online Actors in their faction
 local next_check = 0
-local disguised = {} -- char -> the faction whose outfit he wears
 -- A few players per call, in turn: one store file read each. All online
 -- players at once every 5 s was 128 file reads in one server frame.
 local online_cursor = 0
@@ -512,7 +554,7 @@ function update_online()
 		local char = obj and char_of(obj)
 		if char and char ~= "" and obj:alive() then
 			local wanted = (deserialize(netcoop_store_read("char_faction", char)) or {}).faction
-			local own = wanted or visible_faction(obj)
+			local own = wanted or true_faction(obj)
 			local shown = disguise_of(obj, own)
 			if shown ~= visible_faction(obj) then
 				if shown ~= own or disguised[char] then

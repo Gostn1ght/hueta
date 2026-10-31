@@ -259,6 +259,8 @@ end
 local player_tasks = {}
 
 local restored_players = {} -- actor id -> its saved character state was applied
+local first_seen, state_sent = {}, {}
+local send_player_state
 
 -- Engine (GameTaskManager, netcoop_cluster.inc): a generated task whose
 -- target is on another map cannot be done on this location server. It is
@@ -279,6 +281,13 @@ function capture_character_state(actor)
     state.netcoop_respawn = not actor:alive()
     state.netcoop_conditions = state.netcoop_respawn and {radiation=0, psy_health=1} or
         {radiation=actor.radiation, psy_health=actor.psy_health}
+    if not state.netcoop_respawn then
+        state.netcoop_admin = {
+            god = netcoop_admin_god_enabled and netcoop_admin_god_enabled(id) or false,
+            ammo = netcoop_admin_ammo_enabled and netcoop_admin_ammo_enabled(id) or false,
+        }
+        state.netcoop_faction = netcoop_factions and netcoop_factions.true_faction(actor) or nil
+    end
     task_manager.save_state(state)
     return marshal.encode(state)
 end
@@ -303,7 +312,33 @@ function restore_character_state(actor, encoded, respawn)
         if conditions.radiation then actor.radiation = conditions.radiation end
         if conditions.psy_health then actor.psy_health = conditions.psy_health end
     end
-    restored_players[id] = true
+    if state.netcoop_faction then db.storage[id].pstor.netcoop_own_faction = state.netcoop_faction end
+    local admin = not new_body and type(state.netcoop_admin) == "table" and state.netcoop_admin or {}
+    if netcoop_admin_god_set then netcoop_admin_god_set(id, admin.god == true) end
+    if netcoop_admin_ammo_set then netcoop_admin_ammo_set(id, admin.ammo == true) end
+    restored_players[id] = false -- equipment placement has not been acknowledged yet
+end
+
+-- The engine calls this only after saved items, progress and equipment are ready.
+function character_ready(actor, new_life)
+    local id = actor:id()
+    if new_life then
+        local st = db.storage[id] or {object=actor}; db.storage[id] = st
+        st.pstor, st.pstor_ctime = {}, {}
+        player_tasks[id] = task_manager.CRandomTask()
+        if netcoop_admin_god_set then netcoop_admin_god_set(id, false) end
+        if netcoop_admin_ammo_set then netcoop_admin_ammo_set(id, false) end
+    end
+    if new_life and netcoop_factions and netcoop_factions.reset_life then
+        if not netcoop_factions.reset_life(actor) then return false end
+    end
+    restored_players[id], state_sent[id], first_seen[id] = true, nil, nil
+    local god = netcoop_admin_god_enabled and netcoop_admin_god_enabled(id) or false
+    local ammo = netcoop_admin_ammo_enabled and netcoop_admin_ammo_enabled(id) or false
+    netcoop_send_to_actor(id, "netcoop_admin_state", (god and "1" or "0") .. "|" .. (ammo and "1" or "0"))
+    if netcoop_factions and netcoop_factions.character_ready then netcoop_factions.character_ready(actor) end
+    if send_player_state then send_player_state(id) end
+    return true
 end
 
 local function install_player_tasks()
@@ -1718,19 +1753,16 @@ local function access_change(obj, args, login)
 end
 
 -- Owners see their stashes on the PDA map, also after reconnecting.
-local first_seen = {} -- actor id -> time it was first seen online
-local state_sent = {}
-
 -- The client's own saved state goes back to it once the character was
--- restored (or after 10 s for a new character); then it starts reporting.
-local function send_player_state(actor_id)
+-- fully restored; elapsed time alone is not proof that it is ready.
+send_player_state = function(actor_id)
 	if state_sent[actor_id] then return end
 	first_seen[actor_id] = first_seen[actor_id] or time_global()
-	if not restored_players[actor_id] and time_global() - first_seen[actor_id] < 10000 then return end
+    if not restored_players[actor_id] then return end
 	state_sent[actor_id] = true
 	local st = db.storage[actor_id]
 	local saved = st and st.pstor and st.pstor.netcoop_player_state
-	netcoop_send_to_actor(actor_id, "player_state", saved or "-")
+	netcoop_send_to_actor(actor_id, "player_state", "@" .. actor_id .. "|" .. (saved or "-"))
 end
 
 local function send_owner_spots()

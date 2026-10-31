@@ -571,7 +571,7 @@ bool s_own_dead = false;
 bool s_respawn_sent = false;
 u32 s_death_time = 0;
 u32 s_respawn_sent_time = 0;
-const u32 respawn_delay_ms = 10000;
+const u32 respawn_delay_ms = 1500;
 }
 
 void client_on_own_death()
@@ -595,6 +595,10 @@ void client_death_frame()
 	const u32 now = real_time_ms();
 	if (s_respawn_sent && now - s_respawn_sent_time > 5000)
 		s_respawn_sent = false; // ask again if nothing came
+	if (!s_respawn_sent && now-s_death_time>=respawn_delay_ms) {
+		s_respawn_sent=true;s_respawn_sent_time=now;
+		client_send_command("respawn"); // server persists death, then returns to the account room
+	}
 	if ((now / 500) % 2)
 		return; // blink
 	CGameFont* font = UI().Font().pFontGraffiti22Russian;
@@ -951,16 +955,10 @@ bool script_respawn(u16 actor_id)
 	CActor* body = smart_cast<CActor*>(Level().Objects.net_Find(actor_id));
 	if (!body || body->g_Alive())
 		return false;
-	// The body and what it carries stay in the world as a corpse, owned by
-	// the server; the player gets a new Actor at the spawn point.
-	server_character_save_actor(actor_id);
-	s_actor_character.erase(actor_id);
-	// The tasks travel with the character; the corpse keeps none.
-	server_release_task_manager(actor_id);
-	give_to_server(server, CL->owner, 0);
-	CL->owner = NULL;
-	netcoop_respawn_spawn(CL->ID);
-	Msg("[Lost Zone] respawn for client 0x%08x (body %u stays)", CL->ID.value(), actor_id);
-	return true;
+	// Keep the dead checkpoint and corpse. A new life is created only after
+	// account authentication and a different Russian call sign in the room.
+	if (!character_save_actor(actor_id,nullptr,false)) return false;
+	Msg("[diag][character] life ended actor=%u; returning to account room",actor_id);
+	return script_send_to_actor(actor_id,"netcoop_life_ended","");
 }
 } // namespace netcoop

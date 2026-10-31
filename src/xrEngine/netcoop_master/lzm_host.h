@@ -26,6 +26,7 @@ class HostController
         bool demand=true,loading=false,expected=false,blocked=false;
         HANDLE process=nullptr;DWORD pid=0,exit=0;unsigned failures=0,players=0;
         uint64_t launched=0,retry_at=0,healthy_at=0;bool has_exit=false;
+        double peak_commit=0;
     };
     std::wstring root_,folder_,exe_;
     std::vector<Map> maps_;
@@ -182,12 +183,12 @@ class HostController
         reserve_commit_=1.0;
         free_ram_=std::max(0.0,available_ram-reserve_ram_);
         free_commit_=std::max(0.0,available_commit-reserve_commit_);
-        // Initial estimates until a map has run. Then retain the largest
-        // observed process peak, with 20% headroom, instead of twice an
-        // average that mixes loading and sleeping processes.
-        need_ram_=std::max(1.5,peak_ram_*1.2);
-        need_commit_=std::max(3.0,peak_commit_*1.2);
+        // Trimming an idle process releases physical pages, not its commit.
+        // Keep a small physical startup budget and learn commit per map.
+        need_ram_=1.5;
+        need_commit_=3.0;
     }
+    double launch_commit(const Map& map) const {return std::max(3.0,map.peak_commit*1.2);}
     bool memory_available() const {return free_ram_>=need_ram_ && free_commit_>=need_commit_;}
     std::string memory_detail() const {
         return format("ОЗУ: доступно %.1f ГБ, нужно %.1f ГБ; резерв ОС %.1f ГБ. Лимит памяти: доступно %.1f ГБ, нужно %.1f ГБ. Освободите память или остановите другую локацию.",
@@ -199,6 +200,7 @@ class HostController
             if(GetProcessMemoryInfo(m.process,reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),sizeof(counters))) {
                 peak_ram_=std::max(peak_ram_,double(counters.PeakWorkingSetSize)/1073741824.0);
                 peak_commit_=std::max(peak_commit_,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
+                m.peak_commit=std::max(m.peak_commit,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
             }}
         calculate_budget(double(memory.ullAvailPhys)/1073741824.0,double(memory.ullTotalPhys)/1073741824.0,
             double(memory.ullAvailPageFile)/1073741824.0);
@@ -208,7 +210,7 @@ class HostController
         const auto log=m.plan.name=="k00_marsh" ? "srv":"srv_"+m.plan.name;
         std::wstring args=L"\""+exe_+L"\" -nosplashwindow -noprefetch -netcoop -multi_instance -netcoop_background -logname "+widen(log)+
             L" -fsltx fsgame_server.ltx -netport "+std::to_wstring(m.plan.port)+L" -netcoop_start_location="+widen(m.start)+L" -netcoop_world="+widen(m.world)+
-            L" -netcoop_hibernate=120 "+(m.demand ? std::wstring(L"-netcoop_idle_exit=21600 "):L"")+
+            L" -netcoop_hibernate=1 "+(m.demand ? std::wstring(L"-netcoop_idle_exit=21600 "):L"")+
             L"-start \"server(all/single/alife/new/portsv="+std::to_wstring(m.plan.port)+L"/maxplayers=129)\" \"client(localhost/name=serverauthority/port="+
             std::to_wstring(m.plan.port)+L"/portcl="+std::to_wstring(m.plan.port+1)+L")\"";
         DeleteFileW((folder_+L"\\host_stop_"+std::to_wstring(m.plan.port)+L".txt").c_str());
@@ -233,6 +235,9 @@ class HostController
             if(paused) {transition(m,exists(folder_+L"\\host_master_paused.txt") ? "master_stopped":"master_wait","waiting for master service and verified world storage");continue;}
             if(m.retry_at>GetTickCount64()) continue;
             if(loading) {transition(m,"queued","another map is loading");continue;}
+            // Working-set peaks are reclaimable pages. Commit is not: keep
+            // its budget, but learn it for THIS map rather than every map.
+            need_ram_=1.5;need_commit_=launch_commit(m);
             if(!memory_available()) {transition(m,"memory","insufficient loading budget; see memory counters");continue;}
             if(exists(file("host_command_",m))) continue; // consume a late stop before launch
             launch(m);loading=m.process && m.loading;

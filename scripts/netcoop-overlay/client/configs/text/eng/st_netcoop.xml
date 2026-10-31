@@ -1549,4 +1549,9 @@
   <string id="st_netcoop_map_jupiter_underground"><text>Pripyat Underpass</text></string>
   <string id="st_netcoop_map_pripyat"><text>Pripyat Outskirts</text></string>
   <string id="st_netcoop_map_labx8"><text>Lab X-8</text></string>
+  <string id="st_netcoop_life_title"><text>New life</text></string>
+  <string id="st_netcoop_life_help"><text>One account, one character. Start as a loner with starter equipment and money. Death requires a new call sign.</text></string>
+  <string id="st_netcoop_life_start"><text>Begin life</text></string>
+  <string id="st_netcoop_life_name_invalid"><text>Use at least two Russian letters, spaces or hyphens. Choose a different call sign after death.</text></string>
+  <string id="st_netcoop_create_account_link"><text>Create account</text></string>
 </string_table>

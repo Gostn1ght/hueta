@@ -21,7 +21,12 @@ CCar::SExhaust::~SExhaust()
 void CCar::SExhaust::Init()
 {
 	VERIFY(!physics_world()->Processing());
-	pelement = (bone_map.find(bone_id))->second.element;
+	const auto exhaust_bone = bone_map.find(bone_id);
+	if (exhaust_bone == bone_map.end() || !exhaust_bone->second.element) {
+		Msg("! [diag][vehicle] section=%s exhaust bone=%u has no physics element; exhaust disabled", pcar->cNameSect().c_str(), bone_id);
+		return;
+	}
+	pelement = exhaust_bone->second.element;
 	IKinematics* K = smart_cast<IKinematics*>(pcar->Visual());
 	CBoneData& bone_data = K->LL_GetData(u16(bone_id));
 	transform.set(bone_data.bind_transform);
@@ -30,7 +35,15 @@ void CCar::SExhaust::Init()
 	//pelement->InterpolateGlobalTransform(&element_transform);
 	//element_transform.invert();
 	//transform.mulA(element_transform);
-	p_pgobject = CParticlesObject::Create(*pcar->m_exhaust_particles,FALSE);
+	LPCSTR effect = *pcar->m_exhaust_particles;
+	if (!CParticlesObject::IsAvailable(effect))
+	{
+		if (g_dedicated_server) return;
+		Msg("! [diag][vehicle] section=%s missing exhaust=%s; checking default exhaust", pcar->cNameSect().c_str(), effect ? effect : "<empty>");
+		effect = "vehiclefx\\exhaust_1";
+		if (!CParticlesObject::IsAvailable(effect)) return;
+	}
+	p_pgobject = CParticlesObject::Create(effect,FALSE);
 	Fvector zero_vector;
 	zero_vector.set(0.f, 0.f, 0.f);
 	p_pgobject->UpdateParent(pcar->XFORM(), zero_vector);
@@ -38,6 +51,7 @@ void CCar::SExhaust::Init()
 
 void CCar::SExhaust::Update()
 {
+	if (!p_pgobject) return;
 	VERIFY(!physics_world()->Processing());
 	Fmatrix global_transform;
 	pelement->InterpolateGlobalTransform(&global_transform);
@@ -62,6 +76,7 @@ void CCar::SExhaust::Clear()
 
 void CCar::SExhaust::Play()
 {
+	if (!p_pgobject) return;
 	VERIFY(!physics_world()->Processing());
 	p_pgobject->Play(false);
 	Update();
@@ -69,6 +84,7 @@ void CCar::SExhaust::Play()
 
 void CCar::SExhaust::Stop()
 {
+	if (!p_pgobject) return;
 	VERIFY(!physics_world()->Processing());
 	p_pgobject->Stop();
 }

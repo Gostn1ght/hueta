@@ -129,9 +129,10 @@ def strings(dcp, lang):
 
 
 def adapt_particle_paths(data):
-    # Lost Alpha DCP adds an "exhausts" folder absent from GAMMA's library.
-    # The same KamAZ effect already exists in the installed particles.xr.
-    return data.replace(b'vehiclefx\\exhausts\\exhaust_kamaz', b'vehiclefx\\exhaust_kamaz')
+    # Owners can have different GAMMA particle libraries. Use the common
+    # exhaust; the engine independently verifies every optional effect.
+    return data.replace(b'vehiclefx\\exhausts\\exhaust_kamaz', b'vehiclefx\\exhaust_1').replace(
+        b'vehiclefx\\exhaust_kamaz', b'vehiclefx\\exhaust_1')
 
 
 def main(dcp, overlay, gamma):

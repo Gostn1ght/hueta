@@ -8,6 +8,7 @@
 #include "hit.h"
 #include "PHDestroyable.h"
 #include "Car.h"
+#include "ParticlesObject.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "../xrphysics/IPHWorld.h"
 //#include "PHWorld.h"
@@ -21,9 +22,9 @@ void read_bones(IKinematics* K, LPCSTR S, xr_vector<u16>& bones)
 		_GetItem(S, i, S1);
 
 		u16 bone_id = K->LL_BoneID(S1);
-		R_ASSERT3(bone_id!=BI_NONE, "wrong bone", S1);
+		if(bone_id==BI_NONE) {Msg("! [diag][vehicle] optional particle bone absent: %s",S1);continue;}
 		xr_vector<u16>::iterator iter = std::find(bones.begin(), bones.end(), bone_id);
-		R_ASSERT3(iter==bones.end(), "double bone", S1);
+		if(iter!=bones.end()) continue;
 		bones.push_back(bone_id);
 	}
 }
@@ -38,6 +39,11 @@ void CCarDamageParticles::Init(CCar* car)
 		m_car_damage_particles2 = ini->r_string("damage_particles", "car_damage_particles2");
 		m_wheels_damage_particles1 = ini->r_string("damage_particles", "wheels_damage_particles1");
 		m_wheels_damage_particles2 = ini->r_string("damage_particles", "wheels_damage_particles2");
+		for(shared_str* effect:{&m_car_damage_particles1,&m_car_damage_particles2,&m_wheels_damage_particles1,&m_wheels_damage_particles2})
+			if(!CParticlesObject::IsAvailable(effect->c_str())) {
+				if(!g_dedicated_server) Msg("! [diag][vehicle] section=%s missing optional damage particles=%s",car->cNameSect().c_str(),effect->c_str());
+				*effect=nullptr;
+			}
 
 		read_bones(K, ini->r_string("damage_particles", "particle_bones1"), bones1);
 		read_bones(K, ini->r_string("damage_particles", "particle_bones2"), bones2);

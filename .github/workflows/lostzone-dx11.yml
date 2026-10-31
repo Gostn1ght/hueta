@@ -192,6 +192,10 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-character-restore.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-netcoop-character-life.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-netcoop-car-optional-assets.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-physics-save.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-breakable-save.py

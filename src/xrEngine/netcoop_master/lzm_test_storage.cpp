@@ -120,8 +120,11 @@ struct HostControllerFixture {
         assert(!controller.memory_available()); // commit/pagefile is a separate limit
         controller.peak_ram_=2;controller.peak_commit_=4;
         controller.calculate_budget(8.68,16,20);
-        assert(controller.need_ram_>2.39 && controller.need_ram_<2.41);
-        assert(controller.need_commit_>4.79 && controller.need_commit_<4.81);
+        assert(controller.need_ram_==1.5 && controller.need_commit_==3.0);
+        controller.maps_[0].peak_commit=10;controller.maps_[1].peak_commit=0;
+        assert(controller.launch_commit(controller.maps_[0])==12.0);
+        assert(controller.launch_commit(controller.maps_[1])==3.0); // heavy map cannot inflate another map's gate
+        controller.maps_[0].peak_commit=0;
         controller.peak_ram_=controller.peak_commit_=0;
         controller.calculate_budget(8.68,16,20);
         controller.enabled_=true;a.demand=false;controller.queue();

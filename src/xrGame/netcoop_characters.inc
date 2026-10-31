@@ -21,6 +21,9 @@ struct CharacterRestore
 {
 	xr_vector<std::pair<u16, u16>> places, entities; // runtime item -> expected parent
 	bool inventory_complete = false, attempted = false;
+	bool placements_sent = false;
+	bool new_life = false;
+	u32 last_report = 0;
 	u32 last_attempt = 0;
 	u32 since = 0;
 	bool clock_started = false, rejected = false;
@@ -28,6 +31,7 @@ struct CharacterRestore
 static xr_map<u16, CharacterRestore> s_character_restore;
 static bool character_capture_progress(Character& character, CActor* actor);
 static bool character_restore_progress(Character& character, CActor* actor);
+static bool character_notify_ready(CActor* actor, bool new_life);
 static void character_restore_timeout(u16 actor_id);
 
 bool server_character_accepts(xrClientData* CL, u16 type)
@@ -77,9 +81,24 @@ static bool character_name_valid(LPCSTR name)
 	return true;
 }
 
+// Game text is CP1251. Existing saves remain readable, but a new life must
+// use a Russian call sign; Latin lookalikes, digits and markup are refused.
+static bool character_call_sign_valid(LPCSTR name)
+{
+	if (!character_name_valid(name)) return false;
+	u32 letters=0;
+	bool separator=true;
+	for (const unsigned char* c=(const unsigned char*)name;*c;++c) {
+		if (*c>=0xc0 || *c==0xa8 || *c==0xb8) {++letters;separator=false;}
+		else if ((*c==' ' || *c=='-') && !separator) separator=true;
+		else return false;
+	}
+	return letters>=2 && !separator;
+}
+
 bool script_character(int slot, LPCSTR name, LPCSTR faction, int economy, LPCSTR loadout)
 {
-	if (slot < 0 || slot > 10 || !name || !faction || !loadout || xr_strlen(loadout) > 4096) return false;
+	if (slot < 0 || slot > 1 || !name || !faction || !loadout || xr_strlen(loadout) > 4096) return false;
 	s_client_character_slot = u8(slot);
 	s_client_character_name = name;
 	s_client_character_faction = faction;
@@ -540,28 +559,57 @@ static bool character_validate_loadout(LPCSTR faction, u8 economy, LPCSTR loadou
 	return true;
 }
 
-static bool character_select(xrClientData* CL, u8 slot, LPCSTR name, LPCSTR faction, u8 economy, LPCSTR loadout)
+static bool character_starter_loadout(xr_string& loadout)
 {
-	// Enforce the allowance from the authenticated server account, never the UI or a cached role.
-	if (!CL || slot < 1 || slot > (CL->netcoop_role == role_admin ? 10 : 1)) return false;
+	string_path path;
+	if (!FS.exist(path,"$game_config$","items\\settings\\new_game_loadouts.ltx")) return false;
+	CInifile ini(path,TRUE,TRUE,FALSE);
+	if (!ini.section_exist("stalker_loadout")) return false;
+	loadout.clear();
+	auto add=[&](LPCSTR section,u32 count) {
+		if (!pSettings->section_exist(section) || !count || count>32) return false;
+		for(u32 i=0;i<count;++i) {if(!loadout.empty())loadout+=",";loadout+=section;}
+		return loadout.size()<=4096;
+	};
+	for(u32 i=0;i<ini.line_count("stalker_loadout");++i) {
+		LPCSTR section=nullptr,values=nullptr;
+		if(!ini.r_line("stalker_loadout",i,&section,&values)) return false;
+		string128 selectable,count;_GetItem(values,0,selectable);_Trim(selectable);
+		if(xr_strcmp(selectable,"false"))continue;
+		_GetItem(values,1,count);
+		if(!add(section,u32(atoi(count))))return false;
+	}
+	// The rest is fixed by the server, never by account role or client input.
+	for(LPCSTR section:{"wpn_pb","novice_outfit","device_flashlight","medkit","bread","mineral_water"})
+		if(!add(section,1))return false;
+	return character_validate_loadout("stalker",1,loadout.c_str());
+}
+
+static bool character_select(xrClientData* CL, u8 slot, LPCSTR name, LPCSTR, u8, LPCSTR)
+{
+	// One authenticated account owns one character, including administrators.
+	if (!CL || slot != 1) return false;
 	Character* character = character_load(CL->netcoop_login.c_str(), slot);
-	if (!character)
+	if (!character || character->respawn)
 	{
 		// A damaged existing save must not be replaced by a new empty character.
 		string_path existing; character_path(CL->netcoop_login.c_str(),slot,existing);
-		if (GetFileAttributesA(existing)!=INVALID_FILE_ATTRIBUTES) return false;
-		// A damaged save must never be silently replaced by a fresh character.
-		string_path path; character_path(CL->netcoop_login.c_str(), slot, path);
-		if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) return false;
-		if (!character_name_valid(name) || !character_validate_loadout(faction, economy, loadout)) return false;
+		if (!character && GetFileAttributesA(existing)!=INVALID_FILE_ATTRIBUTES) return false;
+		if (!character_call_sign_valid(name) || (character && character->name==name)) return false;
 		Character created;
 		created.account = CL->netcoop_login.c_str(); created.slot = slot;
-		created.name = name; created.faction = faction; created.economy = economy; created.loadout = loadout;
+		created.name = name; created.faction = "stalker"; created.economy = 1;
+		if (!character_starter_loadout(created.loadout)) return false;
+		if (character) {
+			if(character->storage_revision==0xffffffffu)return false;
+			created.storage_revision=character->storage_revision+1;
+		}
 		created.actor.B.count = 0;
 		if (!character_save(created)) return false;
 		const xr_string key = character_key(created.account.c_str(), slot);
 		s_characters[key] = std::move(created);
 		character = &s_characters[key];
+		Msg("[diag][character] account=%s new life slot=1 revision=%u faction=stalker",CL->netcoop_login.c_str(),character->storage_revision);
 	}
 	CL->netcoop_character_slot = slot;
 	CL->netcoop_character_name = character->name.c_str();
@@ -603,7 +651,7 @@ static void drafts_load()
 bool script_save_draft(int slot, LPCSTR name, LPCSTR description, LPCSTR history, LPCSTR faction, int economy, LPCSTR loadout)
 {
     drafts_load();
-    if (s_drafts_owner.empty() || slot < 1 || slot > 10 || !character_name_valid(name) || !description || !history ||
+    if (s_drafts_owner.empty() || slot != 1 || !character_name_valid(name) || !description || !history ||
         xr_strlen(description) > 512 || xr_strlen(history) > 1536 || !faction || !loadout ||
         !character_validate_loadout(faction, u8(economy), loadout)) return false;
     const auto key = std::to_string(slot);
@@ -670,18 +718,19 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor)
 		if (!character->initialized)
 		{
 			trader->set_character_profile(shared_str((xr_string("actor_") + character->faction).c_str()));
-			// Freeplay's starting money for the faction (new_game_loadouts.ltx
-			// [<faction>_money]); only while the account has no money yet -
-			// money belongs to the account, a second character keeps it.
+			// A fresh life receives starter money, preserving account credentials
+			// and role but never the wallet of the dead character.
 			Account* account = account_find(CL->netcoop_login.c_str());
 			string_path path;
-			if (account && !account->has_money && FS.exist(path, "$game_config$", "items\\settings\\new_game_loadouts.ltx"))
+			if (account && FS.exist(path, "$game_config$", "items\\settings\\new_game_loadouts.ltx"))
 			{
 				CInifile ini(path, TRUE, TRUE, FALSE);
 				const xr_string section = character->faction + "_money";
 				if (ini.line_exist(section.c_str(), "money"))
 				{
 					trader->m_dwMoney = u32(_max(0.f, ini.r_float(section.c_str(), "money")));
+					account->money=trader->m_dwMoney;account->has_money=true;
+					account->change_fields|=2;account->touched=true;s_accounts_dirty=true;
 					Msg("[Lost Zone] new character '%s': %u RU (%s)", character->name.c_str(), trader->m_dwMoney, section.c_str());
 				}
 			}
@@ -754,6 +803,7 @@ void server_character_spawn_items(xrClientData* CL)
 	restore = CharacterRestore(); // IDs may have belonged to an abandoned partial restore
 	Character* character = character_load(CL->netcoop_login.c_str(), CL->netcoop_character_slot);
 	if (!character) return;
+	restore.new_life = !character->initialized;
 	s_actor_character[CL->owner->ID] = character_key(character->account.c_str(), character->slot);
 	xrServer* server = Level().Server;
 	if (character->initialized)
@@ -970,13 +1020,35 @@ static void characters_restore_update()
 		{
 			CGameObject* item = smart_cast<CGameObject*>(Level().Objects.net_Find(expected.first));
 			if (!item || !item->H_Parent() || item->H_Parent()->ID() != expected.second ||
-				!item_state_ready_for_save(expected.first)) { ready = false; break; }
+				!item_state_ready_for_save(expected.first)) {
+				if(!it->second.last_report || u32(now-it->second.last_report)>=2000) {
+					it->second.last_report=now;
+					Msg("! [diag][character] actor=%u restore waiting item=%u exists=%u parent=%u expected_parent=%u state_ready=%u",actor->ID(),expected.first,u32(item!=nullptr),item && item->H_Parent() ? item->H_Parent()->ID():u16(-1),expected.second,u32(item_state_ready_for_save(expected.first)));
+				}
+				ready = false; break;
+			}
 		}
 		if (!ready) { ++it; continue; }
 		const auto key = s_actor_character.find(actor->ID());
 		if (key == s_actor_character.end()) { ++it; continue; }
 		const auto character = s_characters.find(key->second);
 		if (character == s_characters.end()) { ++it; continue; }
+		if(it->second.placements_sent) {
+			bool placed=true;
+			for(const auto& saved:it->second.places) {
+				SInvItemPlace wanted;wanted.value=saved.second;
+				auto* item=smart_cast<CInventoryItem*>(Level().Objects.net_Find(saved.first));
+				if(!item || (wanted.type==eItemPlaceSlot && (item->CurrPlace()!=eItemPlaceSlot || item->CurrSlot()!=wanted.slot_id)) ||
+					(wanted.type==eItemPlaceBelt && item->CurrPlace()!=eItemPlaceBelt)) {placed=false;break;}
+			}
+			if(!placed) {++it;continue;}
+			if (it->second.attempted && u32(now-it->second.last_attempt)<1000) {++it;continue;}
+			it->second.attempted=true;it->second.last_attempt=now;
+			if (!character_notify_ready(actor,it->second.new_life)) {++it;continue;}
+			const u16 completed=actor->ID();it=s_character_restore.erase(it);
+			Msg("[diag][character] actor=%u restore complete; inventory and script state ready",completed);
+			continue;
+		}
 		if (it->second.attempted && u32(now - it->second.last_attempt) < 1000) { ++it; continue; }
 		it->second.attempted = true; it->second.last_attempt = now;
 		if (!character_restore_progress(character->second, actor))
@@ -998,7 +1070,9 @@ static void characters_restore_update()
 				if (pass == 1) { packet.w_u16(place.slot_id); packet.w_u8(1); }
 				CGameObject::u_EventSend(packet);
 			}
-		it = s_character_restore.erase(it);
+		it->second.placements_sent=true;
+		it->second.attempted=false;
+		++it;
 	}
 }
 

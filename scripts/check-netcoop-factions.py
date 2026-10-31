@@ -180,4 +180,15 @@ spy.outfit = outfit("dolg_outfit"); tick(); assert(spy.community == "actor_dolg"
 spy.outfit = nil; tick()
 assert(spy.community == "actor_freedom", "taking the outfit off shows his own faction")
 ''')
-print("Factions: apply only, contracts gate, leader/deputy/admin decide per faction policy, cross-server membership, expel, furniture grant, loners/renegades rules, console roster/leader, admin renegade pardon, faction heard by every client, outfit disguise PASS")
+b.execute(r'''
+local reborn=player(12,"reborn_1","New name","freedom",0)
+assert(force_join("freedom","reborn_1","Old name"))
+for _,bucket in ipairs({"ratings","bounties","goodwill"}) do
+ store_update(bucket,"reborn_1",function(data) data.old_life=123;return true end)
+end
+assert(reset_life(reborn) and true_faction(reborn)=="stalker")
+assert(not store_get("factions","freedom").members.reborn_1)
+for _,bucket in ipairs({"ratings","bounties","goodwill"}) do assert(next(store_get(bucket,"reborn_1"))==nil) end
+assert(reset_life(reborn) and true_faction(reborn)=="stalker","new-life reset is idempotent")
+''')
+print("Factions: membership, authority, cross-server changes, disguise and new-life faction/ratings/goodwill reset PASS")

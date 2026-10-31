@@ -1196,7 +1196,11 @@ void CCar::Init()
 		{
 			const CInifile::Item& item = *I;
 			u16 index = pKinematics->LL_BoneID(*item.first);
-			R_ASSERT3(index != BI_NONE, "Wrong bone name", *item.first);
+			if (index == BI_NONE)
+			{
+				Msg("! [diag][vehicle] section=%s damage bone=%s absent; ignored optional damage definition", cNameSect().c_str(), *item.first);
+				continue;
+			}
 			xr_map<u16, SWheel>::iterator i = m_wheels_map.find(index);
 
 			if (i != m_wheels_map.end())
@@ -1204,7 +1208,11 @@ void CCar::Init()
 			else
 			{
 				xr_map<u16, SDoor>::iterator i = m_doors.find(index);
-				R_ASSERT3(i!=m_doors.end(), "only wheel and doors bones allowed for damage defs", *item.first);
+				if (i == m_doors.end())
+				{
+					Msg("! [diag][vehicle] section=%s bone=%s has no physical wheel/door; ignored optional damage definition", cNameSect().c_str(), *item.first);
+					continue;
+				}
 				i->second.CDamagableHealthItem::Init(float(atof(*item.second)), 1);
 			}
 		}

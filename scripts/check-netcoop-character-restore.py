@@ -111,6 +111,9 @@ struct CGameObject {
  static void u_EventSend(NET_Packet&){}
 };
 struct CActor:CGameObject {Info info;Info* m_known_info_registry=&info;int* lua_game_object(){return nullptr;}};
+struct CInventoryItem:CGameObject {u16 place=0,slot=0;u16 CurrPlace()const{return place;}u16 CurrSlot()const{return slot;}};
+int fixture_ready_calls=0;bool fixture_ready_available=true;
+static bool character_notify_ready(CActor*,bool){++fixture_ready_calls;return fixture_ready_available;}
 int fixture_scope_depth=0;
 struct ServerVictimScope {explicit ServerVictimScope(CActor*){++fixture_scope_depth;}~ServerVictimScope(){--fixture_scope_depth;}};
 bool fixture_stopping=false;bool server_stopping(){return fixture_stopping;}
@@ -231,7 +234,7 @@ void admission_cases(CActor& actor,xrClientData& client){
  reset(actor);s_actor_character[actor.ID()]="tester:1";s_characters["tester:1"].progress=saved();
  auto& pending=s_character_restore[actor.ID()];
  characters_restore_update();assert(s_character_restore.size()==1 && fixture_restore_calls==0);
- pending.inventory_complete=true;CGameObject root_item,child;root_item.id=100;root_item.parent=&actor;child.id=101;child.parent=&root_item;
+ pending.inventory_complete=true;CInventoryItem root_item;CGameObject child;root_item.id=100;root_item.parent=&actor;child.id=101;child.parent=&root_item;
  pending.entities={{u16(100),actor.ID()},{u16(101),u16(100)}};pending.places={{u16(100),u16(1)}};
  fixture_runtime.Objects.entries[100]=&root_item;
  characters_restore_update();assert(s_character_restore.size()==1 && fixture_restore_calls==0);
@@ -252,7 +255,15 @@ void admission_cases(CActor& actor,xrClientData& client){
  assert(server_character_accepts(&client,M_CLIENTREADY) && server_character_accepts(&client,M_CLIENT_REQUEST_CONNECTION_DATA));
  assert(server_character_accepts(&client,M_CHANGE_LEVEL) && server_character_accepts(&client,M_CHAT_MESSAGE));
  fixture_throw=false;fixture_clock=999;characters_restore_update();assert(fixture_restore_calls==1 && s_character_restore.size()==1);
- fixture_clock=1000;characters_restore_update();assert(fixture_restore_calls==2 && s_character_restore.empty() && fixture_events.size()==2);
+ fixture_clock=1000;characters_restore_update();assert(fixture_restore_calls==2 && s_character_restore.size()==1 && fixture_events.size()==2);
+ const int ready_before=fixture_ready_calls;
+ characters_restore_update();assert(s_character_restore.size()==1 && fixture_ready_calls==ready_before);
+ root_item.place=eItemPlaceSlot;root_item.slot=2;
+ characters_restore_update();assert(s_character_restore.size()==1 && fixture_ready_calls==ready_before);
+ root_item.slot=1;fixture_ready_available=false;
+ characters_restore_update();assert(s_character_restore.size()==1 && fixture_ready_calls==ready_before+1);
+ assert(!server_character_accepts(&client,M_CL_INPUT));
+ fixture_ready_available=true;fixture_clock=2000;characters_restore_update();assert(s_character_restore.empty() && fixture_ready_calls==ready_before+2);
  assert(server_character_accepts(&client,M_CL_INPUT) && server_character_accepts(nullptr,M_EVENT));
  fixture_stopping=true;assert(!server_character_accepts(&client,M_CL_INPUT)&&!server_character_accepts(&client,M_EVENT));
  assert(server_character_accepts(&client,M_CLIENTREADY));fixture_stopping=false;
@@ -260,7 +271,8 @@ void admission_cases(CActor& actor,xrClientData& client){
  reset(actor);s_actor_character[actor.ID()]="tester:1";s_characters["tester:1"].progress=saved();s_character_restore[actor.ID()].inventory_complete=true;
  fixture_clock=0xfffffff0u;fixture_available=false;characters_restore_update();assert(s_character_restore.size()==1);
  fixture_available=true;fixture_clock+=999u;characters_restore_update();assert(s_character_restore.size()==1);
- fixture_clock+=1u;characters_restore_update();assert(s_character_restore.empty());
+ fixture_clock+=1u;characters_restore_update();assert(s_character_restore.size()==1);
+ characters_restore_update();assert(s_character_restore.empty());
 }
 void timeout_cases(CActor& actor){
  reset(actor);fixture_timeouts=0;s_actor_character[actor.ID()]="tester:1";s_characters["tester:1"].progress=saved();

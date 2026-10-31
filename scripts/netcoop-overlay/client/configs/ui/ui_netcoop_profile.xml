@@ -1,47 +1,17 @@
 <?xml version="1.0" encoding="windows-1251"?>
 <w>
   <panel x="0" y="0" width="1024" height="768" stretch="1">
-    <texture x="0" y="0" width="1672" height="941">ui\lost_zone_background</texture>
-    <auto_static x="194" y="104" width="636" height="560" stretch="1">
-      <texture r="15" g="17" b="18" a="230">ui\netcoop_menu_solid</texture>
+    <auto_static x="236" y="204" width="552" height="350" stretch="1">
+      <texture r="15" g="17" b="18" a="238">ui\netcoop_menu_solid</texture>
     </auto_static>
   </panel>
-  <title x="226" y="129" width="572" height="34">
-    <text r="221" g="204" b="177" font="letterica18" align="l" vert_align="c" />
-  </title>
-  <help x="226" y="173" width="572" height="42">
-    <text r="221" g="204" b="177" font="letterica16" align="l" vert_align="c" complex_mode="1" />
-  </help>
-  <nick x="226" y="235" width="572" height="24">
-    <text r="221" g="204" b="177" font="letterica16" align="l" vert_align="c" />
-  </nick>
-  <input_name x="226" y="265" width="572" height="34" max_symb_count="63">
-    <text x="8" r="230" g="228" b="214" font="letterica16" vert_align="c" align="l" />
-    <texture>ui_inGame2_edit_box_2</texture>
+  <title x="264" y="226" width="496" height="34"><text r="221" g="204" b="177" font="letterica18" align="l" vert_align="c" /></title>
+  <help x="264" y="270" width="496" height="58"><text r="198" g="197" b="183" font="letterica16" complex_mode="1" /></help>
+  <nick x="264" y="340" width="496" height="24"><text r="221" g="204" b="177" font="letterica16" /></nick>
+  <input_name x="264" y="370" width="496" height="34" max_symb_count="63">
+    <text x="8" r="230" g="228" b="214" font="letterica16" vert_align="c" align="l" /><texture>ui_inGame2_edit_box_2</texture>
   </input_name>
-  <description x="226" y="319" width="572" height="24">
-    <text r="221" g="204" b="177" font="letterica16" align="l" vert_align="c" />
-  </description>
-  <input_description x="226" y="349" width="572" height="42" max_symb_count="512">
-    <text x="8" r="230" g="228" b="214" font="letterica16" vert_align="c" align="l" />
-    <texture>ui_inGame2_edit_box_2</texture>
-  </input_description>
-  <history x="226" y="411" width="572" height="24">
-    <text r="221" g="204" b="177" font="letterica16" align="l" vert_align="c" />
-  </history>
-  <input_history x="226" y="441" width="572" height="62" max_symb_count="1536">
-    <text x="8" r="230" g="228" b="214" font="letterica16" vert_align="c" align="l" />
-    <texture>ui_inGame2_edit_box_2</texture>
-  </input_history>
-  <msg x="226" y="521" width="572" height="42">
-    <text r="221" g="204" b="177" font="letterica16" align="l" vert_align="c" complex_mode="1" />
-  </msg>
-  <next x="418" y="589" width="380" height="36">
-    <text r="215" g="210" b="186" align="c" vert_align="c" font="letterica18" />
-    <texture>ui_button_ordinary</texture>
-  </next>
-  <back x="226" y="589" width="172" height="36">
-    <text r="215" g="210" b="186" align="c" vert_align="c" font="letterica16" />
-    <texture>ui_button_ordinary</texture>
-  </back>
+  <msg x="264" y="416" width="496" height="42"><text r="232" g="120" b="104" font="letterica16" complex_mode="1" /></msg>
+  <next x="450" y="486" width="310" height="36"><text r="215" g="210" b="186" font="letterica18" align="c" vert_align="c" /><texture>ui_button_ordinary</texture></next>
+  <back x="264" y="486" width="166" height="36"><text r="215" g="210" b="186" font="letterica16" align="c" vert_align="c" /><texture>ui_button_ordinary</texture></back>
 </w>

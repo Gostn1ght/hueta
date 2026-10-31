@@ -23,7 +23,7 @@ namespace netcoop_world
 namespace
 {
 constexpr std::uint64_t maximum=0x7fffffffffffffffULL;
-constexpr unsigned lease_ms=15000;
+constexpr unsigned lease_ms=60000;
 std::string text(const char* value,std::size_t limit)
 {
     if(!value) return std::string();
@@ -680,7 +680,10 @@ CoordinatorStatus AdmissionCoordinator::status() noexcept
         result.http_status=state_->last_http_status;result.attempts=state_->open_attempts;
         put(result.phase,state_->phase);
         const auto checkpoint=state_->worker.status();
-        if(checkpoint.authority_lost || checkpoint.configuration_error) {result.ready=false;result.failed=true;put(result.phase,"checkpoint_authority_lost");}
+        if(checkpoint.authority_lost || checkpoint.configuration_error) {
+            result.ready=false;result.failed=true;result.http_status=checkpoint.renewal_http_status;
+            result.attempts=checkpoint.renewal_failures;put(result.phase,"checkpoint_authority_lost");
+        }
     }
     catch(...){}
     return result;

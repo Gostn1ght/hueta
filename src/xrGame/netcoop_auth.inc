@@ -29,19 +29,19 @@ static void send_auth_result(xrServer* server, xrClientData* CL, bool ok, u8 rol
     if (ok)
     {
         xr_string names;
-        for (u8 slot = 1; slot <= (role == role_admin ? 10 : 1); ++slot)
+        for (u8 slot = 1; slot <= 1; ++slot)
         {
             Character* character = character_load(CL->netcoop_login.c_str(), slot);
             if (slot > 1) names += "|";
-            if (character) names += character->name;
+            if (character && !character->respawn) names += character->name;
         }
         P.w_stringZ(names.c_str());
         xr_string previews;
-        for (u8 slot = 1; slot <= (role == role_admin ? 10 : 1); ++slot)
+        for (u8 slot = 1; slot <= 1; ++slot)
         {
             Character* character = character_load(CL->netcoop_login.c_str(), slot);
             xr_string visual = "actors\\stalker_neutral\\stalker_neutral_1.ogf", items;
-            if (character)
+            if (character && !character->respawn)
                 for (const auto& item : character->items)
                 {
                     SInvItemPlace place; place.value = item.place;
@@ -49,7 +49,7 @@ static void send_auth_result(xrServer* server, xrClientData* CL, bool ok, u8 rol
                         visual = pSettings->r_string(item.section.c_str(), "actor_visual");
                     if (items.size() + item.section.size() < 1100) { if (!items.empty()) items += ","; items += item.section; }
                 }
-            previews += visual + "|" + (character ? character->faction : "stalker") + "|" + items + "\n";
+            previews += visual + "|" + (character && !character->respawn ? character->faction : "stalker") + "|" + items + "\n";
         }
         // Storage snapshots occupy a separate bounded payload. Full account
         // previews can approach the packet limit and are omitted in that case.
@@ -211,6 +211,7 @@ void server_on_auth(xrServer* server, xrClientData* CL, NET_Packet& P)
     {
         char name[64], faction[32], loadout[4097];
         pending->slot = P.r_u8();
+        if (pending->slot>1) {xr_delete(pending);reject(server,CL,"One account owns one character");return;}
         if (!read_string(P, name, sizeof(name)) || !read_string(P, faction, sizeof(faction)) || P.r_elapsed() < 1)
         { xr_delete(pending); reject(server, CL, "Invalid character request"); return; }
         pending->economy = P.r_u8();
@@ -1060,6 +1061,9 @@ static void server_drop_config_cache()
 void server_frame_update(xrServer* server)
 {
 	if (!enabled() || !g_pGameLevel) return;
+	static u32 restore_checked=0;
+	const u32 restore_now=real_time_ms();
+	if(u32(restore_now-restore_checked)>=100) {restore_checked=restore_now;characters_restore_update();}
 	server_drop_config_cache();
 	world_store_cleanup_loaded();
 	cache_player_positions();

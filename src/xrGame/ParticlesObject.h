@@ -51,6 +51,7 @@ public:
 
 	const shared_str Name();
 public:
+	static bool IsAvailable(LPCSTR name);
 	static CParticlesObject* Create(LPCSTR p_name, BOOL bAutoRemove = TRUE, bool remove_on_game_load = true)
 	{
 		return xr_new<CParticlesObject>(p_name, bAutoRemove, remove_on_game_load);

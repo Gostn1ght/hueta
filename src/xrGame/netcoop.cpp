@@ -5,6 +5,7 @@
 #include "xr_level_controller.h"
 #include "ui_defs.h"
 #include "../xrEngine/netcoop_menu_camera.h"
+#include "../xrEngine/Engine.h"
 
 #include <bcrypt.h>
 #include <algorithm>

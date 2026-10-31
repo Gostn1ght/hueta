@@ -125,7 +125,9 @@ enum class CheckpointStep { Progress,Retry,Rejected,Complete };
 using CheckpointRequest=std::function<bool(const std::string&,const std::string&,const std::string&,BridgeJson&,unsigned&)>;
 inline CheckpointStep checkpoint_failure(unsigned status)
 {
-    return !status || status==408 || status==429 || status>=500 ? CheckpointStep::Retry:CheckpointStep::Rejected;
+    // A 200 header without a verified complete body is an ambiguous reply,
+    // not a fencing refusal. Retry the SAME idempotent command; never accept it.
+    return !status || status==200 || status==408 || status==429 || status>=500 ? CheckpointStep::Retry:CheckpointStep::Rejected;
 }
 inline bool checkpoint_format(const std::string& raw)
 {

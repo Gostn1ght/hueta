@@ -122,6 +122,7 @@ struct State
     HWND hwnd = nullptr, locations = nullptr, players = nullptr, journal = nullptr, output = nullptr, input = nullptr;
     int tab = 2;
     std::vector<Button> buttons, tabs;
+    std::string layout_status;
     int hover = -1;
     float dpi = 1;
     HFONT f_ui = nullptr, f_small = nullptr, f_bold = nullptr, f_title = nullptr, f_value = nullptr, f_mono = nullptr;
@@ -516,6 +517,7 @@ void layout(State& s)
     }
     int online = 0;
     for (auto& l : view.locations) online += l.online;
+    s.layout_status=std::to_string(running)+"|"+std::to_string(online)+"|"+std::to_string(view.locations.size())+"|"+std::to_string(view.players.size());
     std::vector<std::wstring> names = { L"Локации · " + std::to_wstring(online) + L"/" + std::to_wstring(view.locations.size()),
                                         L"Игроки · " + std::to_wstring(view.players.size()), L"Общая консоль" };
     for (int i = 0; i < 3; ++i)
@@ -677,6 +679,11 @@ void paint(State& s, HDC target)
 // -- rich text journal ---------------------------------------------------------------------------------------------
 void append(HWND edit, const std::wstring& t, COLORREF color)
 {
+    SCROLLINFO scroll{sizeof(scroll),SIF_ALL};GetScrollInfo(edit,SB_VERT,&scroll);
+    const bool follow=scroll.nPos+int(scroll.nPage)>=scroll.nMax-2;
+    CHARRANGE selection{};SendMessageW(edit,EM_EXGETSEL,0,(LPARAM)&selection);
+    const int first=int(SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0));
+    SendMessageW(edit,WM_SETREDRAW,FALSE,0);
     int length = GetWindowTextLengthW(edit);
     SendMessageW(edit, EM_SETSEL, length, length);
     CHARFORMAT2W format{};
@@ -686,13 +693,21 @@ void append(HWND edit, const std::wstring& t, COLORREF color)
     SendMessageW(edit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
     SendMessageW(edit, EM_REPLACESEL, FALSE, (LPARAM)t.c_str());
     int lines = int(SendMessageW(edit, EM_GETLINECOUNT, 0, 0));
+    int removed=0,cut=0;
     if (lines > 4000)
     {
-        int cut = int(SendMessageW(edit, EM_LINEINDEX, lines - 3000, 0));
+        removed=lines-3000;cut = int(SendMessageW(edit, EM_LINEINDEX, removed, 0));
         SendMessageW(edit, EM_SETSEL, 0, cut);
         SendMessageW(edit, EM_REPLACESEL, FALSE, (LPARAM)L"");
     }
-    SendMessageW(edit, WM_VSCROLL, SB_BOTTOM, 0);
+    if(follow) SendMessageW(edit,WM_VSCROLL,SB_BOTTOM,0);
+    else {
+        selection.cpMin=(std::max)(0L,selection.cpMin-cut);selection.cpMax=(std::max)(0L,selection.cpMax-cut);
+        SendMessageW(edit,EM_EXSETSEL,0,(LPARAM)&selection);
+        const int now=int(SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0));
+        SendMessageW(edit,EM_LINESCROLL,0,(std::max)(0,first-removed)-now);
+    }
+    SendMessageW(edit,WM_SETREDRAW,TRUE,0);InvalidateRect(edit,nullptr,FALSE);
 }
 
 HWND make_rich(State& s, HWND parent)
@@ -777,6 +792,26 @@ HWND make_list(State& s, HWND parent, const std::vector<std::pair<std::wstring, 
 
 void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, const std::vector<int>& tags)
 {
+    bool stable=ListView_GetItemCount(list)==int(rows.size());
+    for(size_t r=0;stable && r<rows.size();++r) {
+        wchar_t key[256]{};LVITEMW item{};item.pszText=key;item.cchTextMax=256;
+        SendMessageW(list,LVM_GETITEMTEXTW,WPARAM(r),(LPARAM)&item);stable=rows[r][0]==key;
+    }
+    if(stable) {
+        // Heartbeats change cells, not row identity. Keep scroll, focus and selection.
+        for(size_t r=0;r<rows.size();++r) {
+            LVITEMW tag{};tag.mask=LVIF_PARAM;tag.iItem=int(r);tag.lParam=tags[r];
+            SendMessageW(list,LVM_SETITEMW,0,(LPARAM)&tag);
+            for(size_t c=0;c<rows[r].size();++c) {
+                wchar_t value[4096]{};LVITEMW cell{};cell.iSubItem=int(c);cell.pszText=value;cell.cchTextMax=4096;
+                SendMessageW(list,LVM_GETITEMTEXTW,WPARAM(r),(LPARAM)&cell);
+                if(rows[r][c]==value) continue;
+                cell.pszText=(LPWSTR)rows[r][c].c_str();SendMessageW(list,LVM_SETITEMTEXTW,WPARAM(r),(LPARAM)&cell);
+            }
+        }
+        return;
+    }
+    const int previous_top=ListView_GetTopIndex(list);
     std::set<std::wstring> selected_keys;
     for(int selected=ListView_GetNextItem(list,-1,LVNI_SELECTED);selected>=0;selected=ListView_GetNextItem(list,selected,LVNI_SELECTED))
     {
@@ -808,7 +843,36 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
         if (selected_keys.count(rows[r][0])) ListView_SetItemState(list, index, LVIS_SELECTED, LVIS_SELECTED);
     }
     SendMessageW(list, WM_SETREDRAW, TRUE, 0);
-    InvalidateRect(list, nullptr, TRUE);
+    if(!rows.empty()) ListView_EnsureVisible(list,(std::min)(previous_top,int(rows.size())-1),FALSE);
+    InvalidateRect(list, nullptr, FALSE);
+}
+
+// Runs only in the isolated CI window, never against the hoster's controls.
+bool preservation_selftest(State& s)
+{
+    HWND list=make_list(s,s.hwnd,{{L"id",180},{L"state",180}});
+    MoveWindow(list,3000,0,400,200,FALSE);
+    std::vector<std::vector<std::wstring>> rows;std::vector<int> tags;
+    for(int i=0;i<80;++i) {rows.push_back({std::to_wstring(i),L"before"});tags.push_back(i);}
+    set_rows(list,rows,tags);ListView_EnsureVisible(list,60,FALSE);
+    ListView_SetItemState(list,60,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+    const int top=ListView_GetTopIndex(list);
+    rows[60][1]=L"after";set_rows(list,rows,tags);
+    const bool table_ok=ListView_GetTopIndex(list)==top &&
+        ListView_GetNextItem(list,-1,LVNI_SELECTED)==60 && ListView_GetNextItem(list,-1,LVNI_FOCUSED)==60;
+    HIMAGELIST image=ListView_GetImageList(list,LVSIL_SMALL);DestroyWindow(list);if(image)ImageList_Destroy(image);
+    HWND edit=make_rich(s,s.hwnd);MoveWindow(edit,3000,0,400,160,FALSE);
+    std::wstring lines;for(int i=0;i<300;++i)lines+=L"scroll fixture "+std::to_wstring(i)+L"\r\n";
+    append(edit,lines,C_TEXT);
+    CHARRANGE selection{10,15};SendMessageW(edit,EM_EXSETSEL,0,(LPARAM)&selection);
+    SendMessageW(edit,WM_VSCROLL,SB_TOP,0);SendMessageW(edit,EM_LINESCROLL,0,30);
+    const auto first=SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0);
+    append(edit,L"new heartbeat\r\n",C_TEXT);
+    CHARRANGE after{};SendMessageW(edit,EM_EXGETSEL,0,(LPARAM)&after);
+    const bool console_ok=first>0 && first==SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0) &&
+        after.cpMin==selection.cpMin && after.cpMax==selection.cpMax;
+    DestroyWindow(edit);
+    return table_ok && console_ok;
 }
 
 bool operator==(const LocationRow& a, const LocationRow& b) { return a.id == b.id && a.state == b.state && a.address == b.address && a.players == b.players && a.process==b.process && a.detail==b.detail; }
@@ -1183,7 +1247,14 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
             if(s->close_after_stop) {s->closing=true;DestroyWindow(hwnd);return 0;}
         }
         refresh_lists(*s);
-        layout(*s);
+        {
+            View view;
+            {std::lock_guard<std::mutex> guard(s->view_lock);if(s->view)view=*s->view;}
+            int online=0;for(const auto& location:view.locations)online+=location.online;
+            const bool running=s->service && s->service->running();
+            const auto status=std::to_string(running)+"|"+std::to_string(online)+"|"+std::to_string(view.locations.size())+"|"+std::to_string(view.players.size());
+            if(status!=s->layout_status)layout(*s);
+        }
         InvalidateRect(hwnd, nullptr, FALSE);
         if (!s->options.selftest.empty())
         {
@@ -1216,10 +1287,11 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
                 const bool written = write_host_command(s->options.roster_folder, "k00_marsh", "start");
                 std::ifstream command(s->options.roster_folder + L"\\host_command_k00_marsh.txt", std::ios::binary);
                 std::string action((std::istreambuf_iterator<char>(command)), std::istreambuf_iterator<char>());
+                const bool preserved=preservation_selftest(*s);
                 s->selftest = { { "status", split(status, '\n')[0] }, { "quit", refused }, { "locations", view.locations.size() },
-                                { "host_command", written && action == "start" }, {"pid_json",pids_ok},
+                                { "host_command", written && action == "start" }, {"pid_json",pids_ok}, {"scroll_selection",preserved},
                                 { "calendar", calendar_text(view.world_ms) }, { "api_port", s->service->api_port() } };
-                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start" && pids_ok, "");
+                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start" && pids_ok && preserved, "");
             }
             else if ((monotonic_ns() - s->started_ns) > 90000000000LL)
                 finish_selftest(*s, false, "timeout");

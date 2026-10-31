@@ -550,6 +550,17 @@ static bool character_capture_progress(Character& character, CActor* actor)
 	return true;
 }
 
+static bool character_notify_ready(CActor* actor, bool new_life)
+{
+	ServerVictimScope scope(actor);
+	::luabind::functor<bool> ready;
+	if(!ai().script_engine().functor("netcoop_server_compat.character_ready",ready)) {
+		Msg("! [diag][character] actor=%u ready callback missing; verify server script archive",actor->ID());return false;
+	}
+	try {return ready(actor->lua_game_object(),new_life);}
+	catch(...) {Msg("! [diag][character] actor=%u ready callback failed",actor->ID());return false;}
+}
+
 static bool character_restore_progress(Character& character, CActor* actor)
 {
 	if (character.progress.empty()) return true;

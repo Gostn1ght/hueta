@@ -1172,6 +1172,14 @@ end
 function use_player_state(data)
 	local a = db.actor
 	if not a then pending_player_state = data; return end
+	local target, payload = string.match(data or "", "^@(%d+)|(.*)$")
+	if target then
+		if tonumber(target) ~= a:id() then
+			printf("[Lost Zone][state] ignored snapshot actor=%s current=%s", target, a:id())
+			return
+		end
+		data = payload
+	end
 	local state = (not data or data == "-") and {} or state_decode(data)
 	if not state then return end
 	pending_player_state = nil

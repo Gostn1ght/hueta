@@ -100,8 +100,9 @@ particle_catalog = json.loads((ROOT / 'scripts/fixtures/gamma-particle-names.jso
 particle_names = set(particle_catalog['names'])
 assert len(particle_names) > 2000 and re.fullmatch('[0-9a-f]{64}', particle_catalog['sha256'])
 old_particle = b'vehiclefx\\exhausts\\exhaust_kamaz'
-new_particle = b'vehiclefx\\exhaust_kamaz'
+new_particle = b'vehiclefx\\exhaust_1'
 assert dcp_import.adapt_particle_paths(b'physics unchanged\nexhaust_particles = ' + old_particle) == b'physics unchanged\nexhaust_particles = ' + new_particle
+assert dcp_import.adapt_particle_paths(b'vehiclefx\\exhaust_kamaz') == new_particle
 assert new_particle.decode() in particle_names and old_particle.decode() not in particle_names
 for side in (CLIENT, SERVER):
     for path in (side / 'configs/models/vehicles').rglob('*.ltx'):

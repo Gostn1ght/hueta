@@ -67,6 +67,7 @@ struct CheckpointWorker::State
     bool stopping=false,initialized=false,configuration_error=false,storage_error=false,authority_lost=false;
     bool fatal=false,all_staged=false;
     std::uint64_t lease_deadline=0,renewals=0,bytes=0;
+    unsigned renewal_http_status=0,renewal_failures=0;
     std::map<Key,Record> records;
     std::map<std::string,std::uint64_t> floor;
     std::thread pump,heartbeat;
@@ -85,6 +86,7 @@ struct CheckpointWorker::State
         result.initialized=initialized;result.ready=ready_locked();result.stopping=stopping;
         result.configuration_error=configuration_error;result.storage_error=storage_error;result.authority_lost=authority_lost;
         result.captures=unsigned(records.size());result.bytes=bytes;result.lease_renewals=renewals;
+        result.renewal_http_status=renewal_http_status;result.renewal_failures=renewal_failures;
         for(const auto& record:records) if(!record.second.staged) ++result.buffered;
         return result;
     }
@@ -110,6 +112,8 @@ struct CheckpointWorker::State
                             bridge_unsigned(result,"fence")==scope.fence && bridge_unsigned(result,"expires_ms")>0;
                     std::unique_lock<std::mutex> guard(lock);
                     if(stopping) return;
+                    renewal_http_status=http_status;
+                    if(!valid)++renewal_failures;
                     if(valid)
                     {
                         lease_deadline=sent+scope.lease_ms;++renewals;accepted=true;wake.notify_all();
@@ -125,7 +129,7 @@ struct CheckpointWorker::State
                 }
                 std::unique_lock<std::mutex> guard(lock);
                 const auto now=GetTickCount64();
-                const auto delay=lease_deadline>now ? std::min<std::uint64_t>(scope.lease_ms/3,lease_deadline-now):0;
+                const auto delay=lease_deadline>now ? std::min<std::uint64_t>(5000,std::min<std::uint64_t>(scope.lease_ms/3,lease_deadline-now)):0;
                 wake.wait_for(guard,std::chrono::milliseconds(delay),[this]{return stopping;});
                 if(stopping) return;
             }
@@ -310,7 +314,7 @@ bool CheckpointWorker::start(const char* path,const wchar_t* directory,const Che
         const auto config=fixed(path,4096),location=fixed(scope.location,64),instance=fixed(scope.instance,32);
         if(config.empty() || location.empty() || location.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")!=std::string::npos ||
             !checkpoint_hex(instance,32) || !scope.world || !scope.epoch || scope.epoch>maximum || !scope.fence || scope.fence>maximum ||
-            scope.lease_ms<1000 || scope.lease_ms>15000 || !directory) return false;
+            scope.lease_ms<1000 || scope.lease_ms>60000 || !directory) return false;
         std::size_t length=0;while(length<=2048 && directory[length]) ++length;
         if(!length || length>2048) return false;
         auto state=std::make_unique<State>(config,std::wstring(directory,length),scope);state_=state.release();return true;

@@ -14,6 +14,11 @@
 
 const Fvector zero_vel = {0.f, 0.f, 0.f};
 
+bool CParticlesObject::IsAvailable(LPCSTR name)
+{
+	return !g_dedicated_server && Render && Render->model_ParticlesExists(name);
+}
+
 CParticlesObject::CParticlesObject(LPCSTR p_name, BOOL bAutoRemove, bool destroy_on_game_load) :
 	inherited(destroy_on_game_load)
 {

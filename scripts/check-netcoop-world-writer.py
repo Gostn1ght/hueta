@@ -559,6 +559,7 @@ int main(int argc,char** argv){
  assert(refused && corrupt.step(actual)==CheckpointStep::Rejected);rejects([&]{corrupt.bytes();});
  rejects([&]{CheckpointDownload invalid(character,tf,1,2,sha,checkpoint_limit+1);});
  assert(checkpoint_failure(409)==CheckpointStep::Rejected && checkpoint_failure(429)==CheckpointStep::Retry);
+ assert(checkpoint_failure(200)==CheckpointStep::Retry && "incomplete HTTP success must retry the same idempotent command");
  CheckpointUpload stale(raw,character,sf,1,7,2,1,std::string(32,'b'));
  auto old_source=[&](const std::string& method,const std::string& path,const std::string& payload,BridgeJson& out,unsigned& code){
   return writer_request(src,a,epoch,method,path,payload,out,code);

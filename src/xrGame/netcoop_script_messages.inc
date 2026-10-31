@@ -50,6 +50,21 @@ void client_on_script(NET_Packet& P)
 		return;
 	if (!xr_strcmp(channel, "netcoop_transfer")) return client_cluster_transfer(data);
 	if (!xr_strcmp(channel, "netcoop_zones")) return client_on_zones(data);
+	if (!xr_strcmp(channel,"netcoop_life_ended")) {
+		::luabind::functor<void> ended;
+		if(ai().script_engine().functor("netcoop_login_ui.on_life_ended",ended)) {
+			try {ended();}catch(...) {Msg("! [diag][character] life-ended menu callback failed");}
+		}
+		Engine.Event.Defer("KERNEL:disconnect");
+		return;
+	}
+	if (!xr_strcmp(channel,"netcoop_admin_state")) {
+		unsigned god=0,ammo=0;
+		if(sscanf(data,"%u|%u",&god,&ammo)!=2 || god>1 || ammo>1) return;
+		psActorFlags.set(AF_GODMODE,client_admin_authorized() && god);
+		psActorFlags.set(AF_UNLIMITEDAMMO,client_admin_authorized() && ammo);
+		return;
+	}
 	if (!xr_strcmp(channel, "netcoop_actor_faction"))
 	{
 		// A player's faction or disguise changed on the server (netcoop_factions,
@@ -79,7 +94,10 @@ void client_on_script(NET_Packet& P)
 		const bool admin = !xr_strcmp(data, "admin");
 		s_client_role = admin ? role_admin : role_player;
 		s_client_role_verified = true;
-		if (!admin) psActorFlags.set(AF_GODMODE, FALSE);
+		if (!admin) {
+			psActorFlags.set(AF_GODMODE, FALSE);
+			psActorFlags.set(AF_UNLIMITEDAMMO, FALSE);
+		}
 		// The admin's debug/spawn menu keys were registered only at login
 		// (owner 2026-10-18: admin given from the master window needed a relog).
 		call_lua("netcoop_client_compat.on_role_changed", true, s_client_role, "");

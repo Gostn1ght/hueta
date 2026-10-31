@@ -7,6 +7,8 @@ from pathlib import Path
 import os
 import subprocess
 
+if os.environ.get('GITHUB_ACTIONS') != 'true':
+    raise SystemExit('Native checks must run in GitHub Actions')
 root = Path(__file__).resolve().parents[1]
 out = root.parent / 'build-logs' / 'menu-access'
 out.mkdir(parents=True, exist_ok=True)
@@ -24,6 +26,8 @@ stub = r'''
 #include <cstdio>
 using LPCSTR = const char*;
 using u8 = unsigned char;
+using u32 = unsigned;
+void Msg(const char*,...){}
 using xr_string = std::string;
 using string_path = char[1024];
 struct { LPCSTR Params = "-netcoop"; } Core;
@@ -36,7 +40,7 @@ const unsigned INVALID_FILE_ATTRIBUTES = ~0u;
 unsigned GetFileAttributesA(LPCSTR) { return INVALID_FILE_ATTRIBUTES; }
 struct Character {
     xr_string account,name="Existing character",faction,loadout;
-    u8 slot=1,economy=1;
+    u8 slot=1,economy=1; bool respawn=false;u32 storage_revision=1;
     struct { struct { unsigned count; } B; } actor;
 };
 struct xrClientData {
@@ -59,7 +63,8 @@ static xr_string s_firebase_api,s_email_code_endpoint;
 int loads=0;
 Character* character_load(LPCSTR,u8) { ++loads; return &existing; }
 void character_path(LPCSTR,u8,string_path& path) { path[0]=0; }
-bool character_name_valid(LPCSTR) { return true; }
+bool character_call_sign_valid(LPCSTR) { return true; }
+bool character_starter_loadout(xr_string& kit) {kit="starter";return true;}
 bool character_validate_loadout(LPCSTR,u8,LPCSTR) { return true; }
 bool character_save(Character&) { return true; }
 xr_string character_key(LPCSTR,u8) { return "character"; }
@@ -100,8 +105,9 @@ int main() {
         int before=loads;assert(!character_select(&client,slot,"x","stalker",1,""));assert(loads==before);
     }
     client.netcoop_role=2;
-    for (u8 slot=1;slot<=10;++slot) {
-        assert(character_select(&client,slot,"x","stalker",1,""));assert(client.netcoop_character_slot==slot);
+    assert(character_select(&client,1,"x","stalker",1,""));
+    for (u8 slot=2;slot<=10;++slot) {
+        assert(!character_select(&client,slot,"x","stalker",1,""));assert(client.netcoop_character_slot==1);
     }
     assert(!character_select(&client,11,"x","stalker",1,""));
     client.netcoop_role=1;assert(!character_select(&client,10,"x","stalker",1,""));

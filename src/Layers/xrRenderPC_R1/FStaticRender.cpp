@@ -215,6 +215,11 @@ IRenderVisual* CRender::model_CreatePE(LPCSTR name)
 	return Models->CreatePE(SE);
 }
 
+bool CRender::model_ParticlesExists(LPCSTR name)
+{
+	return name && *name && (PSLibrary.FindPED(name) || PSLibrary.FindPGD(name));
+}
+
 IRenderVisual* CRender::model_CreateParticles(LPCSTR name)
 {
 	PS::CPEDef* SE = PSLibrary.FindPED(name);

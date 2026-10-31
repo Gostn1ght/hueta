@@ -1549,4 +1549,9 @@
   <string id="st_netcoop_map_jupiter_underground"><text>Путепровод «Припять-1»</text></string>
   <string id="st_netcoop_map_pripyat"><text>Припять (ЗП)</text></string>
   <string id="st_netcoop_map_labx8"><text>Лаборатория X-8</text></string>
+  <string id="st_netcoop_life_title"><text>Новая жизнь</text></string>
+  <string id="st_netcoop_life_help"><text>Один аккаунт — один персонаж. Начало за одиночек со стартовыми вещами и деньгами. После смерти нужна новая кличка.</text></string>
+  <string id="st_netcoop_life_start"><text>Начать жизнь</text></string>
+  <string id="st_netcoop_life_name_invalid"><text>Кличка: только русские буквы, пробел или дефис. Минимум две буквы. Кличка прошлой жизни не подходит.</text></string>
+  <string id="st_netcoop_create_account_link"><text>Создать аккаунт</text></string>
 </string_table>

@@ -275,6 +275,7 @@ void client_on_auth_result(NET_Packet& P)
 
 	s_client_role = ok ? role : u8(role_none);
     psActorFlags.set(AF_GODMODE, FALSE); // new/revoked auth is not an inherited god session
+    psActorFlags.set(AF_UNLIMITEDAMMO, FALSE); // restored only by the admitted server-owned snapshot
     s_client_role_verified = !!ok;
     const bool cloud = firebase_enabled() && !s_firebase_session.id.empty();
 	if (ok) { s_client_approved = true; if (!cloud) client_store_credentials(); }

@@ -30,6 +30,7 @@ struct CheckpointWorkerStatus
 {
     bool initialized=false,ready=false,stopping=false,configuration_error=false,storage_error=false,authority_lost=false;
     unsigned captures=0,buffered=0;
+    unsigned renewal_http_status=0,renewal_failures=0;
     std::uint64_t bytes=0,lease_renewals=0;
 };
 

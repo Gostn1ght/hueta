@@ -121,10 +121,11 @@ lua.execute(menu_source.read_text(encoding='cp1251'))
 lua.execute("assert(rawget(netcoop_login_wnd, 'Show') == nil, 'native Show must stay inherited')")
 lua.execute(r'''
 local menu={HideDialog=function(s) s.hidden=true end,Show=function() end,ShowDialog=function() end}
-local approved_menu={}; state=2
-assert(frontend_update(approved_menu)==false)
+local approved_menu={HideDialog=function() end,Show=function() end}; state=2
+assert(frontend_update(approved_menu)==true and last_window.mode=='characters' and #auth_requests==0)
 state=0
-assert(frontend_update(menu)==true)
+assert(frontend_update(menu)==true and last_window.mode=='characters')
+last_window:ShowCharacterView();assert(last_window.mode=='account')
 assert(not controls.input_code.shown and not controls.input_code.enabled, 'legacy account form must not show a verification-code overlay')
 controls.input_login:SetText('tester_pending'); controls.input_pass:SetText('')
 callbacks.btn_reg(); assert(#characters==0 and #commands==0)
@@ -143,21 +144,20 @@ on_auth_result(true,1,'Account verified'); last_window:Update()
 assert(#commands==0)
 assert(controls.name.text=='Alpha' and previews[#previews].pose==-2)
 finish_camera()
-assert(callbacks.room_next~=nil and callbacks.room_previous~=nil and not controls.details_panel.shown, 'camera arrows and hidden character list')
+assert(callbacks.room_next~=nil and callbacks.room_previous~=nil and controls.details_panel.shown, 'character interaction opens its details without a slot list')
 assert(last_window:CharacterLimit()==1 and not controls.slot2.shown and not controls.slot10.shown)
 local n=#characters; last_window:SelectCharacter(2); assert(#characters==n)
 local previous=last_window.mode; last_window:ShowProfile(2); assert(last_window.mode==previous)
 assert(callbacks.preview_pose_1==nil and callbacks.char_poses==nil)
 role=2; cache_characters('Alpha|Beta||||||||');last_window:ShowCharacters()
-assert(last_window:CharacterLimit()==10 and controls.slot10.shown)
-callbacks.char_slot2();assert(controls.name.text=='Beta')
-callbacks.char_slot1();assert(controls.name.text=='Alpha')
-callbacks.char_slot10(); assert(controls.info.text:find('10 / 10',1,true))
-callbacks.char_slot1(); last_window:ActivateObject(0); camera_done=true;last_window:Update(); callbacks.server_connect()
+assert(last_window:CharacterLimit()==1 and not controls.slot10.shown and not controls.slot1.shown)
+local before=#characters;last_window:SelectCharacter(10);assert(#characters==before,'admin cannot enter a second character')
+assert(controls.name.text=='Alpha')
+ last_window:ActivateObject(0); camera_done=true;last_window:Update(); callbacks.server_connect()
 assert(characters[#characters].slot==1 and characters[#characters].name=='Alpha')
 assert(can_mcm()==true);role=0;assert(can_mcm()==false)
 ''')
-print('Actual menu Lua: first screen, saved-account bypass, empty-password rejection, account verification without world-start commands, pending account lock, one/ten character allowance, admin slot 10 and seated 3D preview PASS')
+print('Actual menu Lua: first screen, saved-account bypass, empty-password rejection, account verification without world-start commands, pending account lock, one character for players/admins, hidden slot list and seated 3D preview PASS')
 
 lua.execute(r'''
 commands,characters,cloud_requests,drafts={},{},{},{}
@@ -208,7 +208,9 @@ function finish_camera() camera_done=true;if room_model then room_presented=true
 lua.execute(menu_source.read_text(encoding='cp1251'))
 lua.execute(r'''
 local menu={HideDialog=function() end,Show=function() end,ShowDialog=function() end}
-assert(frontend_update(menu)==true)
+assert(frontend_update(menu)==true and last_window.mode=='characters' and #cloud_requests==0)
+last_window:ShowCharacterView();assert(last_window.mode=='account' and last_window.screen=='login')
+last_window:OpenRegistration()
 local account_music=music_started
 last_window:Update();netcoop_menu_radio.track(1);netcoop_menu_radio.toggle();netcoop_menu_radio.toggle()
 assert(music_started==account_music, 'account screen must remain silent, including direct radio controls')
@@ -293,46 +295,23 @@ now=now+60000;last_window:Update();assert(cloud_requests[#cloud_requests].action
 cloud_state=2;on_cloud_result(true,'','cloud_user',true);last_window:Update()
 assert(last_window.mode=='profile' and #commands==0)
 last_window:Update();assert(music_started==account_music, 'profile creation must remain silent')
-controls.input_name:SetText('Loner One'); controls.input_description:SetText('Brown jacket')
-controls.input_history:SetText('A separate character history')
-canonical_loads, injected_loads=0,0
-new_game_loadout_injector_mcm={_LoadLoadout=function(menu) canonical_loads=canonical_loads+1;menu.canonical=true end}
-local picker={LoadLoadout=function(menu) injected_loads=injected_loads+1;menu.canonical=false end}
-ui_mm_faction_select={UINewGame=setmetatable(picker,{__call=function(class,owner)
- local hidden={Show=function() end}
- last_creator={owner=owner,actions={},SetAutoDelete=function() end,HideDialog=function(s) s.shown=false end,ShowDialog=function(s) s.shown=true end,Show=function(s,v) s.shown=v end,
-  AddCallback=function(s,id,event,fn,selfref) s.actions[id]=function() return fn(selfref) end end,
-  character_name={SetText=function(s,v) s.name=v end,GetText=function(s) return s.name end},scroll_options=hidden,list_map=hidden}
- last_creator.actions.btn_start=function() error('Legacy start callback must be replaced') end
- class.LoadLoadout(last_creator,false)
- setmetatable(last_creator,{__index=class})
- return last_creator
-end})}
-callbacks.profile_next(); assert(last_creator.character_name.name=='Loner One' and last_creator.canonical and canonical_loads==1)
-assert(#commands==0 and #characters==0)
-last_creator.access=true; last_creator.points_left=10; last_creator.selected_economy='st_econ_1'; last_creator.selected_faction='stalker'
-last_creator.CC={inventory={cell={{section='medkit',IsShown=function() return true end,CountChilds=function() return 2 end}}}}
-netcoop_login_ui={finish_creation=finish_creation}
-local original_save=netcoop_save_draft
-netcoop_save_draft=function() return false end
-last_creator.actions.btn_start()
-assert(last_creator.shown and last_window.mode=='profile' and last_creator.netcoop_status.text=='st_netcoop_loadout_save_failed')
-assert(last_creator.CC.inventory.cell[1]:CountChilds()==2 and last_window.profile_data.history=='A separate character history')
-netcoop_save_draft=function() error('fixture write error') end
-last_creator.actions.btn_start()
-assert(last_creator.shown and last_creator.netcoop_status.text=='st_netcoop_loadout_error')
-netcoop_save_draft=original_save
-last_creator.actions.btn_back()
-assert(last_window.mode=='profile' and not last_creator.shown and controls.input_history.text=='A separate character history')
-local loads=canonical_loads
-callbacks.profile_next();assert(canonical_loads==loads and last_creator.CC.inventory.cell[1]:CountChilds()==2, 'back must preserve selected equipment')
-last_creator.actions.btn_start()
-assert(drafts[1].loadout=='medkit,medkit,medkit')
-assert(drafts[1].history=='A separate character history')
-assert(last_window.mode=='characters' and controls.name.text=='Loner One' and #commands==0)
-assert(not controls.input_email.shown and not controls.background.shown)
-last_window:Update();assert(music_started==account_music, 'loaded room must wait for a successfully presented frame')
-drafts[1].loadout='medkit,medkit,medkit,wpn_ak74';last_window:ShowCharacters()
+-- A new account creates its single life with a Russian call sign only.
+assert(controls.input_description==nil and controls.input_history==nil)
+local original_enter=last_window.EnterCharacter
+local started
+last_window.EnterCharacter=function(self,slot,name,faction,economy,loadout) started={slot,name,faction,economy,loadout} end
+for _,bad in ipairs({'Loner One','123','-',' A','A|B',string.char(192,32,32,193)}) do
+ controls.input_name:SetText(bad);callbacks.profile_next();assert(not started and controls.msg.text=='st_netcoop_life_name_invalid')
+end
+local russian=string.char(193,238,240,232,241)
+controls.input_name:SetText(russian);callbacks.profile_next()
+assert(started[1]==1 and started[2]==russian and started[3]=='stalker' and started[4]==1 and started[5]=='')
+assert(profile[1]=='' and profile[2]=='' and #commands==0 and #characters==0)
+last_window.EnterCharacter=original_enter
+-- A dead character must not be restored from an old equipment-picker draft.
+drafts[1]={name='Dead draft',faction='dolg',loadout='wpn_ak74'}
+cache_characters('');last_window:ShowCharacters();assert((last_window.names[1] or '')=='')
+cache_characters('Loner One');cache_previews('actors\\novice.ogf|stalker|wpn_ak74\n');last_window:ShowCharacters()
 assert(last_weapon=='' and controls.inventory_scroll==nil and controls.safe==nil and callbacks.char_inventory==nil)
 finish_camera()
 -- The inventory key no longer opens anything in the menu.
@@ -357,13 +336,13 @@ ui_options.UIOptions=options_factory
 finish_camera()
 controls.server_edit:SetText('Other-Server.example:1268');callbacks.server_save()
 assert(draft_scope=='other-server.example:1268' and (last_window.names[1] or '')=='' and previews[#previews].pose==-2)
-assert(draft_stores['127.0.0.1:5446'][1].name=='Loner One')
+assert(draft_stores['127.0.0.1:5446'][1].name=='Dead draft')
 controls.server_edit:SetText('127.0.0.1:5446');callbacks.server_save();assert(last_window.names[1]=='Loner One' and previews[#previews].pose==-2)
 last_window:ActivateObject(0); finish_camera();assert(controls.server_panel.shown,'server panel');callbacks.server_connect(); assert(cloud_requests[#cloud_requests].action=='refresh' and #commands==0,'server refresh')
 on_cloud_result(false,'NETWORK_ERROR','cloud_user',true); assert(#commands==0)
 callbacks.server_connect(); on_cloud_result(true,'','cloud_user',true)
 assert(characters[#characters].name=='Loner One' and characters[#characters].slot==1)
-assert(profile[1]=='Brown jacket' and #commands==2)
+assert(profile[1]=='' and #commands==2)
 cache_characters('Server saved name||||');last_window:ShowCharacters();assert(last_window.names[1]=='Server saved name')
 cloud_identity='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';last_window:ShowCharacters();assert((last_window.names[1] or '')=='' and previews[#previews].pose==-2)
 cloud_identity='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';last_window:ShowCharacters();assert(last_window.names[1]=='Server saved name')
@@ -372,7 +351,8 @@ last_window:ResetCloud();assert(not controls.input_code.shown and not controls.b
 -- A remembered cloud account is refreshed before the frontend skips login.
 commands={}; local again={HideDialog=function() end,Show=function() end,ShowDialog=function() end}
 local before=#cloud_requests; assert(frontend_update(again)==true)
-assert(#cloud_requests==before+1 and cloud_requests[#cloud_requests].action=='refresh' and #commands==0)
+assert(#cloud_requests==before and last_window.mode=='characters' and #commands==0)
+last_window:OpenAccountForm('login');last_window:CloudRequest('refresh')
 ''')
 lua.execute(r"""
 on_cloud_result(true,'','cloud_user',true);last_window:Update()
@@ -386,12 +366,12 @@ on_auth_result(false,0,'Server is unavailable')
 assert(last_window.mode=='characters' and last_window:CharacterLimit()==1 and #commands==0)
 callbacks.server_check();on_cloud_result(true,'','cloud_user',true)
 role=2;cache_characters('Admin One|||||||||Admin Ten');on_auth_result(true,2,'Account verified')
-assert(last_window:CharacterLimit()==10 and #commands==0)
-last_window.slot=10;last_window:ChangeSlot(0);assert(controls.name.text=='Admin Ten')
+assert(last_window:CharacterLimit()==1 and #commands==0)
+last_window.slot=10;last_window:ChangeSlot(0);assert(controls.name.text=='Admin One' and last_window.slot==1)
 controls.server_edit:SetText('another-role-server.example:1267');callbacks.server_save()
 assert(last_window:CharacterLimit()==1 and not controls.slot10.shown)
 """)
-print('Firebase menu: separate account/character, verification gate, duplicate request lock, offline starter draft, stack counts, inventory key, refreshed world entry, remembered login PASS')
+print('Account character menu: room before auth, verification gate, single Russian call sign, fixed starter request, dead drafts ignored, inventory key, refreshed entry and remembered login PASS')
 lua.execute(r"""
 -- Closing a room view brings the camera back to the overview.
 finish_camera(); last_window:ActivateObject(0); finish_camera(); assert(camera_target==0 and controls.server_panel.shown)
@@ -530,7 +510,8 @@ assert(cloud_requests[before+1].action=='refresh')
 on_cloud_result(false,'NETWORK_ERROR','cloud_user',true);last_window:Update()
 assert(last_window.screen=='signed_in' and last_window.msg.text=='st_netcoop_cloud_network_error')
 last_window.names={};drafts={};last_window:ShowProfile(1);last_window:OnBack()
-assert(last_window.mode=='account' and last_window.screen=='signed_in', 'profile Back without characters keeps the signed-in account')
+assert(last_window.mode=='characters' and last_window.account_verified, 'profile Back returns to the room with the account retained')
+last_window:ResetCloud()
 -- Switch account: sign-in form with the old email; Tab walks the fields.
 callbacks.btn_reset();assert(cloud_state==0 and last_window.screen=='login' and last_window.focus_index==2)
 last_window:OnKeyboard(DIK_keys.DIK_TAB,ui_events.WINDOW_KEY_PRESSED);assert(last_window.focus_index==1)
