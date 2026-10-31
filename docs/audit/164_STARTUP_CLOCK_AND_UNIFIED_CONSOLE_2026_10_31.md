@@ -13,7 +13,9 @@ and `CALifeSimulator` construction at `start_game_callback`.
 runs before `load/reload` allocates `m_time_manager`. The previous time API
 checked only whether the simulator existed. This crash is separate from
 the earlier `system.ltx` archive-order defect, already fixed in release .3.
-No private dump, account data or credentials were uploaded.
+All five recent startup dumps (Marsh, Darkscape and Military) have the same
+access violation and null clock receiver. No private dump, account data or
+credentials were uploaded.
 
 ## Changes
 
