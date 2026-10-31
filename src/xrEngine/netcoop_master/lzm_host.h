@@ -21,7 +21,7 @@ class HostController
 {
     friend struct HostControllerFixture;
     struct Map {
-        PlanLocation plan;std::string start,world,mode="auto",state="stopped",detail;
+        PlanLocation plan;std::string start,world,mode="off",state="stopped",detail;
         bool demand=true,loading=false,expected=false,blocked=false;
         HANDLE process=nullptr;DWORD pid=0,exit=0;unsigned failures=0,players=0;
         uint64_t launched=0,retry_at=0,healthy_at=0;bool has_exit=false;
@@ -34,7 +34,11 @@ class HostController
     std::atomic<unsigned> active_{0};
     std::atomic<uint64_t> master_epoch_{0};
     std::thread worker_;
-    double free_ram_=0,free_commit_=0,need_=6;
+    // Physical headroom and commit capacity are different limits. Requiring
+    // 6 GiB of both, after another 3 GiB reserve, prevented even the first
+    // dedicated process from starting on otherwise usable machines.
+    double free_ram_=0,free_commit_=0,need_ram_=1.5,need_commit_=3;
+    double reserve_ram_=1,reserve_commit_=1,peak_ram_=0,peak_commit_=0;
     uint64_t last_heartbeat_=0;
 
     static std::string read(const std::wstring& path) {
@@ -57,7 +61,7 @@ class HostController
     std::wstring file(const std::string& prefix,const Map& m) const {return folder_+L"\\"+widen(prefix+m.plan.name)+L".txt";}
     std::string mode(const Map& m) const {
         auto value=read(file("host_mode_",m));
-        return value=="on" || value=="off" ? value:"auto";
+        return value=="on" || value=="off" || value=="auto" ? value:"off";
     }
     void transition(Map& m,const std::string& state,const std::string& detail="") {
         if(m.state!=state || m.detail!=detail) {
@@ -155,13 +159,31 @@ class HostController
             transition(m,"loading_timeout","no ready heartbeat after 600 seconds; process retained for diagnosis");
         }
     }
+    void calculate_budget(double available_ram,double total_ram,double available_commit) {
+        reserve_ram_=std::max(0.5,std::min(2.0,total_ram*0.1));
+        reserve_commit_=1.0;
+        free_ram_=std::max(0.0,available_ram-reserve_ram_);
+        free_commit_=std::max(0.0,available_commit-reserve_commit_);
+        // Initial estimates until a map has run. Then retain the largest
+        // observed process peak, with 20% headroom, instead of twice an
+        // average that mixes loading and sleeping processes.
+        need_ram_=std::max(1.5,peak_ram_*1.2);
+        need_commit_=std::max(3.0,peak_commit_*1.2);
+    }
+    bool memory_available() const {return free_ram_>=need_ram_ && free_commit_>=need_commit_;}
+    std::string memory_detail() const {
+        return format("ОЗУ: доступно %.1f ГБ, нужно %.1f ГБ; резерв ОС %.1f ГБ. Лимит памяти: доступно %.1f ГБ, нужно %.1f ГБ. Освободите память или остановите другую локацию.",
+            free_ram_,need_ram_,reserve_ram_,free_commit_,need_commit_);
+    }
     void budget() {
         MEMORYSTATUSEX memory{sizeof(memory)};if(!GlobalMemoryStatusEx(&memory)) throw Unavailable("memory counters unavailable");
-        free_ram_=double(memory.ullAvailPhys)/1073741824.0-3;free_commit_=double(memory.ullAvailPageFile)/1073741824.0-3;
-        double bytes=0;unsigned count=0;
         for(auto& m:maps_) if(m.process) {PROCESS_MEMORY_COUNTERS_EX counters{};counters.cb=sizeof(counters);
-            if(GetProcessMemoryInfo(m.process,reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),sizeof(counters))) {bytes+=double(counters.PrivateUsage);++count;}}
-        need_=std::max(6.0,count ? 2.0*bytes/count/1073741824.0:6.0);
+            if(GetProcessMemoryInfo(m.process,reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),sizeof(counters))) {
+                peak_ram_=std::max(peak_ram_,double(counters.PeakWorkingSetSize)/1073741824.0);
+                peak_commit_=std::max(peak_commit_,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
+            }}
+        calculate_budget(double(memory.ullAvailPhys)/1073741824.0,double(memory.ullTotalPhys)/1073741824.0,
+            double(memory.ullAvailPageFile)/1073741824.0);
     }
     void launch(Map& m) {
         if(adopt(m) || m.blocked) return;
@@ -185,14 +207,15 @@ class HostController
         const bool paused=!enabled_ || exists(folder_+L"\\host_master_paused.txt");
         bool loading=false;for(const auto& m:maps_) loading|=m.process && m.loading;
         for(auto& m:maps_) {
-            if(m.process || m.mode=="off") continue;
+            if(m.process) continue;
+            if(m.mode=="off") {transition(m,"stopped");continue;}
             const bool requested=m.mode=="on" || !m.demand || exists(file("wake_",m));
             if(!requested) {transition(m,"stopped");continue;}
             if(m.blocked) continue;
             if(paused) {transition(m,exists(folder_+L"\\host_master_paused.txt") ? "master_stopped":"master_wait","waiting for master service and verified world storage");continue;}
             if(m.retry_at>GetTickCount64()) continue;
             if(loading) {transition(m,"queued","another map is loading");continue;}
-            if(free_ram_<need_ || free_commit_<need_) {transition(m,"memory","insufficient loading budget");continue;}
+            if(!memory_available()) {transition(m,"memory","insufficient loading budget; see memory counters");continue;}
             if(exists(file("host_command_",m))) continue; // consume a late stop before launch
             launch(m);loading=m.process && m.loading;
         }
@@ -201,13 +224,15 @@ class HostController
         json rows=json::array();
         unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;
         for(const auto& m:maps_) rows.push_back({{"map",m.plan.name},{"port",m.plan.port},{"processId",m.pid},{"state",m.state},{"mode",m.mode},
-            {"detail",m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
+            {"detail",m.state=="memory" ? memory_detail():m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
             {"retry_seconds",m.retry_at>GetTickCount64() ? int((m.retry_at-GetTickCount64()+999)/1000):0},
             {"exit_code",m.has_exit ? json(m.exit):json()}});
         write(folder_+L"\\host_view_native.json",json({{"updated",int64_t(time(nullptr))},{"controller","native"},{"pid",GetCurrentProcessId()},
-            {"maps",rows},{"memory",{{"free_gb",free_ram_},{"commit_gb",free_commit_},{"need_gb",need_}}}}).dump());
+            {"maps",rows},{"memory",{{"free_gb",free_ram_},{"commit_gb",free_commit_},{"need_gb",need_commit_},
+                {"need_ram_gb",need_ram_},{"need_commit_gb",need_commit_},{"reserve_ram_gb",reserve_ram_},{"reserve_commit_gb",reserve_commit_}}}}).dump());
         if(GetTickCount64()-last_heartbeat_>15000) {last_heartbeat_=GetTickCount64();
-            log_line(format("[diag][host] heartbeat maps=%zu memory_free_gb=%.2f commit_free_gb=%.2f load_need_gb=%.2f enabled=%u",maps_.size(),free_ram_,free_commit_,need_,unsigned(enabled_.load())));}
+            log_line(format("[diag][host] heartbeat maps=%zu ram_available_gb=%.2f ram_need_gb=%.2f ram_reserved_gb=%.2f commit_available_gb=%.2f commit_need_gb=%.2f enabled=%u",
+                maps_.size(),free_ram_,need_ram_,reserve_ram_,free_commit_,need_commit_,unsigned(enabled_.load())));}
     }
     void run() noexcept {
         while(!stopping_) {
@@ -241,7 +266,11 @@ public:
                 if(m.start.empty() || m.start.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")!=std::string::npos) throw Invalid("invalid start section for "+p.name);
                 m.world=p.name=="k00_marsh" ? "zone":p.name=="l01_escape" ? "zone_escape":"zone_"+p.name;
                 auto demand=ini.find("on_demand");m.demand=demand==ini.end() || !demand->second.count(p.name) || demand->second.at(p.name)!="0";
-                m.mode=mode(m);adopt(m);maps_.push_back(std::move(m));
+                m.mode=mode(m);
+                // Fresh installations are manual. Preserve an already running
+                // server when adopting an older installation without mode files.
+                if(adopt(m) && !exists(file("host_mode_",m))) {m.mode="on";write(file("host_mode_",m),"on");}
+                maps_.push_back(std::move(m));
             }
             log_line(format("[diag][host] native controller owns %zu maps; exe=%s",maps_.size(),narrow(exe_).c_str()));
             unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;

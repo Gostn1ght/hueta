@@ -90,11 +90,38 @@ struct HostControllerFixture {
         std::puts("PASS actual IPv4 and dual-stack IPv6 UDP owner lookup, foreign executable rejection and matching process adoption; no game started");
         auto& a=controller.maps_[0];auto& b=controller.maps_[1];
         assert(!a.process && !b.process); // no executable exists in this fixture
-        controller.enabled_=true;controller.free_ram_=0;controller.free_commit_=100;controller.need_=6;
+        // The screenshot's real 16 GiB PC: 8.68 GiB available used to be
+        // reduced to 5.68 and rejected by a hard 6 GiB physical-memory gate.
+        controller.calculate_budget(8.68,16,20.38);
+        assert(controller.memory_available() && controller.free_ram_>7.0);
+        controller.calculate_budget(1.0,16,20);
+        assert(!controller.memory_available() && controller.free_ram_==0);
+        controller.calculate_budget(8.68,16,2);
+        assert(!controller.memory_available()); // commit/pagefile is a separate limit
+        controller.peak_ram_=2;controller.peak_commit_=4;
+        controller.calculate_budget(8.68,16,20);
+        assert(controller.need_ram_>2.39 && controller.need_ram_<2.41);
+        assert(controller.need_commit_>4.79 && controller.need_commit_<4.81);
+        controller.peak_ram_=controller.peak_commit_=0;
+        controller.calculate_budget(8.68,16,20);
+        controller.enabled_=true;a.demand=false;controller.queue();
+        assert(a.mode=="off" && a.state=="stopped" && !a.process && !a.blocked);
+        // Explicit automatic mode is still supported and survives re-reading.
+        controller.write(controller.file("host_mode_",b),"auto");assert(controller.mode(b)=="auto");
+        controller.write(controller.file("host_mode_",b),"off");
+        controller.free_ram_=0;controller.free_commit_=100;
         controller.write(controller.file("host_command_",a),"start");controller.update(a);controller.queue();
         assert(a.mode=="on" && a.state=="memory" && !a.process);
+        controller.publish();
+        auto blocked_view=loads(controller.read(controller.folder_+L"\\host_view_native.json"));
+        assert(blocked_view["memory"]["need_ram_gb"]==1.5 && blocked_view["memory"]["need_commit_gb"]==3.0);
+        assert(blocked_view["maps"][0]["detail"].get<std::string>().find("1.5")!=std::string::npos);
         controller.write(controller.file("host_command_",a),"stop");controller.update(a);controller.free_ram_=100;controller.queue();
-        assert(a.mode=="off" && !a.process);
+        assert(a.mode=="off" && a.state=="stopped" && a.detail.empty() && !a.process);
+        controller.write(controller.file("host_command_",a),"start");controller.update(a);controller.queue();
+        // With sufficient RAM, the actual queue reaches CreateProcess. The
+        // fixture deliberately has no server executable, so no game is run.
+        assert(a.state=="failed" && a.blocked && a.detail.find("CreateProcess Win32=")==0);
         controller.write(controller.file("host_command_",a),"start");controller.update(a);
         controller.write(controller.folder_+L"\\host_master_paused.txt","paused");controller.queue();assert(a.state=="master_stopped" && !a.process);
         DeleteFileW((controller.folder_+L"\\host_master_paused.txt").c_str());controller.enabled_=false;controller.queue();assert(a.state=="master_wait");
@@ -110,6 +137,7 @@ struct HostControllerFixture {
         controller.budget();controller.publish();
         const auto view=loads(controller.read(controller.folder_+L"\\host_view_native.json"));assert(view["maps"].size()==2 && view["controller"]=="native");
         puts("PASS actual native controller: persistent stop/start, cancellation before launch, real memory gate, serialization, paused/recovering master, PID-bound saved stop, live snapshot; no game process started");
+        puts("PASS memory regression: 8.68 GiB free can launch; physical and commit shortage blocked; learned peaks; fresh manual mode; cancelled memory wait clears; sufficient budget reaches CreateProcess; no game started");
         return 0;
     }
 };

@@ -371,6 +371,7 @@ View build_view(Service& service, const WindowOptions& options)
         else if (state == "retry") row.state = L"сбой · повтор через " + std::to_wstring(h->second.retry_seconds) + L" с";
         else if (state == "failed") row.state = L"остановлена после сбоев" + (h->second.has_exit_code ? L" · код " + std::to_wstring(h->second.exit_code) : L"");
         else if (state == "saving") row.state = L"сохраняет мир…";
+        else if (state == "stopped") row.state = L"выключена";
         else if (it != expiry.end()) row.state = L"не отвечает";
         else row.state = row.planned ? L"выключена" : L"нет в плане хостера";
         if(h!=host.maps.end()) {row.process=h->second.process;row.detail=widen(h->second.detail);}
@@ -988,7 +989,7 @@ void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
     log_line(std::string(on ? "Включение" : "Выключение") + " локаций: " + narrow(names));
     if (!failed.empty()) set_status(s, "Не удалось передать команду: " + failed.front(), C_RED);
     else if (!managed) set_status(s, "Управление локациями недоступно. Причина записана в журнале мастера.", C_AMBER);
-    else set_status(s, narrow((on ? L"Включаются: " : L"Выключаются (с сохранением мира): ") + names), C_GREEN);
+    else set_status(s, narrow((on ? L"Запуск запрошен (состояние — в списке): " : L"Выключаются (с сохранением мира): ") + names), on ? C_AMBER:C_GREEN);
 }
 
 void click(State& s, int id)
