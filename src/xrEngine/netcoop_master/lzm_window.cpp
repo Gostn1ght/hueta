@@ -1197,15 +1197,29 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
             if (!s->service) finish_selftest(*s, false, s->service_error.empty() ? "service stopped" : s->service_error);
             else if (have && view.ready)
             {
+                const auto pid_fixture=s->options.roster_folder+L"\\host_view_pid_selftest.json";
+                {
+                    std::ofstream out(pid_fixture,std::ios::binary);
+                    out<<"{\"updated\":"<<int64_t(time(nullptr))<<",\"maps\":["
+                        "{\"map\":\"pid_positive_fixture\",\"processId\":12345},"
+                        "{\"map\":\"pid_negative_fixture\",\"processId\":-1},"
+                        "{\"map\":\"pid_overflow_fixture\",\"processId\":4294967296}]}";
+                }
+                const auto pid_view=read_host_view(s->options.roster_folder);
+                DeleteFileW(pid_fixture.c_str());
+                const bool pids_ok=pid_view.maps.count("pid_positive_fixture") &&
+                    pid_view.maps.at("pid_positive_fixture").process==12345 &&
+                    pid_view.maps.at("pid_negative_fixture").process==0 &&
+                    pid_view.maps.at("pid_overflow_fixture").process==0;
                 std::string status = s->service->console("status");
                 std::string refused = s->service->console("quit");
                 const bool written = write_host_command(s->options.roster_folder, "k00_marsh", "start");
                 std::ifstream command(s->options.roster_folder + L"\\host_command_k00_marsh.txt", std::ios::binary);
                 std::string action((std::istreambuf_iterator<char>(command)), std::istreambuf_iterator<char>());
                 s->selftest = { { "status", split(status, '\n')[0] }, { "quit", refused }, { "locations", view.locations.size() },
-                                { "host_command", written && action == "start" },
+                                { "host_command", written && action == "start" }, {"pid_json",pids_ok},
                                 { "calendar", calendar_text(view.world_ms) }, { "api_port", s->service->api_port() } };
-                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start", "");
+                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start" && pids_ok, "");
             }
             else if ((monotonic_ns() - s->started_ns) > 90000000000LL)
                 finish_selftest(*s, false, "timeout");
