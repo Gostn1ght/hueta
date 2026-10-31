@@ -506,6 +506,17 @@ ServerVictimScope::~ServerVictimScope()
 		bind_script_actor(previous);
 }
 
+static bool character_notify_ready(CActor* actor, bool new_life)
+{
+	ServerVictimScope scope(actor);
+	::luabind::functor<bool> ready;
+	if(!ai().script_engine().functor("netcoop_server_compat.character_ready",ready)) {
+		Msg("! [diag][character] actor=%u ready callback missing; verify server script archive",actor->ID());return false;
+	}
+	try {return ready(actor->lua_game_object(),new_life);}
+	catch(...) {Msg("! [diag][character] actor=%u ready callback failed",actor->ID());return false;}
+}
+
 static const u32 task_origin_marker = 0x524f434e; // "NCOR"
 
 static bool character_capture_progress(Character& character, CActor* actor)
@@ -548,17 +559,6 @@ static bool character_capture_progress(Character& character, CActor* actor)
 	const u8* data = static_cast<const u8*>(writer.pointer());
 	character.progress.assign(data, data + writer.size());
 	return true;
-}
-
-static bool character_notify_ready(CActor* actor, bool new_life)
-{
-	ServerVictimScope scope(actor);
-	::luabind::functor<bool> ready;
-	if(!ai().script_engine().functor("netcoop_server_compat.character_ready",ready)) {
-		Msg("! [diag][character] actor=%u ready callback missing; verify server script archive",actor->ID());return false;
-	}
-	try {return ready(actor->lua_game_object(),new_life);}
-	catch(...) {Msg("! [diag][character] actor=%u ready callback failed",actor->ID());return false;}
 }
 
 static bool character_restore_progress(Character& character, CActor* actor)

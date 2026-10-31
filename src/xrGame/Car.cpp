@@ -1207,13 +1207,13 @@ void CCar::Init()
 				i->second.CDamagableHealthItem::Init(float(atof(*item.second)), 2);
 			else
 			{
-				xr_map<u16, SDoor>::iterator i = m_doors.find(index);
-				if (i == m_doors.end())
+				xr_map<u16, SDoor>::iterator door = m_doors.find(index);
+				if (door == m_doors.end())
 				{
 					Msg("! [diag][vehicle] section=%s bone=%s has no physical wheel/door; ignored optional damage definition", cNameSect().c_str(), *item.first);
 					continue;
 				}
-				i->second.CDamagableHealthItem::Init(float(atof(*item.second)), 1);
+				door->second.CDamagableHealthItem::Init(float(atof(*item.second)), 1);
 			}
 		}
 	}
