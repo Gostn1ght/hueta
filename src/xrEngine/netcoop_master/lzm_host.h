@@ -3,6 +3,8 @@
 #pragma once
 #include "lzm_service.h"
 #include "lzm_cluster_plan.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <iphlpapi.h>
 #include <psapi.h>
@@ -124,7 +126,7 @@ class HostController
             CloseHandle(m.process);m.process=nullptr;m.has_exit=true;m.exit=exit;m.pid=0;
             const bool failure=!m.expected && (exit!=0 || m.loading);
             m.loading=false;m.healthy_at=0;
-            if(failure) {++m.failures;m.blocked=m.failures>=3;m.retry_at=GetTickCount64()+30000ULL*(1ULL<<std::min(m.failures-1,3u));
+            if(failure) {++m.failures;m.blocked=m.failures>=3;m.retry_at=GetTickCount64()+30000ULL*(1ULL<<(std::min)(m.failures-1,3u));
                 transition(m,m.blocked ? "failed":"retry","process exit="+std::to_string(exit));}
             else {
                 if(!m.expected && (m.mode=="on" || !m.demand)) {m.mode="off";write(file("host_mode_",m),"off");}

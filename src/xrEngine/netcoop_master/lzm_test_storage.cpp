@@ -1,5 +1,8 @@
 // Compiled only in the GitHub test executable, never into the game project.
 #ifdef LZM_TEST_FIXTURES
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "lzm_world_files.h"
