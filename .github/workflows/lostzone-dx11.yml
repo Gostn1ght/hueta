@@ -248,6 +248,8 @@ jobs:
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-trunk-reach.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-idle-exit.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-ui-resize.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-map-privacy.py

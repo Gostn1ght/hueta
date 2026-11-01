@@ -900,6 +900,15 @@ struct ClusterCountOnline
 	}
 };
 
+static bool cluster_status_remove()
+{
+	string64 key; xr_sprintf(key,"%u",cluster_port());
+	string_path path; cluster_file("status",key,-1,path);
+	if(DeleteFileA(path) || GetLastError()==ERROR_FILE_NOT_FOUND) return true;
+	Msg("! [diag][host] cannot withdraw status before saved stop: Win32=%u",GetLastError());
+	return false;
+}
+
 // -netcoop_idle_exit=<seconds>: an on-demand server saves its world and
 // exits after that long without players (the watchdog starts it again).
 static void cluster_idle_exit(xrServer* server, u32 now)
@@ -922,6 +931,7 @@ static void cluster_idle_exit(xrServer* server, u32 now)
 	if(!receipt) return;
 	fprintf(receipt,"%u",GetCurrentProcessId());
 	if(fclose(receipt)!=0) return;
+	if(!cluster_status_remove()) return;
 	s_cluster_quitting = true;
 	Msg("[Lost Zone][cluster] no players for %u s: world saved, server exits", limit / 1000);
 	FlushLog();
@@ -980,6 +990,7 @@ static void cluster_host_stop(xrServer* server, u32 now)
 	character_commits_flush();
 	if (!accounts_save()) return;
 	if (!world_store_save_now("hoster stop")) return;
+	if (!cluster_status_remove()) return;
 	s_cluster_quitting = true;
 	DeleteFileA(path);
 	Msg("[Lost Zone][cluster] hoster requested stop: characters and world saved");
@@ -1032,6 +1043,7 @@ static void cluster_update(xrServer* server)
 	cluster_host_stop(server, now);
 	if (s_cluster_quitting) return;
 	cluster_idle_exit(server, now);
+	if (s_cluster_quitting) return; // never re-advertise a process that is exiting
 	cluster_hibernate(server, now);
 	if (now - s_cluster_clock_check >= 5000)
 	{
