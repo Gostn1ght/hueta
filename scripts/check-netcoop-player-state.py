@@ -60,4 +60,4 @@ assert confirmation.index('client_flush_player_state()') < confirmation.index('L
 assert 'net_flags(TRUE, TRUE)' in confirmation
 print('PASS actual player-state Lua: early delivery retained, limb damage/healing and thirst preserved, fresh-body reset, bounded values, no NaN/Inf, ordered forced flush before passage')
 
-lua.execute("local b=zzz_player_injuries;local old=b.maxhp;b.maxhp={};fixture_begin_body();use_player_state('@7|-');assert(fixture_pending()=='-');b.maxhp=old;use_player_state(fixture_pending());assert(fixture_pending()==nil)")
+lua.execute("local b=zzz_player_injuries;local old=b.maxhp;b.maxhp={};fixture_begin_body();use_player_state('@7|-');assert(fixture_pending()=='@7|-');b.maxhp=old;use_player_state(fixture_pending());assert(fixture_pending()==nil)")

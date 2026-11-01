@@ -120,12 +120,12 @@ FIXED = set()
 def native_save(name="Tester"):
     def packet(data):
         return struct.pack("<II", len(data), crc32c(data)) + data
-    out = b"NCH9" + name.encode() + b"\0" + b"stalker\0" + b"loadout\0" + b"x\0" + b"y\0"
+    out = b"NCHA" + name.encode() + b"\0" + b"stalker\0" + b"loadout\0" + b"x\0" + b"y\0"
     out += bytes([3, 0, 1]) + packet(b"actor-state" * 30)
     out += struct.pack("<I", 1) + b"wpn_pm\0" + struct.pack("<HH", 0, 7) + packet(b"item") + struct.pack("<H", 3) + b"abc"
     out += packet(b"progress" * 100)
     out += struct.pack("<I", 1) + b"stash\0" + b"label\0" + struct.pack("<I", 0)
-    out += struct.pack("<I", 40)
+    out += struct.pack("<IB", 40, 4)
     return out
 
 
