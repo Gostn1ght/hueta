@@ -50,16 +50,16 @@ struct CActor{
  bool alive=true,seated=false,m_bAnimTorsoPlayed=false;int m_rp_index=-1;
  MotionID m_netcoop_prone_motion,m_current_legs,m_current_torso,m_current_head;
  CBlend* m_netcoop_prone_blends[3]{};CBlend* m_current_legs_blend=nullptr;CBlend* m_current_torso_blend=nullptr;
- bool m_netcoop_prone_torso_free=true;Inventory inv;Movement movement;Movement* m_PhysicMovementControl=&movement;
- IKinematicsAnimated* model=nullptr;
+ bool m_netcoop_prone_torso_free=true;Inventory inv;Movement test_movement;Movement* m_PhysicMovementControl=&test_movement;
+ IKinematicsAnimated* test_model=nullptr;
  Inventory& inventory(){return inv;}bool g_Alive(){return alive;}bool netcoop_seated(){return seated;}
  bool IsZoomAimingMode(){return false;}bool isActorAccelerated(u32 m,bool){return !(m&mcAccel);}
- IKinematicsAnimated* Visual(){return model;}unsigned ID(){return 42;}
+ IKinematicsAnimated* Visual(){return test_model;}unsigned ID(){return 42;}
  bool netcoop_prone_animation(u32);
 };
 '''+code+r'''
 int main(){
- IKinematicsAnimated model;CActor actor;actor.model=&model;unsigned id=0;
+ IKinematicsAnimated model;CActor actor;actor.test_model=&model;unsigned id=0;
  for(LPCSTR grip:{"empty","knife","pistol","rifle"})for(LPCSTR direction:{"idle","fwd","back","left","right"})
   model.motions[std::string("lz_prone_")+grip+"_"+direction]={int(id++)};
  constexpr u32 prone=mcCrouch|mcAccel;
