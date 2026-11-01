@@ -1630,28 +1630,42 @@ end
 -- Choose actual walkable vertices around the NPC instead of spawning in
 -- its model or behind a counter. The engine applies crowd separation too.
 function respawn_point(origin)
-	local best, distance
-	for _, storage in pairs(db.storage or {}) do
-		local npc = storage.object
-		if npc and npc.alive and npc:alive() and netcoop_traders and netcoop_traders.is_service_npc(npc) then
-			local vertex = npc:level_vertex_id()
-			if level.valid_vertex(vertex) then
-				for _, angle in ipairs({0,90,180,270,45,135,225,315}) do
-					local direction = vector():setHP(angle*math.pi/180,0)
-					local near = level.vertex_in_direction(vertex,direction,4)
-					if near and level.valid_vertex(near) then
-						local pos = level.vertex_position(near)
-						local d = pos:distance_to_sqr(origin)
-						if not distance or d<distance then best,distance=pos,d end
-					end
-				end
-			end
-		end
-	end
-	if best then return best end
-	local anchor = alife() and alife():actor()
-	return anchor and anchor.position or origin
+ local best,distance
+ local function consider(vertex,accept)
+  if not level.valid_vertex(vertex) then return end
+  for _,angle in ipairs({0,90,180,270,45,135,225,315}) do
+   local near=level.vertex_in_direction(vertex,vector():setHP(angle*math.pi/180,0),4)
+   if near and level.valid_vertex(near) then
+    local pos=level.vertex_position(near)
+    if not accept or accept(pos) then
+     local d=pos:distance_to_sqr(origin)
+     if not distance or d<distance then best,distance=pos,d end
+    end
+   end
+  end
+ end
+ for name,zone in pairs(db.zone_by_name or {}) do
+  local safe=false
+  for _,pattern in ipairs(SAFE_ZONE_PATTERNS) do if name:find(pattern,1,true) then safe=true end end
+  if safe and zone.position and zone.inside and level.vertex_id then
+   consider(level.vertex_id(zone:position()),function(pos)return zone:inside(pos) end)
+  end
+ end
+ for story_id,radius in pairs(SAFE_STORY_NPCS) do
+  local npc=get_story_object and get_story_object(story_id)
+  if npc then consider(npc:level_vertex_id(),function(pos)return pos:distance_to(npc:position())<=radius end) end
+ end
+ if best then return best end
+ -- Some maps have no authored safe restrictor: use their service NPC.
+ for _,storage in pairs(db.storage or {}) do
+  local npc=storage.object
+  if npc and npc.alive and npc:alive() and netcoop_traders and netcoop_traders.is_service_npc(npc) then consider(npc:level_vertex_id()) end
+ end
+ if best then return best end
+ local anchor=alife() and alife():actor()
+ return anchor and anchor.position or origin
 end
+
 
 local function zone_faction(pos)
 	local best, best_d

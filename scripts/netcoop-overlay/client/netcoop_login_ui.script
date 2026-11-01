@@ -743,6 +743,7 @@ function netcoop_login_wnd:ShowLoadout(slot)
 	if self.creator.netcoop_creation_name ~= (self.profile_data and self.profile_data.name) then rebuild = true end
 	self.creator.netcoop_creation_name = self.profile_data and self.profile_data.name
     if rebuild then self.creator:LoadLoadout(false) end
+    if self.profile_data then self.creator.character_name:SetText(self.profile_data.name) end
     for _, field in ipairs({"ck_story", "ck_warfare", "ck_hardcore", "ck_azazel_mode", "ck_survival", "ck_campfire", "ck_conditions", "ck_routes"}) do
         if self.creator[field] then self.creator[field]:SetCheck(false); self.creator[field]:Enable(false) end
     end

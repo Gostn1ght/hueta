@@ -567,3 +567,26 @@ w:OnBack();assert(not w.route_wait and #commands==before)
 netcoop_master_entry=nil
 ''')
 print('Actual route UI: no fallback to another map, loading/memory wait, automatic resume, cancellation, terminal disabled state, finite timeout and old-port normalization PASS')
+
+# Run the actual starter-picker completion, including cloud failure and selected stacks.
+lua.execute(r'''
+local joined,hidden
+local nickname=string.char(193,238,240,232,241)
+local owner={profile_data={name=nickname},ShowDialog=function()end,Show=function()end,
+ EnterCharacter=function(self,slot,name,faction,economy,items) joined={slot,name,faction,economy,items} end}
+local status={TextControl=function(self)return self end,SetText=function(self,s)self.text=s end}
+local function cell(section,count,shown)return {section=section,IsShown=function()return shown end,CountChilds=function()return count-1 end}end
+local menu={access=true,netcoop_creation_owner=owner,netcoop_creation_slot=1,netcoop_status=status,
+ selected_faction="dolg",selected_economy="st_econ_1",points_left=0,
+ CC={inventory={cell={cell("medkit",1,true),cell("bandage",2,true),cell("ghost",1,false)}}},
+ HideDialog=function()hidden=true end,Show=function()end}
+finish_creation(menu);assert(not joined and not hidden)
+menu.selected_faction="stalker";menu.points_left=-1;finish_creation(menu);assert(not joined and not hidden)
+menu.points_left=0
+local save=netcoop_save_draft;netcoop_save_draft=function()return false end
+finish_creation(menu);assert(not joined and not hidden and status.text=="st_netcoop_loadout_save_failed")
+netcoop_save_draft=save;finish_creation(menu)
+assert(hidden and joined[1]==1 and joined[2]==nickname and joined[3]=="stalker" and joined[4]==1 and joined[5]=="bandage,bandage,medkit")
+assert(drafts[1].name==nickname and drafts[1].loadout==joined[5])
+''')
+print('Actual starter completion: selected items/stacks, fixed loner economy, Russian name, rejected points/faction and failed cloud save hold entry PASS')

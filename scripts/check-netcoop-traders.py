@@ -109,3 +109,36 @@ assert(inits[#inits][2] == "items\\trade\\trade_generic.ltx", "other NPCs untouc
 ''')
 print("Traders: one neutral unkillable trader on each of the %d maps without GAMMA traders, near the start point, "
       "once per world, never replaced; %d GAMMA trader maps untouched; own assortment kept PASS" % (len(added), len(gamma_traders)))
+
+lua.execute(r'''
+local makevector=vector
+function vector()
+ local v=makevector()
+ function v:distance_to_sqr(o)return (self.x-o.x)^2+(self.y-o.y)^2+(self.z-o.z)^2 end
+ function v:distance_to(o)return math.sqrt(self:distance_to_sqr(o)) end
+ return v
+end
+db.storage={}
+xr_logic={pick_section_from_condlist=function(actor,npc,cond)return cond end}
+local npc={id=function()return 10 end,character_community=function()return "stalker" end,
+ alive=function()return true end,level_vertex_id=function()return 80 end,position=function()return vector():set(80,0,0) end}
+assert(not netcoop_traders.is_service_npc(npc),'ordinary combat NPC stays vulnerable')
+for _,role in ipairs({'trader','mechanic','barman'}) do
+ db.storage[10]={object=npc,section_logic='logic',ini={r_string_to_condlist=function()return role end}}
+ assert(netcoop_traders.is_service_npc(npc),role)
+end
+function get_story_object()return nil end
+level.vertex_id=function(p)return p.x end
+local function zone(x)return {position=function()return vector():set(x,0,0)end,inside=function(self,p)return math.abs(p.x-x)<3 end}end
+db.zone_by_name={first_safe_zone=zone(20),second_safe_zone=zone(100)}
+''')
+compat=(root/'scripts/netcoop-overlay/server/netcoop_server_compat.script').read_text(encoding='utf8')
+constants=compat[compat.index('local SAFE_ZONE_PATTERNS ='):compat.index('local SAFE_ZONE_FACTION =')]
+respawn=compat[compat.index('function respawn_point(origin)'):compat.index('local function zone_faction(')]
+lua.execute(constants+respawn)
+lua.execute(r'''
+assert(respawn_point(vector():set(90,0,0)).x==101,'nearest authored safe zone wins over an outside service NPC')
+db.zone_by_name={};assert(respawn_point(vector():set(90,0,0)).x==81,'service-area fallback on maps without safe restrictors')
+db.storage={};assert(respawn_point(vector():set(90,0,0))==anchor.position,'empty level uses its arrival anchor')
+''')
+print('PASS actual services and respawn: traders/mechanics/barmen, combat NPC exclusion, nearest safe zone, service/arrival fallbacks')

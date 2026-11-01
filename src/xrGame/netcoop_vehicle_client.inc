@@ -320,7 +320,8 @@ LPCSTR script_vehicle_status()
 	const auto found=s_vehicle_hud.find(actor->m_netcoop_seat_car);
 	if(found==s_vehicle_hud.end())return text;
 	const auto& h=found->second;
-	xr_sprintf(text,"%.1f|%.1f|%.1f|%.0f|%u|%u",h.speed,h.tank>0.f ? h.fuel*100.f/h.tank:0.f,h.health*100.f,h.rpm,u32(h.gear),u32(h.flags&3));
+	// Engine state uses radians/second; the dashboard displays revolutions/minute.
+	xr_sprintf(text,"%.1f|%.1f|%.1f|%.0f|%u|%u",h.speed,h.tank>0.f ? h.fuel*100.f/h.tank:0.f,h.health*100.f,h.rpm*9.5492965855f,u32(h.gear),u32(h.flags&3));
 	return text;
 }
 

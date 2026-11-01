@@ -39,7 +39,7 @@ struct NET_Packet {
 };
 namespace netcoop {
 std::map<u16,u16> s_box_anchor;
-std::map<u16,unsigned> s_vehicle_seats,s_vehicles_sv,s_vehicles_cl;
+std::map<u16,unsigned> s_vehicle_seats,s_vehicles_sv,s_vehicles_cl,s_vehicle_hud;
 std::vector<unsigned> s_vehicle_arrivals,s_vehicle_conditions;
 u32 s_vehicle_inbox_check=99,s_vehicle_keys=1,s_vehicle_keys_sent=99;
 u16 s_trunk_pending=0xffff;u32 s_trunk_pending_until=0;
@@ -75,7 +75,8 @@ int main(){
  netcoop::s_box_anchor[500]=501;netcoop::s_vehicle_seats[501]=1;
  netcoop::s_vehicles_sv[501]=1;netcoop::s_vehicles_cl[501]=1;
  netcoop::s_vehicle_arrivals.push_back(1);netcoop::s_vehicle_conditions.push_back(1);
- netcoop::vehicles_reset();
+ netcoop::s_vehicle_hud[501]=99;netcoop::vehicles_reset();
+ assert(netcoop::s_vehicle_hud.empty());
  assert(netcoop::s_box_anchor.empty() && netcoop::s_vehicle_seats.empty());
  assert(netcoop::s_vehicles_sv.empty() && netcoop::s_vehicles_cl.empty());
  assert(netcoop::s_vehicle_arrivals.empty() && netcoop::s_vehicle_conditions.empty());

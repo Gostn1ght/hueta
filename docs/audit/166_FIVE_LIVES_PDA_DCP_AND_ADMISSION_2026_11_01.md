@@ -3,7 +3,7 @@
 Status: source changes; native GitHub validation and delivery pending. No owner game processes launched for verification.
 
 ## User rule
-One account owns one character. It has five lives. After the first four deaths the same name and faction resume at the nearest available service/safe-zone anchor on the current level. One persisted random draw retains half of the non-PDA root items (rounding up); the remaining originals stay on the corpse. The physical PDA is always retained. On the fifth death the whole inventory, including the PDA, remains on the final corpse; the account room requires a different Russian call sign and a starter-kit selection.
+One account owns one character. It has five lives. After the first four deaths the same name and faction resume at the nearest available authored safe zone, with service/arrival fallbacks on the current level. One persisted random draw retains half of the non-PDA root items (rounding up); the remaining originals stay on the corpse. The physical PDA is always retained. On the fifth death the whole inventory, including the PDA, remains on the final corpse; the account room requires a different Russian call sign and a starter-kit selection.
 
 NCHA extends NCH9 with one bounded server-owned lives byte. Both masters accept it and legacy NCH3..9. Repeated processing of one dead body cannot spend another life. Reserved corpse inventory cannot be looted during the physical transfer, including by NPC script transfers. The reservation is world-persisted, and restoration waits for the actual parent and item state. This uses the existing world/character durability barriers; it is not a new atomic transaction across the two stores.
 
@@ -19,7 +19,9 @@ NCHA extends NCH9 with one bounded server-owned lives byte. Both masters accept 
 - Admin noclip is authorized on the server; demo teleport allows authenticated admins. The weather editor sends bounded server commands and disallows online asset-path changes.
 
 ## Limits and required acceptance
-Native compile/fixtures must pass in GitHub before deployment. Gameplay, ride height, glass hit geometry, collision/exit behavior and every DCP model still require owner gameplay acceptance. The current safe-zone respawn search stays within the loaded level. A reliable cross-level nearest-safe-zone selection is not implemented here. No claim that every random crash or all vehicle physics issues are resolved.
+Native compile/fixtures must pass in GitHub before deployment. Gameplay, ride height, glass hit geometry, collision/exit behavior and every DCP model still require owner gameplay acceptance. The safe-zone respawn search stays within the loaded level and checks walkable vertices inside authored safe restrictors first. A reliable cross-level nearest-safe-zone selection is not implemented here. No claim that every random crash or all vehicle physics issues are resolved.
 
 ## Offline validation
 Actual Lua survival tests cover stable draw, PDA retention, no partial transfer with absent items, retries, ownership, NPC reservation protection and final death. Existing relevant Lua suites and native-save Python tests are run; full native checks run only in GitHub. Exact build/release receipts will be appended after validation.
+
+Initial CI: master run 41300308525 on 1ced4f6d3 passed all production GUI/parity/process/storage checks. Engine run 41302586438 on 2ec30e711 passed Lua and all Windows regression fixtures except the trunk-reset harness, which needed the new HUD cache in its stub. The added native noclip/lifetime/five-life/checksum/suspension tests passed there; full engine compilation remains pending.

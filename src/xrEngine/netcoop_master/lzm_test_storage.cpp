@@ -161,6 +161,27 @@ struct HostControllerFixture {
         const auto view=loads(controller.read(controller.folder_+L"\\host_view_native.json"));assert(view["maps"].size()==2 && view["controller"]=="native");
         puts("PASS actual native controller: persistent stop/start, cancellation before launch, real memory gate, serialization, paused/recovering master, PID-bound saved stop, live snapshot; no game process started");
         puts("PASS memory regression: 8.68 GiB free can launch; physical and commit shortage blocked; learned peaks; fresh manual mode; cancelled memory wait clears; sufficient budget reaches CreateProcess; no game started");
+        // A harmless short-lived Windows process stands in for a dedicated
+        // process that saved its world before a cold idle exit. Never a game.
+        CloseHandle(a.process);a.process=nullptr;a.pid=0;a.loading=false;
+        for(bool matching:{false,true}) {
+            wchar_t system[4096]{};assert(GetSystemDirectoryW(system,4096));
+            std::wstring executable=std::wstring(system)+L"\\cmd.exe";
+            std::wstring args=L"\""+executable+L"\" /d /c exit 0";
+            STARTUPINFOW startup{sizeof(startup)};PROCESS_INFORMATION child{};
+            assert(CreateProcessW(executable.c_str(),args.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&child));
+            CloseHandle(child.hThread);assert(WaitForSingleObject(child.hProcess,10000)==WAIT_OBJECT_0);
+            b.process=child.hProcess;b.pid=child.dwProcessId;b.expected=false;b.loading=false;b.mode="on";b.blocked=false;
+            controller.write(controller.file("host_mode_",b),"on");
+            controller.write(mailbox+L"\\idle_exit_"+std::to_wstring(b.plan.port)+L".txt",std::to_string(b.pid+(matching ? 0:1)));
+            controller.update(b);
+            assert(!b.process && b.pid==0 && b.mode==(matching ? "auto":"off"));
+            assert(b.state==(matching ? "dormant":"stopped"));
+        }
+        controller.queue();assert(b.state=="dormant" && !b.process);
+        controller.write(controller.file("wake_",b),"new route");controller.queue();
+        assert(b.state=="failed" && b.detail.find("CreateProcess Win32=")==0);
+        puts("PASS actual idle exit: matching saved PID arms cold demand sleep, foreign PID cannot arm it, no unsolicited restart, a new route reaches launch; no game started");
         const std::vector<std::string> names={"k00_marsh","l01_escape","l08_yantar","jupiter","jupiter_underground"};
         assert(LocationLogs::map_for("xray_srv_jupiter_underground_test.log",names)=="jupiter_underground");
         assert(LocationLogs::map_for("xray_srv_jupiter_test.log",names)=="jupiter");

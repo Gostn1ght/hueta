@@ -6,9 +6,8 @@
 -- ALife, so no pin could be placed. Here PAW gets client-side stand-ins:
 -- a pin is a local id (PIN_FIRST..PIN_LAST) with a position the engine shows
 -- on the map (netcoop_map_position_set), nothing is spawned on the server.
--- The pins belong to the character: they are kept on the server (bucket
--- "pda", netcoop_pda_store) and come back at the next login, on any
--- computer. Other players never see them.
+-- Pins belong to the physical PDA UID in the server pda_marks store.
+-- They survive reconnects and follow that device to its legitimate holder.
 
 local PIN_FIRST, PIN_LAST = 64000, 65500
 local CHUNK = 3000
