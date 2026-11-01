@@ -1,6 +1,6 @@
 # Follow-up: admission, master tabs, observer animation and Mi-24
 
-Status: implementation in progress, not released. Previous release 2026.11.01.1 is delivered (audit 166).
+Status: urgent admission/master fix delivered as 2026.11.01.2. Helicopter/observer/prone follow-up awaits CI and release packaging.
 
 ## Confirmed failures
 
@@ -24,7 +24,13 @@ Full original Mi-24 airframe/rotor mesh retained, split into 16-bit draw chunks 
 
 The body normal maps retain original 4K resolution; detail/rotor source normals remain 2K. DX11 helicopter-only material adds weather-driven glass drops/trails; legacy renderer fallback retains normal transparency. Real shader compilation and native flight/gear fixtures are required before release. Actual in-game appearance, flight model, gear collision and bullet/glass geometry still require owner testing.
 
-Observer animation work resets old-model RP/use caches, provides a missing-specific-motion fallback, and logs body/movement/held item/clip phases. Pistol poses accept generic BAS pistol classes by grip, independent of magazine capacity, and exclude binoculars/knives. A separate authored prone set is being visually checked; it is not yet enabled or delivered.
+Observer animation work resets old-model RP/use caches, provides a missing-specific-motion fallback, and logs body/movement/held item/clip phases. Pistol poses accept generic BAS pistol classes by grip, independent of magazine capacity, and exclude binoculars/knives. The separate authored prone set is enabled in source, but is not yet delivered.
 
 
 Prone source update: 20 original full-body clips (empty/knife/pistol/rifle, idle/forward/back/left/right) now use an analytic two-segment joint solve on the common human bind skeleton. They are isolated `lz_prone_` names, so existing NPC animation names are untouched. Partition bone mappings match the main actor OMF exactly. QA receipt `167_PRONE_POSE_QA.json` binds sampled low head/foot positions and gait variation to the exact OMF SHA256; offline Blender frames of empty and rifle poses were inspected. Native low-stance selection, overlay preservation, grip/direction changes and recovery still require GitHub execution; multiplayer appearance is not locally tested.
+
+## Follow-up packaging and CI
+
+The first 000050 candidate classified the client overlay model as a client-only asset. That candidate was never published. The headless simulation also reads its bones/collision, so clean release patches now put client model/animation assets and dependencies in the shared input namespace; explicitly server-specific assets retain role overrides. Both role archives receive the exact new Mi-24 model and prone OMF. Authenticated full archive integrity, final mounted precedence and payload equality passed for all 13 client and 10 server effective updates (`delta50-reviewed.json`); the checked candidate is `patch_000050_shared_publish`, source ad5763637. Resources-only CI 41349689337 passed at that exact commit.
+
+Native CI 41349298423 stopped on strict warning errors caused by fixture member names `movement` and `model` shadowing the extracted function locals. The fixture members were renamed (no warnings disabled). Run 41349896783 at f1cab7553 now checks the same gameplay implementation plus corrected fixture and shared packaging. Native build, shader compilation and release remain pending; 2026.11.01.2 stays the published version until they pass.
