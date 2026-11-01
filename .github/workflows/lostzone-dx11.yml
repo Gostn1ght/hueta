@@ -145,6 +145,9 @@ jobs:
     if: ${{ !inputs.analyze && (!inputs.resources_only || inputs.shaders_only) }}
     runs-on: windows-2022
     timeout-minutes: 10
+    # GitHub hides draft release assets from read-only job tokens.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
