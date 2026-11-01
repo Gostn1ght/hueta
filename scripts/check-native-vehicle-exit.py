@@ -70,8 +70,8 @@ struct Space {
  void GetNearest(xr_vector<CObject*>& out,const Fvector&,float,CObject* ignore){for(auto* o:nearby)if(o!=ignore)out.push_back(o);}
  bool RayPick(const Fvector& start,const Fvector&,float,int,collide::rq_result& hit,CCar*){hit.range=start.y;return ground;}
 };
-struct World {Space ObjectSpace;}world;
-World& Level(){return world;}
+struct World {Space ObjectSpace;}fixture_world;
+World& Level(){return fixture_world;}
 struct VehicleSeatPose {Fmatrix local;};
 struct VehicleSeats {float center_x=0,half_width=1;};
 '''
@@ -99,16 +99,16 @@ int main(){
  CCar car;VehicleSeats seats;VehicleSeatPose seat;seat.local.c.x=-.4f;
  bool clear=false;Fvector exit=vehicle_exit_position(&car,seats,seat,&clear);
  assert(clear&&exit.x<0&&std::abs(exit.y-.08f)<1e-5f);
- world.ObjectSpace.preferred_blocked=true;
+ fixture_world.ObjectSpace.preferred_blocked=true;
  exit=vehicle_exit_position(&car,seats,seat,&clear);assert(clear&&exit.x>0);
- world.ObjectSpace.all_blocked=true;
+ fixture_world.ObjectSpace.all_blocked=true;
  vehicle_exit_position(&car,seats,seat,&clear);assert(!clear);
- world.ObjectSpace.all_blocked=world.ObjectSpace.preferred_blocked=false;
+ fixture_world.ObjectSpace.all_blocked=fixture_world.ObjectSpace.preferred_blocked=false;
  CObject parked;parked.model.data.box.set(-.5f,0,-.5f,.5f,2,.5f);parked.pose.c.set(-1.9f,0,0);
- world.ObjectSpace.nearby={&parked,&car};
+ fixture_world.ObjectSpace.nearby={&parked,&car};
  exit=vehicle_exit_position(&car,seats,seat,&clear);assert(clear&&exit.x>0);
  parked.destroyed=true;exit=vehicle_exit_position(&car,seats,seat,&clear);assert(clear&&exit.x<0);
- world.ObjectSpace.ground=false;seat.local.c.y=20;
+ fixture_world.ObjectSpace.ground=false;seat.local.c.y=20;
  exit=vehicle_exit_position(&car,seats,seat,&clear);assert(clear&&exit.y==20.5f);
  std::puts("PASS actual vehicle exit/contact: standing volume, alternate side, occupied exits, no-ground dismount, bounded player penetration; no gameplay physics claim");
 }
