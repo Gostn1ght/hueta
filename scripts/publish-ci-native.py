@@ -71,10 +71,22 @@ def main():
     notes=args.out/'release-notes.md'
     notes.write_text(f'Internal CI output for `{commit}`. Run {run}, attempt {attempt}.\n\n'
                      'Draft only. This is not an approved player release. Runtime and matching symbols have SHA-256 manifests.\n',encoding='utf-8')
-    subprocess.run(['gh','release','create',tag,'--repo',os.environ['GITHUB_REPOSITORY'],
-                    '--target',commit,'--draft','--title',f'Native CI {commit[:9]} ({run}/{attempt})',
-                    '--notes-file',str(notes),str(args.out/result['runtime']['name']),
-                    str(args.out/result['symbols']['name']),str(args.out/'native-ci.json')],check=True)
+    repo=os.environ['GITHUB_REPOSITORY']
+    # GITHUB_TOKEN cannot create a release whose target changes workflow
+    # files relative to the default branch, even with contents:write. An
+    # authorized maintainer can pre-create this exact private draft; asset
+    # upload then needs only the existing job's scoped contents permission.
+    releases=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/releases?per_page=100']))
+    existing=next((row for row in releases if row['tag_name']==tag),None)
+    assets=[str(args.out/result['runtime']['name']),str(args.out/result['symbols']['name']),str(args.out/'native-ci.json')]
+    if existing:
+        if not existing['draft'] or existing['target_commitish']!=commit:
+            raise ValueError('Existing CI draft does not match this exact build')
+        subprocess.run(['gh','release','upload',tag,'--repo',repo,*assets,'--clobber'],check=True)
+    else:
+        subprocess.run(['gh','release','create',tag,'--repo',repo,
+                        '--target',commit,'--draft','--title',f'Native CI {commit[:9]} ({run}/{attempt})',
+                        '--notes-file',str(notes),*assets],check=True)
     print('Private draft CI outputs preserved:',tag,flush=True)
 
 

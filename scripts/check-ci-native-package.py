@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import zipfile
+from unittest.mock import patch
 
 root=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('native_package',root/'scripts/publish-ci-native.py')
@@ -34,6 +35,24 @@ with TemporaryDirectory() as temporary:
         assert not any(name.endswith('.pdb') for name in packed.namelist())
     with zipfile.ZipFile(out/metadata['symbols']['name']) as packed:
         assert packed.namelist()==['LostZoneDX11.pdb','built-from.txt']
+    # A maintainer-created private draft permits the scoped Actions token
+    # to upload assets without asking it to create a workflow-bearing tag.
+    environment={'GITHUB_ACTIONS':'true','GITHUB_SHA':commit,'GITHUB_RUN_ID':'17','GITHUB_RUN_ATTEMPT':'2','GITHUB_REPOSITORY':'owner/project'}
+    for existing in (None,{'tag_name':'ci-native-17-2','draft':True,'target_commitish':commit},
+                     {'tag_name':'ci-native-17-2','draft':False,'target_commitish':commit},
+                     {'tag_name':'ci-native-17-2','draft':True,'target_commitish':'f'*40}):
+        with patch.dict(module.os.environ,environment),patch('sys.argv',['publish-ci-native.py','--out',str(out)]),\
+             patch.object(module,'package',return_value=metadata),\
+             patch.object(module.subprocess,'check_output',return_value=json.dumps([existing] if existing else []).encode()),\
+             patch.object(module.subprocess,'run') as run:
+            allowed=existing is None or (existing['draft'] and existing['target_commitish']==commit)
+            try:module.main()
+            except ValueError:assert not allowed and not run.called
+            else:
+                assert allowed and run.call_count==1
+                command=run.call_args.args[0]
+                assert command[:3]==['gh','release','upload' if existing else 'create']
+                if not existing:assert '--draft' in command and command[command.index('--target')+1]==commit
     for wrong in ('invalid','f'*40):
         try:
             module.package(source,folder/'bad',wrong,17,2)
