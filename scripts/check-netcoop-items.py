@@ -299,7 +299,9 @@ assert(owned_t()[stash]==nil and created[#created]=='itm_stash_pack' and sent[#s
 lua.execute(r'''
 cmds={}; function netcoop_command(t) cmds[#cmds+1]=t end
 now_ms=0
-actor_obj={satiety=0.2, power=0.9}
+actor_obj={satiety=0.2, power=0.9,id=function() return 91 end}
+zzz_player_injuries={maxhp={},health={},timedhp={}}
+for _,limb in ipairs({'head','torso','leftarm','rightarm','leftleg','rightleg'}) do zzz_player_injuries.maxhp[limb]=100 end
 db.actor=actor_obj
 loaded=nil
 actor_status_thirst={save_state=function(m) m.drink={last_drink=42, chk_drink={Y=2012,M=5,D=1}} end,
@@ -309,13 +311,13 @@ actor_status_sleep={toggle_feature=function(v) toggled[#toggled+1]=v end}
 ''')
 start = client.index('local PLAYER_STATE_MODULES')
 end = client.index('local function install_server_item_actions()', start)
-lua.execute(client[start:end] + '\nps_report = report_player_state')
+lua.execute('next_player_state=0;\n'+client[start:end] + '\nps_report = report_player_state')
 lua.execute(r'''
-ps_report(); assert(#cmds==0,'no report before the server sent the saved state')
+ps_report(); assert(#cmds==1 and cmds[1]=='player_state get','only restore request before saved state');cmds={}
 use_player_state("satiety=0.75;power=0.5;modules={actor_status_thirst={drink={last_drink=1200;chk_drink={Y=2012;};};};};")
 assert(actor_obj.satiety==0.75 and actor_obj.power==0.5 and loaded and loaded.last_drink==1200 and loaded.chk_drink.Y==2012)
 now_ms=40000; ps_report()
-assert(#cmds==1 and string.find(cmds[1],"^player_state ") and string.find(cmds[1],"last_drink=42",1,true))
+local reports={};for _,c in ipairs(cmds) do if c~='player_state ack' and c~='player_state get' then reports[#reports+1]=c end end;assert(#reports==1 and string.find(reports[1],"^player_state ") and string.find(reports[1],"last_drink=42",1,true))
 use_player_state("-"); use_player_state("broken{{")
 disable_sleep_need(); disable_sleep_need()
 actor_status_sleep.toggle_feature(true)

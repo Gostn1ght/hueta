@@ -522,7 +522,7 @@ static bool cluster_on_login(xrClientData* CL, LPCSTR login, u8 slot, xr_string&
 static bool cluster_route(xrServer* server, LPCSTR login, u8 slot, xr_string& redirect, bool* starting = nullptr)
 {
 	Character* character = slot ? character_load(login, slot) : nullptr;
-	if (!character || !character->initialized || character->respawn || !character->actor.B.count) return false;
+	if (!character || !character->initialized || (character->respawn && !character->lives_remaining) || !character->actor.B.count) return false;
 	CSE_Abstract* entity = server->game->spawn_begin("actor");
 	if (!entity) return false;
 	NET_Packet packet = character->actor;
@@ -896,7 +896,7 @@ struct ClusterCountOnline
 	void operator()(IClient* client) const
 	{
 		xrClientData* CL = static_cast<xrClientData*>(client);
-		if (CL && !CL->flags.bLocal && CL->owner) ++*count;
+		if (CL && !CL->flags.bLocal) ++*count; // authentication/loading connections must prevent idle exit too
 	}
 };
 
@@ -914,6 +914,14 @@ static void cluster_idle_exit(xrServer* server, u32 now)
 	if (!s_cluster_idle_since) s_cluster_idle_since = now;
 	if (!limit || now - s_cluster_idle_since < limit) return;
 	if (!world_store_save_now("idle exit")) { s_cluster_idle_since = now - limit + 60000; return; } // retry in a minute
+	// The native host distinguishes a saved cold sleep from a deliberate
+	// stop. Only this matching PID may leave its map armed for demand wakeup.
+	string64 key; xr_sprintf(key,"%u",cluster_port());
+	string_path path; cluster_file("idle_exit",key,-1,path);
+	FILE* receipt=fopen(path,"wb");
+	if(!receipt) return;
+	fprintf(receipt,"%u",GetCurrentProcessId());
+	if(fclose(receipt)!=0) return;
 	s_cluster_quitting = true;
 	Msg("[Lost Zone][cluster] no players for %u s: world saved, server exits", limit / 1000);
 	FlushLog();

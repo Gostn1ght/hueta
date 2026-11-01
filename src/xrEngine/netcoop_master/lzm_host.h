@@ -26,7 +26,8 @@ class HostController
         bool demand=true,loading=false,expected=false,blocked=false;
         HANDLE process=nullptr;DWORD pid=0,exit=0;unsigned failures=0,players=0;
         uint64_t launched=0,retry_at=0,healthy_at=0;bool has_exit=false;
-        double peak_commit=0;
+        double peak_commit=0,working_set=0,private_commit=0;
+        uint64_t memory_reported=0;
     };
     std::wstring root_,folder_,exe_;
     std::vector<Map> maps_;
@@ -146,14 +147,20 @@ class HostController
         DWORD exit=STILL_ACTIVE;
         if(!GetExitCodeProcess(m.process,&exit)) {transition(m,"failed","cannot inspect dedicated process");return;}
         if(exit!=STILL_ACTIVE) {
+            const auto idle_file=folder_+L"\\idle_exit_"+std::to_wstring(m.plan.port)+L".txt";
+            const bool cold=!m.expected && exit==0 && m.demand && read(idle_file)==std::to_string(m.pid);
+            DeleteFileW(idle_file.c_str());
             CloseHandle(m.process);m.process=nullptr;m.has_exit=true;m.exit=exit;m.pid=0;
             const bool failure=!m.expected && (exit!=0 || m.loading);
             m.loading=false;m.healthy_at=0;
             if(failure) {++m.failures;m.blocked=m.failures>=3;m.retry_at=GetTickCount64()+30000ULL*(1ULL<<(std::min)(m.failures-1,3u));
                 transition(m,m.blocked ? "failed":"retry","process exit="+std::to_string(exit));}
             else {
-                if(!m.expected && (m.mode=="on" || !m.demand)) {m.mode="off";write(file("host_mode_",m),"off");}
-                transition(m,"stopped","saved or deliberate clean exit");
+                if(cold) {m.mode="auto";write(file("host_mode_",m),"auto");transition(m,"dormant","world saved; process memory released; wakes when a player requests this map");}
+                else {
+                    if(!m.expected && (m.mode=="on" || !m.demand)) {m.mode="off";write(file("host_mode_",m),"off");}
+                    transition(m,"stopped","saved or deliberate clean exit");
+                }
             }
             m.expected=false;return;
         }
@@ -201,6 +208,12 @@ class HostController
                 peak_ram_=std::max(peak_ram_,double(counters.PeakWorkingSetSize)/1073741824.0);
                 peak_commit_=std::max(peak_commit_,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
                 m.peak_commit=std::max(m.peak_commit,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
+                m.working_set=double(counters.WorkingSetSize)/1073741824.0;
+                m.private_commit=double(counters.PrivateUsage)/1073741824.0;
+                if(GetTickCount64()-m.memory_reported>=30000) {
+                    m.memory_reported=GetTickCount64();
+                    log_line(format("[diag][memory] map=%s pid=%lu players=%u resident_gb=%.2f private_commit_gb=%.2f loading=%u",m.plan.name.c_str(),m.pid,m.players,m.working_set,m.private_commit,unsigned(m.loading)));
+                }
             }}
         calculate_budget(double(memory.ullAvailPhys)/1073741824.0,double(memory.ullTotalPhys)/1073741824.0,
             double(memory.ullAvailPageFile)/1073741824.0);
@@ -210,11 +223,12 @@ class HostController
         const auto log=m.plan.name=="k00_marsh" ? "srv":"srv_"+m.plan.name;
         std::wstring args=L"\""+exe_+L"\" -nosplashwindow -noprefetch -netcoop -multi_instance -netcoop_background -logname "+widen(log)+
             L" -fsltx fsgame_server.ltx -netport "+std::to_wstring(m.plan.port)+L" -netcoop_start_location="+widen(m.start)+L" -netcoop_world="+widen(m.world)+
-            L" -netcoop_hibernate=1 "+(m.demand ? std::wstring(L"-netcoop_idle_exit=21600 "):L"")+
+            L" -netcoop_hibernate=1 "+(m.demand ? std::wstring(L"-netcoop_idle_exit=180 "):L"")+
             L"-start \"server(all/single/alife/new/portsv="+std::to_wstring(m.plan.port)+L"/maxplayers=129)\" \"client(localhost/name=serverauthority/port="+
             std::to_wstring(m.plan.port)+L"/portcl="+std::to_wstring(m.plan.port+1)+L")\"";
         DeleteFileW((folder_+L"\\host_stop_"+std::to_wstring(m.plan.port)+L".txt").c_str());
         DeleteFileW((folder_+L"\\status_"+std::to_wstring(m.plan.port)+L".txt").c_str());
+        DeleteFileW((folder_+L"\\idle_exit_"+std::to_wstring(m.plan.port)+L".txt").c_str());
         STARTUPINFOW si{sizeof(si)};si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;
         PROCESS_INFORMATION p{};
         if(!CreateProcessW(exe_.c_str(),args.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW|NORMAL_PRIORITY_CLASS,nullptr,root_.c_str(),&si,&p)) {
@@ -230,7 +244,7 @@ class HostController
             if(m.process) continue;
             if(m.mode=="off") {transition(m,"stopped");continue;}
             const bool requested=m.mode=="on" || !m.demand || exists(file("wake_",m));
-            if(!requested) {transition(m,"stopped");continue;}
+            if(!requested) {if(m.state!="dormant")transition(m,"stopped");continue;}
             if(m.blocked) continue;
             if(paused) {transition(m,exists(folder_+L"\\host_master_paused.txt") ? "master_stopped":"master_wait","waiting for master service and verified world storage");continue;}
             if(m.retry_at>GetTickCount64()) continue;
@@ -248,6 +262,7 @@ class HostController
         unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;
         for(const auto& m:maps_) rows.push_back({{"map",m.plan.name},{"port",m.plan.port},{"processId",m.pid},{"state",m.state},{"mode",m.mode},
             {"detail",m.state=="memory" ? memory_detail():m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
+            {"resident_gb",m.process ? m.working_set:0},{"private_commit_gb",m.process ? m.private_commit:0},
             {"retry_seconds",m.retry_at>GetTickCount64() ? int((m.retry_at-GetTickCount64()+999)/1000):0},
             {"exit_code",m.has_exit ? json(m.exit):json()}});
         write(folder_+L"\\host_view_native.json",json({{"updated",int64_t(time(nullptr))},{"controller","native"},{"pid",GetCurrentProcessId()},

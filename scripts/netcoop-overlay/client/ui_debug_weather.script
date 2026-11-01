@@ -1,0 +1,48 @@
+-- Multiplayer controls: every action goes through the authoritative server.
+-- No local file editor, texture path, or client clock override.
+GUI=nil
+local ACTIONS={
+ {"st_lz_weather_clear","weather clear"},{"st_lz_weather_cloudy","weather cloudy"},
+ {"st_lz_weather_rain","weather rain"},{"st_lz_weather_storm","weather storm"},
+ {"st_lz_weather_fog","weather foggy"},{"st_lz_weather_reset","weather_edit pause 0"},
+ {"st_lz_weather_hour","time 1"},{"st_lz_weather_six_hours","time 6"},
+ {"st_lz_weather_realtime","timescale 1"},{"st_lz_weather_normal","timescale 10"},
+ {"st_lz_weather_emission","emission start"},{"st_lz_weather_psi","psi start"}
+}
+class "WeatherEditor" (CUIScriptWnd)
+function WeatherEditor:__init(owner) super()
+ self.owner=owner
+ self:SetWndRect(Frect():set(0,0,1024,768));self:SetAutoDelete(false)
+ local xml=CScriptXmlInit();xml:ParseFile("ui_netcoop_weather.xml")
+ xml:InitStatic("shade",self);xml:InitStatic("frame",self)
+ xml:InitTextWnd("title",self):SetText(game.translate_string("st_lz_weather_title"))
+ xml:InitTextWnd("hint",self):SetText(game.translate_string("st_lz_weather_hint"))
+ for i,action in ipairs(ACTIONS) do
+  local command=action[2]
+  local button=xml:Init3tButton("button",self)
+  button:SetWndPos(vector2():set(230+((i-1)%2)*286,220+math.floor((i-1)/2)*48))
+  button:TextControl():SetText(game.translate_string(action[1]))
+  local id="weather_"..i;self:Register(button,id)
+  self:AddCallback(id,ui_events.BUTTON_CLICKED,function()
+   if netcoop_role and netcoop_role()==2 then netcoop_command(command) end
+  end,self)
+ end
+ local close=xml:Init3tButton("close",self);self:Register(close,"close")
+ close:TextControl():SetText(game.translate_string("st_close"))
+ self:AddCallback("close",ui_events.BUTTON_CLICKED,self.Close,self)
+end
+function WeatherEditor:Close()
+ self:HideDialog()
+ if self.owner then self.owner:ShowDialog(true) end
+ GUI=nil
+end
+function WeatherEditor:OnKeyboard(dik,action)
+ if action==ui_events.WINDOW_KEY_PRESSED and dik==DIK_keys.DIK_ESCAPE then self:Close();return true end
+ return CUIScriptWnd.OnKeyboard(self,dik,action)
+end
+function start(owner)
+ if not (netcoop_role and netcoop_role()==2) then return end
+ if GUI then return end
+ if owner then owner:HideDialog() end
+ GUI=WeatherEditor(owner);GUI:ShowDialog(true)
+end

@@ -149,17 +149,24 @@ void CCarLights::Init(CCar* pcar)
 
 void CCarLights::ParseDefinitions()
 {
+	// Dedicated servers own physics and lamp flags, never renderer lights.
+	if (g_dedicated_server) return;
 	CInifile* ini = smart_cast<IKinematics*>(m_pcar->Visual())->LL_UserData();
 	if (!ini->section_exist("lights")) return;
-	LPCSTR S = READ_IF_EXISTS(ini, r_string, "lights", "headlights", "");  // veh_lada_dead: [lights] without any
-	string64 S1;
-	int count = _GetItemCount(S);
-	for (int i = 0; i < count; ++i)
-	{
-		_GetItem(S, i, S1);
-		m_lights.push_back(xr_new<SCarLight>());
-		m_lights.back()->Init(this);
-		m_lights.back()->ParseDefinitions(S1);
+	const LPCSTR groups[]={"headlights","stoplights","reverselights","indoorlights"};
+	for(u8 group=0;group<4;++group) {
+		LPCSTR list=READ_IF_EXISTS(ini,r_string,"lights",groups[group],"");
+		for(u32 i=0;list[0] && i<_GetItemCount(list);++i) {
+			string64 section;_GetItem(list,i,section);_Trim(section);
+			IKinematics* model=smart_cast<IKinematics*>(m_pcar->Visual());
+			if(!ini->section_exist(section) || !ini->line_exist(section,"bone") || model->LL_BoneID(ini->r_string(section,"bone"))==BI_NONE) {
+				Msg("! [diag][vehicle] section=%s invalid optional lamp=%s; skipped",m_pcar->cNameSect().c_str(),section);continue;
+			}
+			m_lights.push_back(xr_new<SCarLight>());
+			m_lights.back()->group=group;
+			m_lights.back()->Init(this);
+			m_lights.back()->ParseDefinitions(section);
+		}
 	}
 }
 
@@ -167,28 +174,34 @@ void CCarLights::Update()
 {
 	VERIFY(!physics_world()->Processing());
 	LIGHTS_I i = m_lights.begin(), e = m_lights.end();
-	for (; i != e; ++i) (*i)->Update();
+	const u8 flags=m_pcar->netcoop_aux_lights();
+	for (; i != e; ++i) {
+		if((*i)->group) {
+			if(flags & (1u<<((*i)->group-1))) (*i)->TurnOn(); else (*i)->TurnOff();
+		}
+		(*i)->Update();
+	}
 }
 
 void CCarLights::SwitchHeadLights()
 {
 	VERIFY(!physics_world()->Processing());
 	LIGHTS_I i = m_lights.begin(), e = m_lights.end();
-	for (; i != e; ++i) (*i)->Switch();
+	for (; i != e; ++i) if(!(*i)->group) (*i)->Switch();
 }
 
 void CCarLights::TurnOnHeadLights()
 {
 	VERIFY(!physics_world()->Processing());
 	LIGHTS_I i = m_lights.begin(), e = m_lights.end();
-	for (; i != e; ++i) (*i)->TurnOn();
+	for (; i != e; ++i) if(!(*i)->group) (*i)->TurnOn();
 }
 
 void CCarLights::TurnOffHeadLights()
 {
 	VERIFY(!physics_world()->Processing());
 	LIGHTS_I i = m_lights.begin(), e = m_lights.end();
-	for (; i != e; ++i) (*i)->TurnOff();
+	for (; i != e; ++i) if(!(*i)->group) (*i)->TurnOff();
 }
 
 bool CCarLights::IsLight(u16 bone_id)

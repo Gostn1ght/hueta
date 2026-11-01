@@ -297,17 +297,17 @@ assert(last_window.mode=='profile' and #commands==0)
 last_window:Update();assert(music_started==account_music, 'profile creation must remain silent')
 -- A new account creates its single life with a Russian call sign only.
 assert(controls.input_description==nil and controls.input_history==nil)
-local original_enter=last_window.EnterCharacter
+local original_enter=last_window.ShowLoadout
 local started
-last_window.EnterCharacter=function(self,slot,name,faction,economy,loadout) started={slot,name,faction,economy,loadout} end
+last_window.ShowLoadout=function(self,slot) started={slot,self.profile_data.name} end
 for _,bad in ipairs({'Loner One','123','-',' A','A|B',string.char(192,32,32,193)}) do
  controls.input_name:SetText(bad);callbacks.profile_next();assert(not started and controls.msg.text=='st_netcoop_life_name_invalid')
 end
 local russian=string.char(193,238,240,232,241)
 controls.input_name:SetText(russian);callbacks.profile_next()
-assert(started[1]==1 and started[2]==russian and started[3]=='stalker' and started[4]==1 and started[5]=='')
+assert(started[1]==1 and started[2]==russian)
 assert(profile[1]=='' and profile[2]=='' and #commands==0 and #characters==0)
-last_window.EnterCharacter=original_enter
+last_window.ShowLoadout=original_enter
 -- A dead character must not be restored from an old equipment-picker draft.
 drafts[1]={name='Dead draft',faction='dolg',loadout='wpn_ak74'}
 cache_characters('');last_window:ShowCharacters();assert((last_window.names[1] or '')=='')

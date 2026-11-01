@@ -103,6 +103,7 @@ end
 
 -- Engine hook (Level_network_spawn.cpp) after the local Actor is assigned.
 function on_actor_spawned(obj)
+	if netcoop_pda and netcoop_pda.reset then netcoop_pda.reset() end
 	controlled_actor = obj
 	player_state_ready = false
 	next_player_state = 0
@@ -565,6 +566,7 @@ end
 -- named places and anomaly fields on the PDA map, named on hover in this
 -- client's language. "<id> <x> <y> <z> <spot> <kind>|<name>" per line.
 local MAP_KINDS = { c = true, p = true, a = true }
+local known_map_spots = {}
 local function map_hint(kind, name)
 	local tr = game.translate_string
 	if kind == "c" then return string.format(tr("st_lz_map_changer"), tr(name)) end
@@ -572,11 +574,20 @@ local function map_hint(kind, name)
 	return tr(name)
 end
 local function use_map_known(data)
+	if data == "clear" then
+		for id, spot in pairs(known_map_spots) do
+			pcall(level.map_remove_object_spot, id, spot)
+			if netcoop_map_position_clear then netcoop_map_position_clear(id) end
+		end
+		known_map_spots = {}
+		return
+	end
 	local here = level.name()
 	for row in string.gmatch(data or "", "[^\n]+") do
 		local id, x, y, z, spot, kind, name = string.match(row, "^(%d+) (%S+) (%S+) (%S+) ([%w_]+) (%a)|([%w_%.]+)$")
 		id, x, y, z = tonumber(id), tonumber(x), tonumber(y), tonumber(z)
 		if id and x and y and z and MAP_KINDS[kind] and id < 65535 then
+			known_map_spots[id] = spot
 			if netcoop_map_position_set then netcoop_map_position_set(id, x, y, z, here) end
 			if level.map_has_object_spot(id, spot) == 0 then
 				pcall(level.map_add_object_spot_ser, id, spot, map_hint(kind, name))
@@ -761,7 +772,15 @@ local function set_attached(data)
 end
 
 function on_script_message(channel, data)
-	if channel == "registration" then
+	if channel == "netcoop_lives" then
+		local lives=tonumber(data)
+		if db.actor and lives and lives>=0 and lives<=5 then
+			local st=db.storage[db.actor:id()] or {object=db.actor};db.storage[db.actor:id()]=st
+			st.pstor=st.pstor or {};st.pstor.netcoop_lives=lives
+			db.actor:give_game_news("Lost Zone",string.format(game.translate_string("st_lz_car_lives"),lives),"ui_inGame2_Pered_zadaniyami_voennih",0,7000)
+		end
+		return
+	elseif channel == "registration" then
 		-- Older servers may send this notice; there is no approval queue now.
 		return
 	elseif channel == "emission" then
@@ -1156,7 +1175,15 @@ local function collect_player_state()
 end
 
 local function report_player_state(force)
-	if not (player_state_ready and netcoop_command) or (not force and time_global() < next_player_state) then return end
+	if not db.actor or not netcoop_command then return end
+	if not player_state_ready then
+		if time_global() < next_player_state then return end
+		next_player_state = time_global() + 2000
+		if pending_player_state then use_player_state(pending_player_state) end
+		if not player_state_ready then netcoop_command("player_state get") end
+		return
+	end
+	if not force and time_global() < next_player_state then return end
 	next_player_state = time_global() + 5000
 	local data = collect_player_state()
 	if data and #data < 3000 then netcoop_command("player_state " .. data) end
@@ -1172,6 +1199,7 @@ end
 function use_player_state(data)
 	local a = db.actor
 	if not a then pending_player_state = data; return end
+	local original=data
 	local target, payload = string.match(data or "", "^@(%d+)|(.*)$")
 	if target then
 		if tonumber(target) ~= a:id() then
@@ -1179,9 +1207,17 @@ function use_player_state(data)
 			return
 		end
 		data = payload
+		if player_state_ready then netcoop_command("player_state ack");return end
 	end
 	local state = (not data or data == "-") and {} or state_decode(data)
 	if not state then return end
+	local injuries = zzz_player_injuries
+	-- Do not acknowledge a snapshot before BHS has its six limb tables.
+	-- Otherwise an early delivery is lost and the previous body's red HUD persists.
+	if not (injuries and injuries.maxhp and injuries.health and injuries.timedhp) then pending_player_state = original; return end
+	for _, limb in ipairs({"head", "torso", "leftarm", "rightarm", "leftleg", "rightleg"}) do
+		if type(injuries.maxhp[limb]) ~= "number" or injuries.maxhp[limb] <= 0 then pending_player_state = original; return end
+	end
 	pending_player_state = nil
 	player_state_ready = true
 	next_player_state = time_global() + 5000
@@ -1191,7 +1227,6 @@ function use_player_state(data)
 		local m = _G[name]
 		if m and type(m.load_state) == "function" then pcall(m.load_state, saved) end
 	end
-	local injuries = zzz_player_injuries
 	if injuries and injuries.maxhp and injuries.health and injuries.timedhp then
 		local saved = type(state.injuries) == "table" and state.injuries or {}
 		local storage = db.storage[a:id()]
@@ -1211,6 +1246,7 @@ function use_player_state(data)
 		end
 	end
 	printf("[Lost Zone] player state restored")
+	if netcoop_command then netcoop_command("player_state ack") end
 end
 
 -- Sleep deprivation is cut from multiplayer (owner 2026-10-05): GAMMA's own

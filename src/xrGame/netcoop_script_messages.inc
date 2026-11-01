@@ -65,6 +65,11 @@ void client_on_script(NET_Packet& P)
 		psActorFlags.set(AF_UNLIMITEDAMMO,client_admin_authorized() && ammo);
 		return;
 	}
+	if(!xr_strcmp(channel,"netcoop_noclip")) {
+		CActor* actor=smart_cast<CActor*>(Level().CurrentControlEntity());
+		if(actor)actor->netcoop_set_noclip(client_admin_authorized() && !xr_strcmp(data,"1"));
+		return;
+	}
 	if (!xr_strcmp(channel, "netcoop_actor_faction"))
 	{
 		// A player's faction or disguise changed on the server (netcoop_factions,
@@ -97,6 +102,7 @@ void client_on_script(NET_Packet& P)
 		if (!admin) {
 			psActorFlags.set(AF_GODMODE, FALSE);
 			psActorFlags.set(AF_UNLIMITEDAMMO, FALSE);
+			if(CActor* actor=smart_cast<CActor*>(Level().CurrentControlEntity()))actor->netcoop_set_noclip(false);
 		}
 		// The admin's debug/spawn menu keys were registered only at login
 		// (owner 2026-10-18: admin given from the master window needed a relog).

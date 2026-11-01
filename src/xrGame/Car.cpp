@@ -2,6 +2,7 @@
 #include "ai_space.h"
 #include "script_engine.h"
 #include "car.h"
+#include "CustomZone.h"
 //#if 0
 
 #include "ParticlesObject.h"
@@ -349,14 +350,17 @@ void CCar::ActorObstacleCallback(bool& do_colide, bool bo1, dContact& c, SGameMt
 
 void CCar::SpawnInitPhysics(CSE_Abstract* D)
 {
+	Msg("[diag][vehicle] id=%u section=%s model=%s spawn phase=parse",ID(),cNameSect().c_str(),cNameVisual().c_str());FlushLog();
 	CSE_PHSkeleton* so = smart_cast<CSE_PHSkeleton*>(D);
 	R_ASSERT(so);
 	ParseDefinitions(); //parse ini filling in m_driving_wheels,m_steering_wheels,m_breaking_wheels
 	CreateSkeleton(D); //creates m_pPhysicsShell & fill in bone_map
+	Msg("[diag][vehicle] id=%u section=%s spawn phase=physics wheels=%u doors=%u exhausts=%u",ID(),cNameSect().c_str(),u32(m_wheels_map.size()),u32(m_doors.size()),u32(m_exhausts.size()));FlushLog();
 	IKinematics* K = smart_cast<IKinematics*>(Visual());
 	K->CalculateBones_Invalidate(); //this need to call callbacks
 	K->CalculateBones(TRUE);
 	Init();
+	Msg("[diag][vehicle] id=%u section=%s spawn phase=ready",ID(),cNameSect().c_str());FlushLog();
 	//inits m_driving_wheels,m_steering_wheels,m_breaking_wheels values using recieved in ParceDefinitions & from bone_map
 	//PPhysicsShell()->add_ObjectContactCallback(ActorObstacleCallback);
 	SetDefaultNetState(so);
@@ -704,6 +708,17 @@ void CCar::OnHUDDraw(CCustomHUD* /**hud*/)
 void CCar::Hit(SHit* pHDS)
 {
 	SHit HDS = *pHDS;
+	if(netcoop::enabled() && !netcoop::pure_client() && HDS.power>0.f) {
+		IKinematics* model=smart_cast<IKinematics*>(Visual());
+		if(model && HDS.boneID<model->LL_BoneCount()) {
+			LPCSTR name=model->LL_GetData(HDS.boneID).name.c_str();
+			if(strstr(name,"glass") || strstr(name,"window")) {
+				model->LL_SetBoneVisible(HDS.boneID,FALSE,FALSE);
+				model->CalculateBones_Invalidate();
+				Msg("[diag][vehicle] id=%u section=%s broken window=%s",ID(),cNameSect().c_str(),name);
+			}
+		}
+	}
 	// NPCs and mutants do not wreck the players' cars (owner 2026-10-24, spec
 	// 2.2); players, anomalies, explosions without an NPC and falls still do.
 	// configs: [netcoop_vehicles] npc_damage_factor (0 = none).
@@ -772,6 +787,17 @@ void CCar::ChangeCondition(float fDeltaCondition)
 void CCar::PHHit(SHit& H)
 {
 	if (!m_pPhysicsShell) return;
+	if(netcoop::enabled() && !netcoop_is_heli()) {
+		// Gravitational hits scale their impulse by target mass. Applying the
+		// unrestricted value to a multi-body car launches it like debris.
+		const bool anomaly=H.who && smart_cast<CCustomZone*>(H.who);
+		const float mass=m_pPhysicsShell->getMass();
+		if(_valid(mass) && mass>0.f) {
+			const float limit=mass*(anomaly ? 2.f:8.f);
+			H.impulse=_min(H.impulse,limit);
+			if(H.who && smart_cast<CActor*>(H.who) && H.hit_type==ALife::eHitTypeStrike)H.impulse=_min(H.impulse,mass*.1f);
+		}
+	}
 	if (m_bone_steer == H.bone()) return;
 	if (CPHUpdateObject::IsActive())
 	{
@@ -1201,10 +1227,12 @@ void CCar::Init()
 				Msg("! [diag][vehicle] section=%s damage bone=%s absent; ignored optional damage definition", cNameSect().c_str(), *item.first);
 				continue;
 			}
+			const float configured_health=float(atof(*item.second));
+			const float health=_valid(configured_health) && configured_health>0.f ? configured_health:100.f;
 			xr_map<u16, SWheel>::iterator i = m_wheels_map.find(index);
 
 			if (i != m_wheels_map.end())
-				i->second.CDamagableHealthItem::Init(float(atof(*item.second)), 2);
+				i->second.CDamagableHealthItem::Init(health, 2);
 			else
 			{
 				xr_map<u16, SDoor>::iterator door = m_doors.find(index);
@@ -1213,7 +1241,7 @@ void CCar::Init()
 					Msg("! [diag][vehicle] section=%s bone=%s has no physical wheel/door; ignored optional damage definition", cNameSect().c_str(), *item.first);
 					continue;
 				}
-				door->second.CDamagableHealthItem::Init(float(atof(*item.second)), 1);
+				door->second.CDamagableHealthItem::Init(health, 1);
 			}
 		}
 	}
@@ -2593,6 +2621,54 @@ void CCar::netcoop_toggle(u8 what)
 		m_lights.SwitchHeadLights();
 		m_netcoop_lights = !m_netcoop_lights;
 	}
+}
+
+u16 CCar::netcoop_door_bone(u16 hit)
+{
+	IKinematics* model=smart_cast<IKinematics*>(Visual());
+	if(!model)return BI_NONE;
+	for(u16 depth=0;hit<model->LL_BoneCount() && depth<model->LL_BoneCount();++depth) {
+		xr_map<u16,SDoor>::iterator door;
+		if(is_Door(hit,door))return hit;
+		hit=model->LL_GetData(hit).GetParentID();
+	}
+	return BI_NONE;
+}
+
+u64 CCar::netcoop_broken_glass()
+{
+	u64 mask=0;IKinematics* model=smart_cast<IKinematics*>(Visual());
+	if(model)for(u16 id=0;id<model->LL_BoneCount() && id<64;++id) {
+		LPCSTR name=model->LL_GetData(id).name.c_str();
+		if((strstr(name,"glass") || strstr(name,"window")) && !model->LL_GetBoneVisible(id))mask|=u64(1)<<id;
+	}
+	return mask;
+}
+
+void CCar::netcoop_glass_state(u64 mask)
+{
+	IKinematics* model=smart_cast<IKinematics*>(Visual());
+	if(!model)return;
+	for(u16 id=0;id<model->LL_BoneCount() && id<64;++id)if(mask & (u64(1)<<id)) {
+		LPCSTR name=model->LL_GetData(id).name.c_str();
+		if(strstr(name,"glass") || strstr(name,"window"))model->LL_SetBoneVisible(id,FALSE,FALSE);
+	}
+	model->CalculateBones_Invalidate();
+}
+
+u8 CCar::netcoop_aux_lights()
+{
+	if(netcoop::pure_client())return m_netcoop_aux_lights;
+	u8 flags=u8((b_breaks ? 1:0) | (b_engine_on && m_current_transmission_num==0 ? 2:0));
+	IKinematics* model=smart_cast<IKinematics*>(Visual());
+	CInifile* ini=model ? model->LL_UserData():nullptr;
+	LPCSTR doors=ini ? READ_IF_EXISTS(ini,r_string,"lights","indoorlightdoors",""):"";
+	for(u32 i=0;doors[0] && i<_GetItemCount(doors);++i) {
+		string64 name;_GetItem(doors,i,name);_Trim(name);
+		const auto door=m_doors.find(model->LL_BoneID(name));
+		if(door!=m_doors.end() && door->second.state!=SDoor::closed && door->second.state!=SDoor::broken) {flags|=4;break;}
+	}
+	return flags;
 }
 
 void CCar::netcoop_replica_state(bool engine, bool lights, float rpm, float steer)

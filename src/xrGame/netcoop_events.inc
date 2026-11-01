@@ -18,6 +18,10 @@ static bool accessible_corpse(xrClientData* CL, CSE_Abstract* entity)
 	CEntityAlive* body = smart_cast<CEntityAlive*>(Level().Objects.net_Find(entity->ID));
 	CEntityAlive* actor = smart_cast<CEntityAlive*>(Level().Objects.net_Find(CL->owner->ID));
 	CInventoryOwner* inventory = smart_cast<CInventoryOwner*>(body);
+	::luabind::functor<bool> reserved;
+	if(body && ai().script_engine().functor("netcoop_survival.protected_body",reserved)) {
+		try {if(reserved(int(entity->ID)))return false;}catch(...){return false;}
+	}
 	return body && !body->g_Alive() && actor && actor->g_Alive() && inventory &&
 		!inventory->deadbody_closed_status() && actor->Position().distance_to(body->Position()) <= 3.f;
 }

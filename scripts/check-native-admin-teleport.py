@@ -9,7 +9,7 @@ if os.environ.get('GITHUB_ACTIONS')!='true':
 root=Path(__file__).resolve().parents[1]
 native=netcoop_cpp(root, encoding='latin-1')
 owner=native[native.index('struct FindActorOwner\n'):native.index('void server_forward_news(',native.index('struct FindActorOwner\n'))]
-teleport=native[native.index('bool script_admin_teleport('):native.index('bool script_respawn(',native.index('bool script_admin_teleport('))]
+teleport=native[native.index('bool script_admin_teleport('):native.index('bool script_admin_noclip(',native.index('bool script_admin_teleport('))]
 events=(root/'src/xrGame/Actor_Events.cpp').read_text(encoding='latin-1')
 move=events[events.index('void CActor::MoveActor('):]
 assert move.rstrip().endswith('}') and 'ResetPredictionState' not in move

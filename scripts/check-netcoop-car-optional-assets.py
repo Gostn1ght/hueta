@@ -13,6 +13,7 @@ exhaust=(root/'src/xrGame/CarExhaust.cpp').read_text(encoding='utf8')
 exhaust=exhaust[exhaust.index('void CCar::SExhaust::Init()'):]
 source=r'''
 #include <cassert>
+#include <cmath>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@ source=r'''
 using u16=unsigned short;using u32=unsigned;using LPCSTR=const char*;
 template<class K,class V>using xr_map=std::map<K,V>;
 template<class T,class P>T smart_cast(P* p){return dynamic_cast<T>(p);}
+bool _valid(float x){return std::isfinite(x);}
 void Msg(const char*,...){}
 #define VERIFY(x) assert(x)
 constexpr bool FALSE=false;constexpr u16 BI_NONE=0xffff;
@@ -68,6 +70,8 @@ int main(){
  CInifile ini;ini.data.Data={{Text("wheel"),Text("35")},{Text("door"),Text("70")},{Text("back_door"),Text("90")},{Text("absent"),Text("100")}};
  car.damage(&ini);assert(car.m_wheels_map.at(1).health==35 && car.m_wheels_map.at(1).kind==2);
  assert(car.m_doors.at(2).health==70 && car.m_doors.at(2).kind==1 && car.m_doors.size()==1);
+ ini.data.Data={{Text("wheel"),Text("0")},{Text("door"),Text("-1")}};
+ car.damage(&ini);assert(car.m_wheels_map.at(1).health==100 && car.m_doors.at(2).health==100);
  PhysElement element;bone_map[7].element=&element;
  car.m_exhaust_particles=Text("vehiclefx\\exhausts\\exhaust_kamaz");
  {CCar::SExhaust e;e.pcar=&car;e.Init();e.Update();e.Play();e.Stop();assert(!e.p_pgobject && created.empty());}

@@ -87,6 +87,7 @@ private:
 // native_save.py
 struct NativeSave
 {
+	unsigned lives_remaining = 5;
     int version = 0;
     std::string sha256;
     int64_t bytes = 0, items = 0, safe_items = 0, progress_bytes = 0, actor_bytes = 0, inventory_cells = 0;

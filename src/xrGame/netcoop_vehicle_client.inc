@@ -8,6 +8,8 @@
 static xr_map<u16, xr_vector<u16>> s_vehicles_cl; // car id -> seat occupants
 static u8 s_vehicle_keys = 0;
 static u32 s_vehicle_keys_sent = 0;
+struct VehicleHud {float speed=0,fuel=0,tank=0,health=0,rpm=0;u16 gear=0;u8 flags=0;};
+static xr_map<u16,VehicleHud> s_vehicle_hud;
 
 static void vehicle_send(u8 op, u16 car, int value)
 {
@@ -28,6 +30,7 @@ static u32 s_trunk_pending_until = 0;
 
 void vehicles_reset()
 {
+	s_vehicle_hud.clear();
 	s_box_anchor.clear();
 	s_vehicle_seats.clear();
 	s_vehicles_sv.clear();
@@ -85,15 +88,23 @@ void client_on_vehicle(NET_Packet& P)
 	const float rpm = P.r_float();
 	const float steer = P.r_float();
 	const u8 count = P.r_u8();
-	if (count > vehicle_max_seats || P.r_elapsed() != u32(count) * 2 || !_valid(rpm) || !_valid(steer))
+	if (count > vehicle_max_seats || (P.r_elapsed() != u32(count)*2 && P.r_elapsed() != u32(count)*2+26) || !_valid(rpm) || !_valid(steer))
 		return;
 	xr_vector<u16> seats(count);
 	for (u16& id : seats)
 		id = P.r_u16();
+	VehicleHud hud;hud.rpm=rpm;hud.flags=flags;u64 glass=0;
+	if(P.r_elapsed()==26) {
+		hud.speed=P.r_float();hud.fuel=P.r_float();hud.tank=P.r_float();hud.health=P.r_float();hud.gear=P.r_u16();glass=P.r_u64();
+		if(!_valid(hud.speed) || !_valid(hud.fuel) || !_valid(hud.tank) || !_valid(hud.health))return;
+		s_vehicle_hud[car_id]=hud;
+	}
 	CCar* car = smart_cast<CCar*>(Level().Objects.net_Find(car_id));
 	if (!car)
 		return; // it comes again while the car is in use
 	car->netcoop_replica_state(!!(flags & 1), !!(flags & 2), rpm, steer);
+	car->m_netcoop_aux_lights=u8((flags>>2)&7);
+	car->netcoop_glass_state(glass);
 	car->m_netcoop_keys = keys; // the driver's steering animation
 	const VehicleSeats* poses = vehicle_seats(car);
 	if (!poses)
@@ -133,11 +144,19 @@ bool vehicle_use(CActor* actor, CObject* object, const Fvector& aim)
 	const VehicleSeats* poses = vehicle_seats(car);
 	if (!poses)
 		return true;
+	const u16 door=car->netcoop_door_bone(u16(HUD().GetRQ().element));
+	IKinematics* model=smart_cast<IKinematics*>(car->Visual());
+	CInifile* ini=model ? model->LL_UserData():nullptr;
+	const bool panel=door!=BI_NONE && ini && READ_IF_EXISTS(ini,r_bool,model->LL_GetData(door).name.c_str(),"non_enterable",false);
 	Fmatrix inverse;
 	inverse.invert(car->XFORM());
 	Fvector local;
 	inverse.transform_tiny(local, aim);
 	const int seat = vehicle_aim(*poses, local);
+	if(door!=BI_NONE && ((panel && seat!=-2) || GetAsyncKeyState(VK_SHIFT)<0)) {
+		NET_Packet packet;packet.w_begin(M_NETCOOP_VEHICLE);packet.w_u8(vehicle_op_door);packet.w_u16(car->ID());packet.w_u16(door);
+		Level().Send(packet,net_flags(TRUE,TRUE));return true;
+	}
 	if (seat == -2)
 	{
 		vehicle_send(vehicle_op_trunk, car->ID(), -1);
@@ -291,6 +310,19 @@ void vehicle_key(CActor* actor, int cmd, bool pressed)
 // crosshair - "driver", "passenger", "taken", "trunk" - or "seated_driver" /
 // "seated" in a car; "" otherwise. Also opens a trunk the server granted.
 static Fvector s_vehicle_prompt_point = {0.f, 0.f, 0.f};
+
+LPCSTR script_vehicle_status()
+{
+	static string256 text;text[0]=0;
+	if(!pure_client() || !g_pGameLevel)return text;
+	CActor* actor=smart_cast<CActor*>(Level().CurrentControlEntity());
+	if(!actor || !actor->g_Alive() || !actor->netcoop_seated())return text;
+	const auto found=s_vehicle_hud.find(actor->m_netcoop_seat_car);
+	if(found==s_vehicle_hud.end())return text;
+	const auto& h=found->second;
+	xr_sprintf(text,"%.1f|%.1f|%.1f|%.0f|%u|%u",h.speed,h.tank>0.f ? h.fuel*100.f/h.tank:0.f,h.health*100.f,h.rpm,u32(h.gear),u32(h.flags&3));
+	return text;
+}
 
 Fvector script_vehicle_prompt_point()
 {

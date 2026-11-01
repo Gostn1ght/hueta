@@ -600,7 +600,7 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 		Fvector accepted;
 		accepted.add(Position(), delta);
 		CCharacterPhysicsSupport* physics = character_physics_support();
-		if (physics && physics->movement())
+		if (!m_netcoop_noclip && physics && physics->movement())
 			physics->movement()->SetPosition(accepted);
 		Position().set(accepted);
 		// Ground contact impulses are applied once by server_physics_update.

@@ -24,6 +24,7 @@ enum
 	vehicle_op_trunk_open, // server -> client: u16 box, u16 car (legacy: box only)
 	vehicle_op_fire, // client -> server: u16 car, vec3 aim direction (the gunner's seat, gun view)
 	vehicle_op_gun, // server -> client: u16 car, vec3 muzzle, vec3 direction (a shot to see and hear)
+	vehicle_op_door, // client -> server: u16 car, u16 physical door/hood/trunk bone
 };
 
 // ---------------------------------------------------------------------------

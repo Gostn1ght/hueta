@@ -13,6 +13,7 @@ local function entries()
 	local tr = game.translate_string
 	local out = {
 		{ name = tr("st_lz_admin_god"), functor = { send, "god" }, hide_ui = 0 },
+		{ name = tr("st_lz_car_noclip"), functor = { send, "noclip" }, hide_ui = 0 },
 		{ name = tr("st_lz_admin_faction_status"), functor = { send, "faction status" }, hide_ui = 0 },
 		{ name = tr("st_lz_admin_pardon_me"), functor = { send, "faction pardon me" }, hide_ui = 0 },
 	}
@@ -26,6 +27,7 @@ local function install()
 	local launcher = ui_debug_launcher
 	if not launcher or launcher.__netcoop_admin then return end
 	launcher.__netcoop_admin = true
+	launcher.start_weather_editor=function() ui_debug_weather.start(launcher.GUI) end
 	local prepare = launcher.prepare
 	launcher.prepare = function(...)
 		local r = prepare(...)

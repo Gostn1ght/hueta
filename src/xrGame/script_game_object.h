@@ -186,16 +186,7 @@ public:
 	virtual ~CScriptGameObject();
 	operator CObject*();
 
-    IC bool is_valid() const
-    {
-        // If the pointer was never set, it's obviously invalid.
-        if (!m_game_object) return false;
-
-        // Check lua game object pointer back-reference. If it doesn't point to this, then the object was likely deleted and the pointer is now dangling.
-        if (m_game_object->lua_game_object() != this) return false;
-
-        return true;
-    }
+    bool is_valid() const;
 
 	CGameObject& object() const;
 	CScriptGameObject* Parent() const;

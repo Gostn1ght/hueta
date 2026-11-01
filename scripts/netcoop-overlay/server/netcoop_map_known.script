@@ -141,23 +141,30 @@ function update_world()
 		local id = tonumber(sid)
 		local actor = level.object_by_id(id)
 		local char = char_of(id)
+		local device = char ~= "" and netcoop_pdanet and netcoop_pdanet.held_device(id, char)
+		local uid = device and device.own and device.uid
 		present[id] = true
-		if actor and char ~= "" then
-			local known = (de(netcoop_store_read("map_known", char)) or {})[here] or {}
+		if sent[id] and sent[id].uid ~= uid then netcoop_send_to_actor(id, "map_known", "clear"); sent[id] = nil end
+		if actor and uid then
+			local known = (de(netcoop_store_read("map_known", uid)) or {})[here] or {}
 			local pos = actor:position()
 			local found = {}
 			each_place(function(p)
-				if not known[p.key] and pos:distance_to(p.pos) <= RADIUS[p.kind] then found[#found + 1] = p.key end
+				if p.kind ~= "c" and not known[p.key] and pos:distance_to(p.pos) <= RADIUS[p.kind] then found[#found + 1] = p.key end
 			end)
 			if #found > 0 then
-				known = remember(char, here, found) or known
+				known = remember(uid, here, found) or known
 				printf("[Lost Zone][map] %s found %s place(s) on %s", char, #found, here)
 			end
 			-- everything known here and not sent yet in this session
-			local mine, out = sent[id] or {}, {}
-			sent[id] = mine
+			local record = sent[id] or {uid=uid, places={}, at=now}
+			-- Resend after spawn/map initialization; an early spot packet can
+			-- precede the client's map reset during a location handoff.
+			if now - record.at >= 15000 then record.places, record.at = {}, now end
+			sent[id] = record
+			local mine, out = record.places, {}
 			each_place(function(p)
-				if known[p.key] and not mine[p.key] then mine[p.key] = true; out[#out + 1] = p end
+				if (p.kind == "c" or known[p.key]) and not mine[p.key] then mine[p.key] = true; out[#out + 1] = p end
 			end)
 			send(id, out)
 		end

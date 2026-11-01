@@ -271,11 +271,11 @@ void CAI_Stalker::Hit(SHit* pHDS)
 	netcoop::ServerActorScope netcoop_scope(this);
 	CActor* player_attacker = smart_cast<CActor*>(pHDS->who);
 	netcoop::ServerVictimScope hit_player_scope(player_attacker);
-	if (netcoop::enabled() && !netcoop::pure_client() && player_attacker && pHDS->power > 0.f)
+	if (netcoop::enabled() && !netcoop::pure_client() && pHDS->power > 0.f)
 	{
 		::luabind::functor<void> before_hit;
 		if (ai().script_engine().functor("netcoop_server_compat.before_npc_hit", before_hit))
-			before_hit(ID(), player_attacker->ID());
+			before_hit(ID(), player_attacker ? player_attacker->ID() : u16(-1));
 	}
 	//хит может меняться в зависимости от ранга (новички получают больше хита, чем ветераны)
 	SHit HDS = *pHDS;

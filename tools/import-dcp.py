@@ -75,6 +75,41 @@ def model_bones(path):
     return found
 
 
+def opening_panels(path):
+    """Physical door/hood/trunk hinges from OGF's actual bone chunks."""
+    data=path.read_bytes();chunks={};pos=0
+    while pos+8<=len(data):
+        cid,size=struct.unpack_from('<II',data,pos)
+        if cid&0x80000000 or pos+8+size>len(data): raise ValueError('Invalid OGF chunk')
+        chunks[cid]=data[pos+8:pos+8+size];pos+=8+size
+    raw=chunks[13];pos=4;names=[]
+    for _ in range(struct.unpack_from('<I',raw)[0]):
+        end=raw.index(0,pos);names.append(raw[pos:end].decode('cp1251'));pos=end+1
+        pos=raw.index(0,pos)+1+60
+    raw=chunks[16];pos=0;panels=[]
+    for name in names:
+        version=struct.unpack_from('<I',raw,pos)[0];pos=raw.index(0,pos+4)+1
+        shape,flags=struct.unpack_from('<HH',raw,pos);pos+=112
+        joint=struct.unpack_from('<I',raw,pos)[0]
+        limits=struct.unpack_from('<12f',raw,pos+4);pos+=72+(4 if version else 0)+40
+        axes=sum(abs(limits[i]-limits[i+1])>.0001 for i in (0,4,8))
+        if shape and not flags&4 and joint==2 and axes==1 and re.search('door|hood|bonnet|trunk',name):panels.append(name)
+    return panels
+
+
+def adapt_panels(data, panels):
+    if not panels:return data
+    text=data.decode('cp1251');profile=sections(text)
+    current=[v.strip() for v in profile.get('car_definition',{}).get('doors','').split(',') if v.strip()]
+    original=list(current)
+    for name in panels:
+        if name not in current:current.append(name)
+    if current==original:return data
+    # Only the active doors key, preserving the rest of the donor profile.
+    text=re.sub(r'(?m)^([ \t]*doors[ \t]*=)[^\r\n]*',lambda m:m[1]+' '+', '.join(current),text,count=1)
+    return text.encode('cp1251')
+
+
 def seats_for(dcp, visual, profile):
     names = model_bones(dcp / "meshes" / visual.replace("\\", "/"))
     # seat_left / seat_right / seat_back... are places; "seat", "seats" are the seats' meshes
@@ -142,6 +177,7 @@ def main(dcp, overlay, gamma):
     lines = ["; The Definitive Car Pack's vehicles (owner 2026-10-24), by tools/import-dcp.py.",
              "; Seats from the models' seat bones (netcoop_vehicles.inc), the driver first.", ""]
     names_needed, kept = set(), []
+    panel_profiles={}
     for name, keys in sorted(vehicles.items()):
         if not name.startswith("vehicle_") or SKIP.search(name) or "visual" not in keys:
             continue
@@ -156,6 +192,8 @@ def main(dcp, overlay, gamma):
             print("   no profile for", name)
             continue
         profile = sections(profile_path.read_text(encoding="cp1251", errors="replace"))
+        panel_key=profile_path.relative_to(dcp / "configs/models/vehicles").as_posix()
+        panel_profiles.setdefault(panel_key,set()).update(opening_panels(model))
         section = "dcp_" + name[len("vehicle_"):]
         seats = seats_for(dcp, visual + ".ogf", profile)
         lines += ["[%s]:m_car" % section, '$spawn = "vehicles\\%s"' % section, "visual = " + visual + ".ogf"]
@@ -194,7 +232,7 @@ def main(dcp, overlay, gamma):
                     target = dst / f.relative_to(src)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     if folder == "configs/models/vehicles":
-                        target.write_bytes(adapt_particle_paths(f.read_bytes()))
+                        target.write_bytes(adapt_panels(adapt_particle_paths(f.read_bytes()),panel_profiles.get(f.relative_to(src).as_posix(),[])))
                     else:
                         shutil.copyfile(f, target)
     jobs = []

@@ -57,6 +57,7 @@ level = {name = function() return "l01_escape" end, object_by_id = function(id) 
 players = {}
 function netcoop_players() local t = {} for id in pairs(players) do t[#t + 1] = id end table.sort(t) return table.concat(t, ",") end
 function netcoop_actor_character(id) return players[id] and players[id].char or "" end
+netcoop_pdanet={held_device=function(id,char) return {uid=players[id].uid or char.."-pda",own=true} end}
 inbox = {}
 function netcoop_send_to_actor(id, ch, data) assert(ch == "map_known"); inbox[id] = (inbox[id] or "") .. data .. "\n" end
 function join(id, char, x, z)
@@ -80,12 +81,11 @@ def inbox(pid):
 
 lua.execute('join(1, "a_1", 0, 0)')
 lua.eval("step()")
-assert inbox(1) == [], "nothing known at the map's middle"
+assert sorted(row.split()[0] for row in inbox(1)) == ["10", "11"], "both level transitions visible immediately"
 lua.execute('players[1].pos = vector():set(480, 0, 10)')  # at the Garbage changer
 lua.eval("step()")
 got = inbox(1)
-assert len(got) == 1 and got[0].startswith("10 ") and got[0].endswith(" c|l02_garbage"), got
-assert " level_changer_right " in got[0], got  # east of the middle
+assert got == [], "transitions already sent at spawn"
 lua.eval("step()")
 assert inbox(1) == [], "sent once per session"
 lua.execute('players[1].pos = vector():set(10, 0, 290)')  # the named village
@@ -96,16 +96,16 @@ lua.eval("step()")
 assert inbox(1) == []
 lua.execute('players[1].pos = vector():set(190, 0, 190)')  # the acid field
 lua.execute("tg = tg + 15000"); lua.eval("step()")
-assert inbox(1) == ["30 200.0 0.0 200.0 circle_empty a|chemical"]
+assert "30 200.0 0.0 200.0 circle_empty a|chemical" in inbox(1)
 # A relog (another session, any PDA): everything known comes back at once.
 lua.execute('players[1] = nil'); lua.eval("step()")
 lua.execute('join(7, "a_1", -100, -100)'); lua.eval("step()")
-assert sorted(l.split()[0] for l in inbox(7)) == ["10", "20", "30"]
+assert sorted(l.split()[0] for l in inbox(7)) == ["10", "11", "20", "30"]
 # Another character knows nothing.
 lua.execute('join(8, "b_1", -100, -100)'); lua.eval("step()")
-assert inbox(8) == []
-known = lua.eval("netcoop_transit.deserialize(store.map_known.a_1)")
-assert sorted(known["l01_escape"].keys()) == ["a:esc_zone_field_acidic_1", "c:esc_changer_to_garbage", "p:esc_smart_terrain_village"]
+assert sorted(row.split()[0] for row in inbox(8)) == ["10", "11"]
+known = lua.eval("netcoop_transit.deserialize(store.map_known['a_1-pda'])")
+assert sorted(known["l01_escape"].keys()) == ["a:esc_zone_field_acidic_1", "p:esc_smart_terrain_village"]
 
 # The client: position for the id, a spot with a name in its own language.
 client = (root / "client/netcoop_client_compat.script").read_bytes().decode("utf-8")
@@ -114,6 +114,7 @@ lua.execute(r'''
 positions, spots = {}, {}
 function netcoop_map_position_set(id, x, y, z, l) positions[id] = {x, y, z, l} end
 level.map_has_object_spot = function(id, spot) return spots[id .. spot] and 1 or 0 end
+level.map_remove_object_spot=function(id,spot) spots[id..spot]=nil end
 level.map_add_object_spot_ser = function(id, spot, hint) spots[id .. spot] = hint end
 game = {translate_string = function(s)
     local t = {st_lz_map_changer = "Переход: %s", l02_garbage = "Свалка", st_lz_map_anomaly = "Аномальное поле: %s",
@@ -128,3 +129,8 @@ assert lua.eval("spots['20blue_location']") == "Деревня новичков"
 assert lua.eval("spots['30circle_empty']") == "Аномальное поле: химическое"
 assert lua.eval("positions[30][4]") == "l01_escape" and lua.eval("positions[99999]") is None
 print("PASS map places: found only near, per character in the shared store, once per session, relog restores, client spots named")
+
+# Switching to an empty physical PDA removes discoveries; no player-owned fallback.
+lua.execute('players[7].uid="replacement";inbox[7]=nil;step()')
+assert "clear" in inbox(7)
+print("PASS transitions always visible, map discoveries owned by PDA UID and periodically resent")

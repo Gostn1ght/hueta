@@ -125,6 +125,10 @@ for name, keys in cars.items():
     bones = model_physics(data)
     profile = dcp_import.sections(profile_text(CLIENT / 'configs' / include.group(1).replace('\\', '/')))
     definition = profile['car_definition']
+    listed=set(filter(None,map(str.strip,definition.get('doors','').split(','))))
+    assert set(dcp_import.opening_panels(model)) <= listed, (name,'physical opening panel omitted')
+    relative=include.group(1).replace('\\','/')
+    assert (CLIENT/'configs'/relative).read_bytes()==(SERVER/'configs'/relative).read_bytes()
     for field in ('reference_radius', 'fuel_tank', 'max_engine_rpm', 'idling_engine_rpm', 'main_gear_ratio'):
         if field in definition:
             value = float(definition[field])
@@ -158,6 +162,6 @@ for side in (CLIENT, SERVER):
 lights = (Path(__file__).resolve().parents[1] / "src/xrGame/CarLights.cpp").read_text(encoding="utf-8")
 for need in ('if (spot) light_render->set_cone(', 'ini->line_exist(section, "spot_texture")',
              'ini->line_exist(section, "glow_texture")', 'READ_IF_EXISTS(ini, r_s32, section, "type"',
-             'READ_IF_EXISTS(ini, r_string, "lights", "headlights", "")'):
+             '"headlights","stoplights","reverselights","indoorlights"'):
     assert need in lights, need
 print("PASS DCP: %d complete models, physical shapes/masses, wheel and door joints, profile bone references, client/server configs and seat names; %d old cars cut" % (len(cars), len(old)))

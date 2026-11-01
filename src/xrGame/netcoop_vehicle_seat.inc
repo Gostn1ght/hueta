@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 void CActor::netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& local, const Fvector& eye)
 {
+	if(m_netcoop_noclip)netcoop_set_noclip(false);
 	const bool was_seated = netcoop_seated();
 	m_netcoop_seat_car = car;
 	m_netcoop_seat = seat;
@@ -30,6 +31,20 @@ void CActor::netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& lo
 		m_current_torso.invalidate();
 	}
 	netcoop_seat_place();
+}
+
+void CActor::netcoop_set_noclip(bool enabled)
+{
+	if(enabled==m_netcoop_noclip || (enabled && netcoop_seated()))return;
+	CPHMovementControl* movement=character_physics_support() ? character_physics_support()->movement():nullptr;
+	m_netcoop_noclip=enabled;
+	if(movement) {
+		if(enabled && movement->CharacterExist())movement->DestroyCharacter();
+		if(!enabled && !movement->CharacterExist()) {
+			movement->CreateCharacter();movement->SetPosition(Position());movement->SetVelocity(0.f,0.f,0.f);
+		}
+	}
+	m_client_prediction_history.clear();
 }
 
 void CActor::netcoop_seat_leave(const Fvector& exit)

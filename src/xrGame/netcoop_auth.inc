@@ -33,7 +33,7 @@ static void send_auth_result(xrServer* server, xrClientData* CL, bool ok, u8 rol
         {
             Character* character = character_load(CL->netcoop_login.c_str(), slot);
             if (slot > 1) names += "|";
-            if (character && !character->respawn) names += character->name;
+            if (character && (!character->respawn || character->lives_remaining)) names += character->name;
         }
         P.w_stringZ(names.c_str());
         xr_string previews;
@@ -41,7 +41,7 @@ static void send_auth_result(xrServer* server, xrClientData* CL, bool ok, u8 rol
         {
             Character* character = character_load(CL->netcoop_login.c_str(), slot);
             xr_string visual = "actors\\stalker_neutral\\stalker_neutral_1.ogf", items;
-            if (character && !character->respawn)
+            if (character && (!character->respawn || character->lives_remaining))
                 for (const auto& item : character->items)
                 {
                     SInvItemPlace place; place.value = item.place;
@@ -49,7 +49,7 @@ static void send_auth_result(xrServer* server, xrClientData* CL, bool ok, u8 rol
                         visual = pSettings->r_string(item.section.c_str(), "actor_visual");
                     if (items.size() + item.section.size() < 1100) { if (!items.empty()) items += ","; items += item.section; }
                 }
-            previews += visual + "|" + (character && !character->respawn ? character->faction : "stalker") + "|" + items + "\n";
+            previews += visual + "|" + (character && (!character->respawn || character->lives_remaining) ? character->faction : "stalker") + "|" + items + "\n";
         }
         // Storage snapshots occupy a separate bounded payload. Full account
         // previews can approach the packet limit and are omitted in that case.

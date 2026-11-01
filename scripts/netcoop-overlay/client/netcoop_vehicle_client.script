@@ -10,8 +10,34 @@
 
 local prompt
 local seated_since
+local dashboard
 
 local function tr(id) return game.translate_string(id) end
+
+-- A compact freeplay instrument panel, using the game's inventory palette.
+class "UIVehicleStatus" (CUIScriptWnd)
+function UIVehicleStatus:__init() super()
+	self:SetWndRect(Frect():set(0,0,1024,768))
+	local xml=CScriptXmlInit();xml:ParseFile("ui_netcoop_vehicle_status.xml")
+	local panel=xml:InitStatic("dashboard",self)
+	self.speed=xml:InitTextWnd("dashboard:speed",panel)
+	self.details=xml:InitTextWnd("dashboard:details",panel)
+	self.condition=xml:InitTextWnd("dashboard:condition",panel)
+	self.shown=false
+end
+function UIVehicleStatus:Set(data)
+	local speed,fuel,health,rpm,gear,flags=string.match(data or "","^(%S+)|(%S+)|(%S+)|(%S+)|(%d+)|(%d+)$")
+	if not speed then
+		if self.shown then get_hud():RemoveDialogToRender(self);self.shown=false end
+		return
+	end
+	speed,fuel,health,rpm,gear,flags=tonumber(speed),tonumber(fuel),tonumber(health),tonumber(rpm),tonumber(gear),tonumber(flags)
+	self.speed:SetText(string.format("%03d  %s",math.floor(speed+.5),tr("st_lz_car_kmh")))
+	self.details:SetText(string.format("%s %s   /   %s %d\n%s: %s",tr("st_lz_car_gear"),gear==0 and "R" or tostring(gear),tr("st_lz_car_rpm"),rpm,tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
+	self.condition:SetText(string.format("%s %d%%    /    %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
+	self.condition:SetTextColor((fuel<15 or health<30) and GetARGB(255,220,145,90) or GetARGB(255,205,199,179))
+	if not self.shown then get_hud():AddDialogToRender(self);self.shown=true end
+end
 
 local function key(bind, default)
 	local ok, name = pcall(function() return dik_to_keyname(bind_to_dik(key_bindings[bind])) end)
@@ -164,5 +190,16 @@ end
 
 function on_game_start()
 	if not (netcoop_pure_client and netcoop_pure_client()) then return end
+	RegisterScriptCallback("actor_on_net_destroy",function()
+		if dashboard then dashboard:Set("") end
+		if mark then mark:Set(nil) end
+		if prompt then prompt:Set(nil) end
+		seated_since=nil
+	end)
+	RegisterScriptCallback("actor_on_update",function()
+		if not netcoop_vehicle_status then return end
+		local data=netcoop_vehicle_status()
+		if data~="" or dashboard then dashboard=dashboard or UIVehicleStatus();dashboard:Set(data) end
+	end)
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 end

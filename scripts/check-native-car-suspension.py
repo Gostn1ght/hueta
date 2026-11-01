@@ -20,6 +20,7 @@ def method(path, signature):
 
 source=r'''
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -29,7 +30,7 @@ source=r'''
 #include <initializer_list>
 using u32=uint32_t;using LPCSTR=const char*;
 bool _valid(float x){return std::isfinite(x);}
-float fixed_step=.01f;const float hinge2_spring=60000,hinge2_damping=200;
+float fixed_step=.01f;const float hinge2_spring=20000,hinge2_damping=1000;
 const float world_spring=10000,world_damping=100;
 float CFM(float k,float d){return 1.f/(fixed_step*k+d);}
 float ERP(float k,float d){return fixed_step*k/(fixed_step*k+d);}
@@ -60,9 +61,16 @@ int main(){
  // rendering/contact friction multiplier or position/velocity override.
  for(float step:{.01f,1.f/60.f,1.f/120.f}){
   fixed_step=step;assert(car_apply_suspension_profile(&ini,&joint,"wheel"));
-  assert(std::fabs(joint.m_cfm-1.f/(step*60000.f+1000.f))<1e-9f);
-  assert(std::fabs(joint.m_erp-(step*60000.f)/(step*60000.f+1000.f))<1e-6f);
+  assert(std::fabs(joint.m_cfm-1.f/(step*20000.f+5000.f))<1e-9f);
+  assert(std::fabs(joint.m_erp-(step*20000.f)/(step*20000.f+5000.f))<1e-6f);
  }
+ ini.set("wheels_params","suspension_distance",.25f);
+ for(float mass:{600.f,1500.f,3500.f,12000.f}){
+  assert(car_apply_suspension_profile(&ini,&joint,"wheel",mass,4));
+  const float k=joint.m_erp/(joint.m_cfm*fixed_step);
+  assert((mass/4)*9.81f/k<=.0751f);
+ }
+ ini.values.erase({"wheels_params","suspension_distance"});
  ini.set("wheel","suspension_spring_factor",2);
  assert(car_apply_suspension_profile(&ini,&joint,"wheel"));
  assert(std::fabs(joint.m_erp-ERP(hinge2_spring*2,hinge2_damping*5))<1e-6f);
@@ -78,7 +86,7 @@ int main(){
 }
 '''
 wheel=(ROOT/'src/xrGame/CarWheels.cpp').read_text(encoding='utf-8')
-assert 'car_apply_suspension_profile(model->LL_UserData(), joint, model->LL_GetData(bone_id).name.c_str());' in wheel
+assert 'car->PPhysicsShell()->getMass(),u32(car->m_wheels_map.size())' in wheel
 if os.environ.get('GITHUB_ACTIONS')!='true':
     raise SystemExit('Native compilation is permitted only in GitHub Actions')
 with TemporaryDirectory(prefix='car-suspension-') as temporary:

@@ -47,6 +47,7 @@ local function near_player(pos, players)
 end
 
 local function protected(id)
+	if netcoop_survival and netcoop_survival.protected_body(id) then return true end
 	if get_object_story_id(id) then return true end
 	local obj = level.object_by_id(id)
 	if obj and utils_item and utils_item.has_quest_item and utils_item.has_quest_item(obj) then return true end

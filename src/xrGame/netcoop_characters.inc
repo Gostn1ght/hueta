@@ -4,6 +4,7 @@ struct Character
 {
 	xr_string account, name, faction, loadout, description, history;
 	u8 slot = 1, economy = 1;
+	u8 lives_remaining = 5; // NCHA: decremented once when an alive snapshot becomes dead.
 	bool initialized = false, respawn = false;
 	u32 last_save = 0;
 	NET_Packet actor;
@@ -22,8 +23,10 @@ struct CharacterRestore
 	xr_vector<std::pair<u16, u16>> places, entities; // runtime item -> expected parent
 	bool inventory_complete = false, attempted = false;
 	bool placements_sent = false;
+	bool survival_pending = false;
 	bool new_life = false;
 	u32 last_report = 0;
+	u32 placement_started = 0;
 	u32 last_attempt = 0;
 	u32 since = 0;
 	bool clock_started = false, rejected = false;
@@ -32,6 +35,7 @@ static xr_map<u16, CharacterRestore> s_character_restore;
 static bool character_capture_progress(Character& character, CActor* actor);
 static bool character_restore_progress(Character& character, CActor* actor);
 static bool character_notify_ready(CActor* actor, bool new_life);
+static bool character_claim_survivors(CActor* actor, xr_vector<std::pair<u16,u16>>& expected);
 static void character_restore_timeout(u16 actor_id);
 
 bool server_character_accepts(xrClientData* CL, u16 type)
@@ -218,7 +222,7 @@ static bool character_snapshot(const Character& character, xr_vector<u8>& snapsh
 	for (unsigned pass = 0; pass < 2; ++pass)
 	{
 		if (pass) { output.data.resize(output.offset); output.offset = 0; output.counting = false; }
-		const u32 magic = 0x3948434e; // Same NCH9 bytes as the local durable file.
+		const u32 magic = 0x4148434e; // NCHA, NCH9 plus the server-owned remaining lives byte.
 		output.write(&magic, 4);
 		output.string(character.name, 63); output.string(character.faction, 32); output.string(character.loadout, 4096);
 		output.string(character.description, 512); output.string(character.history, 1536);
@@ -244,6 +248,8 @@ static bool character_snapshot(const Character& character, xr_vector<u8>& snapsh
 		output.string(character.storage_request, 32); output.string(character.storage_signature, 80);
 		inventory(character.safe);
 		output.write(&character.inventory_cells, 4);
+		if(character.lives_remaining>5)return false;
+		output.write(&character.lives_remaining,1);
 		if (!output.valid) return false;
 	}
 	if (output.offset != output.data.size()) return false;
@@ -407,6 +413,12 @@ static void character_commits_flush_account(LPCSTR account)
 	}
 }
 
+static void character_record_death(Character& character)
+{
+	if (!character.respawn && character.lives_remaining) --character.lives_remaining;
+	character.respawn = true;
+}
+
 static bool character_save(Character& character, bool background = false)
 {
     string_path path, temp;
@@ -436,7 +448,7 @@ static bool character_decode(const void* bytes, size_t byte_count, Character& ch
  CharacterInput input(bytes, byte_count);
  CharacterInput* f = &input;
 	u32 magic = 0, count = 0;
-	bool ok = f->read(&magic, 4, 1) == 1 && (magic == 0x3348434e || magic == 0x3448434e || magic == 0x3548434e || magic == 0x3648434e || magic == 0x3748434e || magic == 0x3848434e || magic == 0x3948434e) &&
+	bool ok = f->read(&magic, 4, 1) == 1 && (magic == 0x3348434e || magic == 0x3448434e || magic == 0x3548434e || magic == 0x3648434e || magic == 0x3748434e || magic == 0x3848434e || magic == 0x3948434e || magic == 0x4148434e) &&
 		character_read_string(f, character.name, 63) && character_read_string(f, character.faction, 32) &&
 		character_read_string(f, character.loadout, 4096);
 	if (ok && magic >= 0x3548434e) ok = character_read_string(f, character.description, 512) && character_read_string(f, character.history, 1536);
@@ -483,6 +495,8 @@ static bool character_decode(const void* bytes, size_t byte_count, Character& ch
         }
     }
     if (ok && magic>=0x3948434e) ok=f->read(&character.inventory_cells,4,1)==1 && character.inventory_cells<=512;
+    character.lives_remaining=character.respawn ? 4:5;
+    if(ok && magic==0x4148434e) ok=f->read(&character.lives_remaining,1,1)==1 && character.lives_remaining<=5;
     ok=ok && input.remaining==0;
 
  return ok && character_name_valid(character.name.c_str());
@@ -559,13 +573,22 @@ static bool character_validate_loadout(LPCSTR faction, u8 economy, LPCSTR loadou
 	return true;
 }
 
-static bool character_starter_loadout(xr_string& loadout)
+static bool character_starter_loadout(xr_string& loadout, LPCSTR requested)
 {
 	string_path path;
 	if (!FS.exist(path,"$game_config$","items\\settings\\new_game_loadouts.ltx")) return false;
 	CInifile ini(path,TRUE,TRUE,FALSE);
 	if (!ini.section_exist("stalker_loadout")) return false;
-	loadout.clear();
+	loadout = requested ? requested : "";
+	if (!character_validate_loadout("stalker",1,loadout.c_str())) {
+		Msg("! [diag][character] starter rejected: requested items exceed loner allowance or reference unavailable sections");
+		return false;
+	}
+	xr_map<xr_string,u32> selected;
+	for(u32 i=0;!loadout.empty() && i<_GetItemCount(loadout.c_str());++i) {
+		string128 item;_GetItem(loadout.c_str(),i,item);_Trim(item);++selected[item];
+	}
+	const bool legacy_default=loadout.empty();
 	auto add=[&](LPCSTR section,u32 count) {
 		if (!pSettings->section_exist(section) || !count || count>32) return false;
 		for(u32 i=0;i<count;++i) {if(!loadout.empty())loadout+=",";loadout+=section;}
@@ -576,21 +599,25 @@ static bool character_starter_loadout(xr_string& loadout)
 		if(!ini.r_line("stalker_loadout",i,&section,&values)) return false;
 		string128 selectable,count;_GetItem(values,0,selectable);_Trim(selectable);
 		if(xr_strcmp(selectable,"false"))continue;
+		// The freeplay picker also skips optional rows absent from this installation.
+		if(!pSettings->section_exist(section)) {Msg("! [diag][character] starter skips unavailable optional row: %s",section);continue;}
 		_GetItem(values,1,count);
-		if(!add(section,u32(atoi(count))))return false;
+		const u32 required=u32(atoi(count));
+		if(required>32)return false;
+		if(selected[section]<required && !add(section,required-selected[section]))return false;
 	}
 	// The rest is fixed by the server, never by account role or client input.
-	for(LPCSTR section:{"wpn_pb","novice_outfit","device_flashlight","medkit","bread","mineral_water"})
+	if(legacy_default) for(LPCSTR section:{"wpn_pb","novice_outfit","device_flashlight","medkit","bread","mineral_water"})
 		if(!add(section,1))return false;
 	return character_validate_loadout("stalker",1,loadout.c_str());
 }
 
-static bool character_select(xrClientData* CL, u8 slot, LPCSTR name, LPCSTR, u8, LPCSTR)
+static bool character_select(xrClientData* CL, u8 slot, LPCSTR name, LPCSTR, u8, LPCSTR requested_loadout)
 {
 	// One authenticated account owns one character, including administrators.
 	if (!CL || slot != 1) return false;
 	Character* character = character_load(CL->netcoop_login.c_str(), slot);
-	if (!character || character->respawn)
+	if (!character || (character->respawn && !character->lives_remaining))
 	{
 		// A damaged existing save must not be replaced by a new empty character.
 		string_path existing; character_path(CL->netcoop_login.c_str(),slot,existing);
@@ -599,7 +626,7 @@ static bool character_select(xrClientData* CL, u8 slot, LPCSTR name, LPCSTR, u8,
 		Character created;
 		created.account = CL->netcoop_login.c_str(); created.slot = slot;
 		created.name = name; created.faction = "stalker"; created.economy = 1;
-		if (!character_starter_loadout(created.loadout)) return false;
+		if (!character_starter_loadout(created.loadout,requested_loadout)) return false;
 		if (character) {
 			if(character->storage_revision==0xffffffffu)return false;
 			created.storage_revision=character->storage_revision+1;
@@ -710,6 +737,21 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor)
 		{ creature->m_holderID = 0xffff; creature->m_bOnline = true; }
 	}
 	character_clear_dead_body_state(actor, character->respawn);
+	if(character->respawn && character->lives_remaining) {
+		::luabind::functor<Fvector> point;
+		if(ai().script_engine().functor("netcoop_server_compat.respawn_point",point)) {
+			try {
+				const Fvector position=point(actor->o_Position);
+				if(_valid(position) && ai().get_level_graph()) {
+					const u32 node=ai().level_graph().vertex_id(position);
+					if(ai().level_graph().valid_vertex_id(node)) {
+						actor->o_Position=position;
+						if(auto* creature=smart_cast<CSE_ALifeCreatureActor*>(actor))creature->m_tNodeID=node;
+					}
+				}
+			}catch(...){Msg("! [diag][respawn] safe-zone lookup failed; using level arrival");}
+		}
+	}
 	CSE_ALifeTraderAbstract* trader = smart_cast<CSE_ALifeTraderAbstract*>(actor);
 	if (trader)
 	{
@@ -751,7 +793,7 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor)
 		ai().valid_game_vertex(ai().game_graph().current_level_vertex()) &&
 		ai().game_graph().vertex(creature->m_tGraphID)->level_id() ==
 		ai().game_graph().vertex(ai().game_graph().current_level_vertex())->level_id();
-	const bool placed = character->initialized && !character->respawn && same_level &&
+	const bool placed = character->initialized && (!character->respawn || character->lives_remaining) && same_level &&
 		ai().get_level_graph() && ai().level_graph().valid_vertex_id(creature->m_tNodeID) && _valid(creature->o_Position);
 	// A saved or arrival point far above or below its level vertex (a level
 	// changer's destination, an old save) would put the player in the air or
@@ -806,7 +848,16 @@ void server_character_spawn_items(xrClientData* CL)
 	restore.new_life = !character->initialized;
 	s_actor_character[CL->owner->ID] = character_key(character->account.c_str(), character->slot);
 	xrServer* server = Level().Server;
-	if (character->initialized)
+	const bool respawning=character->respawn && character->lives_remaining;
+	if(respawning) {
+		::luabind::functor<bool> reserved;
+		if(ai().script_engine().functor("netcoop_survival.reserved",reserved)) {
+			try {restore.survival_pending=reserved(character_key(character->account.c_str(),character->slot).c_str(),character->name.c_str());}
+			catch(...){restore.survival_pending=true;}
+		}
+		if(restore.survival_pending) {restore.inventory_complete=true;return;}
+	}
+	if (character->initialized && !respawning)
 	{
 		if (!character_spawn_saved_items(server, CL, *character, restore))
 		{
@@ -816,10 +867,13 @@ void server_character_spawn_items(xrClientData* CL)
 	}
 	else
 	{
-		const u32 count = _GetItemCount(character->loadout.c_str());
-		for (u32 i = 0; character->loadout.size() && i < count; ++i)
+		xr_string respawn_kit;
+		if(respawning && !character_starter_loadout(respawn_kit,""))return;
+		const xr_string& loadout=respawning ? respawn_kit:character->loadout;
+		const u32 count = _GetItemCount(loadout.c_str());
+		for (u32 i = 0; loadout.size() && i < count; ++i)
 		{
-			string128 section; _GetItem(character->loadout.c_str(), i, section); _Trim(section);
+			string128 section; _GetItem(loadout.c_str(), i, section); _Trim(section);
 			CSE_Abstract* item = server->game->spawn_begin(section);
 			if (!item) return;
 			item->ID_Parent = CL->owner->ID;
@@ -833,9 +887,9 @@ void server_character_spawn_items(xrClientData* CL)
         if (FS.exist(path, "$game_config$", "items\\settings\\new_game_loadouts.ltx"))
         {
             CInifile ini(path, TRUE, TRUE, FALSE);
-            for (u32 i = 0; character->loadout.size() && i < count; ++i)
+            for (u32 i = 0; loadout.size() && i < count; ++i)
             {
-                string128 weapon, ammo; _GetItem(character->loadout.c_str(), i, weapon); _Trim(weapon);
+                string128 weapon, ammo; _GetItem(loadout.c_str(), i, weapon); _Trim(weapon);
                 if (!pSettings->line_exist(weapon, "ammo_class") || !pSettings->line_exist(weapon, "slot")) continue;
                 const u32 slot = pSettings->r_u32(weapon, "slot");
                 if (slot != 1 && slot != 2 && !(slot == 0 && pSettings->line_exist(weapon, "animation_slot") && pSettings->r_u32(weapon, "animation_slot") == 1)) continue;
@@ -965,7 +1019,16 @@ static bool character_save_actor(u16 actor_id, const CharacterDestination* desti
 		entity->m_tGraphID = runtime->ai_location().game_vertex_id();
 	if (ai().get_level_graph())
 		entity->m_tNodeID = ai().level_graph().vertex_id(runtime->Position());
+	if(!runtime->g_Alive() && !character.respawn && character.lives_remaining) {
+		::luabind::functor<bool> reserve;
+		if(!ai().script_engine().functor("netcoop_survival.prepare",reserve))return false;
+		try {if(!reserve(runtime->lua_game_object(),int(character.lives_remaining-1)))return false;}
+		catch(...){Msg("! [diag][survival] death equipment reservation failed actor=%u",actor_id);return false;}
+		character_record_death(character);
+		Msg("[diag][character] actor=%u death recorded; lives_remaining=%u",actor_id,u32(character.lives_remaining));
+	}
 	character.respawn = !runtime->g_Alive();
+	if(character.respawn && !world_store_save_now("death equipment reservation"))return false;
 	character.items.clear();
 	if (runtime->g_Alive()) character_capture_items(server, character, actor, 0, 0);
 	const Fvector position = entity->o_Position, angles = entity->o_Angle;
@@ -1015,6 +1078,12 @@ static void characters_restore_update()
 		CActor* actor = smart_cast<CActor*>(Level().Objects.net_Find(it->first));
 		if (!actor) { ++it; continue; }
 		if (!it->second.inventory_complete) { ++it; continue; }
+		if(it->second.survival_pending) {
+			if(it->second.attempted && u32(now-it->second.last_attempt)<1000){++it;continue;}
+			it->second.attempted=true;it->second.last_attempt=now;
+			if(!character_claim_survivors(actor,it->second.entities)){++it;continue;}
+			it->second.survival_pending=false;it->second.attempted=false;
+		}
 		bool ready = true;
 		for (const auto& expected : it->second.entities)
 		{
@@ -1035,16 +1104,32 @@ static void characters_restore_update()
 		if (character == s_characters.end()) { ++it; continue; }
 		if(it->second.placements_sent) {
 			bool placed=true;
-			for(const auto& saved:it->second.places) {
+			for(auto& saved:it->second.places) {
 				SInvItemPlace wanted;wanted.value=saved.second;
 				auto* item=smart_cast<CInventoryItem*>(Level().Objects.net_Find(saved.first));
 				if(!item || (wanted.type==eItemPlaceSlot && (item->CurrPlace()!=eItemPlaceSlot || item->CurrSlot()!=wanted.slot_id)) ||
-					(wanted.type==eItemPlaceBelt && item->CurrPlace()!=eItemPlaceBelt)) {placed=false;break;}
+					(wanted.type==eItemPlaceBelt && item->CurrPlace()!=eItemPlaceBelt)) {
+					if(item && now-it->second.placement_started>=10000) {
+						// A changed outfit/slot layout can legitimately refuse old
+						// equipment placement. All items are present and owned; keep
+						// the server's actual place instead of locking every action.
+						Msg("! [diag][character] actor=%u item=%u saved slot/belt refused; retained in actual place=%u slot=%u",actor->ID(),saved.first,u32(item->CurrPlace()),u32(item->CurrSlot()));
+						saved.second=0;continue;
+					}
+					if(!it->second.last_report || now-it->second.last_report>=2000) {
+						it->second.last_report=now;
+						Msg("! [diag][character] actor=%u awaiting item=%u placement type=%u slot=%u",actor->ID(),saved.first,u32(wanted.type),u32(wanted.slot_id));
+					}
+					placed=false;break;
+				}
 			}
 			if(!placed) {++it;continue;}
 			if (it->second.attempted && u32(now-it->second.last_attempt)<1000) {++it;continue;}
 			it->second.attempted=true;it->second.last_attempt=now;
 			if (!character_notify_ready(actor,it->second.new_life)) {++it;continue;}
+			character->second.respawn=false;
+			string32 lives;xr_sprintf(lives,"%u",u32(character->second.lives_remaining));
+			script_send_to_actor(actor->ID(),"netcoop_lives",lives);
 			const u16 completed=actor->ID();it=s_character_restore.erase(it);
 			Msg("[diag][character] actor=%u restore complete; inventory and script state ready",completed);
 			continue;
@@ -1071,6 +1156,7 @@ static void characters_restore_update()
 				CGameObject::u_EventSend(packet);
 			}
 		it->second.placements_sent=true;
+		it->second.placement_started=now;
 		it->second.attempted=false;
 		++it;
 	}

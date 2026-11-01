@@ -1,51 +1,59 @@
-----------------------------------------------------------------------
--- Personal PDA storage (owner 2026-10-06)
-----------------------------------------------------------------------
--- Every player has a PDA of their own: the map pins they put (GAMMA's PAW)
--- belong to the character, are seen by nobody else and come back on any
--- computer. The client sends its PDA data in hex chunks ("pda put n total
--- hex", commands are limited to 4 KB); the server keeps it in the cluster's
--- shared store (bucket "pda", key = character) and sends it back in chunks
--- on "pda get" (channel "pda", "n/total|hex").
+-- Map pins travel with the physical PDA's persistent item UID.
+local CHUNK, MAX_HEX = 3000, 2 * 65536
+local pending = {}
 
-local CHUNK = 3000
-local MAX_HEX = 2 * 65536
-local pending = {} -- Actor id -> { total, parts = {} }
-
-local function char_of(id) return netcoop_actor_character and netcoop_actor_character(id) or "" end
-
-local function store(char, data)
-	for _ = 1, 8 do
-		local old = netcoop_store_read("pda", char)
-		if netcoop_store_swap("pda", char, old, data) then return true end
-	end
-	return false
+local function device(id)
+ local char = netcoop_actor_character and netcoop_actor_character(id) or ""
+ if char == "" or not netcoop_pdanet then return nil end
+ local d = netcoop_pdanet.held_device(id, char)
+ if not d or not d.own then return nil end
+ return d, char
 end
 
-local function send(id, data)
-	local total = math.max(1, math.ceil(#data / CHUNK))
-	for n = 1, total do
-		netcoop_send_to_actor(id, "pda", n .. "/" .. total .. "|" .. string.sub(data, (n - 1) * CHUNK + 1, n * CHUNK))
-	end
+local function store(bucket, key, data)
+ for _ = 1, 8 do
+  local old = netcoop_store_read(bucket, key) or ""
+  if netcoop_store_swap(bucket, key, old, data) then return true end
+ end
+ return false
 end
 
--- "pda put n total hex" / "pda get" from the player whose Actor is entity_id.
-function command(entity_id, args)
-	local char = char_of(entity_id)
-	if char == "" then return "" end
-	local verb, rest = string.match(args or "", "^(%S+)%s*(.*)$")
-	if verb == "get" then
-		send(entity_id, netcoop_store_read("pda", char) or "")
-	elseif verb == "put" then
-		local n, total, hex = string.match(rest, "^(%d+) (%d+) (%x*)$")
-		n, total = tonumber(n), tonumber(total)
-		if not (n and total and total >= 1 and n <= total and total * CHUNK <= MAX_HEX and #hex <= CHUNK) then return "" end
-		local p = pending[entity_id]
-		if n == 1 or not p or p.total ~= total then p = { total = total, parts = {} }; pending[entity_id] = p end
-		p.parts[n] = hex
-		for i = 1, total do if not p.parts[i] then return "" end end
-		pending[entity_id] = nil
-		store(char, table.concat(p.parts))
-	end
-	return ""
+-- Migrate legacy character pins once, to the first owned PDA that asks.
+-- A replacement device must not inherit the previous device's map.
+local function saved(d, char)
+ local data = netcoop_store_read("pda_marks", d.uid) or ""
+ if data ~= "" then return data end
+ local legacy = netcoop_store_read("pda", char) or ""
+ if legacy == "" then return "" end
+ local claim = netcoop_store_read("pda_migrated", char) or ""
+ if claim == "" and netcoop_store_swap("pda_migrated", char, "", d.uid) then claim = d.uid end
+ if claim ~= d.uid then return "" end
+ if store("pda_marks", d.uid, legacy) then return legacy end
+ return nil -- retry rather than replacing unread data with an empty map
+end
+
+function command(id, args)
+ local d, char = device(id)
+ if not d then pending[id] = nil; netcoop_send_to_actor(id, "pda", "none"); return "" end
+ local verb, rest = string.match(args or "", "^(%S+)%s*(.*)$")
+ if verb == "get" then
+  local data = saved(d, char)
+  if data == nil then return "" end
+  local total = math.max(1, math.ceil(#data / CHUNK))
+  for n = 1, total do
+   netcoop_send_to_actor(id, "pda", d.uid .. "|" .. n .. "/" .. total .. "|" .. string.sub(data, (n-1)*CHUNK+1, n*CHUNK))
+  end
+ elseif verb == "put" then
+  local uid, n, total, hex = string.match(rest, "^(%S+) (%d+) (%d+) (%x*)$")
+  n, total = tonumber(n), tonumber(total)
+  if uid ~= d.uid or not (n and total and total >= 1 and n >= 1 and n <= total and (total-1)*CHUNK < MAX_HEX and #hex <= CHUNK) then return "" end
+  local p = pending[id]
+  if n == 1 or not p or p.uid ~= uid or p.total ~= total then p = {uid=uid,total=total,parts={}}; pending[id] = p end
+  p.parts[n] = hex
+  for i = 1, total do if not p.parts[i] then return "" end end
+  pending[id] = nil
+  local data = table.concat(p.parts)
+  if #data <= MAX_HEX and #data % 2 == 0 and store("pda_marks", uid, data) then netcoop_send_to_actor(id, "pda", uid .. "|saved") end
+ end
+ return ""
 end

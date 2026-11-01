@@ -21,7 +21,7 @@ def runtime():
     function V:set(x, y, z) self.x, self.y, self.z = x, y, z return self end
     clsid = {script_zone = 77}
     level = {name = function() return "k00_marsh" end, object_by_id = function() return nil end}
-    db = {actor = nil}
+    db = {actor = {item_in_slot=function() return {id=function() return 81 end} end}}
     spots = {}
     function netcoop_map_position_set(id, x, y, z, lvl) spots[id] = {x, y, z, lvl} end
     function netcoop_map_position_clear(id) spots[id] = nil end
@@ -61,6 +61,8 @@ server.globals().netcoop_store_swap = swap
 server.execute(r'''
 chars = {[1] = "anna_1", [2] = "boris_1"}
 function netcoop_actor_character(id) return chars[id] or "" end
+held={[1]="device-A",[2]="device-B"}; own=true
+netcoop_pdanet={held_device=function(id) return held[id] and {uid=held[id],own=own} end}
 outbox = {}
 function netcoop_send_to_actor(id, ch, data) outbox[#outbox + 1] = {id, ch, data} end
 ''')
@@ -71,6 +73,7 @@ c1 = runtime()
 load(c1, "client/netcoop_pda.script", "netcoop_pda")
 c1.execute(r'''
 netcoop_pda.on_game_start()
+netcoop_pda.receive("device-A|1/1|")
 local paw = tasks_placeable_waypoints
 local pos = vector():set(120.5, 2, -310.25)
 local se = paw.alife_create("script_zone", pos, 4567, 89)   -- PAW: register_script_zone
@@ -79,13 +82,14 @@ assert(spots[se.id] and spots[se.id][4] == "k00_marsh", "the engine knows the pi
 assert(paw.alife_object(se.id):name() == "paw_pin_" .. se.id, "PAW finds its pin object")
 paw.pins[se.id] = {id = se.id, name = "Тайник у вышки", icon = "bwhr_loot", text = "мой тайник"}
 pin_id = se.id
-netcoop_pda.receive("1/1|")            -- the server had nothing saved yet
+-- Snapshot was loaded before the local edit.
 tick = 6000; callbacks.actor_on_update()
 assert(#sent >= 1, "saved to the server")
 ''')
 for text in list(c1.globals().sent.values()):
     server.globals().netcoop_pda_store.command(1, text[len("pda "):])
-assert store.get(("pda", "anna_1")), "stored for Anna's character"
+assert store.get(("pda_marks", "device-A")), "stored for the physical device"
+c1.execute('netcoop_pda.receive("device-A|saved")')
 
 # Client 2 (Anna on another computer): asks, gets the chunks back.
 c2 = runtime()
@@ -107,8 +111,28 @@ assert(spots[%d] and spots[%d][1] == 120.5 and spots[%d][3] == -310.25, "at the 
 # Boris (another character) gets nothing of Anna's.
 server.execute("outbox = {}")
 server.globals().netcoop_pda_store.command(2, "get")
-assert list(server.globals().outbox.values())[0][3] == "1/1|", "another character's PDA is empty"
+assert list(server.globals().outbox.values())[0][3] == "device-B|1/1|", "another character's PDA is empty"
 
 # Removing a pin clears its map position.
 c1.execute("tasks_placeable_waypoints.alife_release({id = pin_id}); assert(not spots[pin_id])")
 print("PDA: PAW pins without ALife, saved per character in chunks, restored on another client, private to the character PASS")
+
+# Same physical device follows its new legitimate holder; a replacement is empty.
+server.execute('chars[2]="boris_1";held[2]="device-A";outbox={}')
+server.globals().netcoop_pda_store.command(2,"get")
+assert list(server.globals().outbox.values())[0][3].startswith("device-A|1/")
+server.execute('held[1]="replacement";outbox={}')
+server.globals().netcoop_pda_store.command(1,"get")
+assert list(server.globals().outbox.values())[0][3]=="replacement|1/1|"
+# Forging another device's UID cannot overwrite it; a foreign locked PDA is unreadable.
+before=dict(store)
+server.globals().netcoop_pda_store.command(1,"put device-A 1 1 6666")
+assert dict(store)==before
+server.execute('own=false;outbox={}')
+server.globals().netcoop_pda_store.command(2,"get")
+assert list(server.globals().outbox.values())[0][3]=="none"
+# Reconnecting within this Lua VM must request state again and remove stale pins.
+c2.execute('netcoop_pda.reset(); sent={}; tick=9000; callbacks.actor_on_update(); assert(sent[1]=="pda get")')
+# Lost saves are retried until an explicit server acknowledgment.
+c1.execute('sent={}; tick=12000; callbacks.actor_on_update(); tick=18000; callbacks.actor_on_update(); assert(#sent==2); netcoop_pda.receive("device-A|saved"); sent={}; tick=24000; callbacks.actor_on_update(); assert(#sent==0)')
+print("PASS physical PDA: UID isolation, ownership checks, device transfer, replacement, reconnect reset and acknowledged save retry")

@@ -168,8 +168,15 @@ function UIBarter:__init(partner, name) super()
 	xml:ParseFile("ui_netcoop_barter.xml")
 	self.xml = xml
 	self.dialog = xml:InitStatic("barter:background", self)
+	for _, panel in ipairs({"left_panel", "equipment_panel", "right_panel"}) do xml:InitStatic("barter:" .. panel, self.dialog) end
 	self.caption = xml:InitTextWnd("barter:caption", self.dialog)
 	self.caption:SetText(string.format(tr("st_netcoop_barter_with"), name))
+	xml:InitTextWnd("barter:my_name", self.dialog):SetText(db.actor and db.actor:character_name() or "")
+	xml:InitTextWnd("barter:partner_name", self.dialog):SetText(name or "")
+	for _, entry in ipairs({{"my_icon", db.actor}, {"partner_icon", level.object_by_id(partner)}}) do
+		local icon = xml:InitStatic("barter:" .. entry[1], self.dialog)
+		if entry[2] and entry[2].character_icon then icon:InitTexture(entry[2]:character_icon()) end
+	end
 	xml:InitTextWnd("barter:title_bag", self.dialog):SetText(tr("st_netcoop_barter_bag"))
 	xml:InitTextWnd("barter:title_their_bag", self.dialog):SetText(tr("st_netcoop_barter_their_bag"))
 	xml:InitTextWnd("barter:title_give", self.dialog):SetText(tr("st_netcoop_barter_give"))
@@ -178,6 +185,12 @@ function UIBarter:__init(partner, name) super()
 	self.give = utils_ui.UICellContainer("give", self, nil, "barter:cont_give", self.dialog)
 	self.get = utils_ui.UICellContainer("get", self, nil, "barter:cont_get", self.dialog)
 	self.their_bag = utils_ui.UICellContainer("their_bag", self, nil, "barter:cont_their_bag", self.dialog)
+	self.equipment = utils_ui.UICellContainer("equipment", self, nil, "barter:cont_equipment", self.dialog)
+	self.equipment.disable_drag = true
+	local worn = {}
+	if db.actor then for slot = 1, 16 do local item = db.actor:item_in_slot(slot); if item then worn[#worn+1] = item end end end
+	self.equipment:Reinit(worn)
+	self.equipment_status = xml:InitTextWnd("barter:equipment_status", self.dialog)
 	-- the partner's side shows sections: his items are his to move
 	for _, cc in ipairs({ self.get, self.their_bag }) do
 		cc.showcase = 1
@@ -293,10 +306,14 @@ end
 function UIBarter:Update()
 	CUIScriptWnd.Update(self)
 	local found = false
-	for _, cc in ipairs({ self.bag, self.give, self.get, self.their_bag }) do
+	for _, cc in ipairs({ self.bag, self.give, self.get, self.their_bag, self.equipment }) do
 		if cc:Update(self.item_info) then found = true end
 	end
 	if not found then self.item_info:Update() end
+	if db.actor and time_global() >= (self.next_status or 0) then
+		self.next_status = time_global() + 1000
+		self.equipment_status:SetText(string.format("%s: %d%%\n%s: %d%%\n%s: %d RU", tr("ui_inv_health"), math.floor(db.actor.health*100), tr("ui_inv_power"), math.floor(db.actor.power*100), tr("st_netcoop_barter_money"), db.actor:money()))
+	end
 end
 
 function UIBarter:OnKeyboard(dik, action)

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+<string id="st_lz_weather_title"><text>Погода и время Зоны</text></string>
+<string id="st_lz_weather_hint"><text>Изменения применяет сервер для всех локаций</text></string>
+<string id="st_lz_weather_clear"><text>Ясно</text></string>
+<string id="st_lz_weather_cloudy"><text>Облачно</text></string>
+<string id="st_lz_weather_rain"><text>Дождь</text></string>
+<string id="st_lz_weather_storm"><text>Гроза</text></string>
+<string id="st_lz_weather_fog"><text>Туман</text></string>
+<string id="st_lz_weather_reset"><text>Сбросить ручную правку</text></string>
+<string id="st_lz_weather_hour"><text>Время: +1 час</text></string>
+<string id="st_lz_weather_six_hours"><text>Время: +6 часов</text></string>
+<string id="st_lz_weather_realtime"><text>Время: реальная скорость</text></string>
+<string id="st_lz_weather_normal"><text>Время: обычная скорость</text></string>
+<string id="st_lz_weather_emission"><text>Начать выброс</text></string>
+<string id="st_lz_weather_psi"><text>Начать пси-шторм</text></string>
+</string_table>

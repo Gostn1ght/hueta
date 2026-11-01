@@ -38,6 +38,12 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 	const u32 now = Level().timeServer();
 	switch (op)
 	{
+	case vehicle_op_door:
+		if(P.r_elapsed()==2 && !actor->netcoop_seated() && actor->Position().distance_to(car->Position())<=car->Radius()+2.5f) {
+			const u16 bone=P.r_u16();
+			if(car->netcoop_door_bone(bone)==bone) {car->DoorSwitch(bone);v.dirty=true;}
+		}
+		break;
 	case vehicle_op_enter:
 		{
 			const u8 seat = P.r_u8();
@@ -121,13 +127,17 @@ static void vehicle_send_state(xrServer* server, CCar* car, const VehicleRuntime
 	P.w_begin(M_NETCOOP_VEHICLE);
 	P.w_u8(vehicle_op_state);
 	P.w_u16(car->ID());
-	P.w_u8(u8((car->netcoop_engine_on() ? 1 : 0) | (car->m_netcoop_lights ? 2 : 0)));
+	P.w_u8(u8((car->netcoop_engine_on() ? 1 : 0) | (car->m_netcoop_lights ? 2 : 0) | (car->netcoop_aux_lights()<<2)));
 	P.w_u8(v.keys);
 	P.w_float(car->netcoop_rpm());
 	P.w_float(car->netcoop_steer());
 	P.w_u8(u8(v.seats.size()));
 	for (u16 id : v.seats)
 		P.w_u16(id);
+	Fvector velocity;velocity.set(0,0,0);if(car->PPhysicsShell())car->PPhysicsShell()->get_LinearVel(velocity);
+	P.w_float(_valid(velocity) ? velocity.magnitude()*3.6f:0.f);
+	P.w_float(car->netcoop_fuel());P.w_float(car->netcoop_fuel_capacity());P.w_float(car->GetfHealth());
+	P.w_u16(car->netcoop_gear());P.w_u64(car->netcoop_broken_glass());
 	struct Send
 	{
 		xrServer* server;
@@ -448,9 +458,24 @@ static const float RUN_OVER_SPEED = 3.f; // m/s
 static const u32 RUN_OVER_REPEAT = 800;
 static xr_map<u32, u32> s_run_over_last; // car id << 16 | player id -> time
 
+static bool vehicle_swept_hit(const Fbox& box, const Fvector& point, const Fvector& travel)
+{
+	float enter=0.f,leave=1.f;
+	for(u32 axis=0;axis<3;++axis) {
+		const float p=point[axis],d=travel[axis];
+		if(_abs(d)<.00001f) {if(p<box.min[axis] || p>box.max[axis])return false;continue;}
+		float a=(box.min[axis]-p)/d,b=(box.max[axis]-p)/d;
+		if(a>b)std::swap(a,b);
+		enter=_max(enter,a);leave=_min(leave,b);
+		if(enter>leave)return false;
+	}
+	return true;
+}
+
 static void vehicle_run_over(CCar* car, VehicleRuntime& v, u32 now)
 {
 	if (now - v.run_over_check < 100) return;
+	const float elapsed=v.run_over_check ? _min(.25f,float(now-v.run_over_check)/1000.f):.1f;
 	v.run_over_check = now;
 	CPhysicsShell* shell = car->PPhysicsShell();
 	if (!shell || !shell->isActive() || !car->Visual()) return;
@@ -459,9 +484,10 @@ static void vehicle_run_over(CCar* car, VehicleRuntime& v, u32 now)
 	const float speed = velocity.magnitude();
 	if (!_valid(speed) || speed < RUN_OVER_SPEED) return;
 	Fbox box = car->Visual()->getVisData().box;
-	box.grow(0.35f);
+	box.grow(0.65f); // player capsule, including the contact solver's separation
 	Fmatrix to_car;
 	to_car.invert(car->XFORM());
+	Fvector world_travel,travel;world_travel.mul(velocity,elapsed);to_car.transform_dir(travel,world_travel);
 	Fvector way = velocity;
 	way.normalize_safe();
 	CActor* driver = !v.seats.empty() && v.seats[0] != vehicle_seat_free ?
@@ -474,7 +500,7 @@ static void vehicle_run_over(CCar* car, VehicleRuntime& v, u32 now)
 		Fvector local, centre = player->Position();
 		centre.y += 0.9f;
 		to_car.transform_tiny(local, centre);
-		if (!box.contains(local)) continue;
+		if (!vehicle_swept_hit(box,local,travel)) continue;
 		u32& last = s_run_over_last[(u32(car->ID()) << 16) | player->ID()];
 		if (last && now - last < RUN_OVER_REPEAT) continue;
 		last = now;

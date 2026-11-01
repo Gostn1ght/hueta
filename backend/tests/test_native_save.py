@@ -25,14 +25,14 @@ def independent_crc(data):
     return value
 
 
-def native_fixture(version=8, *, ieee=False, section=b"wpn_pm", parent=0, state=b"uid/ammo/condition", actor=b"actor-position-state", progress=b"tasks/info/lua/origins", name=b"player"):
+def native_fixture(version=8, *, ieee=False, section=b"wpn_pm", parent=0, state=b"uid/ammo/condition", actor=b"actor-position-state", progress=b"tasks/info/lua/origins", name=b"player", lives=5, dead=False):
     def packet(raw):
         checksum = zlib.crc32(raw) if ieee else independent_crc(raw)
         return struct.pack("<II", len(raw), checksum) + raw
-    data = b"NCH" + bytes([48 + version]) + name + b"\0stalker\0loadout\0"
+    data = b"NCH" + (b"A" if version==10 else bytes([48 + version])) + name + b"\0stalker\0loadout\0"
     if version >= 5:
         data += b"description\0history\0"
-    data += b"\1\1\0" + packet(actor)
+    data += bytes([1,1,int(dead)]) + packet(actor)
     item = section + b"\0" + struct.pack("<H", parent)
     if version >= 4:
         item += struct.pack("<H", 5)
@@ -46,6 +46,8 @@ def native_fixture(version=8, *, ieee=False, section=b"wpn_pm", parent=0, state=
         data += struct.pack("<I", 19) + b"request\0signature\0" + struct.pack("<I", 1) + item
     if version >= 9:
         data += struct.pack("<I",240)
+    if version >= 10:
+        data += bytes([lives])
     return data
 
 
@@ -70,6 +72,17 @@ class NativeSaveTest(unittest.TestCase):
                 self.assertEqual(saved.progress_bytes, len(b"tasks/info/lua/origins") if version >= 4 else 0)
         raw = native_fixture(name="Сталкер".encode("cp1251") + b"\x98")
         self.assertEqual(parse_native_save(raw).raw, raw)
+
+    def test_five_lives_persist_and_migrate(self):
+        for lives in range(6):
+            saved=parse_native_save(native_fixture(10,lives=lives,dead=lives<5))
+            self.assertEqual(saved.lives_remaining,lives)
+            self.assertEqual(saved.summary()["format"],"NCHA")
+            self.assertEqual(saved.summary()["lives_remaining"],lives)
+        self.assertEqual(parse_native_save(native_fixture(9,dead=True)).lives_remaining,4)
+        self.assertEqual(parse_native_save(native_fixture(9)).lives_remaining,5)
+        for raw in (native_fixture(10,lives=6),native_fixture(10)[:-1]):
+            with self.assertRaises(Invalid): parse_native_save(raw)
 
     def test_truncation_corruption_forward_parents_and_trailing_bytes_fail_closed(self):
         raw = native_fixture()

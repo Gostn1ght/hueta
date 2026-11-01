@@ -62,10 +62,12 @@ source = r'''
 #include <limits>
 using u8=unsigned char;using u16=unsigned short;using u32=unsigned int;
 constexpr bool TRUE=true;
-using shared_str=std::string;using xr_string=std::string;
+using shared_str=std::string;using xr_string=std::string;using string32=char[32];
 template<class T>using xr_vector=std::vector<T>;
 template<class K,class V>using xr_map=std::map<K,V>;
 template<class T,class P>T smart_cast(P* value){return dynamic_cast<T>(value);}
+template<size_t N,class... T>void xr_sprintf(char(&out)[N],const char* fmt,T... v){std::snprintf(out,N,fmt,v...);}
+void script_send_to_actor(u16,const char*,const char*){}
 void Msg(const char*,...){}
 ''' + input_types + r'''
 namespace ACTOR_DEFS {constexpr u16 mcJump=16,kM1InputIntentFlags=31;}
@@ -113,6 +115,7 @@ struct CGameObject {
 struct CActor:CGameObject {Info info;Info* m_known_info_registry=&info;int* lua_game_object(){return nullptr;}};
 struct CInventoryItem:CGameObject {u16 place=0,slot=0;u16 CurrPlace()const{return place;}u16 CurrSlot()const{return slot;}};
 int fixture_ready_calls=0;bool fixture_ready_available=true;
+static bool character_claim_survivors(CActor*,std::vector<std::pair<u16,u16>>&){return true;}
 static bool character_notify_ready(CActor*,bool){++fixture_ready_calls;return fixture_ready_available;}
 int fixture_scope_depth=0;
 struct ServerVictimScope {explicit ServerVictimScope(CActor*){++fixture_scope_depth;}~ServerVictimScope(){--fixture_scope_depth;}};
@@ -137,7 +140,7 @@ struct xrClientData {
  std::deque<ActorInputCommand> m_pending_inputs;
  explicit xrClientData(CSE_Abstract* entity,int client_id=1):owner(entity),ID(client_id){}
 };
-struct Character {bool respawn=false;std::vector<u8>progress;
+struct Character {u8 lives_remaining=5;bool respawn=false;std::vector<u8>progress;
  struct Item {std::string section="item";u16 parent=0,place=0;NET_Packet spawn;std::vector<u8>state;};
  std::vector<Item>items;
 };

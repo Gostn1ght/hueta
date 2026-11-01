@@ -34,6 +34,19 @@ function is_lost_zone_trader(id)
 	return false
 end
 
+-- Stock GAMMA service NPCs use level_spot in their live logic. Do not
+-- classify every stalker with a generic barter inventory as a trader.
+function is_service_npc(npc)
+	if not npc then return false end
+	if is_lost_zone_trader(npc:id()) or npc:character_community() == "trader" then return true end
+	local st = db.storage[npc:id()]
+	if not (st and st.ini and xr_logic) then return false end
+	local cond = st.section_logic and st.ini:r_string_to_condlist(st.section_logic, "level_spot")
+		or st.active_section and st.ini:r_string_to_condlist(st.active_section, "level_spot")
+	local role = cond and xr_logic.pick_section_from_condlist(db.actor, npc, cond)
+	return role == "trader" or role == "mechanic" or role == "barman"
+end
+
 local function trade_config()
 	return cfg():r_string_ex("trader", "trade") or "items\\trade\\trade_stalker_basic.ltx"
 end

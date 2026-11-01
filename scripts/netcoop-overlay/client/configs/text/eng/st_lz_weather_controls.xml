@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+<string id="st_lz_weather_title"><text>Zone weather and time</text></string>
+<string id="st_lz_weather_hint"><text>The server applies changes across all locations</text></string>
+<string id="st_lz_weather_clear"><text>Clear</text></string>
+<string id="st_lz_weather_cloudy"><text>Cloudy</text></string>
+<string id="st_lz_weather_rain"><text>Rain</text></string>
+<string id="st_lz_weather_storm"><text>Storm</text></string>
+<string id="st_lz_weather_fog"><text>Fog</text></string>
+<string id="st_lz_weather_reset"><text>Reset manual overrides</text></string>
+<string id="st_lz_weather_hour"><text>Time: +1 hour</text></string>
+<string id="st_lz_weather_six_hours"><text>Time: +6 hours</text></string>
+<string id="st_lz_weather_realtime"><text>Time: real speed</text></string>
+<string id="st_lz_weather_normal"><text>Time: normal speed</text></string>
+<string id="st_lz_weather_emission"><text>Start emission</text></string>
+<string id="st_lz_weather_psi"><text>Start psi storm</text></string>
+</string_table>

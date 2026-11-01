@@ -282,6 +282,13 @@ namespace netcoop
 void server_on_player_death(CObject* victim, CObject* killer)
 {
 	if (!victim || !server_player_copy(victim)) return;
+	if(Character* character=character_tracked_for_save(victim->ID())) {
+		::luabind::functor<bool> prepare;
+		if(ai().script_engine().functor("netcoop_survival.prepare",prepare)) {
+			try {prepare(smart_cast<CActor*>(victim)->lua_game_object(),int(character->lives_remaining ? character->lives_remaining-1:0));}
+			catch(...){Msg("! [diag][survival] death draw pending for actor=%u",victim->ID());}
+		}
+	}
 	::luabind::functor<void> handler;
 	if (!ai().script_engine().functor("netcoop_ranks.on_player_death", handler)) return;
 	try { handler(int(victim->ID()), int(killer ? killer->ID() : 65535)); }
@@ -942,6 +949,19 @@ bool script_admin_teleport(u16 actor_id, const Fvector& position)
 	return true;
 }
 
+bool script_admin_noclip(u16 actor_id, bool value)
+{
+	if(!enabled() || pure_client() || !g_pGameLevel || !Level().Server)return false;
+	FindActorOwner find;find.actor_id=actor_id;
+	auto* client=static_cast<xrClientData*>(Level().Server->FindClient(find));
+	auto* actor=smart_cast<CActor*>(Level().Objects.net_Find(actor_id));
+	if(!client || client->netcoop_role!=role_admin || !actor || !actor->g_Alive() || actor->netcoop_seated() || !server_character_accepts(client,M_NETANOMALY_CMD))return false;
+	actor->netcoop_set_noclip(value);
+	script_send_to_actor(actor_id,"netcoop_noclip",value ? "1":"0");
+	Msg("[diag][admin] actor=%u noclip=%u",actor_id,u32(value));
+	return true;
+}
+
 bool script_respawn(u16 actor_id)
 {
 	if (!enabled() || !g_pGameLevel || !Level().Server)
@@ -958,6 +978,17 @@ bool script_respawn(u16 actor_id)
 	// Keep the dead checkpoint and corpse. A new life is created only after
 	// account authentication and a different Russian call sign in the room.
 	if (!character_save_actor(actor_id,nullptr,false)) return false;
+	Character* character=character_load(CL->netcoop_login.c_str(),CL->netcoop_character_slot);
+	if(!character)return false;
+	if(character->lives_remaining) {
+		s_actor_character.erase(actor_id);
+		server_release_task_manager(actor_id);
+		give_to_server(server,CL->owner,0);
+		CL->owner=nullptr;
+		netcoop_respawn_spawn(CL->ID);
+		Msg("[diag][respawn] client=%u corpse=%u lives_remaining=%u",CL->ID.value(),actor_id,u32(character->lives_remaining));
+		return CL->owner!=nullptr;
+	}
 	Msg("[diag][character] life ended actor=%u; returning to account room",actor_id);
 	return script_send_to_actor(actor_id,"netcoop_life_ended","");
 }

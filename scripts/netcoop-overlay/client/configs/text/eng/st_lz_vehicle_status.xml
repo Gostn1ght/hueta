@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+<string id="st_lz_car_kmh"><text>km/h</text></string>
+<string id="st_lz_car_gear"><text>Gear</text></string>
+<string id="st_lz_car_rpm"><text>rpm</text></string>
+<string id="st_lz_car_engine"><text>Engine</text></string>
+<string id="st_lz_car_on"><text>running</text></string>
+<string id="st_lz_car_off"><text>off</text></string>
+<string id="st_lz_car_fuel"><text>Fuel</text></string>
+<string id="st_lz_car_condition"><text>Hull</text></string>
+<string id="st_lz_car_lives"><text>Lives: %d / 5</text></string>
+<string id="st_lz_car_noclip"><text>Free flight (noclip)</text></string>
+<string id="st_lz_car_door"><text>Open / close panel</text></string>
+</string_table>

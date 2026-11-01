@@ -13,6 +13,7 @@ struct SCarLight
 	ref_glow glow_render;
 	u16 bone_id;
 	Fvector offset; // DCP: the light's position in its bone's space
+	u8 group = 0; // headlights, stop, reverse, cabin
 	CCarLights* m_holder;
 	SCarLight();
 	~SCarLight();

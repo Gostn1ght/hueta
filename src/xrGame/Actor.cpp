@@ -804,6 +804,7 @@ void CActor::Die(CObject* who)
     Msg("--- Actor [%s] dies !", this->Name());
 #endif // #ifdef DEBUG
 	inherited::Die(who);
+	if(netcoop::enabled() && !netcoop::pure_client())netcoop::server_on_player_death(this,who);
 
 	if (OnServer())
 	{
@@ -817,6 +818,7 @@ void CActor::Die(CObject* who)
 			{
 				if (item_in_slot)
 				{
+					if(netcoop::enabled()) {inventory().Ruck(item_in_slot);continue;}
 					CGrenade* grenade = smart_cast<CGrenade*>(item_in_slot);
 					if (grenade)
 						grenade->DropGrenade();
@@ -852,8 +854,6 @@ void CActor::Die(CObject* who)
 		m_DangerSnd.stop();
 	}
 
-	if (netcoop::enabled() && !netcoop::pure_client())
-		netcoop::server_on_player_death(this, who); // ranks, renegades, bounties (doc 47)
 	if (netcoop::enabled())
 	{
 		// Netcoop: no game-over. On the server there is no UI at all (it
@@ -933,6 +933,21 @@ void CActor::SwitchOutBorder(bool new_border_state)
 
 void CActor::g_Physics(Fvector& _accel, float jump, float dt)
 {
+	if(m_netcoop_noclip) {
+		if(this==Level().CurrentControlEntity() && netcoop::pure_client()) {
+			auto held=[](EGameActions action) {for(int n=0;n<2;++n){const int dik=get_action_dik(action,n);if(dik && pInput->iGetAsyncKeyState(dik))return true;}return false;};
+			Fvector direction;direction.set(0.f,0.f,0.f);
+			Fvector forward=cam_Active()->vDirection,right;right.crossproduct(Fvector().set(0.f,1.f,0.f),forward);right.normalize_safe();
+			if(held(kFWD))direction.add(forward);if(held(kBACK))direction.sub(forward);
+			if(held(kR_STRAFE))direction.add(right);if(held(kL_STRAFE))direction.sub(right);
+			if(held(kJUMP))direction.y+=1.f;if(held(kCROUCH))direction.y-=1.f;
+			if(direction.square_magnitude()>1.f)direction.normalize_safe();
+			const float speed=held(kSPRINT_TOGGLE) ? 10.f:4.f;
+			Fvector position;position.mad(Position(),direction,_min(.1f,dt)*speed);
+			if(Level().ObjectSpace.GetBoundingVolume().contains(position))Position().set(position);
+		}
+		return;
+	}
 	// Correct accel
 	Fvector accel;
 	accel.set(_accel);
@@ -1901,6 +1916,11 @@ void CActor::shedule_Update(u32 DT)
 	// Remote actors on the server consume one validated input state and take
 	// exactly one physics step here, including netcoop's single-player game type.
 	const bool authoritative_remote = OnServer() && ServerProcessInputs(dt);
+	if(m_netcoop_noclip) {
+		Fvector zero;zero.set(0.f,0.f,0.f);g_Physics(zero,0.f,dt);
+		mstate_real=0;g_SetAnimation(mstate_real);
+		inherited::shedule_Update(DT);return;
+	}
 
 	// Check controls, create accel, prelimitary setup "mstate_real"
 

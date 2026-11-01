@@ -1,0 +1,85 @@
+-- Five lives: reserve half of the original equipment, move the same items
+-- to the next body, never create replacement copies or reroll on reconnect.
+local function records()
+ local state=alife_storage_manager.get_state()
+ state.netcoop_survival=state.netcoop_survival or {}
+ return state.netcoop_survival
+end
+local function char_of(actor) return netcoop_actor_character(actor:id()) end
+function prepare(actor, remaining)
+ local char=char_of(actor)
+ if char=="" then return false end
+ local list=records()
+ local prior=list[char]
+ if prior and prior.body==actor:id() then return true end
+ if remaining==0 then list[char]=nil; return true end
+ local pda=actor:item_in_slot(8)
+ if not pda then actor:iterate_inventory(function(_,item)
+  if not pda and item.section and item:section():find("^device_pda_") then pda=item end
+ end,actor) end
+ local candidates,keep,slots={},{},{}
+ for slot=1,16 do local item=actor:item_in_slot(slot);if item then slots[item:id()]=slot end end
+ actor:iterate_inventory(function(_,item)
+  if pda and item:id()==pda:id() then keep[#keep+1]=item:id()
+  elseif item:parent() and item:parent():id()==actor:id() then candidates[#candidates+1]=item:id() end
+ end,actor)
+ table.sort(candidates)
+ -- Fisher-Yates, one persisted draw per death. Child objects stay with
+ -- their weapon/container; the PDA is excluded from the 50% draw.
+ for i=#candidates,2,-1 do local j=math.random(i);candidates[i],candidates[j]=candidates[j],candidates[i] end
+ for i=1,math.ceil(#candidates/2) do keep[#keep+1]=candidates[i] end
+ table.sort(keep)
+ list[char]={body=actor:id(),name=actor:character_name(),remaining=remaining,items=keep,slots=slots}
+ printf("[diag][survival] actor=%s remaining=%s retained=%s dropped=%s pda=%s",actor:id(),remaining,#keep,#candidates-math.ceil(#candidates/2),pda and pda:id() or "none")
+ return true
+end
+function reserved(char, name)
+	char=string.gsub(char, ":", "_")
+ local r=records()[char]
+ return r and r.name==name and true or false
+end
+function claim(actor)
+ local r=records()[char_of(actor)]
+ if not r or r.name~=actor:character_name() then return "legacy" end
+ local body=level.object_by_id(r.body)
+ if not body then
+  local se=alife():object(r.body)
+  if se then alife():set_switch_online(r.body,true) end
+  return "pending"
+ end
+ for _,id in ipairs(r.items) do
+  local item=level.object_by_id(id)
+  if not item then return "pending" end
+  local parent=item:parent()
+  if not parent or (parent:id()~=r.body and parent:id()~=actor:id()) then
+   printf("! [diag][survival] retained item=%s left reserved corpse=%s; restore refused",id,r.body)
+   return "pending"
+  end
+ end
+ for _,id in ipairs(r.items) do
+  local item=level.object_by_id(id)
+  if item:parent():id()==r.body then body:transfer_item(item,actor) end
+  if r.slots and r.slots[id] and item:parent():id()==actor:id() and actor.move_to_slot then actor:move_to_slot(item,r.slots[id]) end
+ end
+ return #r.items>0 and table.concat(r.items,",") or "-"
+end
+function complete(actor)
+ local char=char_of(actor)
+ local r=records()[char]
+ if not r then return end
+ for _,id in ipairs(r.items) do
+  local item=level.object_by_id(id)
+  if not item or not item:parent() or item:parent():id()~=actor:id() then return end
+ end
+ records()[char]=nil
+end
+function protected_body(id)
+ for _,r in pairs(records()) do if r.body==id then return true end end
+ return false
+end
+function can_transfer(body_id,recipient_id)
+ for char,r in pairs(records()) do
+  if r.body==body_id then return netcoop_actor_character(recipient_id)==char end
+ end
+ return true
+end

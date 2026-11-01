@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <algorithm>
 #ifdef DEBUG
 
 #include "PHDebug.h"
@@ -52,7 +53,7 @@ bool CCar::WheelHit(float P, s16 element, ALife::EHitType hit_type)
 	else return false;
 }
 
-static bool car_apply_suspension_profile(CInifile* ini, CPhysicsJoint* joint, LPCSTR wheel)
+static bool car_apply_suspension_profile(CInifile* ini, CPhysicsJoint* joint, LPCSTR wheel, float mass=0.f, u32 wheels=0)
 {
 	if (!ini || !joint || !joint->IsWheelJoint()) return false;
 	const char* keys[] = {"suspension_spring_factor", "suspension_damping_factor"};
@@ -69,6 +70,20 @@ static bool car_apply_suspension_profile(CInifile* ini, CPhysicsJoint* joint, LP
 		if (!_valid(factors[i]) || factors[i]<=0.f || factors[i]>100.f) return false;
 	}
 	if (!configured) return false;
+	// DCP's travel values were ignored by the base engine. With a heavy
+	// chassis and the stock 20 kN/m spring, static sag exceeded its wheel
+	// clearance. Keep at most 30% of configured travel as static sag and
+	// use near-critical damping, based on the real physics-shell mass.
+	if(mass>0.f && _valid(mass) && wheels && ini->line_exist("wheels_params","suspension_distance")) {
+		const float travel=ini->r_float("wheels_params","suspension_distance");
+		if(_valid(travel) && travel>0.f && travel<=2.f) {
+			const float sag=std::max(.03f,std::min(.12f,travel*.3f));
+			const float supported=mass/float(wheels);
+			const float stiffness=std::max(20000.f*factors[0],supported*9.81f/sag);
+			factors[0]=std::min(100.f,stiffness/20000.f);
+			factors[1]=std::min(100.f,std::max(factors[1],1.6f*sqrtf(stiffness*supported)/1000.f));
+		}
+	}
 	joint->SetJointSDfactors(factors[0],factors[1]);
 	return true;
 }
@@ -89,7 +104,7 @@ void CCar::SWheel::Init()
 	//R_ASSERT2(dJointGetType(joint->GetDJoint())==dJointTypeHinge2,"No wheel join was set for a wheel, only wheel-joint valid!!!");
 	R_ASSERT2(joint->IsWheelJoint(), "No wheel join was set for a wheel, only wheel-joint valid!!!");
 	IKinematics* model = PKinematics(car->Visual());
-	car_apply_suspension_profile(model->LL_UserData(), joint, model->LL_GetData(bone_id).name.c_str());
+	car_apply_suspension_profile(model->LL_UserData(), joint, model->LL_GetData(bone_id).name.c_str(),car->PPhysicsShell()->getMass(),u32(car->m_wheels_map.size()));
 
 	ApplyDriveAxisVelTorque(0.f, 0.f);
 	e->add_ObjectContactCallback(WheellCollisionCallback);

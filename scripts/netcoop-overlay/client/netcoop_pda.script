@@ -17,6 +17,7 @@ local loaded = false        -- the saved PDA has been applied (or there was none
 local incoming = {}         -- chunks of the saved PDA from the server
 local last_sent = nil
 local next_check = 0
+local device_uid, device_id, sending
 
 local function paw() return rawget(_G, "tasks_placeable_waypoints") or tasks_placeable_waypoints end
 
@@ -169,20 +170,22 @@ local function save_if_changed()
 	local data = snapshot()
 	if not data then return end
 	local text = serialize(data)
-	if text == last_sent or #text > 65536 then return end
-	last_sent = text
+	if not device_uid or text == last_sent or #text > 65536 then return end
+	-- Keep retrying the same snapshot until the shared store acknowledges it.
+	sending = sending or text
+	text = sending
 	local hex = to_hex(text)
 	local total = math.max(1, math.ceil(#hex / CHUNK))
 	for n = 1, total do
-		netcoop_command("pda put " .. n .. " " .. total .. " " .. string.sub(hex, (n - 1) * CHUNK + 1, n * CHUNK))
+		netcoop_command("pda put " .. device_uid .. " " .. n .. " " .. total .. " " .. string.sub(hex, (n - 1) * CHUNK + 1, n * CHUNK))
 	end
 end
 
 local function apply(text)
-	loaded = true
 	local data = deserialize(text)
 	local m = paw()
-	if not (data and m) then return end
+	if not m then return false end
+	data = data or {fakes={}, pawsys={pins={}}}
 	for id, f in pairs(data.fakes or {}) do
 		id = tonumber(id)
 		if id and f.level then place(id, f.x, f.y, f.z, f.lv, f.gv, f.level) end
@@ -190,14 +193,42 @@ local function apply(text)
 	if data.pawsys and m.load_state then pcall(m.load_state, { pawsys = data.pawsys }) end
 	if m.show_all_pins then pcall(m.show_all_pins, true) end
 	last_sent = serialize(snapshot())
+	loaded = true
+	return true
+end
+
+-- Called for each local Actor, including reconnects to the same location.
+function reset()
+	local m = paw()
+	for id in pairs(fakes) do
+		local pin = m and m.pins and m.pins[id]
+		if pin and level.map_remove_object_spot then pcall(level.map_remove_object_spot, id, pin.icon or "") end
+		if netcoop_map_position_clear then netcoop_map_position_clear(id) end
+	end
+	fakes, incoming = {}, {}
+	loaded, last_sent, sending, device_uid, device_id, next_check = false, nil, nil, nil, nil, 0
+	if m and m.load_state then pcall(m.load_state, {pawsys={pins={}}}) end
 end
 
 -- netcoop_client_compat: channel "pda", "n/total|hex".
 function receive(data)
-	local n, total, hex = string.match(data or "", "^(%d+)/(%d+)|(%x*)$")
+	if data == "none" then reset(); return end
+	local uid, body = string.match(data or "", "^(%S-)|(.+)$")
+	if not uid then return end
+	if body == "saved" then
+		if uid == device_uid and sending then last_sent, sending = sending, nil end
+		return
+	end
+	local n, total, hex = string.match(body, "^(%d+)/(%d+)|(%x*)$")
 	n, total = tonumber(n), tonumber(total)
-	if not (n and total) then return end
-	if n == 1 then incoming = {} end
+	if not (n and total and n >= 1 and n <= total and total <= 44 and #hex <= CHUNK) then return end
+	if n == 1 then
+		if loaded and uid == device_uid then return end -- late duplicate GET must not overwrite local edits
+		incoming = {}; device_uid = uid
+		local item = db.actor and db.actor:item_in_slot(8)
+		device_id = item and item:id()
+	end
+	if uid ~= device_uid then return end
 	incoming[n] = hex
 	for i = 1, total do if not incoming[i] then return end end
 	local joined = table.concat(incoming)
@@ -207,11 +238,14 @@ end
 
 local function update()
 	local t = time_global()
+	local item = db.actor and db.actor:item_in_slot(8)
+	local id = item and item:id()
+	if id ~= device_id then reset(); device_id = id end
 	if t < next_check then return end
 	next_check = t + 5000
 	if not loaded then
 		if netcoop_command then netcoop_command("pda get") end
-		next_check = t + 15000 -- ask again if the answer was lost
+		next_check = t + 2000 -- admission or PDA placement may still be pending
 		return
 	end
 	save_if_changed()

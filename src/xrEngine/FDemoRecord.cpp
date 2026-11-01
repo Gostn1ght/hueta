@@ -567,7 +567,7 @@ void CDemoRecord::IR_OnKeyboardPress(int dik)
 		//#ifndef MASTER_GOLD
 		if (dik == DIK_RETURN)
 		{
-			if (strstr(Core.Params, "-dbg"))
+			if (strstr(Core.Params, "-dbg") || (g_pGamePersistent && g_pGamePersistent->CanUsePlayerConsole()))
 			{
 				if (g_pGameLevel->CurrentEntity())
 				{

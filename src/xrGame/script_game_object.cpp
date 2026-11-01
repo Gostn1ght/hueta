@@ -1392,20 +1392,12 @@ void CScriptGameObject::IterateAttachments(::luabind::functor<bool> functor)
 
 CGameObject& CScriptGameObject::object() const
 {
-#ifdef DEBUG
-    __try {
-        if (m_game_object && m_game_object->lua_game_object() == this)
-            return	(*m_game_object);
-    } __except (EXCEPTION_EXECUTE_HANDLER) {}
-
-    ai().script_engine().script_log(eLuaMessageTypeError, "you are trying to use a destroyed object [%x]", m_game_object);
-    THROW2(m_game_object && m_game_object->lua_game_object() == this, "Probably, you are trying to use a destroyed object!");
-#endif // #ifdef DEBUG
-
-	static CGameObject* m_game_object_dummy = NULL;
-	if (!m_game_object || m_game_object->lua_game_object() != this)
-		return (*m_game_object_dummy);
-
+	if (!is_valid()) {
+		ai().script_engine().script_log(eLuaMessageTypeError, "[diag][lifetime] stale game_object wrapper=%p; callback cancelled", this);
+		// luabind's dispatcher converts this to a Lua error. Never hand a
+		// null CGameObject reference to RTTI or a dialogue method in release.
+		throw "[Lost Zone] game_object was destroyed; discard the cached script reference";
+	}
 	return (*m_game_object);
 }
 

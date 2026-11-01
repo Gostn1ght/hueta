@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<w>
+ <shade x="0" y="0" width="1024" height="768" stretch="1"><texture a="160" r="0" g="0" b="0">ui_icons_PDA_tooltips</texture></shade>
+ <frame x="204" y="136" width="616" height="488" stretch="1"><texture a="240" r="22" g="22" b="18">ui_icons_PDA_tooltips</texture></frame>
+ <title x="230" y="152" width="564" height="30"><text font="letterica18" r="218" g="190" b="125"/></title>
+ <hint x="230" y="186" width="564" height="28"><text font="letterica16" r="200" g="200" b="180"/></hint>
+ <button x="0" y="0" width="278" height="38" stretch="1"><texture>ui_button_ordinary</texture><text font="letterica16" align="c" vert_align="c"/></button>
+ <close x="370" y="568" width="284" height="36" stretch="1"><texture>ui_button_ordinary</texture><text font="letterica16" align="c" vert_align="c"/></close>
+</w>

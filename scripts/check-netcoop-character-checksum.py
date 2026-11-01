@@ -50,9 +50,9 @@ def crc32c(data):
 
 def legacy(version, algorithm, upgrade=False):
     original_version = version
-    if upgrade: version = 9
+    if upgrade: version = 10
     offsets = {}
-    data = bytearray(b'NCH'+str(version).encode())
+    data = bytearray(b'NCH'+(b'A' if version==10 else str(version).encode()))
     def number(fmt, value): data.extend(struct.pack('<'+fmt, value))
     def string(value): data.extend(value+b'\0')
     def packet(label, value):
@@ -80,6 +80,7 @@ def legacy(version, algorithm, upgrade=False):
         if original_version >= 6: item('safe', b'ammo_9x18_fmj', 0, 8195)
     if version >= 9:
         offsets['capacity']=len(data); number('I',240 if original_version >= 9 else 0)
+    if version >= 10: number('B',5)
     return bytes(data), offsets
 
 source = r'''
@@ -156,7 +157,7 @@ void equal(const Character& a,const Character& b){
  assert(a.name==b.name&&a.faction==b.faction&&a.loadout==b.loadout&&a.description==b.description&&a.history==b.history);
  assert(a.economy==b.economy&&a.initialized==b.initialized&&a.respawn==b.respawn);
  assert(a.actor.B.count==b.actor.B.count&&std::memcmp(a.actor.B.data,b.actor.B.data,a.actor.B.count)==0);
- assert(a.inventory_cells==b.inventory_cells);
+ assert(a.inventory_cells==b.inventory_cells && a.lives_remaining==b.lives_remaining);
  assert(a.progress==b.progress&&a.storage_revision==b.storage_revision&&a.storage_request==b.storage_request&&a.storage_signature==b.storage_signature);
  auto inventory=[](const auto& x,const auto& y){assert(x.size()==y.size());for(size_t i=0;i<x.size();++i){assert(x[i].section==y[i].section&&x[i].parent==y[i].parent&&x[i].place==y[i].place&&x[i].state==y[i].state);assert(x[i].spawn.B.count==y[i].spawn.B.count&&std::memcmp(x[i].spawn.B.data,y[i].spawn.B.data,x[i].spawn.B.count)==0);}};
  inventory(a.items,b.items);inventory(a.safe,b.safe);
@@ -188,7 +189,7 @@ int main(){
   assert(bytes(file)==original); // read/admission never rewrites an old snapshot
   select("portable-soft.bin",false);assert(character_save(reference));const auto soft=bytes(FS.path);
   select("portable-hard.bin",true);assert(character_save(reference));assert(soft==bytes(FS.path));
-  assert(soft[0]=='N'&&soft[1]=='C'&&soft[2]=='H'&&soft[3]=='9');
+  assert(soft[0]=='N'&&soft[1]=='C'&&soft[2]=='H'&&soft[3]=='A');
   assert(soft==bytes("upgraded-v"+std::to_string(version)+".bin"));
   // Autosave must not open/create a file on the producer. It owns a complete
   // immutable byte image even if the actor/inventory/progress changes next.
@@ -203,7 +204,7 @@ int main(){
   assert(!character_save(reference,true)&&reference.last_save==321);forbid_disk=false;fixture_admit=true;
   assert(bytes(FS.path)==soft);
   // Reject malformed snapshots before any disk/queue mutation, never truncate.
-  for(unsigned invalid=0;invalid<7;++invalid){
+  for(unsigned invalid=0;invalid<8;++invalid){
    Character bad=reference;
    if(invalid==0)bad.items[0].state.resize(513);
    if(invalid==1)bad.actor.B.count=16385;
@@ -212,6 +213,7 @@ int main(){
    if(invalid==4)bad.progress.resize(1048577);
    if(invalid==5)bad.name=std::string("bad\0name",8);
    if(invalid==6)bad.inventory_cells=513;
+   if(invalid==7)bad.lives_remaining=6;
    std::vector<u8> output{1,2,3};assert(!character_snapshot(bad,output)&&output.empty());
    forbid_disk=true;assert(!character_save(bad,true));forbid_disk=false;
    assert(bytes(FS.path)==soft);
@@ -236,6 +238,13 @@ int main(){
  assert(!character_load_image("fixture",1,nullptr,0));
  fixture_master_refuses=true;assert(!character_save(retained,true));fixture_master_refuses=false;
  equal(retained,*character_load("fixture",1));
+ for(u8 lives=0;lives<=5;++lives){
+  Character life=retained;life.lives_remaining=lives;life.respawn=lives<5;
+  std::vector<u8> image;assert(character_snapshot(life,image));Character decoded;
+  assert(character_decode(image.data(),image.size(),decoded));
+  assert(decoded.lives_remaining==lives && decoded.respawn==life.respawn);
+  image.back()=6;assert(!character_decode(image.data(),image.size(),decoded));
+ }
  // Explicitly reproduce the old loader's opposite-hardware checksum failure.
  assert(save_checksum::crc32c(sample.data(),900)!=save_checksum::legacy_ieee(sample.data(),900));
  std::cout<<"PASS actual NCH3..9 reader/durable writer, both actual CPU CRC paths, independent golden byte images, no autosave producer IO, immutable queued snapshots, refused malformed/overflow payloads, legacy upgrade, opposite CPU, empty progress, inventory/safe/profile preservation, corruption/truncation/unknown-version rejection\n";

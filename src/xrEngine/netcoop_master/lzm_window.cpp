@@ -369,6 +369,7 @@ View build_view(Service& service, const WindowOptions& options)
         else if (state == "running") row.state = L"мир готов · мастер не подтвердил";
         else if (state == "queued") row.state = L"в очереди на запуск";
         else if (state == "memory") row.state = L"ждёт память";
+        else if (state == "dormant") row.state = L"спит · память освобождена";
         else if (state == "master_stopped") row.state = L"мастер остановлен";
         else if(state=="master_wait") row.state=L"мастер восстанавливает данные";
         else if (state == "loading_timeout") row.state = L"загрузка затянулась";
@@ -537,13 +538,11 @@ void layout(State& s)
     int w = s.content.right - s.content.left, h = s.content.bottom - s.content.top;
     MoveWindow(s.locations, s.content.left, s.content.top, w, h, TRUE);
     MoveWindow(s.players, s.content.left, s.content.top, w, h, TRUE);
-    MoveWindow(s.journal, s.content.left, s.content.top, w, h, TRUE);
     int line = px(s, 40);
     MoveWindow(s.output, s.content.left, s.content.top, w, h - line - px(s, 8), TRUE);
     MoveWindow(s.input, s.content.left + px(s, 86), s.content.bottom - line + px(s, 10), w - px(s, 86) - px(s, 140), line - px(s, 18), TRUE);
     ShowWindow(s.locations, s.tab == 0 ? SW_SHOW : SW_HIDE);
     ShowWindow(s.players, s.tab == 1 ? SW_SHOW : SW_HIDE);
-    ShowWindow(s.journal, s.tab == 2 ? SW_SHOW : SW_HIDE);
     ShowWindow(s.output, s.tab == 2 ? SW_SHOW : SW_HIDE);
     ShowWindow(s.input, s.tab == 2 ? SW_SHOW : SW_HIDE);
     if (s.tab == 0)
@@ -850,6 +849,15 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
 // Runs only in the isolated CI window, never against the hoster's controls.
 bool preservation_selftest(State& s)
 {
+    const int original_tab=s.tab;
+    bool tabs_ok=(GetWindowLongPtrW(s.hwnd,GWL_STYLE)&WS_CLIPCHILDREN)!=0;
+    for(int round=0;round<3;++round) for(int tab=0;tab<3;++tab) {
+        s.tab=tab;layout(s);UpdateWindow(s.hwnd);
+        const auto visible=[](HWND w){return (GetWindowLongPtrW(w,GWL_STYLE)&WS_VISIBLE)!=0;};
+        tabs_ok=tabs_ok && visible(s.locations)==(tab==0) && visible(s.players)==(tab==1) &&
+            visible(s.output)==(tab==2) && visible(s.input)==(tab==2);
+    }
+    s.tab=original_tab;layout(s);
     HWND list=make_list(s,s.hwnd,{{L"id",180},{L"state",180}});
     MoveWindow(list,3000,0,400,200,FALSE);
     std::vector<std::vector<std::wstring>> rows;std::vector<int> tags;
@@ -872,7 +880,7 @@ bool preservation_selftest(State& s)
     const bool console_ok=first>0 && first==SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0) &&
         after.cpMin==selection.cpMin && after.cpMax==selection.cpMax;
     DestroyWindow(edit);
-    return table_ok && console_ok;
+    return table_ok && console_ok && tabs_ok;
 }
 
 bool operator==(const LocationRow& a, const LocationRow& b) { return a.id == b.id && a.state == b.state && a.address == b.address && a.players == b.players && a.process==b.process && a.detail==b.detail; }
@@ -1422,7 +1430,7 @@ int run_window(const WindowOptions& options)
     wc.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
     if (!wc.hIcon) wc.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
     RegisterClassExW(&wc);
-    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"Lost Zone — мастер мира", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"Lost Zone — мастер мира", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
                                 px(*state, 1180), px(*state, 800), nullptr, nullptr, wc.hInstance, nullptr);
     ShowWindow(hwnd, options.selftest.empty() ? SW_SHOWNORMAL : SW_SHOWNOACTIVATE);
     UpdateWindow(hwnd);

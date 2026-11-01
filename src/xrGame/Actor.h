@@ -658,6 +658,8 @@ public:
 	float m_netcoop_seat_car_yaw = 0.f;
 	bool m_netcoop_seat_yaw_valid = false;
 	bool m_netcoop_seat_character = false; // had a character capsule before sitting down
+	bool m_netcoop_noclip = false;
+	void netcoop_set_noclip(bool enabled);
 	MotionID m_netcoop_seat_motion;
 	// The driver is moved (in the car's space) until the hands of the steering
 	// pose meet the model's steering wheel bone; measured once per sitting down.

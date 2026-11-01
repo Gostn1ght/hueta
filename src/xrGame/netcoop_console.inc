@@ -156,6 +156,9 @@ bool server_apply_role_online(LPCSTR login, u8 role)
 	if (!find.found) return false;
 	find.found->netcoop_role = role;
 	if (role != role_admin) find.found->netcoop_admin_god = false;
+	if(role!=role_admin && find.found->owner) {
+		if(CActor* actor=smart_cast<CActor*>(Level().Objects.net_Find(find.found->owner->ID)))actor->netcoop_set_noclip(false);
+	}
 	NET_Packet P;
 	P.w_begin(M_NETCOOP_SCRIPT);
 	P.w_stringZ("netcoop_role");

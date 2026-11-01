@@ -338,6 +338,7 @@ function character_ready(actor, new_life)
     netcoop_send_to_actor(id, "netcoop_admin_state", (god and "1" or "0") .. "|" .. (ammo and "1" or "0"))
     if netcoop_factions and netcoop_factions.character_ready then netcoop_factions.character_ready(actor) end
     if send_player_state then send_player_state(id) end
+    if netcoop_survival then netcoop_survival.complete(actor) end
     return true
 end
 
@@ -683,12 +684,29 @@ end
 --   weather_edit/zone  { seq, paused, sun = { h, m }, values = { par = { k = "n"|"v"|"s", ... } } }
 local EDIT_BUCKET, EDIT_KEY, EDIT_VALUES = "weather_edit", "zone", 64
 local edit_text_sent, edit_next, edit_resend = nil, 0, 0
+local function finite(n) return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge end
+local edit_ranges={rain_density={0,1},fog_density={0,1},fog_distance={10,1000},far_plane={50,1500},
+ wind_velocity={0,30},wind_direction={0,360},sky_rotation={0,360},thunderbolt_period={1,120},
+ thunderbolt_duration={0.01,2},sun_shafts_intensity={0,1},water_intensity={0,5},tree_amplitude_intensity={0,2}}
+local edit_colors={sky_color=3,fog_color=3,rain_color=3,ambient_color=3,sun_color=3,clouds_color=4,hemisphere_color=4}
+local function edit_allowed(par,entry)
+ if type(entry)~="table" then return false end
+ local range=edit_ranges[par]
+ if entry.k=="n" then return range and #entry==1 and finite(entry[1]) and entry[1]>=range[1] and entry[1]<=range[2] end
+ if entry.k~="v" or not edit_colors[par] or (#entry~=3 and #entry~=edit_colors[par]) then return false end
+ for _,n in ipairs(entry) do if not finite(n) or n<0 or n>4 then return false end end
+ return true
+end
 
 local function edit_read()
 	local text = netcoop_store_read and netcoop_store_read(EDIT_BUCKET, EDIT_KEY) or ""
 	if text == "" then return nil, text end
 	local ok, v = pcall(netcoop_transit.deserialize, text)
-	return ok and type(v) == "table" and v or nil, text
+	if not ok or type(v)~="table" then return nil,text end
+	-- Old stored editor sessions may contain asset paths. Never resend them.
+	if type(v.values)~="table" then v.values={} end
+	for par,entry in pairs(v.values) do if not edit_allowed(par,entry) then v.values[par]=nil end end
+	return v, text
 end
 
 local function edit_change(fn)
@@ -706,8 +724,6 @@ local function edit_change(fn)
 	end
 	return "! the weather edit could not be stored, try again"
 end
-
-local function finite(n) return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge end
 
 -- Admin: weather_edit pause <0|1> | sun <h> <m> | num <par> <v> | vec <par> <x> <y> <z> [w] | str <par> <value>
 function weather_edit(args)
@@ -729,8 +745,7 @@ function weather_edit(args)
 		if not par or #par > 48 then return "! usage: weather_edit " .. verb .. " <parameter> <value>" end
 		local entry
 		if verb == "str" then
-			if #value > 160 or not string.match(value, "^[%w_%.%-\\/]+$") then return "! bad weather value" end
-			entry = { k = "s", value }
+			return "! weather asset paths cannot be changed online"
 		else
 			local numbers = {}
 			for n in string.gmatch(value, "%S+") do numbers[#numbers + 1] = tonumber(n) end
@@ -739,6 +754,7 @@ function weather_edit(args)
 			for _, n in ipairs(numbers) do if not finite(n) then return "! bad weather value" end end
 			entry = { k = verb == "num" and "n" or "v", unpack(numbers) }
 		end
+		if not edit_allowed(par,entry) then return "! weather parameter is unsupported or outside safe bounds" end
 		err = edit_change(function(s)
 			local count = 0
 			for _ in pairs(s.values) do count = count + 1 end
@@ -760,7 +776,7 @@ local function weather_edit_tick(now)
 	if not state then return end
 	if text ~= edit_text_sent or now >= edit_resend then
 		edit_text_sent, edit_resend = text, now + 5000
-		netcoop_broadcast("weather_edit", text)
+		netcoop_broadcast("weather_edit", netcoop_transit.serialize(state))
 	end
 end
 
@@ -960,6 +976,7 @@ end
 function before_npc_hit(npc_id, attacker_id)
 	local npc = level.object_by_id(npc_id)
 	if not npc or not npc:alive() then return end
+	if netcoop_traders and netcoop_traders.is_service_npc(npc) then npc:invulnerable(true); return end
 	on_squad_attacked(npc_id, attacker_id)
 	-- Re-evaluate the live freeplay protection policy rather than retaining
 	-- the last scheduled value while the NPC changes camp/combat state.
@@ -999,6 +1016,7 @@ local function install_squad_witnesses()
 	if stalker_generic then
 		local protection = stalker_generic.is_need_invulnerability
 		stalker_generic.is_need_invulnerability = function(npc)
+			if netcoop_traders and netcoop_traders.is_service_npc(npc) then return true end
 			local attacked = npc and squad_attackers[npc:id()]
 			local storage = npc and db.storage[npc:id()]
 			-- Generic simulation camp jobs use safe_restr protection. Once
@@ -1608,6 +1626,33 @@ local function in_safe_zone(pos)
 	return nil
 end
 
+-- A fresh body returns to the closest service/safe area on this level.
+-- Choose actual walkable vertices around the NPC instead of spawning in
+-- its model or behind a counter. The engine applies crowd separation too.
+function respawn_point(origin)
+	local best, distance
+	for _, storage in pairs(db.storage or {}) do
+		local npc = storage.object
+		if npc and npc.alive and npc:alive() and netcoop_traders and netcoop_traders.is_service_npc(npc) then
+			local vertex = npc:level_vertex_id()
+			if level.valid_vertex(vertex) then
+				for _, angle in ipairs({0,90,180,270,45,135,225,315}) do
+					local direction = vector():setHP(angle*math.pi/180,0)
+					local near = level.vertex_in_direction(vertex,direction,4)
+					if near and level.valid_vertex(near) then
+						local pos = level.vertex_position(near)
+						local d = pos:distance_to_sqr(origin)
+						if not distance or d<distance then best,distance=pos,d end
+					end
+				end
+			end
+		end
+	end
+	if best then return best end
+	local anchor = alife() and alife():actor()
+	return anchor and anchor.position or origin
+end
+
 local function zone_faction(pos)
 	local best, best_d
 	for story_id, faction in pairs(SAFE_ZONE_FACTION) do
@@ -1756,13 +1801,24 @@ end
 -- The client's own saved state goes back to it once the character was
 -- fully restored; elapsed time alone is not proof that it is ready.
 send_player_state = function(actor_id)
-	if state_sent[actor_id] then return end
+	if state_sent[actor_id] == true then return end
+	local now = time_global()
+	if state_sent[actor_id] and now - state_sent[actor_id] < 2000 then return end
 	first_seen[actor_id] = first_seen[actor_id] or time_global()
     if not restored_players[actor_id] then return end
-	state_sent[actor_id] = true
+	state_sent[actor_id] = now
 	local st = db.storage[actor_id]
 	local saved = st and st.pstor and st.pstor.netcoop_player_state
 	netcoop_send_to_actor(actor_id, "player_state", "@" .. actor_id .. "|" .. (saved or "-"))
+end
+
+function request_player_state(actor_id, verb)
+	if not restored_players[actor_id] then return end
+	if verb == "ack" then
+		state_sent[actor_id] = true
+	elseif verb == "get" and state_sent[actor_id] ~= true then
+		send_player_state(actor_id)
+	end
 end
 
 local function send_owner_spots()

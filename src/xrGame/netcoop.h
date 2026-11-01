@@ -151,6 +151,7 @@ bool server_actor_unlimited_ammo(const CActor* actor);
 bool script_admin_ammo_enabled(u16 actor_id);
 bool script_admin_ammo_set(u16 actor_id, bool enabled);
 bool script_admin_teleport(u16 actor_id, const Fvector& position);
+bool script_admin_noclip(u16 actor_id, bool value);
 int script_role();
 LPCSTR script_account();
 int script_account_state();
@@ -252,6 +253,7 @@ void vehicle_input_tick(CActor* actor);
 // The gunner's gun view (a helicopter's gun seat): the camera point, or false.
 bool vehicle_gun_view_point(CActor* actor, Fvector& point);
 LPCSTR script_vehicle_prompt();
+LPCSTR script_vehicle_status();
 Fvector script_vehicle_prompt_point(); // where the last prompt stands (Dot Marks style)
 // A box kept away from its anchor (a car's trunk): reachable next to the anchor.
 void script_box_anchor(u16 box, u16 anchor);

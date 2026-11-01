@@ -50,17 +50,17 @@ assert edit[0]("pause 1").startswith("*")
 assert edit[0]("num fog_density 0.8").startswith("*")
 assert edit[0]("vec sky_color 0.1 0.2 0.3").startswith("*")
 assert edit[0]("vec hemisphere_color 1 1 1 0.5").startswith("*")
-assert edit[0](r"str sky_texture sky\sky_9_cube").startswith("*")
+assert edit[0](r"str sky_texture sky\sky_9_cube").startswith("!")
 assert edit[0]("sun 18 30").startswith("*")
 for bad in ("num fog_density nan", "num fog_density 1e400", "vec sky_color 1 2", "str sky_texture a b", "num bad;name 1",
-            "sun 25 0", "pause 2", "spawn x"):
+            "sun 25 0", "pause 2", "spawn x", "num fog_density 1.1", "num rain_density -1", "num far_plane 0", "vec sky_color -1 1 1", "num unknown 1"):
     assert edit[0](bad).startswith("!"), bad
 run(0, 10000); run(1, 10000)
 got = [x for x in lua.eval("sent").values() if x.channel == "weather_edit"]
 assert {x.server for x in got} == {0, 1}, "both maps send the editor's state"
 state = lua.eval("netcoop_transit.deserialize(netcoop_store_read('weather_edit', 'zone'))")
 assert state.paused and state['values'].fog_density[1] == 0.8 and state['values'].sky_color.k == "v" and state.sun.h == 18
-assert state['values'].hemisphere_color[4] == 0.5 and state['values'].sky_texture[1] == r"sky\sky_9_cube"
+assert state['values'].hemisphere_color[4] == 0.5 and state['values'].sky_texture is None
 
 # A client applies it once per change.
 calls = lua.eval("{}")
@@ -84,7 +84,7 @@ text = lua.eval("netcoop_store_read('weather_edit', 'zone')")
 use(text)
 applied = list(lua.eval("applied").values())
 assert applied[0] == "pause true" and "sun 18:30" in applied and "num fog_density 0.8" in applied
-assert "vec hemisphere_color 0.5" in applied and "vec sky_color nil" in applied and r"str sky_texture sky\sky_9_cube" in applied
+assert "vec hemisphere_color 0.5" in applied and "vec sky_color nil" in applied and not any(x.startswith("str ") for x in applied)
 use(text)
 assert len(lua.eval("applied")) == len(applied), "the same state is applied once"
 assert lua.eval("applying_server_weather") is False

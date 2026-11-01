@@ -11,7 +11,7 @@ local player_state_ready, next_player_state, pending_player_state = false, 0, ni
 db={storage={}};now=100;messages={};loads=0
 function time_global() return now end
 function printf(...) end
-function netcoop_command(text) messages[#messages+1]=text end
+function netcoop_command(text) if text~='player_state ack' then messages[#messages+1]=text end end
 actor_status_thirst={save_state=function(t) t.thirst=.6 end,load_state=function(t) assert(t.thirst==.6);loads=loads+1 end}
 zzz_player_injuries={health={},timedhp={},maxhp={head=11,torso=11,leftarm=5,rightarm=5,leftleg=5,rightleg=5}}
 for part,max in pairs(zzz_player_injuries.maxhp) do zzz_player_injuries.health[part]=max;zzz_player_injuries.timedhp[part]=0 end
@@ -20,6 +20,7 @@ function fixture_report() report_player_state() end
 function fixture_collect() return collect_player_state() end
 function fixture_pending() return pending_player_state end
 function fixture_ready() return player_state_ready end
+function fixture_begin_body() player_state_ready=false;pending_player_state=nil;next_player_state=0 end
 ''')
 lua.execute('''
 actor={satiety=.7,power=.4,id=function() return 7 end}
@@ -40,8 +41,8 @@ use_player_state('-');assert(b.health.head==11 and b.health.leftleg==5 and b.tim
 use_player_state(captured);assert(b.health.head==3 and b.timedhp.head==1,'living handoff retains damage')
 local old_head=b.health.head
 use_player_state('@6|-');assert(b.health.head==old_head,'previous actor snapshot must not reset current body')
-use_player_state('@7|-');assert(b.health.head==11,'targeted fresh-body snapshot is applied')
-use_player_state('@7|'..captured);assert(b.health.head==3,'targeted living handoff retains damage')
+fixture_begin_body();use_player_state('@7|-');assert(b.health.head==11,'targeted fresh-body snapshot is applied')
+use_player_state('@7|'..captured);assert(b.health.head==11,'duplicate initial snapshot must not overwrite current health');fixture_begin_body();use_player_state('@7|'..captured);assert(b.health.head==3,'targeted living handoff retains damage')
 use_player_state('injuries={health={head=-5;torso=999;};timedhp={head=99;torso=99;};};')
 assert(b.health.head==0 and b.health.torso==11 and b.timedhp.head==0 and b.timedhp.torso==11)
 local before=fixture_collect();use_player_state('invalid state');assert(fixture_collect()==before)
@@ -58,3 +59,5 @@ confirmation = native[native.index('void CChangeLevelWnd::OnOk()'):native.index(
 assert confirmation.index('client_flush_player_state()') < confirmation.index('Level().Send(')
 assert 'net_flags(TRUE, TRUE)' in confirmation
 print('PASS actual player-state Lua: early delivery retained, limb damage/healing and thirst preserved, fresh-body reset, bounded values, no NaN/Inf, ordered forced flush before passage')
+
+lua.execute("local b=zzz_player_injuries;local old=b.maxhp;b.maxhp={};fixture_begin_body();use_player_state('@7|-');assert(fixture_pending()=='-');b.maxhp=old;use_player_state(fixture_pending());assert(fixture_pending()==nil)")

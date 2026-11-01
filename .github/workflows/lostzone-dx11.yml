@@ -61,6 +61,7 @@ jobs:
           python scripts/check-netcoop-distant-battles.py
           python scripts/check-netcoop-world-events.py
           python scripts/check-netcoop-respawn-state.py
+          python scripts/check-netcoop-survival.py
           python scripts/check-netcoop-player-state.py
           python scripts/check-netcoop-full-map-plan.py
           python scripts/check-dist-windows-batch.py
@@ -220,6 +221,8 @@ jobs:
           python scripts/check-native-texture-list-lifetime.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-script-watchdog.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-script-lifetime.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-background-shutdown.py
           if errorlevel 1 exit /b %errorlevel%

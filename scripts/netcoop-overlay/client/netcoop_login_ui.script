@@ -705,6 +705,7 @@ function netcoop_login_wnd:SelectCharacter(slot)
     return self:ShowProfile(slot)
 end
 
+local call_sign_valid
 function netcoop_login_wnd:ShowLoadout(slot)
     if not ui_mm_faction_select or not ui_mm_faction_select.UINewGame then
         return self:SetMsg("! Character creation menu is unavailable")
@@ -733,6 +734,14 @@ function netcoop_login_wnd:ShowLoadout(slot)
     self.creator.netcoop_creation_slot = slot
     self.creator.netcoop_creation_owner = self
     self.creator.netcoop_status:TextControl():SetText("")
+	-- A new life always starts as a loner, at the server's fixed economy.
+	self.creator.selected_faction, self.creator.selected_economy = "stalker", "st_econ_1"
+	self.creator:AddCallback("btn_faction", ui_events.BUTTON_CLICKED, function() end, self.creator)
+	if self.creator.PopupFaction_Show then self.creator:PopupFaction_Show(false) end
+	if self.creator.list_economy then self.creator.list_economy:Enable(false) end
+	self.creator.character_name:Enable(false)
+	if self.creator.netcoop_creation_name ~= (self.profile_data and self.profile_data.name) then rebuild = true end
+	self.creator.netcoop_creation_name = self.profile_data and self.profile_data.name
     if rebuild then self.creator:LoadLoadout(false) end
     for _, field in ipairs({"ck_story", "ck_warfare", "ck_hardcore", "ck_azazel_mode", "ck_survival", "ck_campfire", "ck_conditions", "ck_routes"}) do
         if self.creator[field] then self.creator[field]:SetCheck(false); self.creator[field]:Enable(false) end
@@ -749,8 +758,9 @@ end
 -- Called before the freeplay menu writes any global new-game settings.
 local function finish_creation_impl(menu)
     if not menu.access then return end
-    local name = menu.character_name:GetText()
-    if not name or #name < 2 or #name > 63 or string.find(name, "[|\r\n/\\]") then
+    local owner = menu.netcoop_creation_owner
+    local name = owner.profile_data and owner.profile_data.name or ""
+    if not call_sign_valid(name) or name == owner.previous_life_name or menu.selected_faction ~= "stalker" or menu.selected_economy ~= "st_econ_1" then
         menu.netcoop_status:TextControl():SetText(tr("character_name_invalid")); return
     end
     if menu.points_left < 0 then menu.netcoop_status:TextControl():SetText(tr("loadout_points_invalid")); return end
@@ -763,7 +773,6 @@ local function finish_creation_impl(menu)
     table.sort(items)
     local economy = tonumber((string.gsub(menu.selected_economy, "st_econ_", ""))) or 1
     if cloud_enabled() then
-        local owner = menu.netcoop_creation_owner
         local profile = owner.profile_data or {}
         if not netcoop_save_draft(menu.netcoop_creation_slot, name, profile.description or "", profile.history or "", menu.selected_faction, economy, table.concat(items, ",")) then
             printf("[Lost Zone][menu] loadout rejected: slot=%s faction=%s economy=%s count=%s", tostring(menu.netcoop_creation_slot), tostring(menu.selected_faction), tostring(economy), tostring(#items))
@@ -771,7 +780,8 @@ local function finish_creation_impl(menu)
         end
         menu:HideDialog(); menu:Show(false)
         owner.slot = menu.netcoop_creation_slot
-        owner:ShowCharacters(); owner:ShowDialog(true); owner:Show(true)
+        owner:ShowDialog(true); owner:Show(true)
+        owner:EnterCharacter(menu.netcoop_creation_slot, name, "stalker", 1, table.concat(items, ","))
         return
     end
     menu:HideDialog()
@@ -1354,7 +1364,7 @@ function netcoop_login_wnd:SaveServer()
     self.server_panel:Show(false)
     self:ShowCharacters(); self:SetMsg("")
 end
-local function call_sign_valid(name)
+call_sign_valid = function(name)
     if type(name) ~= "string" or #name > 63 then return false end
     local letters, separator = 0, true
     for i = 1, #name do
@@ -1396,7 +1406,7 @@ function netcoop_login_wnd:ContinueProfile()
     self.profile_data = {name=name, description="", history=""}
     if netcoop_character_profile then netcoop_character_profile("", "") end
     self.profile_panel:Show(false)
-    self:EnterCharacter(1, name, "stalker", 1, "")
+    self:ShowLoadout(1)
 end
 
 function on_life_ended()

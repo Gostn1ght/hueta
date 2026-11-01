@@ -60,19 +60,29 @@ Fvector CScriptGameObject::GetCurrentDirection()
 	return obj->GetCurrentDirection();
 }
 
+// A Lua callback may outlive net_Destroy. Test membership before touching
+// the wrapper's fields; a back-reference check alone dereferences freed memory.
+static xr_set<const CScriptGameObject*> s_live_script_objects;
+
+bool CScriptGameObject::is_valid() const
+{
+	if (s_live_script_objects.find(this)==s_live_script_objects.end()) return false;
+	return m_game_object && m_game_object->lua_game_object()==this;
+}
+
 CScriptGameObject::CScriptGameObject(CGameObject* game_object) :
 	m_game_object(game_object),
 	m_door(0)
 {
 	R_ASSERT2(m_game_object, "Null actual object passed!");
+	s_live_script_objects.insert(this);
 }
 
 CScriptGameObject::~CScriptGameObject()
 {
-	if (!m_door)
-		return;
-
-	unregister_door();
+	if (m_door) unregister_door();
+	s_live_script_objects.erase(this);
+	m_game_object=nullptr;
 }
 
 CScriptGameObject* CScriptGameObject::Parent() const

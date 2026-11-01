@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+<string id="st_lz_car_kmh"><text>км/ч</text></string>
+<string id="st_lz_car_gear"><text>Передача</text></string>
+<string id="st_lz_car_rpm"><text>об/мин</text></string>
+<string id="st_lz_car_engine"><text>Двигатель</text></string>
+<string id="st_lz_car_on"><text>работает</text></string>
+<string id="st_lz_car_off"><text>выключен</text></string>
+<string id="st_lz_car_fuel"><text>Топливо</text></string>
+<string id="st_lz_car_condition"><text>Корпус</text></string>
+<string id="st_lz_car_lives"><text>Жизни: %d / 5</text></string>
+<string id="st_lz_car_noclip"><text>Свободный полёт (noclip)</text></string>
+<string id="st_lz_car_door"><text>Открыть / закрыть панель</text></string>
+</string_table>

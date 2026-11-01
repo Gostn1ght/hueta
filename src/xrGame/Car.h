@@ -609,6 +609,8 @@ public:
 	};
 	u8 m_netcoop_keys = 0; // server: the driver's held keys
 	bool m_netcoop_lights = false;
+	u8 m_netcoop_aux_lights = 0;
+	u8 netcoop_aux_lights();
 	float m_netcoop_rpm = 0.f; // client replica: from the server
 	float m_netcoop_steer = 0.f;
 	void netcoop_drive(u8 keys); // server
@@ -622,6 +624,11 @@ public:
 	bool netcoop_destroyed() { return b_exploded || CPHDestroyable::Destroyed(); }
 	const Fvector& netcoop_camera_position() const { return m_camera_position; }
 	float netcoop_fuel() const { return m_fuel; }
+	float netcoop_fuel_capacity() const {return m_fuel_tank;}
+	u16 netcoop_gear() const {return u16(m_current_transmission_num);}
+	u64 netcoop_broken_glass();
+	u16 netcoop_door_bone(u16 hit);
+	void netcoop_glass_state(u64 mask);
 	void netcoop_set_fuel(float fuel) { m_fuel = fuel; }
 	// Helicopters (doc 137): a car section with netcoop_heli = true flies.
 	// The server applies rotor lift and rate-commanded cyclic/pedal torques to

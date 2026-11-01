@@ -186,6 +186,10 @@ function on_client_command(cid, name, entity_id, text, role)
 	-- A client's own player state (netcoop_client_compat, every 30 s): kept in
 	-- the character's pstor, saved with the character. No reply, no log line.
 	if cmd == "player_state" then
+		if args == "get" or args == "ack" then
+			netcoop_server_compat.request_player_state(entity_id, args)
+			return ""
+		end
 		local obj = server_actor(entity_id)
 		if obj and #args < 3000 and not string.find(args, "[^%w_=;{}%.%-%+]") then
 			local st = db.storage[entity_id] or { object = obj }
@@ -336,6 +340,15 @@ function on_client_command(cid, name, entity_id, text, role)
 		return netcoop_admin_teleport(entity_id, vector():set(x,y,z))
 			and "* admin teleport accepted" or "! ADMIN teleport rejected"
 
+	elseif cmd == "noclip" or cmd == "noyclip" then
+		local obj=server_actor(entity_id)
+		if not obj then return "! your Actor is not on the server" end
+		local st=db.storage[entity_id] or {object=obj};db.storage[entity_id]=st
+		local value=args=="on" or args=="1" or (args=="" and not st.netcoop_noclip)
+		if args~="" and args~="on" and args~="off" and args~="1" and args~="0" then return "! usage: noclip [on|off]" end
+		if not netcoop_admin_noclip(entity_id,value) then return "! noclip rejected" end
+		st.netcoop_noclip=value
+		return value and "* noclip enabled" or "* noclip disabled"
 	elseif cmd == "god" then
 		if not entity_id or entity_id == 65535 then return "! your Actor is not on the server" end
 		if args ~= "" and args ~= "on" and args ~= "off" and args ~= "1" and args ~= "0" then

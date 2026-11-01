@@ -392,18 +392,19 @@ struct Reader
 
 json NativeSave::summary() const
 {
-    json result = { { "format", "NCH" + std::to_string(version) }, { "sha256", sha256 }, { "bytes", bytes }, { "items", items },
+    json result = { { "format", version==10 ? "NCHA":"NCH" + std::to_string(version) }, { "sha256", sha256 }, { "bytes", bytes }, { "items", items },
                     { "safe_items", safe_items }, { "actor_bytes", actor_bytes }, { "progress_bytes", progress_bytes } };
     if (version >= 9) result["inventory_cells"] = inventory_cells;
+    if (version >= 10) result["lives_remaining"] = lives_remaining;
     return result;
 }
 
 NativeSave parse_native_save(const std::string& data)
 {
     if (data.size() < 4 || int64_t(data.size()) > NATIVE_FILE_LIMIT) throw Invalid("native player save exceeds admission bounds");
-    if (data.compare(0, 3, "NCH") != 0 || data[3] < '3' || data[3] > '9') throw Invalid("unsupported native player save format");
+    if (data.compare(0, 3, "NCH") != 0 || !((data[3]>='3' && data[3]<='9') || data[3]=='A')) throw Invalid("unsupported native player save format");
     NativeSave save;
-    save.version = data[3] - '0';
+    save.version = data[3]=='A' ? 10:data[3] - '0';
     Reader reader{ data, save.version };
     std::string name = reader.text(63);
     if (name.empty()) throw Invalid("invalid native character name");
@@ -432,6 +433,8 @@ NativeSave parse_native_save(const std::string& data)
     }
     save.inventory_cells = save.version >= 9 ? reader.u32() : 0;
     if (save.inventory_cells > 512) throw Invalid("native inventory capacity exceeds format bounds");
+    save.lives_remaining=save.version>=10 ? reader.u8():(b ? 4:5);
+    if(save.lives_remaining>5)throw Invalid("native lives counter exceeds format bounds");
     if (reader.offset != data.size()) throw Invalid("native player save has trailing data");
     save.sha256 = sha256_hex(data);
     save.bytes = int64_t(data.size());

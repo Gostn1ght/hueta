@@ -107,22 +107,25 @@ class NativeSave:
     actor_bytes: int
     sections: tuple
     inventory_cells: int
+    lives_remaining: int = 5
 
     def summary(self):
-        result = {"format": "NCH" + str(self.version), "sha256": self.sha256,
+        result = {"format": "NCHA" if self.version == 10 else "NCH" + str(self.version), "sha256": self.sha256,
                   "bytes": len(self.raw), "items": self.item_count, "safe_items": self.safe_count,
                   "actor_bytes": self.actor_bytes, "progress_bytes": self.progress_bytes}
         if self.version >= 9:
             result["inventory_cells"] = self.inventory_cells
+        if self.version >= 10:
+            result["lives_remaining"] = self.lives_remaining
         return result
 
 
 def parse_native_save(data):
     if type(data) is not bytes or not 4 <= len(data) <= FILE_LIMIT:
         raise Invalid("native player save exceeds admission bounds")
-    if data[:3] != b"NCH" or data[3] not in b"3456789":
+    if data[:3] != b"NCH" or data[3] not in b"3456789A":
         raise Invalid("unsupported native player save format")
-    version = data[3] - ord("0")
+    version = 10 if data[3] == ord("A") else data[3] - ord("0")
     reader = Reader(data, version)
     name = reader.text(63)
     if not name or any(ord(char) < 32 or char == "|" for char in name):
@@ -133,7 +136,8 @@ def parse_native_save(data):
         reader.text(512)
         reader.text(1536)
     reader.number("<B")  # native loader permits legacy economy values
-    if reader.number("<B") not in (0, 1) or reader.number("<B") not in (0, 1):
+    initialized, respawn = reader.number("<B"), reader.number("<B")
+    if initialized not in (0, 1) or respawn not in (0, 1):
         raise Invalid("invalid native player flags")
     actor = reader.packet(PACKET_LIMIT)
     sections = reader.items()
@@ -148,10 +152,13 @@ def parse_native_save(data):
     inventory_cells = reader.number("<I") if version >= 9 else 0
     if inventory_cells > 512:
         raise Invalid("native inventory capacity exceeds format bounds")
+    lives_remaining = reader.number("<B") if version >= 10 else (4 if respawn else 5)
+    if lives_remaining > 5:
+        raise Invalid("native lives counter exceeds format bounds")
     if reader.offset != len(data):
         raise Invalid("native player save has trailing data")
     return NativeSave(data, version, hashlib.sha256(data).hexdigest(), len(sections),
-                      len(safe_sections), len(progress), len(actor), tuple(sections + safe_sections), inventory_cells)
+                      len(safe_sections), len(progress), len(actor), tuple(sections + safe_sections), inventory_cells, lives_remaining)
 
 
 def identity(world_id, seed, account, slot):
