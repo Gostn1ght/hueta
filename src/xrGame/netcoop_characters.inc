@@ -413,12 +413,6 @@ static void character_commits_flush_account(LPCSTR account)
 	}
 }
 
-static void character_record_death(Character& character)
-{
-	if (!character.respawn && character.lives_remaining) --character.lives_remaining;
-	character.respawn = true;
-}
-
 static bool character_save(Character& character, bool background = false)
 {
     string_path path, temp;
@@ -500,6 +494,12 @@ static bool character_decode(const void* bytes, size_t byte_count, Character& ch
     ok=ok && input.remaining==0;
 
  return ok && character_name_valid(character.name.c_str());
+}
+
+static void character_record_death(Character& character)
+{
+	if (!character.respawn && character.lives_remaining) --character.lives_remaining;
+	character.respawn = true;
 }
 
 static bool character_load_image(LPCSTR account, u8 slot, const void* bytes, size_t size)

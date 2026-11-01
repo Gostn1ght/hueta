@@ -110,6 +110,13 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 			}
 			if (box <= 0 || box >= 0xffff)
 				return;
+			if(IKinematics* model=smart_cast<IKinematics*>(car->Visual())) {
+				for(u16 bone=0;bone<model->LL_BoneCount();++bone) {
+					LPCSTR name=model->LL_GetData(bone).name.c_str();
+					if((strstr(name,"trunk") || strstr(name,"back_door") || strstr(name,"door_back")) && car->netcoop_door_bone(bone)==bone)
+						car->DoorOpen(bone);
+				}
+			}
 			NET_Packet answer;
 			answer.w_begin(M_NETCOOP_VEHICLE);
 			answer.w_u8(vehicle_op_trunk_open);

@@ -41,7 +41,7 @@ function command(id, args)
   if data == nil then return "" end
   local total = math.max(1, math.ceil(#data / CHUNK))
   for n = 1, total do
-   netcoop_send_to_actor(id, "pda", d.uid .. "|" .. n .. "/" .. total .. "|" .. string.sub(data, (n-1)*CHUNK+1, n*CHUNK))
+   netcoop_send_to_actor(id, "pda", d.uid .. "|" .. d.item .. "|" .. n .. "/" .. total .. "|" .. string.sub(data, (n-1)*CHUNK+1, n*CHUNK))
   end
  elseif verb == "put" then
   local uid, n, total, hex = string.match(rest, "^(%S+) (%d+) (%d+) (%x*)$")

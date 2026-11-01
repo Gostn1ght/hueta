@@ -10,7 +10,7 @@ root = Path(__file__).resolve().parents[1]
 code = (root/'src/xrGame/netcoop_characters.inc').read_text(encoding='utf8')
 names = code[code.index('static bool character_name_valid('):code.index('bool script_character(')]
 selection = code[code.index('static bool character_select('):code.index('static CloudJson s_drafts')]
-death=code[code.index('static void character_record_death('):code.index('static bool character_save(Character&')]
+death=code[code.index('static void character_record_death('):code.index('static bool character_load_image(')]
 source = r'''
 #include <cassert>
 #include <cstring>

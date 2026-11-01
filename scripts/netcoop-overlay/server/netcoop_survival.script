@@ -56,11 +56,21 @@ function claim(actor)
    return "pending"
   end
  end
+ local pending=false
  for _,id in ipairs(r.items) do
   local item=level.object_by_id(id)
   if item:parent():id()==r.body then body:transfer_item(item,actor) end
-  if r.slots and r.slots[id] and item:parent():id()==actor:id() and actor.move_to_slot then actor:move_to_slot(item,r.slots[id]) end
+  if item:parent():id()~=actor:id() then pending=true
+  elseif r.slots and r.slots[id] and actor.move_to_slot then
+   local equipped=actor:item_in_slot(r.slots[id])
+   if not equipped or equipped:id()~=id then
+    r.slot_tries=r.slot_tries or {};r.slot_tries[id]=(r.slot_tries[id] or 0)+1
+    if r.slot_tries[id]<=10 then actor:move_to_slot(item,r.slots[id]);pending=true
+    elseif r.slot_tries[id]==11 then printf("! [diag][survival] item=%s slot=%s refused; kept in rucksack",id,r.slots[id]) end
+   end
+  end
  end
+ if pending then return "pending" end
  return #r.items>0 and table.concat(r.items,",") or "-"
 end
 function complete(actor)

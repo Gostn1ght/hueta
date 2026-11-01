@@ -76,6 +76,7 @@ jobs:
           python scripts/check-netcoop-cluster-weather.py
           python scripts/check-netcoop-master-weather.py
           python scripts/check-netcoop-weather-edit.py
+          python scripts/check-netcoop-weather-controls.py
           python scripts/check-netcoop-map-known.py
           python scripts/check-netcoop-third-person.py
           python scripts/check-netcoop-rp-anims.py
@@ -174,161 +175,163 @@ jobs:
         shell: cmd
         run: |
           call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set LZ_WINDOWS_CHECKS_FAILED=0
           python scripts/check-netcoop-scheduler.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-bot-gap.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-bot-target.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-windows-auth-api.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-transit-queue.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-player-transfer.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-account-store.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-session-ownership.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-character-commits.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-character-restore.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-character-life.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-car-optional-assets.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-physics-save.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-breakable-save.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-destroyable-save.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-failed-start-input.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-dialog-update.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-exit-log.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-hud-stop.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-console-capture.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-console-vector.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-spawn-visual.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-texture-list-lifetime.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-script-watchdog.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-script-lifetime.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-background-shutdown.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-server-console.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-car-lights.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-car-suspension.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-helicopter.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-hud-light-projection.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-skeleton-motion-history.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-blast-ballistics.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-consumption-animation.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-level-changer-reject.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-trunk-reach.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-ui-resize.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-map-privacy.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-inventory-capacity.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-open-registration.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-rp-input.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-rp-motion.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-physics-replica.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-admin-god.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-admin-teleport.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-relation-null.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-environment-clock.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-bootstrap-clock.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-condition-clock.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-level-transition.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-physics-push.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-fragment-lifetime.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-mark-material.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-crow-enemy.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-monster-snapshot.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-host-stop.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-barrel-fuse.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-projectile-shot.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-voice-resources.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-pda-notifications.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-inventory-hands.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-pickup-admission.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-replica-relcase.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-task-clear.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-preview-pool.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-back-weapons.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-weapon-slot-tail.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-hud-state-authority.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-ammo-import.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-stamina-recovery.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-campfire.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-trade-policy.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-world-bridge.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-world-writer.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-admission.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-lzpack.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-weapon-menu.py
-          if errorlevel 1 exit /b %errorlevel%
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-netcoop-character-checksum.py
+          exit /b %LZ_WINDOWS_CHECKS_FAILED%
       - name: Check archived configurations and native entry routing
         # Archive-only configs must exercise the actual native resolver before
         # removing the old physical client directory from an update.

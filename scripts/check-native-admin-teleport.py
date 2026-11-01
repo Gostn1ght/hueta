@@ -10,6 +10,8 @@ root=Path(__file__).resolve().parents[1]
 native=netcoop_cpp(root, encoding='latin-1')
 owner=native[native.index('struct FindActorOwner\n'):native.index('void server_forward_news(',native.index('struct FindActorOwner\n'))]
 teleport=native[native.index('bool script_admin_teleport('):native.index('bool script_admin_noclip(',native.index('bool script_admin_teleport('))]
+noclip=native[native.index('bool script_admin_noclip('):native.index('bool script_respawn(',native.index('bool script_admin_noclip('))]
+seat=(root/'src/xrGame/netcoop_vehicle_seat.inc').read_text(encoding='utf8');toggle=seat[seat.index('void CActor::netcoop_set_noclip('):seat.index('void CActor::netcoop_seat_leave(')]
 events=(root/'src/xrGame/Actor_Events.cpp').read_text(encoding='latin-1')
 move=events[events.index('void CActor::MoveActor('):]
 assert move.rstrip().endswith('}') and 'ResetPredictionState' not in move
@@ -27,7 +29,7 @@ source=r'''
 #include <limits>
 #include <string>
 #include <vector>
-using u16=unsigned short;constexpr bool TRUE=true;
+using u32=unsigned;using u16=unsigned short;void Msg(const char*,...);constexpr bool TRUE=true;
 constexpr int GE_MOVE_ACTOR=1,M_NETANOMALY_CMD=2;
 struct Fvector{float x=0,y=0,z=0;void set(float a,float b,float c){x=a;y=b;z=c;}void set(const Fvector& v){*this=v;}};
 bool same(const Fvector& a,const Fvector& b){return a.x==b.x&&a.y==b.y&&a.z==b.z;}
@@ -35,7 +37,16 @@ bool _valid(const Fvector& v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std
 struct Fmatrix{Fvector c;void translate(const Fvector& v){c=v;}};
 struct CObject{virtual ~CObject()=default;};
 struct Camera{void Set(float,float,float){}};
+struct CPHMovementControl {bool exists=true;unsigned created=0,destroyed=0;Fvector position;
+ bool CharacterExist(){return exists;}void DestroyCharacter(){exists=false;++destroyed;}
+ void CreateCharacter(){exists=true;++created;}void SetPosition(const Fvector& p){position=p;}
+ void SetVelocity(float,float,float){}
+};
+struct Physics {CPHMovementControl control;CPHMovementControl* movement(){return &control;}};
 struct CActor:CObject{
+ Physics physics;bool seated=false,m_netcoop_noclip=false;
+ Physics* character_physics_support(){return &physics;}bool netcoop_seated(){return seated;}
+ void netcoop_set_noclip(bool);
  u16 id=0;bool alive=true;unsigned moves=0,next_sequence=501,last_ack=490;
  Fmatrix matrix;Camera camera;float r_model_yaw=0,r_torso_tgt_roll=0,m_prediction_error=4;
  struct Torso{float yaw=0,pitch=0,roll=0;}r_torso,unaffected_r_torso;
@@ -54,7 +65,7 @@ struct xrClientData:IClient{
  std::vector<int> m_pending_inputs={1,2};struct{float pitch=.2f,yaw=.3f;int mstate=3;}m_current_intent;
 };
 template<class T>T smart_cast(CObject* o){return dynamic_cast<T>(o);}
-'''+owner+r'''
+'''+toggle+owner+r'''
 struct NET_Packet{int event=0;u16 actor=0;std::vector<Fvector> vectors;void w_vec3(const Fvector& v){vectors.push_back(v);}};
 struct CGameObject{static void u_EventGen(NET_Packet& p,int kind,u16 id){p.event=kind;p.actor=id;}};
 unsigned net_flags(bool reliable,bool immediate){return (reliable?1u:0u)|(immediate?2u:0u);}
@@ -74,12 +85,14 @@ namespace netcoop{
  bool client_admin_authorized(){return admin_flag;}
  bool server_character_accepts(xrClientData* c,int kind){assert(kind==M_NETANOMALY_CMD);return c->admitted;}
  void client_send_command(const char* s){commands.emplace_back(s);}
-'''+teleport+r'''
+std::vector<std::string> states;
+bool script_send_to_actor(u16 id,const char* channel,const char* value){assert(id==7 && std::string(channel)=="netcoop_noclip");states.emplace_back(value);return true;}
+'''+teleport+noclip+r'''
 }
 '''+move+r'''
 using string256=char[256];
 template<class... T>void xr_sprintf(string256& out,const char* fmt,T... args){std::snprintf(out,sizeof(out),fmt,args...);}
-void Msg(const char*){}
+void Msg(const char*,...){}
 struct CGamePersistent{bool RequestDemoTeleport(const Fmatrix& camera);};
 '''+request+r'''
 int main(){
@@ -87,6 +100,15 @@ int main(){
  Owner a,b;a.ID=7;b.ID=8;xrClientData admin,player;
  admin.owner=&a;admin.netcoop_role=2;player.owner=&b;player.netcoop_role=1;
  server.clients={&admin,&player};world.Objects.values={{u16(7),&actor},{u16(8),&other}};
+ assert(!netcoop::script_admin_noclip(8,true));assert(!netcoop::script_admin_noclip(65535,true));
+ actor.seated=true;assert(!netcoop::script_admin_noclip(7,true));actor.seated=false;
+ actor.alive=false;assert(!netcoop::script_admin_noclip(7,true));actor.alive=true;
+ admin.admitted=false;assert(!netcoop::script_admin_noclip(7,true));admin.admitted=true;
+ assert(netcoop::script_admin_noclip(7,true) && actor.m_netcoop_noclip && !actor.physics.control.exists);
+ assert(actor.physics.control.destroyed==1 && actor.m_client_prediction_history.empty() && netcoop::states.back()=="1");
+ assert(netcoop::script_admin_noclip(7,true) && actor.physics.control.destroyed==1);
+ assert(netcoop::script_admin_noclip(7,false) && !actor.m_netcoop_noclip && actor.physics.control.created==1 && netcoop::states.back()=="0");
+ actor.m_client_prediction_history={1,2};
  const Fvector dest={3,4,5};
  assert(!netcoop::script_admin_teleport(8,dest)&&other.moves==0&&server.sends==0);
  assert(!netcoop::script_admin_teleport(65535,dest));

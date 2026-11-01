@@ -62,7 +62,7 @@ server.execute(r'''
 chars = {[1] = "anna_1", [2] = "boris_1"}
 function netcoop_actor_character(id) return chars[id] or "" end
 held={[1]="device-A",[2]="device-B"}; own=true
-netcoop_pdanet={held_device=function(id) return held[id] and {uid=held[id],own=own} end}
+netcoop_pdanet={held_device=function(id) return held[id] and {uid=held[id],item=81,own=own} end}
 outbox = {}
 function netcoop_send_to_actor(id, ch, data) outbox[#outbox + 1] = {id, ch, data} end
 ''')
@@ -73,7 +73,7 @@ c1 = runtime()
 load(c1, "client/netcoop_pda.script", "netcoop_pda")
 c1.execute(r'''
 netcoop_pda.on_game_start()
-netcoop_pda.receive("device-A|1/1|")
+netcoop_pda.receive("device-A|81|1/1|")
 local paw = tasks_placeable_waypoints
 local pos = vector():set(120.5, 2, -310.25)
 local se = paw.alife_create("script_zone", pos, 4567, 89)   -- PAW: register_script_zone
@@ -111,7 +111,7 @@ assert(spots[%d] and spots[%d][1] == 120.5 and spots[%d][3] == -310.25, "at the 
 # Boris (another character) gets nothing of Anna's.
 server.execute("outbox = {}")
 server.globals().netcoop_pda_store.command(2, "get")
-assert list(server.globals().outbox.values())[0][3] == "device-B|1/1|", "another character's PDA is empty"
+assert list(server.globals().outbox.values())[0][3] == "device-B|81|1/1|", "another character's PDA is empty"
 
 # Removing a pin clears its map position.
 c1.execute("tasks_placeable_waypoints.alife_release({id = pin_id}); assert(not spots[pin_id])")
@@ -120,10 +120,10 @@ print("PDA: PAW pins without ALife, saved per character in chunks, restored on a
 # Same physical device follows its new legitimate holder; a replacement is empty.
 server.execute('chars[2]="boris_1";held[2]="device-A";outbox={}')
 server.globals().netcoop_pda_store.command(2,"get")
-assert list(server.globals().outbox.values())[0][3].startswith("device-A|1/")
+assert list(server.globals().outbox.values())[0][3].startswith("device-A|81|1/")
 server.execute('held[1]="replacement";outbox={}')
 server.globals().netcoop_pda_store.command(1,"get")
-assert list(server.globals().outbox.values())[0][3]=="replacement|1/1|"
+assert list(server.globals().outbox.values())[0][3]=="replacement|81|1/1|"
 # Forging another device's UID cannot overwrite it; a foreign locked PDA is unreadable.
 before=dict(store)
 server.globals().netcoop_pda_store.command(1,"put device-A 1 1 6666")
@@ -136,3 +136,7 @@ c2.execute('netcoop_pda.reset(); sent={}; tick=9000; callbacks.actor_on_update()
 # Lost saves are retried until an explicit server acknowledgment.
 c1.execute('sent={}; tick=12000; callbacks.actor_on_update(); tick=18000; callbacks.actor_on_update(); assert(#sent==2); netcoop_pda.receive("device-A|saved"); sent={}; tick=24000; callbacks.actor_on_update(); assert(#sent==0)')
 print("PASS physical PDA: UID isolation, ownership checks, device transfer, replacement, reconnect reset and acknowledged save retry")
+
+# A delayed read for a removed device cannot load its marks into its replacement.
+c2.execute('netcoop_pda.reset();db.actor.item_in_slot=function() return {id=function() return 82 end} end;netcoop_pda.receive("device-A|81|1/1|");sent={};tick=30000;callbacks.actor_on_update();assert(sent[1]=="pda get")')
+print("PASS physical PDA: delayed read bound to the actual equipped item")

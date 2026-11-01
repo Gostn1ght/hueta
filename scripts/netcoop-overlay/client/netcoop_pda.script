@@ -210,7 +210,7 @@ function reset()
 	if m and m.load_state then pcall(m.load_state, {pawsys={pins={}}}) end
 end
 
--- netcoop_client_compat: channel "pda", "n/total|hex".
+-- Bind each read to the current physical item as well as its persistent UID.
 function receive(data)
 	if data == "none" then reset(); return end
 	local uid, body = string.match(data or "", "^(%S-)|(.+)$")
@@ -219,7 +219,9 @@ function receive(data)
 		if uid == device_uid and sending then last_sent, sending = sending, nil end
 		return
 	end
-	local n, total, hex = string.match(body, "^(%d+)/(%d+)|(%x*)$")
+	local item_id,n, total, hex = string.match(body, "^(%d+)|(%d+)/(%d+)|(%x*)$")
+	local current=db.actor and db.actor:item_in_slot(8)
+	if not current or current:id()~=tonumber(item_id) then return end
 	n, total = tonumber(n), tonumber(total)
 	if not (n and total and n >= 1 and n <= total and total <= 44 and #hex <= CHUNK) then return end
 	if n == 1 then

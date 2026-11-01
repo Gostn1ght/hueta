@@ -188,7 +188,7 @@ void CActor::net_ImportInputAck(NET_Packet& P)
 	for (auto& frame : m_client_prediction_history)
 		frame.position.add(shift);
 
-	if (character_physics_support() && character_physics_support()->movement()) {
+	if (!m_netcoop_noclip && character_physics_support() && character_physics_support()->movement()) {
 		character_physics_support()->movement()->SetPosition(corrected);
 		if (m_prediction_error >= snap_error)
 			character_physics_support()->movement()->SetVelocity(auth_vel);

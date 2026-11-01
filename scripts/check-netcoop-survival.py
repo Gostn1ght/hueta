@@ -45,7 +45,17 @@ complete(fresh);assert(not protected_body(7) and not state.netcoop_survival.user
 local kept,left=0,0
 for _,v in pairs(items) do if v.owner==fresh then kept=kept+1 else left=left+1 end end
 assert(kept==6 and left==5 and items[100].owner==fresh)
+-- Real ownership events are asynchronous; admission must wait for them.
+actors[10]={_id=10,_name="Nickname"};local nextbody=actors[10]
+for key,value in pairs(fresh) do if type(value)=="function" then nextbody[key]=value end end
+local queued={}
+function fresh:transfer_item(item,to) queued[#queued+1]={item,to} end
+assert(prepare(fresh,3))
+assert(claim(nextbody)=="pending" and items[100].owner==fresh)
+for _,event in ipairs(queued) do event[1].owner=event[2] end
+assert(claim(nextbody)~="pending" and items[100].owner==nextbody)
+complete(nextbody);assert(not protected_body(8))
 -- The fifth/final death retains no reservation, including the PDA.
-assert(prepare(fresh,0) and not protected_body(8) and items[100].owner==fresh)
+assert(prepare(nextbody,0) and not protected_body(10) and items[100].owner==nextbody)
 ''')
 print("PASS actual survival: half of gear, guaranteed same PDA until final death, stable draw, pending missing item, no partial mutation, physical transfer, repeat safe, corpse unlock")
