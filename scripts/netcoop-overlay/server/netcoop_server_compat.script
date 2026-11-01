@@ -307,7 +307,13 @@ function restore_character_state(actor, encoded, respawn)
     -- Nor the old body's hunger, stamina and thirst (the client's saved
     -- player state): a player who starved or died of thirst got a new body
     -- just as hungry and died again (owner 2026-10-09). Progress stays.
-    if new_body then db.storage[id].pstor.netcoop_player_state = nil end
+    if new_body then
+        local pstor=db.storage[id].pstor
+        pstor.netcoop_player_state = nil
+        for key in pairs(pstor) do
+            if type(key)=="string" and (key:find("^health%.") or key:find("^timedhp%.")) then pstor[key]=nil end
+        end
+    end
     if conditions then
         if conditions.radiation then actor.radiation = conditions.radiation end
         if conditions.psy_health then actor.psy_health = conditions.psy_health end

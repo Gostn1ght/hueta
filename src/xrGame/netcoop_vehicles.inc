@@ -208,21 +208,56 @@ static VehicleSeats* vehicle_seats(CCar* car)
 	return &v;
 }
 
-// Out of the seat's side of the car, on the ground.
-static Fvector vehicle_exit_position(CCar* car, const VehicleSeats& v, const VehicleSeatPose& seat)
+// Test the standing controller's volume before creating it. A ground ray
+// alone accepted points inside walls, parked cars and other players.
+static bool vehicle_exit_clear(CCar* car, const Fvector& feet)
 {
-	Fvector local = seat.local.c;
-	local.x = v.center_x + (local.x < v.center_x ? -1.f : 1.f) * (v.half_width + 0.7f);
-	local.y = seat.local.c.y + 0.5f;
-	Fvector world;
-	car->XFORM().transform_tiny(world, local);
-	collide::rq_result hit;
-	Fvector start = world, down;
-	start.y += 1.5f;
-	down.set(0.f, -1.f, 0.f);
-	if (Level().ObjectSpace.RayPick(start, down, 8.f, collide::rqtStatic, hit, car))
-		world.y = start.y - hit.range + 0.05f;
-	return world;
+	Fvector center = feet, forward, up, size;
+	center.y += 1.f;
+	forward.set(0.f, 0.f, 1.f); up.set(0.f, 1.f, 0.f); size.set(0.8f, 1.7f, 0.8f);
+	if (Level().ObjectSpace.BoxQuery(center, forward, up, size, nullptr)) return false;
+	xr_vector<CObject*> nearby;
+	Level().ObjectSpace.GetNearest(nearby, center, 1.5f, car);
+	Fbox standing;
+	standing.set(feet.x-0.4f, feet.y+0.15f, feet.z-0.4f, feet.x+0.4f, feet.y+1.85f, feet.z+0.4f);
+	for (CObject* object : nearby)
+	{
+		if (!object || object->getDestroy() || !object->Visual()) continue;
+		Fmatrix inverse; inverse.invert(object->XFORM());
+		Fbox local; local.xform(standing, inverse);
+		if (local.intersect(object->Visual()->getVisData().box)) return false;
+	}
+	return true;
+}
+
+// Prefer the seat's side, then try the opposite side and clear points along
+// the body. The optional result lets a normal exit stay seated if blocked.
+static Fvector vehicle_exit_position(CCar* car, const VehicleSeats& v, const VehicleSeatPose& seat, bool* clear = nullptr)
+{
+	if (clear) *clear = false;
+	const float side = seat.local.c.x < v.center_x ? -1.f : 1.f;
+	Fvector fallback = car->Position();
+	for (int along = 0; along < 5; ++along)
+		for (int opposite = 0; opposite < 2; ++opposite)
+		{
+			Fvector local = seat.local.c;
+			local.x = v.center_x + side * (opposite ? -1.f : 1.f) * (v.half_width + 0.9f);
+			local.z += along == 0 ? 0.f : (along % 2 ? -1.f : 1.f) * float((along+1)/2) * 1.2f;
+			local.y += 0.5f;
+			Fvector world; car->XFORM().transform_tiny(world, local);
+			collide::rq_result hit;
+			Fvector start = world, down;
+			start.y += 1.5f; down.set(0.f, -1.f, 0.f);
+			if (Level().ObjectSpace.RayPick(start, down, 8.f, collide::rqtStatic, hit, car))
+				world.y = start.y - hit.range + 0.08f;
+			if (along == 0 && opposite == 0) fallback = world;
+			if (vehicle_exit_clear(car, world))
+			{
+				if (clear) *clear = true;
+				return world;
+			}
+		}
+	return fallback; // forced removal (destroyed car/disconnect) must still release the seat
 }
 
 // Which seat the aim point (car's space) asks for: the nearest seat on that
@@ -337,14 +372,20 @@ static void vehicle_seat_server(CCar* car, VehicleRuntime& v, const VehicleSeats
 		index, seat.driver ? ", driving" : "");
 }
 
-static void vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index)
+static bool vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index, bool force = true)
 {
 	CActor* actor = smart_cast<CActor*>(Level().Objects.net_Find(v.seats[index]));
 	const VehicleSeats* poses = car ? vehicle_seats(car) : nullptr;
 	if (actor && actor->netcoop_seated())
 	{
+		bool clear = true;
 		const Fvector exit = car && poses && index < poses->seats.size() ?
-			vehicle_exit_position(car, *poses, poses->seats[index]) : actor->Position();
+			vehicle_exit_position(car, *poses, poses->seats[index], &clear) : actor->Position();
+		if (!clear && !force)
+		{
+			Msg("[diag][vehicle] id=%u actor=%u exit refused: standing volume blocked", car->ID(), actor->ID());
+			return false;
+		}
 		actor->netcoop_seat_leave(exit);
 		Msg("[Lost Zone][vehicle] %s leaves seat %u", actor->cName().c_str(), index);
 	}
@@ -355,6 +396,7 @@ static void vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index)
 	}
 	v.seats[index] = vehicle_seat_free;
 	v.dirty = true;
+	return true;
 }
 
 static VehicleRuntime* vehicle_runtime(CCar* car, const VehicleSeats& poses)

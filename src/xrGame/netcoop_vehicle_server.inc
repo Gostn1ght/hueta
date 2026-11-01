@@ -19,7 +19,8 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 			return;
 		for (u8 i = 0; i < it->second.seats.size(); ++i)
 			if (it->second.seats[i] == actor->ID())
-				vehicle_unseat_server(smart_cast<CCar*>(Level().Objects.net_Find(it->first)), it->second, i);
+				if (!vehicle_unseat_server(smart_cast<CCar*>(Level().Objects.net_Find(it->first)), it->second, i, false))
+					cluster_refuse(server, CL, "There is no room to leave the vehicle; move it away from the obstacle");
 		return;
 	}
 	if (P.r_elapsed() < 2)

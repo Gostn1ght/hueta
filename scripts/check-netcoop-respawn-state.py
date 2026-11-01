@@ -42,9 +42,10 @@ assert(actor.radiation==0 and actor.psy_health==1)
 actor.alive=function() return false end;actor.radiation=1;actor.psy_health=0
 local dead=capture_character_state(actor)
 assert(dead.netcoop_respawn and dead.netcoop_conditions.radiation==0 and dead.netcoop_conditions.psy_health==1)
-dead.pstor.netcoop_player_state='satiety=0;power=0.1;'
+dead.pstor.netcoop_player_state='satiety=0;power=0.1;';dead.pstor['health.head']=0;dead.pstor['timedhp.head']=9
 restore_character_state(actor,dead)
 assert(actor.radiation==0 and actor.psy_health==1)
+assert(db.storage[7].pstor['health.head']==nil and db.storage[7].pstor['timedhp.head']==nil,'new body drops raw BHS limb state too')
 assert(db.storage[7].pstor.netcoop_player_state==nil,'a new body starts fed and rested, not as the old one died')
 assert(db.storage[7].pstor.rank==42 and db.storage[7].pstor_ctime.stamp==99)
 assert(not restored_players[7] and player_tasks[7])

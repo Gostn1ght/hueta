@@ -27,6 +27,7 @@ local destroyed_actor_id = nil
 local use_own_actor_id -- defined below
 local install_actor_lifecycle
 local player_state_ready = false
+local player_state_spawn_ready = false
 local next_player_state = 0
 local pending_player_state = nil
 
@@ -106,10 +107,14 @@ function on_actor_spawned(obj)
 	if netcoop_pda and netcoop_pda.reset then netcoop_pda.reset() end
 	controlled_actor = obj
 	player_state_ready = false
+	player_state_spawn_ready = false
 	next_player_state = 0
 	controlled_actor_id = obj:id()
 	destroyed_actor_id = nil
 	db.actor = obj
+	-- Scripted item use can disable level input until its completion callback.
+	-- That callback belongs to the dead body and may never run after respawn.
+	if level and level.enable_input then level.enable_input() end
 	install_actor_lifecycle()
 	use_own_actor_id(obj)
 	quiet_busy_hands()
@@ -125,6 +130,7 @@ function on_actor_destroyed(obj)
 		controlled_actor = nil
 		controlled_actor_id = nil
 		player_state_ready, next_player_state, pending_player_state = false, 0, nil
+		player_state_spawn_ready = false
 		rawset(db, "actor", nil)
 	end
 end
@@ -138,7 +144,27 @@ install_actor_lifecycle = function()
 	local destroy, update = binder.net_destroy, binder.update
 	binder.update = function(self, ...)
 		if self.__netcoop_destroying or self.object:id() ~= controlled_actor_id then return end
-		return update(self, ...)
+		if not player_state_spawn_ready then
+			-- BHS globals and raw limb keys can still describe the previous
+			-- body. Its first update must not kill this one before restore.
+			local b=zzz_player_injuries
+			if b and b.maxhp and b.health and b.timedhp then
+				local st=db.storage[controlled_actor_id] or {object=self.object};db.storage[controlled_actor_id]=st
+				st.pstor=st.pstor or {}
+				for part,maximum in pairs(b.maxhp) do
+					if type(maximum)=="number" and maximum>0 then
+						b.health[part],b.timedhp[part]=maximum,0
+						st.pstor["health."..part],st.pstor["timedhp."..part]=maximum,0
+					end
+				end
+			end
+		end
+		local result=update(self, ...)
+		-- The first binder update runs BHS initialization and can replace its
+		-- limb tables/pstor. Apply the authoritative snapshot after that step.
+		player_state_spawn_ready=true
+		if pending_player_state then use_player_state(pending_player_state) end
+		return result
 	end
 	binder.net_destroy = function(self, ...)
 		if self.__netcoop_destroying then return end
@@ -1211,6 +1237,7 @@ function use_player_state(data)
 	end
 	local state = (not data or data == "-") and {} or state_decode(data)
 	if not state then return end
+	if not player_state_spawn_ready then pending_player_state=original;return end
 	local injuries = zzz_player_injuries
 	-- Do not acknowledge a snapshot before BHS has its six limb tables.
 	-- Otherwise an early delivery is lost and the previous body's red HUD persists.

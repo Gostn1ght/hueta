@@ -62,6 +62,7 @@ void CActor::netcoop_seat_leave(const Fvector& exit)
 	CPHMovementControl* movement = character_physics_support() ? character_physics_support()->movement() : nullptr;
 	if (movement && m_netcoop_seat_character && !movement->CharacterExist())
 	{
+		movement->SetPosition(exit); // updates vPosition even while the capsule is absent
 		movement->CreateCharacter();
 		movement->SetPosition(exit);
 		movement->SetVelocity(0.f, 0.f, 0.f);

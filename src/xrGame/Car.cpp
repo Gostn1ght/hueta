@@ -35,6 +35,7 @@
 #include "CharacterPhysicsSupport.h"
 #include "car_memory.h"
 #include "../xrphysics/IPHWorld.h"
+#include "../xrphysics/ExtendedGeom.h"
 BONE_P_MAP CCar::bone_map = BONE_P_MAP();
 
 // Some spawn records carry the editor placeholder "$editor", while the
@@ -346,6 +347,19 @@ void CCar::ActorObstacleCallback(bool& do_colide, bool bo1, dContact& c, SGameMt
 		if (material_1 && material_1->Flags.test(SGameMtl::flActorObstacle))do_colide = true;
 		if (material_2 && material_2->Flags.test(SGameMtl::flActorObstacle))do_colide = true;
 	}
+	if (!do_colide || !netcoop::enabled()) return;
+	// A controller can overlap a door/body after dismount or a network
+	// correction. Do not ask ODE to resolve the entire penetration in one
+	// step: the resulting separating impulse launched the articulated car.
+	// Keep the contact (and run-over hits); soften only car/player pairs.
+	dxGeomUserData* other = retrieveGeomUserData(bo1 ? c.geom.g2 : c.geom.g1);
+	if (!other || !PHIsShellHolderLive(other->ph_ref_object) || !other->ph_ref_object->IsActor()) return;
+	c.geom.depth = _min(c.geom.depth, 0.02f);
+	c.surface.mode |= dContactSoftERP | dContactSoftCFM;
+	c.surface.soft_erp = _min(c.surface.soft_erp, 0.08f);
+	c.surface.soft_cfm = _max(c.surface.soft_cfm, 0.002f);
+	c.surface.mu = _min(c.surface.mu, 0.4f);
+	c.surface.bounce = 0.f;
 }
 
 void CCar::SpawnInitPhysics(CSE_Abstract* D)
@@ -362,7 +376,7 @@ void CCar::SpawnInitPhysics(CSE_Abstract* D)
 	Init();
 	Msg("[diag][vehicle] id=%u section=%s spawn phase=ready",ID(),cNameSect().c_str());FlushLog();
 	//inits m_driving_wheels,m_steering_wheels,m_breaking_wheels values using recieved in ParceDefinitions & from bone_map
-	//PPhysicsShell()->add_ObjectContactCallback(ActorObstacleCallback);
+	if (netcoop::enabled()) PPhysicsShell()->add_ObjectContactCallback(ActorObstacleCallback);
 	SetDefaultNetState(so);
 	CPHUpdateObject::Activate();
 
@@ -844,7 +858,7 @@ void CCar::detach_Actor()
 	if (!Owner()) return;
 	Owner()->setVisible(1);
 	CHolderCustom::detach_Actor();
-	PPhysicsShell()->remove_ObjectContactCallback(ActorObstacleCallback);
+	if (!netcoop::enabled()) PPhysicsShell()->remove_ObjectContactCallback(ActorObstacleCallback);
 	NeutralDrive();
 	Unclutch();
 	ResetKeys();
@@ -886,7 +900,7 @@ bool CCar::attach_Actor(CGameObject* actor)
 
 	OnCameraChange(ectFirst);
 	PPhysicsShell()->Enable();
-	PPhysicsShell()->add_ObjectContactCallback(ActorObstacleCallback);
+	if (!netcoop::enabled()) PPhysicsShell()->add_ObjectContactCallback(ActorObstacleCallback);
 	//	VisualUpdate();
 	processing_activate();
 	ReleaseHandBreak();

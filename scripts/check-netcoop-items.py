@@ -311,7 +311,7 @@ actor_status_sleep={toggle_feature=function(v) toggled[#toggled+1]=v end}
 ''')
 start = client.index('local PLAYER_STATE_MODULES')
 end = client.index('local function install_server_item_actions()', start)
-lua.execute('next_player_state=0;\n'+client[start:end] + '\nps_report = report_player_state')
+lua.execute('player_state_spawn_ready=true;next_player_state=0;\n'+client[start:end] + '\nps_report = report_player_state')
 lua.execute(r'''
 ps_report(); assert(#cmds==1 and cmds[1]=='player_state get','only restore request before saved state');cmds={}
 use_player_state("satiety=0.75;power=0.5;modules={actor_status_thirst={drink={last_drink=1200;chk_drink={Y=2012;};};};};")

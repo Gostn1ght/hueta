@@ -8,6 +8,7 @@ code = source[source.index('local PLAYER_STATE_MODULES ='):source.index('-- Slee
 lua = LuaRuntime(unpack_returned_tuples=True)
 lua.execute('''
 local player_state_ready, next_player_state, pending_player_state = false, 0, nil
+local player_state_spawn_ready=true
 db={storage={}};now=100;messages={};loads=0
 function time_global() return now end
 function printf(...) end
@@ -61,3 +62,34 @@ assert 'net_flags(TRUE, TRUE)' in confirmation
 print('PASS actual player-state Lua: early delivery retained, limb damage/healing and thirst preserved, fresh-body reset, bounded values, no NaN/Inf, ordered forced flush before passage')
 
 lua.execute("local b=zzz_player_injuries;local old=b.maxhp;b.maxhp={};fixture_begin_body();use_player_state('@7|-');assert(fixture_pending()=='@7|-');b.maxhp=old;use_player_state(fixture_pending());assert(fixture_pending()==nil)")
+
+# First binder update must run before snapshot acknowledgement, even if BHS
+# tables already exist from the preceding body in this Lua VM.
+fresh=LuaRuntime(unpack_returned_tuples=True)
+fresh.execute(r'''
+db={storage={[7]={pstor={}}}};now=100;acks=0;input_resets=0
+level={enable_input=function()input_resets=input_resets+1 end}
+function time_global()return now end
+function printf()end
+function netcoop_command(text)if text=='player_state ack' then acks=acks+1 end end
+function quiet_busy_hands()end
+function CreateTimeEvent()end
+zzz_player_injuries={health={},timedhp={},maxhp={head=11,torso=11,leftarm=5,rightarm=5,leftleg=5,rightleg=5}}
+actor={id=function()return 7 end}
+bind_stalker={actor_binder={net_destroy=function()end,update=function(self)
+ assert(zzz_player_injuries.health.head==11 and db.storage[7].pstor['health.head']==11,'old lethal state neutralized before first update')
+ zzz_player_injuries.health.head=0;db.storage[7].pstor['health.head']=0;return 123
+end}}
+''')
+declarations=source[source.index('local controlled_actor = nil'):source.index('-- The locally controlled Actor:')]
+spawn=source[source.index('function on_actor_spawned('):source.index('-- A dead local actor')]
+lifecycle=source[source.index('install_actor_lifecycle = function()'):source.index('function is_pure_client()')]
+fresh.execute(declarations+'\nuse_own_actor_id=function()end\n'+code+spawn+lifecycle+r'''
+on_actor_spawned(actor)
+assert(input_resets==1,'new body releases input lock held by an interrupted old-body animation')
+use_player_state('@7|-');assert(acks==0 and pending_player_state=='@7|-')
+assert(bind_stalker.actor_binder.update({object=actor})==123)
+assert(acks==1 and player_state_ready and pending_player_state==nil)
+assert(zzz_player_injuries.health.head==11 and db.storage[7].pstor['health.head']==11)
+''')
+print('PASS actual binder/state ordering: initialization before ACK; early snapshot survives first-update overwrite')

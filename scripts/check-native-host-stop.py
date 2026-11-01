@@ -29,7 +29,7 @@ struct Entity{u32 ID;};
 struct xrClientData:IClient{struct{bool bLocal=false;}flags;ClientID ID{1};Entity* owner=nullptr;};
 struct xrServer{std::vector<IClient*>clients;template<class T>void ForEachClientDo(T& op){for(auto* c:clients)op(c);}};
 std::map<u32,int>s_cluster_leaving;bool s_cluster_quitting=false;
-bool fixture_admitted=true,fixture_save=true,fixture_world=true,fixture_request_present=false,fixture_accounts=true;
+bool fixture_admitted=true,fixture_save=true,fixture_world=true,fixture_request_present=false,fixture_accounts=true,fixture_status=true;
 xr_string fixture_request,fixture_events;unsigned fixture_saves=0;
 u32 cluster_port(){return 1361;}u32 GetCurrentProcessId(){return 999;}
 void cluster_file(const char*,const char*,int,string_path& path){xr_sprintf(path,"%s","request");}
@@ -40,6 +40,7 @@ void store_money(xrClientData*){fixture_events+='M';}
 bool accounts_save(){fixture_events+='A';return fixture_accounts;}
 void character_commits_flush(){fixture_events+='F';}
 bool world_store_save_now(const char*){fixture_events+='W';return fixture_world;}
+bool cluster_status_remove(){fixture_events+='X';return fixture_status;}
 void DeleteFileA(const char*){fixture_request_present=false;fixture_events+='D';}
 void Msg(const char*){}void FlushLog(){fixture_events+='L';}
 struct ConsoleStub{void Execute(const char* command){assert(xr_string(command)=="quit");fixture_events+='Q';}}fixture_console;
@@ -70,8 +71,9 @@ int main(){
  server.clients.pop_back();fixture_events.clear();fixture_world=false;
  cluster_host_stop(&server,6000);assert(fixture_events=="MCFAW"&&!s_cluster_quitting);
  fixture_events.clear();fixture_world=true;s_cluster_leaving[1]=1;
- cluster_host_stop(&server,7000);assert(fixture_events=="FAWDLQ"&&s_cluster_quitting&&!fixture_request_present);
- auto previous=fixture_events;cluster_host_stop(&server,8000);assert(fixture_events==previous);
+ fixture_status=false;cluster_host_stop(&server,7000);assert(fixture_events=="FAWX"&&!s_cluster_quitting&&fixture_request_present);
+ fixture_events.clear();fixture_status=true;cluster_host_stop(&server,8000);assert(fixture_events=="FAWXDLQ"&&s_cluster_quitting&&!fixture_request_present);
+ auto previous=fixture_events;cluster_host_stop(&server,9000);assert(fixture_events==previous);
  assert(fixture_saves==3);
  std::puts("PASS actual host stop: exact process, admission/restore/save failures hold exit, handoff checkpoint protected, world saved before quit");
 }

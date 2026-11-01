@@ -12,6 +12,7 @@
 #include "script_game_object.h"
 #include "../xrEngine/xr_object.h"
 #include "../xrEngine/IGame_Persistent.h"
+#include "UIGameCustom.h"
 
 // Netcoop client: creating the ALife simulator normally calls the game start
 // callback (_g.start_game_callback -> on_game_start of every GAMMA script,
@@ -169,6 +170,12 @@ void CLevel::g_sv_Spawn(CSE_Abstract* E)
 		{
 			if (CurrentEntity() != NULL)
 			{
+				if (strstr(Core.Params, "-netcoop") && !g_dedicated_server && !ai().get_alife())
+					if (CurrentGameUI())
+					{
+						CurrentGameUI()->HideShownDialogs();
+						CurrentGameUI()->HidePdaMenu();
+					}
 				CGameObject* pGO = smart_cast<CGameObject*>(CurrentEntity());
 				if (pGO) pGO->On_B_NotCurrentEntity();
 			}
