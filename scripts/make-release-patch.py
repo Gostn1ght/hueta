@@ -68,10 +68,15 @@ def main():
                 dst = out / ("input" if clean else "loose") / role / rel
                 (scripts if clean else loose).append(rel)
             else:
-                # Sounds, textures, shaders: inside the archive (the launcher
-                # does not ship a gamedata folder).
+                # Models and their dependencies are shared with the headless
+                # simulation: its skeleton, collision and animation readers
+                # must see the same update as the renderer. Server-specific
+                # assets may still override shared defaults in their own role.
                 inner = rel[len("gamedata/"):] if rel.startswith("gamedata/") else rel
-                dst = out / "input" / role / "assets" / inner if clean else out / "input" / "gamedata" / inner
+                if clean and role == "server":
+                    dst = out / "input" / role / "assets" / inner
+                else:
+                    dst = out / "input" / "gamedata" / inner
                 scripts.append(rel)
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)

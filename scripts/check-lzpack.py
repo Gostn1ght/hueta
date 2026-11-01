@@ -58,6 +58,8 @@ with TemporaryDirectory() as tmp:
     (patchdir/'server/configs').mkdir();(patchdir/'server/configs/system.ltx').write_bytes(b'server-config')
     (patchdir/'client/assets').mkdir();(patchdir/'client/assets/fixture.bin').write_bytes(b'client-asset')
     (patchdir/'server/assets').mkdir();(patchdir/'server/assets/fixture.bin').write_bytes(b'server-asset')
+    (patchdir/'gamedata/meshes').mkdir(parents=True)
+    (patchdir/'gamedata/meshes/shared.ogf').write_bytes(b'shared-model-bones')
     for role in ('client','server'):
         volumes=lzpack.patch_v2(patchdir,folder/('v2-'+role),key,'000048',role)
         assert len(volumes)==3
@@ -65,6 +67,8 @@ with TemporaryDirectory() as tmp:
             reader=lzpack.Reader(archive,key);data=reader.read(0,reader.size)
             other='server' if role=='client' else 'client'
             assert (other+'-asset').encode() not in data and (other+'-config').encode() not in data
+            if '_assets_' in archive.name:
+                assert b'shared-model-bones' in data and b'meshes\\shared.ogf' in data
             assert b'client\\scripts' not in data and b'server\\scripts' not in data
             alias=b'$game_config$\\' if '_configs_' in archive.name else b'$game_scripts$\\' if '_scripts_' in archive.name else b'$game_data$\\'
             assert b'entry_point = '+alias in data
