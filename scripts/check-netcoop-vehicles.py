@@ -36,6 +36,29 @@ assert(pilot:find("%[SPACE/CTRL%] <st_netcoop_heli_collective>") and pilot:find(
 assert(prompt_text("seated_pilot", 34999) ~= nil and prompt_text("seated_pilot", 35001) == nil, "pilot controls for 15 s")
 ''')
 
+# Construct the actual dashboard with the engine's frame API. A nine-slice
+# identifier is not a standalone static texture and must not use InitStatic.
+lua.execute(r'''
+frames,added,removed=0,0,0
+function super()end
+function Frect()return {set=function(self,...)return self end}end
+function GetARGB(a,r,g,b)return {a,r,g,b}end
+function get_hud()return {AddDialogToRender=function()added=added+1 end,RemoveDialogToRender=function()removed=removed+1 end}end
+function CScriptXmlInit()return {
+ ParseFile=function(_,name)assert(name=="ui_netcoop_vehicle_status.xml")end,
+ InitFrame=function(_,name,parent)assert(name=="dashboard" and parent);frames=frames+1;return {}end,
+ InitTextWnd=function(_,name,parent)assert(parent);return {SetText=function(self,value)self.text=value end,SetTextColor=function(self,value)self.color=value end}end,
+}end
+local hud=setmetatable({SetWndRect=function()end},{__index=UIVehicleStatus})
+hud:__init();assert(frames==1)
+hud:Set("64.0|72.0|86.0|2400|3|1")
+assert(hud.speed.text=="064  <st_lz_car_kmh>" and hud.details.text:find("2400",1,true))
+assert(hud.condition.text:find("72%",1,true) and hud.condition.color[2]==205 and added==1)
+hud:Set("0|9|24|0|0|0");assert(hud.condition.color[2]==220 and added==1)
+assert(hud.details.text:find("<st_lz_car_off>",1,true) and hud.details.text:find(" R",1,true))
+hud:Set("");assert(removed==1 and not hud.shown)
+''')
+
 srv = LuaRuntime(unpack_returned_tuples=True)
 srv.execute(r'''
 state, objects, anchors, released, logs, callbacks = {}, {}, {}, {}, {}, {}

@@ -9,6 +9,10 @@ on:
       - '.github/workflows/lostzone-world-backend.yml'
   workflow_dispatch:
     inputs:
+      resources_only:
+        description: 'Validate external scripts and resources without rebuilding unchanged native code'
+        type: boolean
+        default: false
       analyze:
         description: 'MSVC code analysis (PREfast) of the game instead of the build'
         type: boolean
@@ -18,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: lostzone-dx11-${{ github.ref }}-${{ inputs.analyze }}
+  group: lostzone-dx11-${{ github.ref }}-${{ inputs.analyze }}-${{ inputs.resources_only }}
   cancel-in-progress: true
 
 jobs:
@@ -134,6 +138,7 @@ jobs:
         run: python scripts/check-edit-input.py
 
   engine:
+    if: ${{ !inputs.analyze && !inputs.resources_only }}
     needs: checks
     runs-on: windows-2022
     timeout-minutes: 90
