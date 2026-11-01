@@ -54,6 +54,7 @@ struct Movement {
  int Environment(){return peOnGround;}void GroundNormal(Fvector&){}
  float GetMass(){return 80;}void ApplyImpulse(Fvector,float){}
 };
+using CPHMovementControl=Movement;
 struct Support{Movement move;Movement* movement(){return &move;}};
 struct CPhysicsShellHolder {
  virtual ~CPhysicsShellHolder()=default;CPhysicsShell shell;bool destroyed=false;
@@ -80,8 +81,8 @@ struct SHit {
 };
 struct CPHUpdateObject{static bool IsActive(){return true;}};
 struct CCar:CPhysicsShellHolder {
- CPhysicsShell* m_pPhysicsShell=&shell;u16 m_bone_steer=99;IKinematics model;
- IKinematics* Visual(){return &model;}float GravityFactorImpulse(){return .5f;}void PHHit(SHit&);
+ CPhysicsShell* m_pPhysicsShell=&shell;u16 m_bone_steer=99;IKinematics fixture_model;
+ IKinematics* Visual(){return &fixture_model;}float GravityFactorImpulse(){return .5f;}void PHHit(SHit&);
 };
 struct SZoneObjectInfo{CPhysicsShellHolder* object;bool nonalive_object=true;};
 struct CBaseGraviZone {
