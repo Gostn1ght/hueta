@@ -385,7 +385,11 @@ int main(int argc,char** argv){
  assert(!command(src,a,"world_scale",{{"value",100}}) && status==0);
  auto admin=src;admin.token=std::string(48,'a');
  assert(!command(admin,b,"location_claim",{{"location","cordon"}}) && status==403);
- // Real native transport, complete NCH9 bytes, private loopback master.
+ // Reject unknown formats; accept the five-life image at every native hop.
+ assert(checkpoint_format("NCHA") && checkpoint_format("NCH3") && checkpoint_format("NCH9"));
+ for(const char* bad:{"NCH2","NCH:","NCHB","NCH","BAD9"}) assert(!checkpoint_format(std::string(bad)));
+ assert(!checkpoint_format(nullptr,4));
+ // Real native transport, legacy base plus NCHA updates, private loopback master.
  const auto fixture=bridge_json(read(argv[3]),1024*1024);
  for(const auto& vector:fixture["identities"])
   assert(checkpoint_player_id(bridge_unsigned(vector,"world"),bridge_unsigned(vector,"seed"),vector["account"].get<std::string>(),
@@ -692,8 +696,8 @@ with TemporaryDirectory(prefix="world-writer-") as tmp:
             identities=[(71,0,"ALIce",1),(71,0,"alice",2),(72,0,"alice",1),(71,1,"alice",1),
                         (2**64-1,2**64-1,"Ab_.-09",10)]
             native.write_text(json.dumps({"character_id":identity(71,0,"alice",1),"bytes":len(raw),
-                "next_raw":base64.b64encode(native_fixture(9,progress=b"queued generation20")).decode("ascii"),
-                "last_raw":base64.b64encode(native_fixture(9,progress=b"queued generation30 newest complete progress")).decode("ascii"),
+                "next_raw":base64.b64encode(native_fixture(10,progress=b"queued generation20")).decode("ascii"),
+                "last_raw":base64.b64encode(native_fixture(10,progress=b"queued generation30 newest complete progress")).decode("ascii"),
                 "identities":[dict(world=w,seed=s,account=a,slot=n,id=identity(w,s,a,n)) for w,s,a,n in identities],
                 "hashes":[dict(input=text,sha256=hashlib.sha256(text.encode()).hexdigest()) for text in ("","abc","binary\\0data")],
                 "sha256":hashlib.sha256(raw).hexdigest(),"chunks":[
@@ -710,7 +714,7 @@ with TemporaryDirectory(prefix="world-writer-") as tmp:
             assert store.db.execute("SELECT COUNT(*) FROM item").fetchone()[0] == 1
             assert store.db.execute("SELECT COUNT(*) FROM world_event WHERE type='TransferCommitted'").fetchone()[0] == 2
             payload = store.db.execute("SELECT payload_base64 FROM native_player_save ORDER BY revision DESC LIMIT 1").fetchone()[0]
-            assert base64.b64decode(payload) == native_fixture(9,progress=b"queued generation30 newest complete progress")
+            assert base64.b64decode(payload) == native_fixture(10,progress=b"queued generation30 newest complete progress")
             assert store.db.execute("SELECT COUNT(*) FROM native_player_save").fetchone()[0] == 2
             assert store.db.execute("SELECT MAX(revision) FROM native_player_save").fetchone()[0] == 8
             assert store.db.execute("SELECT COUNT(*) FROM world_event WHERE type='NativePlayerSaveCommitted'").fetchone()[0] == 8

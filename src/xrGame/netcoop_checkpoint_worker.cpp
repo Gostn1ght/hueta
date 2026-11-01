@@ -275,9 +275,8 @@ struct CheckpointWorker::State
     bool submit(const CheckpointWorkerCapture& value,const void* data,std::size_t count)
     {
         const auto item=capture(value,scope.fence);
-        if(!data || count<4 || count>checkpoint_limit) return false;
+        if(!checkpoint_format(data,count)) return false;
         const auto source=static_cast<const char*>(data);
-        if(std::memcmp(source,"NCH",3) || source[3]<'3' || source[3]>'9') return false;
         std::lock_guard<std::mutex> guard(lock);
         if(!ready_locked() || records.size()>=outbox_jobs || count>outbox_bytes-bytes) return false;
         auto known=floor.find(item.character);

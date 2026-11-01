@@ -163,7 +163,9 @@ with TemporaryDirectory(prefix="native-admission-") as tmp:
         for name, progress in (("first", b"first save"), ("second", b"second save" * 2000),
                                ("third", b"third save after the passage"), ("stale", b"an old local file")):
             path = folder / (name + ".nch")
-            path.write_bytes(native_fixture(9, progress=progress))
+            # Mixed old/new snapshots through the complete real coordinator,
+            # queue, durable outbox, master, resume and transfer read path.
+            path.write_bytes(native_fixture(9 if name == "stale" else 10, progress=progress))
             images.append(str(path))
         subprocess.run([str(exe), *paths, *images], cwd=tmp, check=True)
         character = identity(71, 0, "alice", 1)

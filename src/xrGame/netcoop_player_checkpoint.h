@@ -129,10 +129,13 @@ inline CheckpointStep checkpoint_failure(unsigned status)
     // not a fencing refusal. Retry the SAME idempotent command; never accept it.
     return !status || status==200 || status==408 || status==429 || status>=500 ? CheckpointStep::Retry:CheckpointStep::Rejected;
 }
-inline bool checkpoint_format(const std::string& raw)
+inline bool checkpoint_format(const void* data,std::size_t count)
 {
-    return raw.size()>=4 && raw.size()<=checkpoint_limit && raw.compare(0,3,"NCH")==0 && raw[3]>='3' && raw[3]<='9';
+    if(!data || count<4 || count>checkpoint_limit) return false;
+    const auto raw=static_cast<const char*>(data);
+    return raw[0]=='N' && raw[1]=='C' && raw[2]=='H' && ((raw[3]>='3' && raw[3]<='9') || raw[3]=='A');
 }
+inline bool checkpoint_format(const std::string& raw) {return checkpoint_format(raw.data(),raw.size());}
 
 enum class PlayerSlotStatus { Missing,Absent,Staged,Active,Disconnected,Elsewhere };
 struct PlayerSlotObservation

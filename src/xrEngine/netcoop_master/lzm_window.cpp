@@ -678,11 +678,14 @@ void paint(State& s, HDC target)
 // -- rich text journal ---------------------------------------------------------------------------------------------
 void append(HWND edit, const std::wstring& t, COLORREF color)
 {
+    // WM_SETREDRAW(TRUE) adds WS_VISIBLE even to a hidden control. Incoming
+    // logs must never reveal the console over the locations/players tab.
+    const bool visible=(GetWindowLongPtrW(edit,GWL_STYLE)&WS_VISIBLE)!=0;
     SCROLLINFO scroll{sizeof(scroll),SIF_ALL};GetScrollInfo(edit,SB_VERT,&scroll);
     const bool follow=scroll.nPos+int(scroll.nPage)>=scroll.nMax-2;
     CHARRANGE selection{};SendMessageW(edit,EM_EXGETSEL,0,(LPARAM)&selection);
     const int first=int(SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0));
-    SendMessageW(edit,WM_SETREDRAW,FALSE,0);
+    if(visible) SendMessageW(edit,WM_SETREDRAW,FALSE,0);
     int length = GetWindowTextLengthW(edit);
     SendMessageW(edit, EM_SETSEL, length, length);
     CHARFORMAT2W format{};
@@ -706,7 +709,7 @@ void append(HWND edit, const std::wstring& t, COLORREF color)
         const int now=int(SendMessageW(edit,EM_GETFIRSTVISIBLELINE,0,0));
         SendMessageW(edit,EM_LINESCROLL,0,(std::max)(0,first-removed)-now);
     }
-    SendMessageW(edit,WM_SETREDRAW,TRUE,0);InvalidateRect(edit,nullptr,FALSE);
+    if(visible) {SendMessageW(edit,WM_SETREDRAW,TRUE,0);InvalidateRect(edit,nullptr,FALSE);}
 }
 
 HWND make_rich(State& s, HWND parent)
@@ -791,6 +794,7 @@ HWND make_list(State& s, HWND parent, const std::vector<std::pair<std::wstring, 
 
 void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, const std::vector<int>& tags)
 {
+    const bool visible=(GetWindowLongPtrW(list,GWL_STYLE)&WS_VISIBLE)!=0;
     bool stable=ListView_GetItemCount(list)==int(rows.size());
     for(size_t r=0;stable && r<rows.size();++r) {
         wchar_t key[256]{};LVITEMW item{};item.pszText=key;item.cchTextMax=256;
@@ -822,7 +826,7 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
         SendMessageW(list, LVM_GETITEMTEXTW, WPARAM(selected), (LPARAM)&get);
         selected_keys.insert(buffer);
     }
-    SendMessageW(list, WM_SETREDRAW, FALSE, 0);
+    if(visible) SendMessageW(list, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(list);
     for (size_t r = 0; r < rows.size(); ++r)
     {
@@ -841,7 +845,7 @@ void set_rows(HWND list, const std::vector<std::vector<std::wstring>>& rows, con
         }
         if (selected_keys.count(rows[r][0])) ListView_SetItemState(list, index, LVIS_SELECTED, LVIS_SELECTED);
     }
-    SendMessageW(list, WM_SETREDRAW, TRUE, 0);
+    if(visible) SendMessageW(list, WM_SETREDRAW, TRUE, 0);
     if(!rows.empty()) ListView_EnsureVisible(list,(std::min)(previous_top,int(rows.size())-1),FALSE);
     InvalidateRect(list, nullptr, FALSE);
 }
@@ -853,6 +857,11 @@ bool preservation_selftest(State& s)
     bool tabs_ok=(GetWindowLongPtrW(s.hwnd,GWL_STYLE)&WS_CLIPCHILDREN)!=0;
     for(int round=0;round<3;++round) for(int tab=0;tab<3;++tab) {
         s.tab=tab;layout(s);UpdateWindow(s.hwnd);
+        // Exercise asynchronous activity between layouts. Visibility-only
+        // tests missed the heartbeat/log WM_SETREDRAW path on hidden tabs.
+        append(s.output,L"background location heartbeat\r\n",C_TEXT);
+        set_rows(s.locations,{{L"fixture",L"ready"}},{0});
+        set_rows(s.players,{{L"account",L"fixture"}},{0});
         const auto visible=[](HWND w){return (GetWindowLongPtrW(w,GWL_STYLE)&WS_VISIBLE)!=0;};
         tabs_ok=tabs_ok && visible(s.locations)==(tab==0) && visible(s.players)==(tab==1) &&
             visible(s.output)==(tab==2) && visible(s.input)==(tab==2);
