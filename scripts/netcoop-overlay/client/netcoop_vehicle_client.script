@@ -34,6 +34,11 @@ function UIVehicleStatus:Set(data)
 	speed,fuel,health,rpm,gear,flags=tonumber(speed),tonumber(fuel),tonumber(health),tonumber(rpm),tonumber(gear),tonumber(flags)
 	self.speed:SetText(string.format("%03d  %s",math.floor(speed+.5),tr("st_lz_car_kmh")))
 	self.details:SetText(string.format("%s %s   /   %s %d\n%s: %s",tr("st_lz_car_gear"),gear==0 and "R" or tostring(gear),tr("st_lz_car_rpm"),rpm,tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
+	if math.floor(flags/64)%2==1 then
+		local gear=tr(math.floor(flags/32)%2==1 and "st_lz_heli_gear_down" or "st_lz_heli_gear_up")
+		if flags>=128 then gear=tr("st_lz_heli_gear_moving") end
+		self.details:SetText(string.format("%s: %s   /   %s %d\n%s: %s",tr("st_lz_heli_gear"),gear,tr("st_lz_car_rpm"),rpm,tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
+	end
 	self.condition:SetText(string.format("%s %d%%  /  %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
 	self.condition:SetTextColor((fuel<15 or health<30) and GetARGB(255,220,145,90) or GetARGB(255,205,199,179))
 	if not self.shown then get_hud():AddDialogToRender(self);self.shown=true end
@@ -139,11 +144,11 @@ function prompt_text(state, now)
 		-- The controls for the first seconds in the seat (a pilot's a little longer).
 		if now - seated_since > (state == "seated_pilot" and 15000 or 8000) then return nil end
 		if state == "seated_pilot" then
-			return string.format("[%s/%s] %s   [%s%s%s%s] %s   [%s/%s] %s   [%s] %s   [%s] %s",
+			return string.format("[%s/%s] %s   [%s%s%s%s] %s   [%s/%s] %s   [%s] %s   [%s] %s   [%s] %s",
 				key("kJUMP", "SPACE"), key("kCROUCH", "CTRL"), tr("st_netcoop_heli_collective"),
 				key("kFWD", "W"), key("kL_STRAFE", "A"), key("kBACK", "S"), key("kR_STRAFE", "D"), tr("st_netcoop_heli_cyclic"),
 				key("kL_LOOKOUT", "Q"), key("kR_LOOKOUT", "E"), tr("st_netcoop_heli_pedals"),
-				key("kDETECTOR", "O"), tr("st_netcoop_heli_engine"), key("kUSE", "F"), tr("st_netcoop_car_exit"))
+				key("kDETECTOR", "O"), tr("st_netcoop_heli_engine"), key("kNIGHT_VISION", "N"), tr("st_lz_heli_gear"), key("kUSE", "F"), tr("st_netcoop_car_exit"))
 		end
 		if state == "seated" then return string.format("[%s]  %s", key("kUSE", "F"), tr("st_netcoop_car_exit")) end
 		return string.format("[%s] %s   [%s] %s   [%s] %s   [%s] %s", key("kUSE", "F"), tr("st_netcoop_car_exit"),

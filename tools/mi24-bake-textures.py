@@ -99,7 +99,14 @@ def save_bump(name, normal_src, gloss):
     A normal x - the shaders read .wzy) and a neutral <name>_bump# (the
     error term, 0.5). DCP's textures use the same layout. A per-texture .ltx
     (Modded Exes texture descriptor) names the bump for the diffuse."""
-    n = load(normal_src, BUMP)
+    # Preserve the source normal-map resolution: the body has 4K normals,
+    # details/rotors have 2K. Neither downsample detail nor upscale missing data.
+    with Image.open(SRC / f"T_{normal_src}_MIP0.png") as source:
+        side = source.width
+        assert source.width == source.height and side <= SIZE
+    n = load(normal_src, side)
+    if np.ndim(gloss) and gloss.shape != n.shape[:2]:
+        gloss = np.asarray(Image.fromarray(gloss.astype(np.float32)).resize((side,side),Image.LANCZOS))
     g = np.clip(gloss if np.ndim(gloss) else np.full(n.shape[:2], gloss, np.float32), 0, 1)
     bump = np.stack([g, n[..., 2], n[..., 1], n[..., 0]], axis=-1)
     write_dds(OUT / f"{name}_bump.dds", Image.fromarray((bump * 255).astype(np.uint8), "RGBA"), "DXT5")
@@ -109,7 +116,7 @@ def save_bump(name, normal_src, gloss):
     struct.pack_into("<I", neutral, 108, 0x1000)
     (OUT / f"{name}_bump#.dds").write_bytes(bytes(neutral) + bytes([128, 128, 128, 128]))
     write_thm(OUT / f"{name}.thm", fmt=0, size=SIZE, bump="veh" + chr(92) + name + "_bump")
-    print(name, "bump", BUMP)
+    print(name, "bump", side)
 
 
 def roughness_gloss(name, scale=0.6):

@@ -88,15 +88,17 @@ void client_on_vehicle(NET_Packet& P)
 	const float rpm = P.r_float();
 	const float steer = P.r_float();
 	const u8 count = P.r_u8();
-	if (count > vehicle_max_seats || (P.r_elapsed() != u32(count)*2 && P.r_elapsed() != u32(count)*2+26) || !_valid(rpm) || !_valid(steer))
+	if (count > vehicle_max_seats || (P.r_elapsed() != u32(count)*2 && P.r_elapsed() != u32(count)*2+26 && P.r_elapsed() != u32(count)*2+30) || !_valid(rpm) || !_valid(steer))
 		return;
 	xr_vector<u16> seats(count);
 	for (u16& id : seats)
 		id = P.r_u16();
 	VehicleHud hud;hud.rpm=rpm;hud.flags=flags;u64 glass=0;
-	if(P.r_elapsed()==26) {
+	float gear_position=1.f;
+	if(P.r_elapsed()==26 || P.r_elapsed()==30) {
 		hud.speed=P.r_float();hud.fuel=P.r_float();hud.tank=P.r_float();hud.health=P.r_float();hud.gear=P.r_u16();glass=P.r_u64();
 		if(!_valid(hud.speed) || !_valid(hud.fuel) || !_valid(hud.tank) || !_valid(hud.health))return;
+		if(P.r_elapsed()==4) {gear_position=P.r_float();if(!_valid(gear_position) || gear_position<0.f || gear_position>1.f)return;}
 		s_vehicle_hud[car_id]=hud;
 	}
 	CCar* car = smart_cast<CCar*>(Level().Objects.net_Find(car_id));
@@ -105,6 +107,7 @@ void client_on_vehicle(NET_Packet& P)
 	car->netcoop_replica_state(!!(flags & 1), !!(flags & 2), rpm, steer);
 	car->m_netcoop_aux_lights=u8((flags>>2)&7);
 	car->netcoop_glass_state(glass);
+	if(flags & 64) car->netcoop_heli_gear_replica(!!(flags & 32),gear_position);
 	car->m_netcoop_keys = keys; // the driver's steering animation
 	const VehicleSeats* poses = vehicle_seats(car);
 	if (!poses)
@@ -301,6 +304,9 @@ void vehicle_key(CActor* actor, int cmd, bool pressed)
 		if (actor->m_netcoop_seat_driver) vehicle_send(vehicle_op_toggle, actor->m_netcoop_seat_car, 0);
 		break;
 	case kCAM_1: actor->cam_Set(eacFirstEye); break;
+	case kNIGHT_VISION:
+		if(actor->m_netcoop_seat_driver) vehicle_send(vehicle_op_toggle,actor->m_netcoop_seat_car,2);
+		break;
 	case kCAM_2: actor->cam_Set(eacLookAt); break;
 
 	}
@@ -321,7 +327,7 @@ LPCSTR script_vehicle_status()
 	if(found==s_vehicle_hud.end())return text;
 	const auto& h=found->second;
 	// Engine state uses radians/second; the dashboard displays revolutions/minute.
-	xr_sprintf(text,"%.1f|%.1f|%.1f|%.0f|%u|%u",h.speed,h.tank>0.f ? h.fuel*100.f/h.tank:0.f,h.health*100.f,h.rpm*9.5492965855f,u32(h.gear),u32(h.flags&3));
+	xr_sprintf(text,"%.1f|%.1f|%.1f|%.0f|%u|%u",h.speed,h.tank>0.f ? h.fuel*100.f/h.tank:0.f,h.health*100.f,h.rpm*9.5492965855f,u32(h.gear),u32(h.flags));
 	return text;
 }
 

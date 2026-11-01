@@ -1,0 +1,39 @@
+#include "common.h"
+
+struct v2p
+{
+    float2 tc0 : TEXCOORD0;
+    float3 tc1 : TEXCOORD1;
+    float3 c0 : COLOR0;
+    float fog : FOG;
+};
+TextureCube s_env;
+
+float hash_column(float x)
+{
+    return frac(sin(x * 127.1 + 17.7) * 43758.5453);
+}
+
+float4 main(v2p I) : SV_Target
+{
+    // Surface UVs anchor the water to each pane, including exterior views.
+    // Only the synchronized weather density creates flowing drops; the wet
+    // film decays with the environment's wetness after rain has stopped.
+    float rain = saturate(rain_params.x);
+    float wet = saturate(rain_params.y);
+    float2 grid = I.tc0 * float2(85.0, 9.0);
+    float column = floor(grid.x);
+    float seed = hash_column(column);
+    float x = frac(grid.x) - (0.18 + seed * 0.64);
+    float y = frac(grid.y + timers.x * (0.35 + seed * 0.65) + seed * 11.0);
+    float head = 1.0 - smoothstep(0.05, 0.22, length(float2(x * 3.5, y - 0.12)));
+    float trail = (1.0 - smoothstep(0.015, 0.055, abs(x))) * (1.0 - smoothstep(0.15, 0.85, y));
+    float flow = rain * (head + trail * 0.35) * step(seed, 0.15 + rain * 0.8);
+    float2 ripple = float2(x * head * 0.035, trail * 0.003) * rain;
+    float4 tint = s_base.Sample(smp_base, I.tc0 + ripple);
+    float3 reflection = s_env.Sample(smp_rtlinear, I.tc1 + float3(ripple, 0.0)).rgb;
+    float3 color = lerp(reflection, tint.rgb, tint.a) * I.c0 * 2.0;
+    color += flow * 0.13;
+    color = lerp(fog_color, color, I.fog);
+    return float4(color, saturate(tint.a + wet * 0.025 + flow * 0.16) * I.fog * I.fog);
+}

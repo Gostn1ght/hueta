@@ -24,8 +24,8 @@ constexpr u32 mcFwd=1,mcBack=2,mcLStrafe=4,mcRStrafe=8;
 template<class T,class U>T smart_cast(U* value){return dynamic_cast<T>(value);}
 struct Item{virtual ~Item()=default;shared_str section;Item& object(){return *this;}const shared_str& cNameSect(){return section;}};
 using PIItem=Item*;
-struct CWeapon:Item{int GetAmmoMagSize(){return capacity;}int capacity=30;};
-struct CWeaponPistol:CWeapon{};struct CWeaponKnife:CWeapon{};
+struct CWeapon:Item{int GetAmmoMagSize(){return capacity;}int capacity=30;unsigned anim_slot=2;unsigned animation_slot(){return anim_slot;}};
+struct CWeaponPistol:CWeapon{};struct CWeaponKnife:CWeapon{};struct CWeaponBinoculars:CWeapon{};
 struct CInventory{
  std::map<u16,PIItem> slots;std::vector<PIItem> m_all;u16 active=NO_ACTIVE_SLOT;
  PIItem ItemFromSlot(u16 slot){auto i=slots.find(slot);return i==slots.end()?nullptr:i->second;}
@@ -62,7 +62,11 @@ int main(){
  inventory.slots[8]=&pistol;assert(rp_weapon_slot(inventory,pose)==8);
  pose.weapon=1;assert(rp_weapon_slot(inventory,pose)==3);
  inventory.active=8;assert(rp_weapon_slot(inventory,pose)==3);
- rifle.capacity=0;assert(rp_weapon_slot(inventory,pose)==NO_ACTIVE_SLOT);
+ rifle.capacity=0;assert(rp_weapon_slot(inventory,pose)==3);
+ CWeapon bas_pistol;bas_pistol.anim_slot=1;bas_pistol.capacity=0;
+ inventory.slots[8]=&bas_pistol;pose.weapon=2;assert(rp_weapon_slot(inventory,pose)==8);
+ CWeaponBinoculars binoculars;binoculars.anim_slot=1;
+ inventory.slots[8]=&binoculars;assert(rp_weapon_slot(inventory,pose)==NO_ACTIVE_SLOT);
  pose.weapon=0;assert(rp_weapon_slot(inventory,pose)==NO_ACTIVE_SLOT);
  assert(rp_has_item(inventory,pose));pose.items={"kolbasa","bread"};
  assert(!rp_has_item(inventory,pose));inventory.m_all={&device,&food};assert(rp_has_item(inventory,pose));

@@ -291,6 +291,11 @@ protected:
 protected:
 	BOOL m_bAnimTorsoPlayed;
 	u32 m_netcoop_consumption_until = 0;
+	u32 m_netcoop_animation_report = 0;
+	MotionID m_netcoop_prone_motion;
+	CBlend* m_netcoop_prone_blends[3] = {};
+	bool m_netcoop_prone_torso_free = true;
+	bool netcoop_prone_animation(u32 movement);
 	// New Way's third-person item use (owner 2026-10-24): the item in the hand
 	// while the consumption motion plays (mod_system_zzzz_lz_third_person.ltx).
 	IRenderVisual* m_netcoop_tp_item = nullptr;

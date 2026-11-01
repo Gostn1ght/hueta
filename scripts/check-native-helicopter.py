@@ -21,6 +21,7 @@ car = (ROOT / 'src/xrGame/Car.cpp').read_text(encoding='utf-8') + (ROOT / 'src/x
 header = (ROOT / 'src/xrGame/Car.h').read_text(encoding='utf-8')
 flight = body(car, 'void CCar::netcoop_heli_step(')
 safe_cycle = body(car, 'static CBlend* car_play_cycle_safe(')
+gear_code='\n'.join(body(car,signature) for signature in ('void CCar::netcoop_heli_gear_step(', 'void CCar::netcoop_heli_toggle_gear(', 'void CCar::netcoop_heli_gear_replica('))
 gravity = '\n'.join(body(car, signature) for signature in (
     'void CCar::PhTune(', 'float CCar::EffectiveGravity(', 'float CCar::AntiGravityAccel('))
 heli = header[header.index('struct NetcoopHeli'):header.index('} m_netcoop_heli;') + len('} m_netcoop_heli;')]
@@ -39,11 +40,13 @@ source = r'''
 using u8=uint8_t;using u16=uint16_t;using u32=uint32_t;
 using LPCSTR=const char*;
 constexpr bool FALSE=false;
+constexpr u16 BI_NONE=u16(-1);
 constexpr float EPS=1e-6f,EPS_L=1e-5f;
 template<class T>T _min(T a,T b){return std::min(a,b);}
 template<class T>T _max(T a,T b){return std::max(a,b);}
 float _abs(float x){return std::fabs(x);}
 bool _valid(float x){return std::isfinite(x);}
+void Msg(const char*,...){}
 struct Fvector {
  float x=0,y=0,z=0;
  void set(float a,float b,float c){x=a;y=b;z=c;}
@@ -54,6 +57,7 @@ struct Fvector {
 };
 bool _valid(const Fvector& v){return _valid(v.x)&&_valid(v.y)&&_valid(v.z);}
 struct Fmatrix{Fvector i{1,0,0},j{0,1,0},k{0,0,1},c{0,5,0};};
+struct CODEGeom {Fmatrix form;unsigned moved=0;void set_local_form_bt(const Fmatrix& f){form=f;++moved;}void clear_cashed_tries(){}void clear_motion_history(bool){}};
 struct CBlend{float speed=0;};
 struct MotionID{int id=-1;bool valid()const{return id>=0;}};
 struct IKinematicsAnimated{
@@ -61,7 +65,8 @@ struct IKinematicsAnimated{
  MotionID ID_Cycle_Safe(LPCSTR name){return MotionID{have_idle&&std::string(name)=="idle"?1:-1};}
  CBlend* PlayCycle(MotionID motion,bool){assert(motion.valid());last=motion;++played;return &blend;}
 };
-struct IKinematics{};
+struct IKinematics{void CalculateBones_Invalidate(){}};
+namespace netcoop{bool pure_client(){return false;}}
 template<class T>T smart_cast(IKinematics* k){return static_cast<T>(k);}
 struct CPhysicsElement {
  Fmatrix form;Fvector force,torque;unsigned force_calls=0;
@@ -96,12 +101,14 @@ struct CCar {
   netcoop_key_handbrake=16,netcoop_key_down=32,netcoop_key_yaw_left=64,netcoop_key_yaw_right=128};
  CPhysicsShell* test_shell=nullptr;IKinematics visual;bool has_visual=true,b_engine_on=true;
  u8 m_netcoop_keys=0;float m_fuel=100,m_current_rpm=0,m_min_rpm=100,m_max_rpm=1000,m_fuel_consumption=0;
- unsigned crashes=0;void netcoop_heli_crash(){++crashes;}
+ unsigned crashes=0;float health=1;void netcoop_heli_crash(){++crashes;}
+ void ChangeCondition(float delta){health+=delta;}void StopEngine(){b_engine_on=false;}unsigned ID(){return 42;}void netcoop_heli_gear_step(float);void netcoop_heli_toggle_gear();void netcoop_heli_gear_replica(bool,float);
  CPhysicsShell* PPhysicsShell(){return test_shell;}
  IKinematics* Visual(){return has_visual?&visual:nullptr;}
+ void netcoop_heli_weather() {}
  void netcoop_heli_step(float dt);
  void PhTune(float);float EffectiveGravity();float AntiGravityAccel();
-''' + heli + '\n};\n' + gravity + '\n' + flight + '\n' + safe_cycle + r'''
+''' + heli + '\n};\n' + gravity + '\n' + flight + '\n' + gear_code + '\n' + safe_cycle + r'''
 void step(CCar& car,unsigned ticks){
  auto& s=*car.test_shell;
  for(unsigned t=0;t<ticks;++t){
@@ -162,6 +169,36 @@ int main(){
  a.m_netcoop_heli.crashed=false;a.m_netcoop_heli.recent_speed=0;a.crashes=0;a.m_netcoop_heli.pilot=true;
  one.element.form.c.y=6;one.velocity.y=0;a.m_netcoop_keys=CCar::netcoop_key_down;step(a,1200);
  assert(one.element.form.c.y<.5f&&a.crashes==0);a.m_netcoop_keys=0;
+ // Actual gear code moves the physical shape and enforces weight/power locks.
+ CODEGeom shape;auto& gh=b.m_netcoop_heli;gh.gear_supported=true;gh.gear_down=true;gh.gear_position=1;
+ gh.gears[0].geom=&shape;gh.gears[0].rest.c.set(0,0,0);gh.gears[0].travel.set(.65f,1.35f,0);
+ gh.ground_height=.1f;b.netcoop_heli_toggle_gear();assert(gh.gear_down);
+ gh.ground_height=10;gh.rotor=.5f;b.netcoop_heli_toggle_gear();assert(gh.gear_down);
+ gh.rotor=1;b.netcoop_heli_toggle_gear();assert(!gh.gear_down);
+ for(int i=0;i<500;++i)b.netcoop_heli_gear_step(.01f);
+ assert(gh.gear_position==0 && std::fabs(shape.form.c.y-1.35f)<1e-6f && shape.moved>0);
+ b.b_engine_on=false;b.netcoop_heli_toggle_gear();assert(gh.gear_down); // emergency extension
+ for(int i=0;i<500;++i)b.netcoop_heli_gear_step(.01f);
+ assert(gh.gear_position==1 && shape.form.c.y==0);
+ b.netcoop_heli_gear_replica(false,.5f);assert(!gh.gear_down && std::fabs(shape.form.c.y-.675f)<1e-6f);
+ b.netcoop_heli_gear_replica(true,2);assert(gh.gear_position==.5f);
+ // Manual Mi-24 controls retain collective on release, not a height hold.
+ CPhysicsShell manual_shell;CCar manual;manual.test_shell=&manual_shell;
+ auto& mh=manual.m_netcoop_heli;mh.on=true;mh.pilot=true;mh.auto_collective=false;mh.auto_level=false;
+ mh.collective_rate=.08f;mh.spool_up=.035f;mh.rotor=1;mh.collective=mh.manual_collective=.5f;
+ manual_shell.element.form.c.y=50;manual.netcoop_heli_step(.01f);
+ assert(std::fabs(mh.manual_collective-.5f)<1e-6f && manual_shell.element.force.y<manual_shell.mass*9.81f);
+ manual.m_netcoop_keys=CCar::netcoop_key_handbrake;manual.netcoop_heli_step(10.f);
+ assert(mh.manual_collective>.5f && mh.manual_collective<=.50401f); // long-frame bound
+ manual.m_netcoop_keys=0;const auto held=mh.manual_collective;manual.netcoop_heli_step(.01f);assert(mh.manual_collective==held);
+ // Supported ground weight supplies friction at the actual wheel plane.
+ mh.auto_collective=true;mh.collective=0;mh.rotor=.4f;mh.ground_clearance=1.8f;mh.ground_probe=0;
+ manual_shell.element.form.c.y=1.9f;manual_shell.velocity.set(2,0,0);manual_shell.element.force.set(0,0,0);
+ manual.netcoop_heli_step(.01f);assert(mh.ground_height<.2f && manual_shell.element.force.x<0 && mh.collective==0);
+ // Wind changes air-relative drag; rain adds bounded deterministic gusts.
+ mh.ground_probe=0;manual_shell.element.form.c.y=50;manual_shell.velocity.set(0,0,0);mh.wind.set(20,0,0);mh.rain=1;
+ manual_shell.element.force.set(0,0,0);manual.netcoop_heli_step(.01f);
+ assert(manual_shell.element.force.x>0 && _valid(manual_shell.element.force) && std::fabs(manual_shell.element.force.x)<manual_shell.mass*2);
  std::puts("PASS actual helicopter step and PhTune gravity: independent bodies, legacy car gravity retained, no extra heli lift, invalid/empty guards, hover/climb/release/descent, engine-off spool, pilotless fall and impact crash, gentle landing, missing startup cycle fallback; ODE and clients still require live testing");
 }
 '''

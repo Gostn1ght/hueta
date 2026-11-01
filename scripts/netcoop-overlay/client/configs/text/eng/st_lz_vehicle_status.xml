@@ -11,4 +11,8 @@
 <string id="st_lz_car_lives"><text>Lives: %d / 5</text></string>
 <string id="st_lz_car_noclip"><text>Free flight (noclip)</text></string>
 <string id="st_lz_car_door"><text>Open / close panel</text></string>
+<string id="st_lz_heli_gear"><text>Landing gear</text></string>
+<string id="st_lz_heli_gear_down"><text>down</text></string>
+<string id="st_lz_heli_gear_up"><text>up</text></string>
+<string id="st_lz_heli_gear_moving"><text>moving</text></string>
 </string_table>

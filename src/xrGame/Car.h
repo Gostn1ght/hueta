@@ -637,6 +637,16 @@ public:
 	{
 		bool on = false;
 		float collective = 0.f, rotor = 0.f; // 0..1
+		bool auto_collective = true, auto_level = true;
+		float manual_collective = 0.f, ground_clearance = 0.f;
+		Fvector wind = {0.f,0.f,0.f};
+		float rain = 0.f;
+		u32 weather_probe = 0;
+		u32 diagnostic_at = 0;
+		struct Gear {u16 bone=BI_NONE;CODEGeom* geom=nullptr;Fmatrix rest;Fvector travel;};
+		Gear gears[3];
+		bool gear_supported=false, gear_down=true, airborne=false;
+		float gear_position=1.f, recent_sink=0.f;
 		float lift_ratio = 1.4f; // full collective at full rotor: lift / weight
 		// W/S and A/D hold a pitch / bank angle (released: level); Q/E turn.
 		float max_pitch = 0.35f, max_roll = 0.45f; // rad
@@ -662,6 +672,13 @@ public:
 	} m_netcoop_heli;
 	bool netcoop_is_heli() const { return m_netcoop_heli.on; }
 	void netcoop_heli_load();
+	void netcoop_heli_weather();
+	void netcoop_heli_gear_step(float dt);
+	void netcoop_heli_toggle_gear();
+	static void netcoop_heli_gear_bone(CBoneInstance* bone);
+	bool netcoop_heli_gear_down() const {return m_netcoop_heli.gear_down;}
+	float netcoop_heli_gear_position() const {return m_netcoop_heli.gear_position;}
+	void netcoop_heli_gear_replica(bool down,float position);
 	void netcoop_heli_step(float dt); // server physics step
 	void netcoop_heli_rotors(); // all sides: the rotor animation runs with the rotor speed
 	void netcoop_heli_rotor_speed(float speed); // every blend of the model

@@ -89,7 +89,7 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 	case vehicle_op_toggle:
 		{
 			const u8 what = P.r_u8();
-			if (v.seats.empty() || v.seats[0] != actor->ID() || what > 1)
+			if (v.seats.empty() || v.seats[0] != actor->ID() || what > 2)
 				return;
 			car->netcoop_toggle(what);
 			v.dirty = true;
@@ -135,7 +135,9 @@ static void vehicle_send_state(xrServer* server, CCar* car, const VehicleRuntime
 	P.w_begin(M_NETCOOP_VEHICLE);
 	P.w_u8(vehicle_op_state);
 	P.w_u16(car->ID());
-	P.w_u8(u8((car->netcoop_engine_on() ? 1 : 0) | (car->m_netcoop_lights ? 2 : 0) | (car->netcoop_aux_lights()<<2)));
+	P.w_u8(u8((car->netcoop_engine_on() ? 1 : 0) | (car->m_netcoop_lights ? 2 : 0) | (car->netcoop_aux_lights()<<2) |
+		(car->netcoop_is_heli() ? 64:0) | (car->netcoop_is_heli() && car->netcoop_heli_gear_down() ? 32:0) |
+		(car->netcoop_is_heli() && car->netcoop_heli_gear_position()>0.01f && car->netcoop_heli_gear_position()<0.99f ? 128:0)));
 	P.w_u8(v.keys);
 	P.w_float(car->netcoop_rpm());
 	P.w_float(car->netcoop_steer());
@@ -146,6 +148,7 @@ static void vehicle_send_state(xrServer* server, CCar* car, const VehicleRuntime
 	P.w_float(_valid(velocity) ? velocity.magnitude()*3.6f:0.f);
 	P.w_float(car->netcoop_fuel());P.w_float(car->netcoop_fuel_capacity());P.w_float(car->GetfHealth());
 	P.w_u16(car->netcoop_gear());P.w_u64(car->netcoop_broken_glass());
+	P.w_float(car->netcoop_heli_gear_position());
 	struct Send
 	{
 		xrServer* server;

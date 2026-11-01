@@ -24,12 +24,14 @@
 #include "player_hud.h"
 #include "WeaponKnife.h"
 #include "WeaponPistol.h"
+#include "WeaponBinoculars.h"
 #include "Pda.h"
 #include "CustomDevice.h"
 #include "Flashlight.h"
 #include "../xrEngine/SkeletonMotions.h"
 #include "../xrEngine/bone.h"
 #include "xrMessages.h"
+#include "PHMovementControl.h"
 
 static const float y_spin0_factor = 0.0f;
 static const float y_spin1_factor = 0.4f;
@@ -691,6 +693,51 @@ void CActor::netcoop_tp_item_attach(LPCSTR item)
 		m_netcoop_tp_track_bones.push_back(model->LL_BoneID(name));
 }
 
+bool CActor::netcoop_prone_animation(u32 movement)
+{
+	const bool prone=netcoop::pure_client() && g_Alive() && !netcoop_seated() && m_rp_index<0 &&
+		(movement & mcCrouch) && !(movement & (mcClimb|mcJump|mcFall|mcSprint)) && !isActorAccelerated(movement,IsZoomAimingMode());
+	if(!prone) {
+		if(m_netcoop_prone_motion.valid()) {
+			m_netcoop_prone_motion.invalidate();m_current_legs.invalidate();
+			if(!m_bAnimTorsoPlayed) m_current_torso.invalidate();
+			for(auto& blend:m_netcoop_prone_blends) blend=nullptr;
+		}
+		return false;
+	}
+	IKinematicsAnimated* model=smart_cast<IKinematicsAnimated*>(Visual());
+	if(!model) return false;
+	PIItem active=inventory().ActiveItem();
+	CWeapon* weapon=smart_cast<CWeapon*>(active);
+	LPCSTR grip=smart_cast<CWeaponKnife*>(active) ? "knife":weapon && !smart_cast<CWeaponBinoculars*>(active) ?
+		(smart_cast<CWeaponPistol*>(active) || weapon->animation_slot()==1 ? "pistol":"rifle"):"empty";
+	LPCSTR direction=(movement & mcFwd) ? "fwd":(movement & mcBack) ? "back":(movement & mcLStrafe) ? "left":(movement & mcRStrafe) ? "right":"idle";
+	string128 name;xr_sprintf(name,"lz_prone_%s_%s",grip,direction);
+	const MotionID motion=model->ID_Cycle_Safe(name);
+	if(!motion.valid()) {netcoop_tp_note("prone","this model lacks the prone motion set; crouch fallback");return false;}
+	const bool torso_free=!m_bAnimTorsoPlayed;
+	if(motion!=m_netcoop_prone_motion || torso_free!=m_netcoop_prone_torso_free || m_current_legs!=motion) {
+		CMotionDef* def=model->LL_GetMotionDef(motion);
+		if(!def || !_valid(def->Speed()) || def->Speed()<=0.f) return false;
+		const LPCSTR names[]={"legs","torso","head"};
+		for(u32 i=0;i<3;++i) {
+			if(i==1 && !torso_free) {m_netcoop_prone_blends[i]=nullptr;continue;}
+			const u16 part=model->LL_PartID(names[i]);if(part==BI_NONE) continue;
+			m_netcoop_prone_blends[i]=model->LL_PlayCycle(part,motion,TRUE,3.5f,5.f,def->Speed(),FALSE,nullptr,nullptr,0);
+		}
+		if(!m_netcoop_prone_blends[0]) return false;
+		m_netcoop_prone_motion=motion;m_netcoop_prone_torso_free=torso_free;
+		m_current_legs=motion;m_current_legs_blend=m_netcoop_prone_blends[0];
+		if(torso_free) {m_current_torso=motion;m_current_torso_blend=m_netcoop_prone_blends[1];}
+		m_current_head=motion;
+		Msg("[diag][actor-animation] id=%u prone=%s",ID(),name);
+	}
+	const float speed=m_PhysicMovementControl && _valid(m_PhysicMovementControl->GetVelocity()) ? m_PhysicMovementControl->GetVelocity().magnitude():0.f;
+	const float rate=(movement & mcAnyMove) ? _max(0.3f,_min(3.f,speed*2.6666667f)):1.f;
+	for(u32 i=0;i<3;++i) if(m_netcoop_prone_blends[i]) m_netcoop_prone_blends[i]->speed=rate;
+	return true;
+}
+
 void CActor::netcoop_consumption_end(CBlend* blend)
 {
 	CActor* actor = static_cast<CActor*>(blend->CallbackParam);
@@ -712,7 +759,13 @@ void CActor::netcoop_play_consumption(u8 kind, LPCSTR section)
 	if (!name) name = netcoop_consumption::motion(kind);
 	IKinematicsAnimated* model = smart_cast<IKinematicsAnimated*>(Visual());
 	if (!name || !model) return;
-	const MotionID motion = model->ID_Cycle_Safe(name);
+	MotionID motion = model->ID_Cycle_Safe(name);
+	if(!motion.valid()) {
+		LPCSTR fallback=netcoop_consumption::motion(kind);
+		if(fallback) motion=model->ID_Cycle_Safe(fallback);
+		if(!motion.valid()) return netcoop_tp_note(section,"no usable consumption motion on this body");
+		netcoop_tp_note(section,"specific consumption motion absent; generic motion used");
+	}
 	const u16 torso = model->LL_PartID("torso");
 	if (!motion.valid() || torso == u16(-1)) return;
 	CMotionDef* def = model->LL_GetMotionDef(motion);
@@ -743,6 +796,15 @@ void CActor::netcoop_expire_consumption()
 void CActor::g_SetAnimation(u32 mstate_rl)
 {
 	netcoop_expire_consumption();
+	if(netcoop::pure_client() && s32(Device.dwTimeGlobal-m_netcoop_animation_report)>=0) {
+		m_netcoop_animation_report=Device.dwTimeGlobal+5000;
+		PIItem held=inventory().ActiveItem();
+		Msg("[diag][actor-animation] id=%u visual=%s remote=%u alive=%u move=0x%08x rp=%d phase=%u use=%u slot=%u held=%s torso=%u legs=%u torso_t=%.3f legs_t=%.3f torso_speed=%.3f legs_speed=%.3f",
+			ID(),cNameVisual().c_str(),Remote() ? 1u:0u,g_Alive() ? 1u:0u,mstate_rl,m_rp_index,u32(m_rp_phase),m_netcoop_consumption_until ? 1u:0u,
+			u32(inventory().GetActiveSlot()),held ? held->object().cNameSect().c_str():"none",u32(m_current_torso.val),u32(m_current_legs.val),
+			m_current_torso_blend ? m_current_torso_blend->timeCurrent:0.f,m_current_legs_blend ? m_current_legs_blend->timeCurrent:0.f,
+			m_current_torso_blend ? m_current_torso_blend->speed:0.f,m_current_legs_blend ? m_current_legs_blend->speed:0.f);
+	}
 	// A netcoop RP animation drives the whole body while it plays.
 	if (m_rp_index >= 0 && rp_update(mstate_rl))
 		return;
@@ -765,6 +827,7 @@ void CActor::g_SetAnimation(u32 mstate_rl)
 
 		return;
 	}
+	if(netcoop_prone_animation(mstate_rl)) return;
 	STorsoWpn::eMovingState moving_idx = STorsoWpn::eIdle;
 	CCustomDevice* drawn_device = netcoop_drawn_device(this);
 	SActorState* ST = 0;
@@ -793,12 +856,12 @@ void CActor::g_SetAnimation(u32 mstate_rl)
 		else
 			moving_idx = STorsoWpn::eWalk;
 	}
-	// анимации
+	// Р°РЅРёРјР°С†РёРё
 	MotionID M_legs;
 	MotionID M_torso;
 	MotionID M_head;
 
-	//если мы просто стоим на месте
+	//РµСЃР»Рё РјС‹ РїСЂРѕСЃС‚Рѕ СЃС‚РѕРёРј РЅР° РјРµСЃС‚Рµ
 	bool is_standing = false;
 
 	// Legs
@@ -1096,7 +1159,7 @@ void CActor::g_SetAnimation(u32 mstate_rl)
 			M_torso = ST->m_torso_idle;
 	}
 
-	// есть анимация для всего - запустим / иначе запустим анимацию по частям
+	// РµСЃС‚СЊ Р°РЅРёРјР°С†РёСЏ РґР»СЏ РІСЃРµРіРѕ - Р·Р°РїСѓСЃС‚РёРј / РёРЅР°С‡Рµ Р·Р°РїСѓСЃС‚РёРј Р°РЅРёРјР°С†РёСЋ РїРѕ С‡Р°СЃС‚СЏРј
 	if (m_current_torso != M_torso)
 	{
 		if (m_bAnimTorsoPlayed)
@@ -1258,8 +1321,10 @@ void CActor::rp_send(u8 index)
 static bool rp_weapon_matches(PIItem item, u8 kind)
 {
 	CWeapon* weapon = smart_cast<CWeapon*>(item);
-	if (!weapon || smart_cast<CWeaponKnife*>(item) || weapon->GetAmmoMagSize() <= 0) return false;
-	const bool pistol = smart_cast<CWeaponPistol*>(item) != nullptr;
+	if (!weapon || smart_cast<CWeaponKnife*>(item) || smart_cast<CWeaponBinoculars*>(item)) return false;
+	// BAS/GAMMA can use a generic firearm class for a pistol. Its animation
+	// slot describes the grip; an empty/detached magazine is not a weapon type.
+	const bool pistol = smart_cast<CWeaponPistol*>(item) != nullptr || weapon->animation_slot()==1;
 	return kind == 2 ? pistol : !pistol;
 }
 
@@ -1332,6 +1397,7 @@ bool CActor::rp_start(int index, bool own)
 	m_rp_walk_legs.invalidate();
 	m_rp_walk_torso.invalidate();
 	m_netcoop_consumption_until = 0;
+	m_netcoop_prone_motion.invalidate();for(auto& blend:m_netcoop_prone_blends) blend=nullptr;
 	rp_attach_item(a);
 	if (own)
 	{

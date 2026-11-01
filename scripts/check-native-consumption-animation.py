@@ -64,6 +64,7 @@ struct CActor{
  void netcoop_tp_item_attach(LPCSTR item){attached=item?item:"";}void netcoop_tp_item_release(){++released;}
  static void netcoop_consumption_end(CBlend*);void netcoop_play_consumption(u8,LPCSTR);void netcoop_expire_consumption();
 };
+void netcoop_tp_note(LPCSTR,LPCSTR){}
 namespace netcoop{bool client=true;bool pure_client(){return client;}}
 struct Runtime{CActor* own=nullptr;CActor* CurrentControlEntity(){return own;}} runtime;
 Runtime& Level(){return runtime;}struct {u32 dwTimeGlobal=100;}Device;

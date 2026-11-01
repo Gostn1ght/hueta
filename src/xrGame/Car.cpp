@@ -402,6 +402,10 @@ void CCar::net_Destroy()
 	{
 		pKinematics->LL_GetBoneInstance(m_bone_steer).reset_callback();
 	}
+	for(auto& gear:m_netcoop_heli.gears) {
+		if(gear.bone!=BI_NONE) pKinematics->LL_GetBoneInstance(gear.bone).reset_callback();
+		gear.geom=nullptr;gear.bone=BI_NONE;
+	}
 	m_netcoop_heli.on = false;
 	m_netcoop_heli.rotor_anim = false;
 	CScriptEntity::net_Destroy();
@@ -726,7 +730,9 @@ void CCar::Hit(SHit* pHDS)
 		IKinematics* model=smart_cast<IKinematics*>(Visual());
 		if(model && HDS.boneID<model->LL_BoneCount()) {
 			LPCSTR name=model->LL_GetData(HDS.boneID).name.c_str();
-			if(strstr(name,"glass") || strstr(name,"window")) {
+			const bool penetrates=!m_netcoop_heli.on || HDS.hit_type==ALife::eHitTypeExplosion ||
+				(HDS.hit_type==ALife::eHitTypeFireWound && (HDS.armor_piercing>=0.6f || HDS.power>=1.2f));
+			if(penetrates && model->LL_GetBoneVisible(HDS.boneID) && (strstr(name,"glass") || strstr(name,"window"))) {
 				model->LL_SetBoneVisible(HDS.boneID,FALSE,FALSE);
 				model->CalculateBones_Invalidate();
 				Msg("[diag][vehicle] id=%u section=%s broken window=%s",ID(),cNameSect().c_str(),name);
@@ -2647,6 +2653,7 @@ void CCar::netcoop_toggle(u8 what)
 		m_lights.SwitchHeadLights();
 		m_netcoop_lights = !m_netcoop_lights;
 	}
+	else if(what==2) netcoop_heli_toggle_gear();
 }
 
 u16 CCar::netcoop_door_bone(u16 hit)

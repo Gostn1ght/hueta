@@ -66,11 +66,33 @@ for section, (folder, model_name) in HELICOPTERS.items():
     assert userdata == '#include "models\\vehicles\\' + model_name + '.ltx"', userdata
     body = model[13]
     count, = struct.unpack_from("<I", body, 0)
-    pos, bones = 4, set()
+    pos, bones, bone_order = 4, set(), []
     for _ in range(count):
-        z = body.index(b"\0", pos); bones.add(body[pos:z].decode()); pos = z + 1
+        z = body.index(b"\0", pos); name=body[pos:z].decode();bones.add(name);bone_order.append(name);pos = z + 1
         z = body.index(b"\0", pos); pos = z + 1 + 60
     assert b"idle" in model[15], "the rotor motion"
+    if section=='veh_mi24_heli':
+        assert {'gear_left','gear_right','gear_nose'}<=bones and len(bones)<=64
+        properties={};at=0;raw=model[16]
+        for name in bone_order:
+            version,=struct.unpack_from('<I',raw,at);at=raw.index(0,at+4)+1
+            shape,flags=struct.unpack_from('<HH',raw,at);joint,=struct.unpack_from('<I',raw,at+112)
+            properties[name]=(shape,flags,joint);at+=112+72+(4 if version else 0)+40
+        assert at==len(raw)
+        for name in ('gear_left','gear_right','gear_nose'):
+            shape,flags,joint=properties[name]
+            assert shape==1 and not flags&4 and joint==0,(name,properties[name])
+        windows=[n for n in bones if n.startswith('glass_')];assert len(windows)==8
+        assert all(properties[n][0]==1 and properties[n][1]&4 for n in windows)
+        triangles=0
+        for data in chunks(model[9]).values():
+            mesh=chunks(data);indices=mesh[4];count,=struct.unpack_from('<I',indices)
+            vertex_count,=struct.unpack_from('<I',mesh[3],4)
+            assert vertex_count<=65535 and len(indices)==4+count*2 and count%3==0
+            assert max(struct.unpack_from('<'+'H'*count,indices,4))<vertex_count
+            triangles+=count//3
+        assert triangles>=163924,triangles
+        assert b'models\\lz_heli_glass\0' in ogf.read_bytes()
     profile_name = f"configs/models/vehicles/{model_name}.ltx"
     client, server = (OVERLAY / "client" / profile_name).read_bytes(), (OVERLAY / "server" / profile_name).read_bytes()
     assert client == server and b"\x0b" not in client, f"{profile_name}: client and server differ"

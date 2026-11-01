@@ -20,8 +20,8 @@ def take(blob):
     result = C.string_at(pointer, size)
     C.WINFUNCTYPE(C.c_ulong, C.c_void_p)(methods[2])(blob)
     return result
-for shader in ['netcoop_preview', 'netcoop_room', 'netcoop_depth', 'netcoop_room_depth', 'netcoop_preview_bump', 'netcoop_room_bump']:
-    for stage in (['ps'] if shader.endswith(('depth','bump')) else ['vs', 'ps']):
+for shader in ['netcoop_preview', 'netcoop_room', 'netcoop_depth', 'netcoop_room_depth', 'netcoop_preview_bump', 'netcoop_room_bump', 'lz_heli_glass']:
+    for stage in (['ps'] if shader.endswith(('depth','bump','glass')) else ['vs', 'ps']):
         for skin in (['NONE', '0', '1', '2', '3', '4'] if stage == 'vs' and shader == 'netcoop_preview' else ['NONE']):
             macros = (Macro*3)(Macro(('SKIN_'+skin).encode(), b'1'), Macro(b'USE_DX11', b'1'), Macro(None,None))
             code, errors = C.c_void_p(), C.c_void_p()

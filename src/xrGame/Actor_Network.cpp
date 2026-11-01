@@ -1331,6 +1331,15 @@ void CActor::OnChangeVisual()
 		// A new model has no blends: the seat pose (doc 100) must play again
 		// on it, or a seated player stood in the bind pose (T-pose) for others.
 		m_netcoop_seat_motion.invalidate();
+		// Every MotionID/blend belongs to the old visual's motion slots.
+		// Keeping RP caches skips playback on the new skeleton (frozen pose);
+		// keeping a consumption lock leaves an invalid torso MotionID active.
+		m_rp_walk_legs.invalidate();m_rp_walk_torso.invalidate();
+		m_rp_motion_done=true;m_rp_motion_deadline=0;m_rp_step=0;
+		m_netcoop_consumption_until=0;m_bAnimTorsoPlayed=FALSE;
+		m_netcoop_prone_motion.invalidate();for(auto& blend:m_netcoop_prone_blends) blend=nullptr;
+		netcoop_tp_item_release();
+		if(m_rp_index>=0 && m_rp_index<int(netcoop::rp_anims().size())) rp_attach_item(netcoop::rp_anims()[m_rp_index]);
 	}
 };
 

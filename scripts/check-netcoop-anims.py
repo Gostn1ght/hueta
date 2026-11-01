@@ -62,4 +62,19 @@ for kind in ("torchelo", "detector"):
                           ("6", ("draw_0", "holster_0", "drawall_0", "holsterall_0", "attack_0", "attack_1", "attack_2"))):
         for action in actions:
             assert f"xrr_norm_torso_{base}_{kind}_{action}" in dev, (base, kind, action) and '#include "Flashlight.h"' in anim
-print("netcoop anims: OK")
+prone=merge.parse(str(actors/'modded_stalker_animations/netcoop_player_prone.omf'))
+expected={f'lz_prone_{grip}_{direction}' for grip in ('empty','knife','pistol','rifle') for direction in ('idle','fwd','back','left','right')}
+assert {d['name'] for d in prone['defs']}==expected
+assert all(not d['flags']&2 for d in prone['defs']), 'prone movement must loop'
+import hashlib,json
+qa=json.loads((root.parent/'docs/audit/167_PRONE_POSE_QA.json').read_text())
+assert qa['omf_sha256']==hashlib.sha256(prone['data']).hexdigest()
+assert 0.2<qa['sampled_head_height'][0]<=qa['sampled_head_height'][1]<0.5
+for grip in ('empty','knife','pistol','rifle'):
+    samples=[s for s in qa['samples'] if s['clip']==f'lz_prone_{grip}_fwd']
+    assert len(samples)==4
+    for side in ('l','r'):
+        foot=[s['bones'][f'bip01_{side}_foot'] for s in samples]
+        assert max(p[1] for p in foot)-min(p[1] for p in foot)>.12
+        assert all(.02<p[2]<.3 for p in foot)
+print("netcoop anims: OK; 20 isolated prone cycles, low body, moving feet, exact QA asset checksum")

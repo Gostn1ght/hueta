@@ -7,28 +7,33 @@ properties come from the shipped Mi-2 (veh_mi2_pilot.ogf): root_0, root
 tail boom box), korpus1 (seat reference). A new "idle" turns both rotors;
 the engine plays it as fast as the rotor turns.
 """
-import bpy, addon_utils, bmesh, json, math, sys
+import bpy, addon_utils, bmesh, json, math, sys, argparse
 from mathutils import Matrix, Quaternion, Vector
 from pathlib import Path
 
-sys.path.insert(0, r'J:\LostZone_Work\_work\portable_blender_4.5.14\addons')
+parser = argparse.ArgumentParser()
+parser.add_argument('--source', type=Path, required=True, help='Directory containing MI24.fbx')
+parser.add_argument('--addons', type=Path, required=True)
+parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--template', type=Path, default=Path(__file__).resolve().parents[1] / 'scripts/netcoop-overlay/client/meshes/dynamics/vehicles/mi2/veh_mi2_pilot.ogf')
+args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
+sys.path.insert(0, str(args.addons.resolve()))
 addon_utils.enable('io_scene_xray', default_set=True, persistent=False)
-OUT = Path(r'J:\LostZone_Work\_work\mi24_src\out')
+OUT = args.output.resolve()
 OUT.mkdir(parents=True, exist_ok=True)
 SCALE = 17.3 / 22.0
-# Owner 2026-10-18: the 20% body looked coarse - 60% keeps the panels and rivets.
-DECIMATE = {'body': 0.6, 'main_rotor': 0.8, 'rear_rotor': 0.8, 'glass': 1.0}
+# Owner 2026-11-01: retain the complete source mesh, including cockpit detail.
+DECIMATE = dict.fromkeys(('body', 'main_rotor', 'rear_rotor', 'glass'), 1.0)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 addon_utils.enable('io_scene_xray', default_set=True, persistent=False)
-tpl = r"C:\Users\Mahito\Desktop\NetAnomaly_Engine_Console_2026-09-10\NetAnomaly_Full\engine-steamnet\scripts\netcoop-overlay\client\meshes\dynamics\vehicles\mi2"
-assert bpy.ops.xray_import.ogf(directory=tpl, files=[{'name': 'veh_mi2_pilot.ogf'}], import_motions=True) == {'FINISHED'}
+assert bpy.ops.xray_import.ogf(directory=str(args.template.parent), files=[{'name': args.template.name}], import_motions=True) == {'FINISHED'}
 rig = next(o for o in bpy.context.scene.objects if o.type == 'ARMATURE')
 for o in [o for o in bpy.context.scene.objects if o.type == 'MESH']:
     bpy.data.objects.remove(o, do_unlink=True)
 
 before = set(bpy.context.scene.objects)
-assert bpy.ops.import_scene.fbx(filepath=r"J:\LostZone_Work\_work\mi24_src\MI24\MI24.fbx") == {'FINISHED'}
+assert bpy.ops.import_scene.fbx(filepath=str(args.source / 'MI24.fbx')) == {'FINISHED'}
 parts = {}
 for o in [o for o in bpy.context.scene.objects if o not in before]:
     if o.type != 'MESH':
@@ -80,12 +85,49 @@ mats = {'MI_air_mi24_base_1': material('mi24_body1', 'veh_mi24_lz_body1', 'model
         'MI_air_mi24_base_2': material('mi24_body2', 'veh_mi24_lz_body2', 'models\\model'),
         'MI_air_mi24_details': material('mi24_details', 'veh_mi24_lz_details', 'models\\model'),
         'MI_air_mi24_rotor': material('mi24_rotor', 'veh_mi24_lz_rotor', 'models\\model'),
-        'MI_air_mi8_glass_clean_01': material('mi24_glass', 'veh_mi24_lz_glass', 'models\\transparent')}
+        'MI_air_mi8_glass_clean_01': material('mi24_glass', 'veh_mi24_lz_glass', 'models\\lz_heli_glass')}
 for o in parts.values():
     for i, slot in enumerate(o.material_slots):
         base = slot.material.name.split('.')[0] if slot.material else ''
         assert base in mats, base
         o.data.materials[i] = mats[base]
+
+# The commissioned FBX has the gear stowed inside its fuselage. Supply
+# visible extended struts/tyres; all three assemblies have independent bones
+# and matching rigid collision shapes, translated into the wells by CCar.
+gear = {
+    'gear_left': (Vector((-1.75,-1.7,-0.55)), Vector((-0.9,-1.7,0.9)), 0.4),
+    'gear_right': (Vector((1.75,-1.7,-0.55)), Vector((0.9,-1.7,0.9)), 0.4),
+    'gear_nose': (Vector((0,4.15,-0.65)), Vector((0,4.0,0.5)), 0.3),
+}
+tyre_mat=material('mi24_tyre','veh_mi24_lz_tyre','models\\model')
+for name,(wheel,pivot,radius) in gear.items():
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius, depth=0.28, location=wheel, rotation=(0,math.pi/2,0))
+    tyre=bpy.context.object;tyre.data.materials.append(tyre_mat)
+    bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+    delta=wheel-pivot
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16,radius=0.065,depth=delta.length,location=(pivot+wheel)/2)
+    strut=bpy.context.object;strut.rotation_mode='QUATERNION';strut.rotation_quaternion=delta.to_track_quat('Z','Y')
+    strut.data.materials.append(mats['MI_air_mi24_details'])
+    bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+    bpy.ops.object.select_all(action='DESELECT');tyre.select_set(True);strut.select_set(True);bpy.context.view_layer.objects.active=tyre
+    bpy.ops.object.join();parts[name]=tyre
+
+# Windows remain full-detail, but no longer belong to the fuselage bone.
+# Classify whole faces, retaining both layers of each source glass surface.
+glass=parts.pop('glass')
+windows={}
+for face in glass.data.polygons:
+    centre=sum((glass.data.vertices[i].co for i in face.vertices),Vector())/len(face.vertices)
+    cabin='front' if centre.y>3.6 else 'rear' if centre.y>1.7 else 'cabin'
+    side='left' if centre.x < -0.15 else 'right' if centre.x>0.15 else 'centre'
+    windows.setdefault('glass_'+cabin+'_'+side,set()).add(face.index)
+for name,indices in windows.items():
+    obj=glass.copy();obj.data=glass.data.copy();bpy.context.collection.objects.link(obj)
+    bm=bmesh.new();bm.from_mesh(obj.data);bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm,geom=[f for f in bm.faces if f.index not in indices],context='FACES')
+    bm.to_mesh(obj.data);bm.free();parts[name]=obj
+bpy.data.objects.remove(glass,do_unlink=True)
 
 # Skeleton: keep five bones of the Mi-2 rig, move them to the MI24.
 keep = {'root_0', 'root', 'front_propeller', 'back_propeller', 'korpus1'}
@@ -101,8 +143,13 @@ cockpit = Vector((0.0, body_hi.y - 3.6, 1.55))   # pilot's seat area, refined by
 targets = {'root': Vector((0.0, body_mean.y, 1.8)), 'front_propeller': hub, 'back_propeller': tail, 'korpus1': cockpit}
 for name, where in targets.items():
     b = eb[name]; delta = where - b.head; b.head += delta; b.tail += delta
+for name,where in [(n,pivot) for n,(_,pivot,_) in gear.items()]+[(n,stats(parts[n])[0]) for n in windows]:
+    b=eb.new(name);b.parent=eb['root'];b.head=where;b.tail=where+Vector((0,0,0.2))
 bpy.ops.object.mode_set(mode='OBJECT')
 bones = rig.data.bones
+for name in (*gear,*windows):
+    for collection in bones['root'].collections:
+        collection.assign(bones[name])
 
 def to_xr(v):  # Blender (x, y, z) -> X-Ray (x, z, y)
     return (v.x, v.z, v.y)
@@ -120,6 +167,13 @@ bones['korpus1'].xray.mass.value = 50.0
 # Fuselage and cabin, from the ground (gear) to the engine deck; then the tail boom.
 box(bones['root'], Vector((-1.15, body_hi.y - 13.2, 0.0)), Vector((1.15, body_hi.y - 0.2, 3.5)), 7000.0)
 box(bones['back_propeller'], Vector((-0.45, body_lo.y + 1.0, 1.9)), Vector((0.45, body_hi.y - 13.2, 3.3)), 600.0)
+for name,(_,pivot,_) in gear.items():
+    _,lo,hi=stats(parts[name]);box(bones[name],lo,hi,30.0)
+    bones[name].xray.ikjoint.type='0' # rigid: wheel geometry is part of the body, not an unstable extra joint
+for name in windows:
+    _,lo,hi=stats(parts[name]);box(bones[name],lo-Vector((0.01,0.01,0.01)),hi+Vector((0.01,0.01,0.01)),0.1)
+    bones[name].xray.ikjoint.type='0'
+    bones[name].xray.shape.flags_nophysics=True # ray-pickable, never an invisible collision wall after breakage
 
 # "idle": both rotors turn (main 2 rev, tail 6 rev per 60 frames at 30 fps).
 for a in list(bpy.data.actions):
@@ -141,10 +195,24 @@ rig.xray.userdata = '#include "models\\vehicles\\veh_mi24_pilot.ltx"'
 rig.name = 'veh_mi24_pilot'
 
 # Skin: rigid parts on their bones.
+# OGF uses 16-bit vertex indices. Split full-detail meshes into draw chunks
+# without deleting any triangles, UVs or normals (a decimator is not needed).
+for key, source in list(parts.items()):
+    if len(source.data.polygons) <= 18000:
+        continue
+    del parts[key]
+    for first in range(0, len(source.data.polygons), 18000):
+        obj = source.copy(); obj.data = source.data.copy()
+        bpy.context.collection.objects.link(obj)
+        bm = bmesh.new(); bm.from_mesh(obj.data); bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if not first <= f.index < first + 18000], context='FACES')
+        bm.to_mesh(obj.data); bm.free()
+        parts[f'{key}.{first // 18000}'] = obj
+    bpy.data.objects.remove(source, do_unlink=True)
 groups = {'body': 'root', 'glass': 'root', 'main_rotor': 'front_propeller', 'rear_rotor': 'back_propeller'}
 for key, o in parts.items():
     o.vertex_groups.clear()
-    g = o.vertex_groups.new(name=groups[key]); g.add(range(len(o.data.vertices)), 1.0, 'REPLACE')
+    g = o.vertex_groups.new(name=groups.get(key.split('.')[0],key)); g.add(range(len(o.data.vertices)), 1.0, 'REPLACE')
     o.parent = rig
     m = o.modifiers.new('arm', 'ARMATURE'); m.object = rig
     o.name = 'mi24_' + key
