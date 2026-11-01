@@ -1,7 +1,7 @@
 """Owner's commissioned MI24 (FBX) -> flyable X-Ray OGF on the Mi-2 rig (doc 141).
 
 Geometry: the owner's FBX, turned nose to +Y, scaled to a real Mi-24 rotor
-(17.3 m), standing on z=0, decimated for the engine. Skeleton/physics
+(17.3 m), standing on z=0, retaining every source triangle. Skeleton/physics
 properties come from the shipped Mi-2 (veh_mi2_pilot.ogf): root_0, root
 (fuselage box), front_propeller (main rotor), back_propeller (tail rotor +
 tail boom box), korpus1 (seat reference). A new "idle" turns both rotors;
@@ -164,8 +164,14 @@ for name in ('root_0', 'front_propeller', 'korpus1'):
     bones[name].xray.shape.type = '0'
 bones['front_propeller'].xray.mass.value = 300.0
 bones['korpus1'].xray.mass.value = 50.0
-# Fuselage and cabin, from the ground (gear) to the engine deck; then the tail boom.
-box(bones['root'], Vector((-1.15, body_hi.y - 13.2, 0.0)), Vector((1.15, body_hi.y - 0.2, 3.5)), 7000.0)
+# A single full-height fuselage box intercepted every shot before the glass.
+# Lower hull + narrower upper cabin/engine deck leave both cockpits and the
+# side panes ray-pickable. Keep the original root centre of mass: changing
+# hit volumes must not suddenly move the flight body's balance to the floor.
+box(bones['root'], Vector((-1.15, body_hi.y - 13.2, 0.0)), Vector((1.15, body_hi.y - 0.2, 1.0)), 7000.0)
+bones['root'].xray.mass.center=to_xr(Vector((0,body_hi.y-6.7,1.75))-bones['root'].head_local)
+box(bones['korpus1'],Vector((-0.8,body_hi.y-13.2,1.0)),Vector((0.8,1.7,3.5)),50.0)
+bones['korpus1'].xray.ikjoint.type='0'
 box(bones['back_propeller'], Vector((-0.45, body_lo.y + 1.0, 1.9)), Vector((0.45, body_hi.y - 13.2, 3.3)), 600.0)
 for name,(_,pivot,_) in gear.items():
     _,lo,hi=stats(parts[name]);box(bones[name],lo,hi,30.0)

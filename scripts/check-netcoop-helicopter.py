@@ -11,6 +11,8 @@ section agree with each other and with what Car.cpp reads.
 import re
 import math
 import struct
+import hashlib
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,10 +75,11 @@ for section, (folder, model_name) in HELICOPTERS.items():
     assert b"idle" in model[15], "the rotor motion"
     if section=='veh_mi24_heli':
         assert {'gear_left','gear_right','gear_nose'}<=bones and len(bones)<=64
-        properties={};at=0;raw=model[16]
+        properties={};boxes={};at=0;raw=model[16]
         for name in bone_order:
             version,=struct.unpack_from('<I',raw,at);at=raw.index(0,at+4)+1
             shape,flags=struct.unpack_from('<HH',raw,at);joint,=struct.unpack_from('<I',raw,at+112)
+            if shape==1:boxes[name]=struct.unpack_from('<15f',raw,at+4)
             properties[name]=(shape,flags,joint);at+=112+72+(4 if version else 0)+40
         assert at==len(raw)
         for name in ('gear_left','gear_right','gear_nose'):
@@ -84,6 +87,29 @@ for section, (folder, model_name) in HELICOPTERS.items():
             assert shape==1 and not flags&4 and joint==0,(name,properties[name])
         windows=[n for n in bones if n.startswith('glass_')];assert len(windows)==8
         assert all(properties[n][0]==1 and properties[n][1]&4 for n in windows)
+        # CCF_Skeleton ray-picks physics primitives, not the visible mesh.
+        # The former full-height root box masked all cockpit/side glass.
+        assert abs(boxes['root'][13]-.5)<1e-5
+        assert abs(boxes['korpus1'][12]-.8)<1e-5 and properties['korpus1'][2]==0
+        qa=json.loads((ROOT/'docs/audit/167_MI24_COLLISION_QA.json').read_text())
+        assert qa['ogf_sha256']==hashlib.sha256(ogf.read_bytes()).hexdigest()
+        assert set(qa['shapes'])==set(boxes) and len(qa['rays'])==8
+        def ray_box(start,direction,box):
+            near,far=0.,100.
+            for i in range(3):
+                if not direction[i]:
+                    if not box['lo'][i]<=start[i]<=box['hi'][i]:return None
+                else:
+                    a=(box['lo'][i]-start[i])/direction[i];b=(box['hi'][i]-start[i])/direction[i]
+                    near=max(near,min(a,b));far=min(far,max(a,b))
+                    if near>far:return None
+            return near
+        assert {r['target'] for r in qa['rays']}==set(windows)
+        for ray in qa['rays']:
+            hits=[(distance,name) for name,box in qa['shapes'].items()
+                  if (distance:=ray_box(ray['start'],ray['direction'],box)) is not None]
+            distance,name=min(hits)
+            assert name.startswith('glass_') and name==ray['first'] and abs(distance-ray['distance'])<1e-4
         triangles=0
         for data in chunks(model[9]).values():
             mesh=chunks(data);indices=mesh[4];count,=struct.unpack_from('<I',indices)
