@@ -13,6 +13,10 @@ on:
         description: 'Validate external scripts and resources without rebuilding unchanged native code'
         type: boolean
         default: false
+      shaders_only:
+        description: 'Compile actual DX11 shaders against the deployed headers, without rebuilding C++'
+        type: boolean
+        default: false
       analyze:
         description: 'MSVC code analysis (PREfast) of the game instead of the build'
         type: boolean
@@ -22,12 +26,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: lostzone-dx11-${{ github.ref }}-${{ inputs.analyze }}-${{ inputs.resources_only }}
+  group: lostzone-dx11-${{ github.ref }}-${{ inputs.analyze }}-${{ inputs.resources_only }}-${{ inputs.shaders_only }}
   cancel-in-progress: true
 
 jobs:
   checks:
-    if: ${{ !inputs.analyze }}
+    if: ${{ !inputs.analyze && !inputs.shaders_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -137,9 +141,31 @@ jobs:
       - name: Check actual keyboard and clipboard paste
         run: python scripts/check-edit-input.py
 
+  shaders:
+    if: ${{ !inputs.analyze && (!inputs.resources_only || inputs.shaders_only) }}
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch exact deployed headers from private compile fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release download ci-dx11-shader-headers-20261102 --repo $env:GITHUB_REPOSITORY --pattern dx11-shader-headers.zip --dir shader-fixture
+          if ($LASTEXITCODE -ne 0) { throw 'Private shader fixture is unavailable' }
+          $hash = (Get-FileHash shader-fixture/dx11-shader-headers.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'a5c2747187dce8986fcb4109560dc2661829aa7f62392eade11741f81aee7a49') { throw 'Shader fixture checksum differs' }
+          Expand-Archive shader-fixture/dx11-shader-headers.zip shader-fixture/headers
+      - name: Compile actual menu, helicopter glass and skinned vertex shaders
+        run: python scripts/check-netcoop-preview-shaders.py --headers shader-fixture/headers
+
   engine:
-    if: ${{ !inputs.analyze && !inputs.resources_only }}
-    needs: checks
+    if: ${{ !inputs.analyze && !inputs.resources_only && !inputs.shaders_only }}
+    needs: [checks, shaders]
     runs-on: windows-2022
     timeout-minutes: 90
     permissions:
