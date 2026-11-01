@@ -1,6 +1,6 @@
 # Five lives, physical PDA, admission and DCP corrections
 
-Status: source changes; native GitHub validation and delivery pending. No owner game processes launched for verification.
+Status: delivered 2026-11-01 as 2026.11.01.1 / patch 000049. Mandatory DX11 GitHub checks, compilation and packaging passed. No owner game processes launched for verification.
 
 ## User rule
 One account owns one character. It has five lives. After the first four deaths the same name and faction resume at the nearest available authored safe zone, with service/arrival fallbacks on the current level. One persisted random draw retains half of the non-PDA root items (rounding up); the remaining originals stay on the corpse. The physical PDA is always retained. On the fifth death the whole inventory, including the PDA, remains on the final corpse; the account room requires a different Russian call sign and a starter-kit selection.
@@ -40,3 +40,15 @@ Safe-zone scope communicated to the owner: service NPC invulnerability and neare
 Full compilation on 41320133234 exposed a LuaBind proxy result used as a materialized string in `character_claim_survivors`. Commit `f1872f511` materializes the return before copying it; native run 41321624376 is the replacement build.
 
 The owner's HUD preview request exposed a nine-slice frame initialized as a static texture. Resource commit `e8ee2d26a` uses the engine's exported `InitFrame` API; the actual Lua constructor/setter is exercised by the vehicle test. Commit `6b26b802a` also fits the full 100% fuel/body labels inside the available width. A preview was rendered offline with the effective release bitmap fonts, nine-slice atlas, XML geometry and actual Lua-formatted values; it is explicitly not an in-game screenshot. Resources-only GitHub run 41322419979 passed all checks on that data commit. Native inputs between `f1872f511` and `6b26b802a` are unchanged; release metadata records native and resource commits/CI separately.
+
+## Final delivery receipt
+
+Native commit `92768bd081e3a373fbec17a712bb55c22cb913d1`, run `41324165268`: mandatory DX11 checks, compilation, package and private draft preservation passed. Client/server executable SHA256: `2ab551708403c193b4ebec1890f910531ecc4927132b0384afeca25277654d43`. Matching private PDB retained outside public packages. Production master remains the validated `3129c3c59c1f76c8611a9492120876facf43e045`, run `41303334526`. Data commit `6b26b802a`, resource run `41322419979`, provides the final HUD resource changes.
+
+Run `41321624376` compiled successfully but failed creating the private release draft: GitHub requires workflow-write authorization when a release target changes workflows. The replacement uploader verifies and uploads to an exact precreated private draft; the workflow also retains runtime fallback artifacts with `always()`. This did not bypass compilation or tests. The replacement run preserved all three private assets successfully.
+
+Signed client manifest: `manifests/2026.11.01.1-aeb3c828.bin`, BLAKE3 `aeb3c8283ac04f9f0a5fa21c1c965d7af4af5a2c524fa3f44020400c178353c6`, 142 files. Signature and reconstruction of changed files from published chunks verified; P2P online. No HTTP mirror configured. Protected baseline archive hashes unchanged.
+
+Installed client: `J:/LostZone/Lost Zone`; installed public server folder: `J:/LostZone_Work/Lost Zone Server`. Public archive: `J:/LostZone_Work/Lost Zone Server.zip`, 2,718,801,734 bytes, 41 files; all file hashes and ZIP CRCs verified. ZIP SHA256: `af84456fb37a30ec2a90cbf6c4f1071ffc84f87336732c404de1a4b54370f35c`. Runtime saves/accounts preserved. Delivery receipts: `J:/LostZone_Work/_work/world_hotfix_20261101_v6/{prepared,publication-reviewed,zip-reviewed,delivery-reviewed}.json`.
+
+Delivery confirms matching release bytes, not gameplay acceptance. The limitations above, including current-level safe-zone search and no universal safe-zone weapon ban, remain.
