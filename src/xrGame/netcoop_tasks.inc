@@ -523,7 +523,7 @@ static bool character_claim_survivors(CActor* actor, xr_vector<std::pair<u16,u16
  ::luabind::functor<luabind::internal_string> claim;
  if(!ai().script_engine().functor("netcoop_survival.claim",claim))return false;
  xr_string ids;
- try {ids=claim(actor->lua_game_object()).c_str();}catch(...){return false;}
+ try {const luabind::internal_string result=claim(actor->lua_game_object());ids=result.c_str();}catch(...){return false;}
  if(ids.empty() || ids=="pending" || ids=="legacy")return false;
  for(u32 i=0;ids!="-" && i<_GetItemCount(ids.c_str());++i) {
   string32 id;_GetItem(ids.c_str(),i,id);const u16 item=u16(atoi(id));
