@@ -34,6 +34,7 @@ struct CWeaponPistol:CWeapon{};struct CWeaponKnife:CWeapon{};struct CWeaponBinoc
 template<class T,class U>T smart_cast(U* value){return dynamic_cast<T>(value);}
 struct Inventory{PIItem active=nullptr;PIItem ActiveItem(){return active;}};
 struct Movement{Fvector velocity{.5f,0,0};const Fvector& GetVelocity(){return velocity;}};
+struct PhysicsSupport{Movement value;Movement* movement(){return &value;}};
 namespace netcoop{bool client=true;bool pure_client(){return client;}}
 struct IKinematicsAnimated{
  virtual ~IKinematicsAnimated()=default;
@@ -50,9 +51,10 @@ struct CActor{
  bool alive=true,seated=false,m_bAnimTorsoPlayed=false;int m_rp_index=-1;
  MotionID m_netcoop_prone_motion,m_current_legs,m_current_torso,m_current_head;
  CBlend* m_netcoop_prone_blends[3]{};CBlend* m_current_legs_blend=nullptr;CBlend* m_current_torso_blend=nullptr;
- bool m_netcoop_prone_torso_free=true;Inventory inv;Movement test_movement;Movement* m_PhysicMovementControl=&test_movement;
+ bool m_netcoop_prone_torso_free=true;Inventory inv;PhysicsSupport test_physics;
  IKinematicsAnimated* test_model=nullptr;
  Inventory& inventory(){return inv;}bool g_Alive(){return alive;}bool netcoop_seated(){return seated;}
+ PhysicsSupport* character_physics_support(){return &test_physics;}
  bool IsZoomAimingMode(){return false;}bool isActorAccelerated(u32 m,bool){return !(m&mcAccel);}
  IKinematicsAnimated* Visual(){return test_model;}unsigned ID(){return 42;}
  bool netcoop_prone_animation(u32);

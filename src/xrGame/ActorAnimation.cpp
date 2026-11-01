@@ -32,6 +32,7 @@
 #include "../xrEngine/bone.h"
 #include "xrMessages.h"
 #include "PHMovementControl.h"
+#include "CharacterPhysicsSupport.h"
 
 static const float y_spin0_factor = 0.0f;
 static const float y_spin1_factor = 0.4f;
@@ -732,7 +733,8 @@ bool CActor::netcoop_prone_animation(u32 movement)
 		m_current_head=motion;
 		Msg("[diag][actor-animation] id=%u prone=%s",ID(),name);
 	}
-	const float speed=m_PhysicMovementControl && _valid(m_PhysicMovementControl->GetVelocity()) ? m_PhysicMovementControl->GetVelocity().magnitude():0.f;
+	auto* control=character_physics_support() ? character_physics_support()->movement():nullptr;
+	const float speed=control && _valid(control->GetVelocity()) ? control->GetVelocity().magnitude():0.f;
 	const float rate=(movement & mcAnyMove) ? _max(0.3f,_min(3.f,speed*2.6666667f)):1.f;
 	for(u32 i=0;i<3;++i) if(m_netcoop_prone_blends[i]) m_netcoop_prone_blends[i]->speed=rate;
 	return true;
