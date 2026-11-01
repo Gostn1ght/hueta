@@ -34,7 +34,7 @@ function UIVehicleStatus:Set(data)
 	speed,fuel,health,rpm,gear,flags=tonumber(speed),tonumber(fuel),tonumber(health),tonumber(rpm),tonumber(gear),tonumber(flags)
 	self.speed:SetText(string.format("%03d  %s",math.floor(speed+.5),tr("st_lz_car_kmh")))
 	self.details:SetText(string.format("%s %s   /   %s %d\n%s: %s",tr("st_lz_car_gear"),gear==0 and "R" or tostring(gear),tr("st_lz_car_rpm"),rpm,tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
-	self.condition:SetText(string.format("%s %d%%    /    %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
+	self.condition:SetText(string.format("%s %d%%  /  %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
 	self.condition:SetTextColor((fuel<15 or health<30) and GetARGB(255,220,145,90) or GetARGB(255,205,199,179))
 	if not self.shown then get_hud():AddDialogToRender(self);self.shown=true end
 end
