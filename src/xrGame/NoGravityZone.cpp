@@ -5,6 +5,8 @@
 #include "PHMovementControl.h"
 //#include "PhWorld.h"
 #include "CharacterPhysicsSupport.h"
+#include "Car.h"
+#include "netcoop.h"
 //extern CPHWorld	*ph_world;
 #include "../xrphysics/IPHWorld.h"
 
@@ -32,6 +34,11 @@ void CNoGravityZone::switchGravity(SZoneObjectInfo& io, bool val)
 	CPhysicsShellHolder* sh = smart_cast<CPhysicsShellHolder*>(io.object);
 	if (!sh)return;
 	CPhysicsShell* shell = sh->PPhysicsShell();
+	if (netcoop::enabled() && smart_cast<CCar*>(sh))
+	{
+		if (shell && shell->isActive()) shell->set_ApplyByGravity(TRUE);
+		return;
+	}
 	if (shell && shell->isActive())
 	{
 		shell->set_ApplyByGravity(val);

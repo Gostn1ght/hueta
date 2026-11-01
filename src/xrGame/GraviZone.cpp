@@ -9,6 +9,8 @@
 #include "PhysicsShellHolder.h"
 #include "Level.h"
 #include "CharacterPhysicsSupport.h"
+#include "Car.h"
+#include "netcoop.h"
 
 CBaseGraviZone::CBaseGraviZone(void)
 {
@@ -101,7 +103,8 @@ bool CBaseGraviZone::IdleState()
 			{
 				CPhysicsShellHolder* GO = smart_cast<CPhysicsShellHolder *>((*it).object);
 
-				if (GO && GO->PPhysicsShell() && !Telekinesis().is_active_object(GO))
+				if (GO && GO->PPhysicsShell() && !Telekinesis().is_active_object(GO) &&
+					!(netcoop::enabled() && smart_cast<CCar*>(GO)))
 				{
 					Telekinesis().activate(GO, 0.1f, m_fTeleHeight, m_dwTimeToTele);
 					PlayTeleParticles(GO);
@@ -173,6 +176,9 @@ void CBaseGraviZone::ThrowInCenter(Fvector& C)
 
 void CBaseGraviZone::AffectPull(CPhysicsShellHolder* GO, const Fvector& throw_in_dir, float dist)
 {
+	// The direct pull bypasses CCar::PHHit. Transport keeps normal gravity
+	// and receives the blowout's damage, without being lifted as loose debris.
+	if (netcoop::enabled() && smart_cast<CCar*>(GO)) return;
 	CEntityAlive* EA = smart_cast<CEntityAlive*>(GO);
 	if (EA && EA->g_Alive())
 	{

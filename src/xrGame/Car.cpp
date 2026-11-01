@@ -801,16 +801,28 @@ void CCar::ChangeCondition(float fDeltaCondition)
 void CCar::PHHit(SHit& H)
 {
 	if (!m_pPhysicsShell) return;
-	if(netcoop::enabled() && !netcoop_is_heli()) {
+	if(netcoop::enabled()) {
 		// Gravitational hits scale their impulse by target mass. Applying the
 		// unrestricted value to a multi-body car launches it like debris.
 		const bool anomaly=H.who && smart_cast<CCustomZone*>(H.who);
-		const float mass=m_pPhysicsShell->getMass();
+		float mass=m_pPhysicsShell->getMass();
+		// Hits address one physical bone. A whole-car mass allowance applied
+		// to a light hinged door/wheel can add hundreds of m/s to that body.
+		IKinematics* model=smart_cast<IKinematics*>(Visual());
+		u16 bone=H.bone();
+		if(model && bone<model->LL_BoneCount())
+			for(u16 depth=0;depth<model->LL_BoneCount();++depth) {
+				if(CPhysicsElement* element=m_pPhysicsShell->get_Element(bone)) {mass=_min(mass,element->getMass());break;}
+				const u16 parent=model->LL_GetData(bone).GetParentID();
+				if(parent==bone || parent>=model->LL_BoneCount())break;
+				bone=parent;
+			}
 		if(_valid(mass) && mass>0.f) {
-			const float limit=mass*(anomaly ? 2.f:8.f);
-			H.impulse=_min(H.impulse,limit);
+			const float limit=mass*8.f;
+			H.impulse=_valid(H.impulse) ? _max(0.f,_min(H.impulse,limit)):0.f;
 			if(H.who && smart_cast<CActor*>(H.who) && H.hit_type==ALife::eHitTypeStrike)H.impulse=_min(H.impulse,mass*.1f);
 		}
+		if(anomaly)H.impulse=0.f; // damage is processed separately by Hit()
 	}
 	if (m_bone_steer == H.bone()) return;
 	if (CPHUpdateObject::IsActive())

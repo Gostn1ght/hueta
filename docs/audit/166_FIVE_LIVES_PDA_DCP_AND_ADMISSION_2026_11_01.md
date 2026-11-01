@@ -10,12 +10,14 @@ NCHA extends NCH9 with one bounded server-owned lives byte. Both masters accept 
 ## Other changes
 - Matching .5 client dump resolves to CScriptGameObject::IsTalking; stale wrapper membership is checked before dereferencing its owner. Generic object access raises a controlled Lua error.
 - Player health state has a request/ack retry and waits for BHS initialization. Pending state retains its target actor ID; duplicate initial snapshots cannot overwrite current health.
+- Before the new body's first binder update, old lethal limb globals/raw keys are neutralized; the authoritative snapshot is applied and acknowledged after initialization. New ownership releases interrupted script input locks and closes old-body inventory/dialog/PDA windows.
 - PDA markers and map discoveries are keyed by the physical device UID. Transfers are always shown; reconnect/save acknowledgements and late map initialization retry.
 - The starter picker uses the chosen loner kit and supplies mandatory valid sections, instead of refusing unavailable legacy entries.
 - Master child controls are clipped and tab visibility is checked in its GUI fixture. Idle demand maps save and exit after 180 seconds, then remain armed for requested wakeup. Memory diagnostics include resident and private commit; this does not guarantee 6-10 occupied maps plus a client fit in 16 GB.
 - Service traders and mechanics are protected against damage without making every combat NPC immortal.
 - Barter layout uses two offers/backpacks and a central equipment/status panel.
 - DCP optional physical panels are included in profiles. Zero damage health cannot divide by zero. Suspension considers actual mass and wheel count. Auxiliary lamps, broken-glass state, a compact car HUD, bounded hit impulses and swept run-over detection are added.
+- Voluntary dismount checks a standing volume against static geometry and nearby objects, tries ten side/longitudinal points, and remains seated when all are occupied. The controller position is assigned before recreation. Car/player contacts keep collision but bound penetration correction and restitution; static/prop car contacts retain their existing parameters. This does not prove every physical launch is eliminated.
 - Admin noclip is authorized on the server; demo teleport allows authenticated admins. The weather editor sends bounded server commands and disallows online asset-path changes.
 
 ## Limits and required acceptance
@@ -25,3 +27,7 @@ Native compile/fixtures must pass in GitHub before deployment. Gameplay, ride he
 Actual Lua survival tests cover stable draw, PDA retention, no partial transfer with absent items, retries, ownership, NPC reservation protection and final death. Existing relevant Lua suites and native-save Python tests are run; full native checks run only in GitHub. Exact build/release receipts will be appended after validation.
 
 Initial CI: master run 41300308525 on 1ced4f6d3 passed all production GUI/parity/process/storage checks. Engine run 41302586438 on 2ec30e711 passed Lua and all Windows regression fixtures except the trunk-reset harness, which needed the new HUD cache in its stub. The added native noclip/lifetime/five-life/checksum/suspension tests passed there; full engine compilation remains pending.
+
+Current offline evidence: all 83 workflow resource/script checks passed on `99a572b3f`; final delta 000049 has 42 client and 35 server payloads. Effective archive mounting was simulated over the actual .5 release: every changed payload selects 000049 and matches its input bytes, including nested server overrides. Receipts are stored privately in `bugs_20261031_v6/offline-final.json` and `delta49-reviewed.json`.
+
+Master production run 41303334526 on `3129c3c59` passed the cold-process/wakeup and GUI tab/scroll regression checks; its production executable metadata and screenshot are downloaded. Engine run 41318306772 stopped on a strict-MSVC name-shadowing warning in the new exit fixture (its global `world`, not a production variable); fixed in `16bbda869`, run 41318861869. Cold status withdrawal and the updated host-stop fixture passed in that first run. Delivery must still wait for a successful full native build.
