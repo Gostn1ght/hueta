@@ -728,6 +728,9 @@ void CPhysicsShellHolder::netcoop_physics_update()
 	const NetcoopPhysicsSnapshot& last = m_netcoop_physics.size() > 1 ? m_netcoop_physics[1] : first;
 	const s32 span = s32(last.stamp - first.stamp);
 	const float factor = span > 0 ? _max(0.f, _min(1.f, float(s32(time - first.stamp)) / span)) : 0.f;
+	const bool ballistic = smart_cast<CMissile*>(this) || smart_cast<CCustomRocket*>(this);
+	const s32 late=s32(time-last.stamp);
+	const float predict=ballistic && late>0 ? float(_min(late,150))*.001f:0.f;
 	for (u16 i = 0; i < first.states.size(); ++i)
 	{
 		SPHNetState state = first.states[i];
@@ -738,6 +741,21 @@ void CPhysicsShellHolder::netcoop_physics_update()
 		    netcoop_physics_coordinate(a.position.y,b.position.y,a.linear_vel.y,b.linear_vel.y,seconds,factor),
 		    netcoop_physics_coordinate(a.position.z,b.position.z,a.linear_vel.z,b.linear_vel.z,seconds,factor));
 		state.quaternion.slerp(first.states[i].quaternion, last.states[i].quaternion, factor);
+		if(predict>0.f && b.enabled && b.linear_vel.square_magnitude()<2000.f*2000.f) {
+			// A 100 ms server frame must not freeze an airborne grenade at
+			// every packet. Predict a short physical segment, stopping at static
+			// geometry; collisions/explosions remain exclusively authoritative.
+			Fvector projected;projected.mad(b.position,b.linear_vel,predict);
+			if(smart_cast<CMissile*>(this)) projected.y-=.5f*physics_world()->Gravity()*predict*predict;
+			Fvector path;path.sub(projected,b.position);
+			const float distance=path.magnitude();
+			if(distance>EPS_S && _valid(projected)) {
+				path.div(distance);collide::rq_result hit;
+				if(Level().ObjectSpace.RayPick(b.position,path,distance,collide::rqtStatic,hit,this))
+					projected.mad(b.position,path,_max(0.f,hit.range-.01f));
+				state.position=projected;
+			}
+		}
 		state.previous_position = state.position;
 		state.previous_quaternion = state.quaternion;
 		state.enabled = true;
@@ -749,7 +767,8 @@ void CPhysicsShellHolder::netcoop_physics_update()
 		state.torque.set(0.f, 0.f, 0.f);
 		PHGetSyncItem(i)->set_State(state);
 	}
-	// No extrapolation through walls or floors when a packet is late.
+	// Ordinary replicas are interpolated only; ballistic prediction above is
+	// bounded to 150 ms and swept against walls/floors before applying the pose.
 	shell->GetGlobalTransformDynamic(&XFORM());
 	if (Visual())
 		if (IKinematics* K = Visual()->dcast_PKinematics())

@@ -10,6 +10,7 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 	if (!actor || !actor->g_Alive())
 		return;
 	const u8 op = P.r_u8();
+	if(actor->m_netcoop_seat_phase) return;
 	if (op == vehicle_op_exit)
 	{
 		if (!actor->netcoop_seated())
@@ -19,7 +20,9 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 			return;
 		for (u8 i = 0; i < it->second.seats.size(); ++i)
 			if (it->second.seats[i] == actor->ID())
-				if (!vehicle_unseat_server(smart_cast<CCar*>(Level().Objects.net_Find(it->first)), it->second, i, false))
+				if (CCar* current=smart_cast<CCar*>(Level().Objects.net_Find(it->first)))
+					if(const VehicleSeats* config=vehicle_seats(current))
+					if (!vehicle_transition(current,it->second,*config,i,actor,true))
 					cluster_refuse(server, CL, "There is no room to leave the vehicle; move it away from the obstacle");
 		return;
 	}
@@ -56,7 +59,7 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 			// Next to the car: its size plus an arm's length.
 			if (actor->Position().distance_to(car->Position()) > car->Radius() + 2.5f)
 				return;
-			vehicle_seat_server(car, v, *poses, seat, actor);
+			vehicle_transition(car, v, *poses, seat, actor, false);
 		}
 		break;
 	case vehicle_op_input:
@@ -167,6 +170,42 @@ static void vehicle_send_state(xrServer* server, CCar* car, const VehicleRuntime
 		}
 	} send = {server, &P, car->Position(), reliable};
 	server->ForEachClientDo(send);
+	// Separate op preserves legacy state packet compatibility. One batched
+	// message also reaches observers who joined during a transition.
+	NET_Packet animation;animation.w_begin(M_NETCOOP_VEHICLE);
+	animation.w_u8(vehicle_op_animation);animation.w_u16(car->ID());animation.w_u8(u8(v.seats.size()));
+	bool active=false;
+	for(u16 id:v.seats) {
+		CActor* actor=smart_cast<CActor*>(Level().Objects.net_Find(id));
+		animation.w_u16(id);animation.w_u8(actor ? actor->m_netcoop_seat_phase:0);
+		animation.w_u32(actor ? actor->m_netcoop_seat_phase_start:0);
+		Fvector outside;outside.set(0,0,0);if(actor) outside=actor->m_netcoop_seat_outside;
+		animation.w_vec3(outside);if(actor && actor->m_netcoop_seat_phase) active=true;
+	}
+	if(active || reliable) {send.packet=&animation;server->ForEachClientDo(send);}
+}
+
+// Owner and observers use the same car frame, even though their car/actor
+// snapshot interpolation delays differ. One small packet per moving owner.
+void platform_publish(CActor* actor)
+{
+ if(pure_client() || !g_pGameLevel || !Level().Server || !actor) return;
+ const u16 car=actor->m_netcoop_platform_car;
+ if(car==vehicle_seat_free && actor->m_netcoop_platform_sent_car==vehicle_seat_free) return;
+ const u32 now=Level().timeServer();
+ if(car==actor->m_netcoop_platform_sent_car && now-actor->m_netcoop_platform_sent<50) return;
+ actor->m_netcoop_platform_sent=now;actor->m_netcoop_platform_sent_car=car;
+ NET_Packet packet;packet.w_begin(M_NETCOOP_VEHICLE);packet.w_u8(vehicle_op_platform);
+ packet.w_u16(actor->ID());packet.w_u16(car);packet.w_vec3(actor->m_netcoop_platform_local);
+ struct Send {
+  xrServer* server;NET_Packet* packet;CActor* actor;
+  void operator()(IClient* client) {
+   auto* CL=static_cast<xrClientData*>(client);
+   if(CL==server->GetServerClient() || !CL->flags.bConnected || !CL->gamma_snapshot_ready || !CL->owner || CL->owner->ID==actor->ID()) return;
+   if(CL->owner->o_Position.distance_to(actor->Position())<500.f) server->SendTo(CL->ID,*packet,net_flags(actor->m_netcoop_platform_car==vehicle_seat_free ? TRUE:FALSE,TRUE));
+  }
+ } send={Level().Server,&packet,actor};
+ Level().Server->ForEachClientDo(send);
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +598,12 @@ void vehicle_server_update(xrServer* server)
 			{
 				vehicle_unseat_server(usable ? car : nullptr, v, i);
 				continue;
+			}
+			if(actor->m_netcoop_seat_phase && now-actor->m_netcoop_seat_phase_start>=1800) {
+				const bool leaving=actor->m_netcoop_seat_phase==2;
+				if(actor->m_netcoop_seat_door!=BI_NONE) car->DoorClose(actor->m_netcoop_seat_door);
+				actor->m_netcoop_seat_phase=0;actor->m_netcoop_seat_motion.invalidate();v.dirty=true;
+				if(leaving && vehicle_unseat_server(car,v,i,false)) continue;
 			}
 			actor->netcoop_seat_place();
 			occupied = true;

@@ -1,5 +1,5 @@
 {
-  "omf_sha256": "1513f3100b089789faba12a2e4d6cee4df5dd71304e63da8e511f095d9aca85a",
+  "omf_sha256": "34dd56229c9c000582bb268581f8d44fbf22e49bdc1597c78b865da97ab911e1",
   "clips": 20,
   "source": "Original Lost Zone authored poses on the installed base human skeleton",
   "sampled_head_height": [
@@ -2887,5 +2887,7 @@
         ]
       }
     }
-  ]
+  ],
+  "prone_only_omf_sha256": "1513f3100b089789faba12a2e4d6cee4df5dd71304e63da8e511f095d9aca85a",
+  "vehicle_append_note": "Audit 169 appended five isolated vehicle poses; all original prone motion blobs are byte-identical."
 }

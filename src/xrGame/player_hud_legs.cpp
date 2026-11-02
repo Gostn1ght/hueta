@@ -26,6 +26,10 @@ void player_legs_controller::destroy()
 
 bool player_legs_controller::resolve_config(CActor* actor, shared_str& sect, shared_str& model)
 {
+	if(actor->netcoop_seated()) {
+		sect="actor";model=actor->cNameVisual();
+		return model.size()!=0;
+	}
     PIItem outfit = actor->inventory().ItemFromSlot(OUTFIT_SLOT);
     shared_str current_outfit = outfit
         ? outfit->object().cNameSect()
@@ -175,7 +179,7 @@ void player_legs_controller::copy_bones_from_actor(CActor* actor, bool isShadowP
 
     if (!isShadowPass)
     {
-        if (auto BoneID = m_model->LL_BoneID("bip01_spine"); BoneID != BI_NONE)
+        if (auto BoneID = m_model->LL_BoneID("bip01_spine"); BoneID != BI_NONE && !actor->netcoop_seated())
         {
             auto& BoneInstance = m_model->LL_GetData(BoneID);
             auto& transform = m_model->LL_GetTransform(BoneInstance.GetParentID());
@@ -189,7 +193,8 @@ void player_legs_controller::copy_bones_from_actor(CActor* actor, bool isShadowP
             u16 bone_id = m_model->LL_BoneID(bone);
             if (bone_id != BI_NONE)
             {
-                m_model->LL_SetBoneVisible(bone_id, false, true);
+                const bool arm = xr_strcmp(bone,"bip01_neck")!=0;
+                m_model->LL_SetBoneVisible(bone_id, arm && actor->netcoop_seated(), true);
             }
         }
     }
@@ -204,7 +209,7 @@ void player_legs_controller::update(CActor* actor, bool isShadowPass)
 {
     if (actor) actor->XFORMShadow.set(actor->XFORM());
 
-    if (!actor || actor != Level().CurrentViewEntity() || !g_legs_enabled || showActorBody != 0)
+    if (!actor || actor != Level().CurrentViewEntity() || (!g_legs_enabled && !actor->netcoop_seated()) || showActorBody != 0)
     {
         destroy();
         return;
@@ -230,6 +235,7 @@ void player_legs_controller::update(CActor* actor, bool isShadowPass)
     copy_bones_from_actor(actor, isShadowPass);
 
     m_legs_transform.set(actor->XFORM());
+    if(actor->netcoop_seated()) return; // full body at the seat, no camera/floor offsets
     if (legs_attach_to_camera && pDemoRecords.empty())
         m_legs_transform.c.set(Device.vCameraPosition.x, m_legs_transform.c.y, Device.vCameraPosition.z);       
 

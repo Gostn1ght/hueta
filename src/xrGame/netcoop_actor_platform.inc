@@ -59,12 +59,23 @@ void CActor::netcoop_platform_detach(bool inherit_velocity)
  }
  m_netcoop_platform_car=0xffff;m_netcoop_platform_object=nullptr;m_netcoop_platform_time=0;
  m_netcoop_platform_velocity.set(0,0,0);
+ if(!netcoop::pure_client()) netcoop::platform_publish(this);
 }
 
 void CActor::netcoop_platform_update()
 {
- if(!netcoop::pure_client() || this!=Level().CurrentControlEntity() || m_netcoop_platform_frame==Device.dwFrame) return;
+ if(!netcoop::pure_client() || m_netcoop_platform_frame==Device.dwFrame) return;
  m_netcoop_platform_frame=Device.dwFrame;
+ if(this!=Level().CurrentControlEntity()) {
+  if(m_netcoop_platform_car==0xffff || netcoop_seated()) return;
+  auto* car=smart_cast<CCar*>(Level().Objects.net_Find(m_netcoop_platform_car));
+  if(!car || car!=m_netcoop_platform_object || car->getDestroy()) {netcoop_platform_detach(false);return;}
+  car->netcoop_physics_follow();
+  Fvector local;local.lerp(m_netcoop_platform_from,m_netcoop_platform_local,_min(1.f,float(Device.dwTimeGlobal-m_netcoop_platform_time)/50.f));
+  car->XFORM().transform_tiny(Position(),local);
+  if(character_physics_support() && character_physics_support()->movement()) character_physics_support()->movement()->SetPosition(Position());
+  spatial_move();return;
+ }
  if(!g_Alive() || netcoop_seated() || m_netcoop_noclip || getDestroy()) {netcoop_platform_detach(false);return;}
  if(mstate_wishful & (mcJump|mcClimb)) {netcoop_platform_detach(true);return;}
  auto* control=character_physics_support() ? character_physics_support()->movement():nullptr;

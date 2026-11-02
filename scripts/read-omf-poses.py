@@ -34,7 +34,7 @@ class Motions:
             if not i:continue
             name,p=string(b,0);self.motions[name]=b[p:]
 
-    def pose(self, name, fraction=.3):
+    def pose(self, name, fraction=.3, matrices=False):
         data=self.motions[name];count=struct.unpack_from('<I',data)[0];p=4
         frame=min(count-1,round(count*fraction));local={}
         for bone in self.bones:
@@ -64,7 +64,7 @@ class Motions:
                 parent=self.parents[bone]
                 world[bone]=evaluate(parent)@local[bone] if parent else local[bone]
             return world[bone]
-        return {bone:evaluate(bone)[:3,3] for bone in self.bones}
+        return {bone:evaluate(bone).copy() if matrices else evaluate(bone)[:3,3] for bone in self.bones}
 
 if __name__=='__main__':
     root=Path(__file__).resolve().parents[2]

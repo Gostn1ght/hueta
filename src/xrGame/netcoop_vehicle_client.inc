@@ -63,6 +63,39 @@ void client_on_vehicle(NET_Packet& P)
 	if (!pure_client() || P.r_elapsed() < 1)
 		return;
 	const u8 op = P.r_u8();
+	if(op==vehicle_op_platform) {
+		if(P.r_elapsed()!=16) return;
+		const u16 id=P.r_u16(),car_id=P.r_u16();Fvector local;P.r_vec3(local);
+		CActor* actor=smart_cast<CActor*>(Level().Objects.net_Find(id));
+		if(!actor || actor==Level().CurrentControlEntity() || !_valid(local)) return;
+		CCar* car=smart_cast<CCar*>(Level().Objects.net_Find(car_id));
+		if(car_id==vehicle_seat_free) {actor->netcoop_platform_detach(false);return;}
+		if(!car || car->getDestroy()) return;
+		if(actor->m_netcoop_platform_car==car_id) {
+			const float t=_min(1.f,float(Device.dwTimeGlobal-actor->m_netcoop_platform_time)/50.f);
+			actor->m_netcoop_platform_from.lerp(actor->m_netcoop_platform_from,actor->m_netcoop_platform_local,t);
+		} else actor->m_netcoop_platform_from=local;
+		actor->m_netcoop_platform_car=car_id;actor->m_netcoop_platform_object=car;
+		actor->m_netcoop_platform_local=local;actor->m_netcoop_platform_time=Device.dwTimeGlobal;
+		return;
+	}
+	if(op==vehicle_op_animation) {
+		if(P.r_elapsed()<3) return;
+		const u16 car=P.r_u16();const u8 count=P.r_u8();
+		if(count>vehicle_max_seats || P.r_elapsed()!=u32(count)*19) return;
+		for(u32 i=0;i<count;++i) {
+			const u16 id=P.r_u16();u8 phase=P.r_u8();const u32 start=P.r_u32();Fvector outside;P.r_vec3(outside);
+			if(phase>2 || !_valid(outside)) continue;
+			CActor* actor=smart_cast<CActor*>(Level().Objects.net_Find(id));
+			if(!actor || actor->m_netcoop_seat_car!=car || actor->m_netcoop_seat!=i ||
+				(actor->m_netcoop_seat_phase_start && s32(start-actor->m_netcoop_seat_phase_start)<0)) continue;
+			if(phase==1 && s32(Level().timeServer()-start)>=1800) phase=0;
+			if(actor->m_netcoop_seat_phase!=phase || actor->m_netcoop_seat_phase_start!=start)
+				actor->m_netcoop_seat_motion.invalidate();
+			actor->m_netcoop_seat_phase=phase;actor->m_netcoop_seat_phase_start=start;actor->m_netcoop_seat_outside=outside;
+		}
+		return;
+	}
 	if (op == vehicle_op_trunk_open)
 	{
 		// A new box arrives a moment later: opened by script_vehicle_prompt.

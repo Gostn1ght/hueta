@@ -637,6 +637,7 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 		if (!m_netcoop_noclip && physics && physics->movement())
 			physics->movement()->SetPosition(accepted);
 		Position().set(accepted);
+		netcoop::platform_publish(this);
 		// Ground contact impulses are applied once by server_physics_update.
 	}
 	// What the other players see: where this player faces and looks and how

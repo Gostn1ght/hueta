@@ -18,6 +18,7 @@ tools/extract-dcp.py made.
 usage: import-dcp.py <DCP gamedata> <overlay folder> <GAMMA client configs>
 """
 import concurrent.futures
+import json
 import re
 import shutil
 import struct
@@ -111,7 +112,11 @@ def adapt_panels(data, panels):
 
 
 def seats_for(dcp, visual, profile):
-    names = model_bones(dcp / "meshes" / visual.replace("\\", "/"))
+    normalized=visual.replace("\\", "/")
+    layouts=json.loads((Path(__file__).with_name("dcp-seat-layouts.json")).read_text())
+    if normalized in layouts:
+        return [q["bone"]+":"+":".join(str(v) for v in (*q["offset"],q["yaw"])) for q in layouts[normalized]["seats"]]
+    names = model_bones(dcp / "meshes" / normalized)
     # seat_left / seat_right / seat_back... are places; "seat", "seats" are the seats' meshes
     seats = sorted({n for n in names if re.match(r"^seat_(left|right|back|rear|middle)[a-z0-9_]*$", n)})
     driver = profile.get("car_definition", {}).get("driver_place", "seat_left").strip()
@@ -199,6 +204,7 @@ def main(dcp, overlay, gamma):
             lines += ["inv_name = " + keys["inv_name"], "inv_name_short = " + keys["inv_name"]]
             names_needed.add(keys["inv_name"])
         lines.append("netcoop_seats = " + ", ".join(seats))
+        lines += ["netcoop_passenger_pose = lz_vehicle_passenger", "netcoop_passenger_drop = 0"]
         if keys.get("has_trunk", "true").lower() == "false":
             lines.append("netcoop_trunk = false")
         lines.append("")

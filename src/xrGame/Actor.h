@@ -668,6 +668,12 @@ public:
 	u32 m_netcoop_owner_teleport_until = 0;
 	void netcoop_set_noclip(bool enabled);
 	MotionID m_netcoop_seat_motion;
+	shared_str m_netcoop_passenger_pose;
+	u8 m_netcoop_seat_phase = 0; // 0 seated, 1 entering, 2 leaving
+	u32 m_netcoop_seat_phase_start = 0;
+	u16 m_netcoop_seat_door = 0xffff;
+	Fvector m_netcoop_seat_outside = {0.f,0.f,0.f};
+	CBlend* m_netcoop_seat_blends[3] = {};
 	// The driver is moved (in the car's space) until the hands of the steering
 	// pose meet the model's steering wheel bone; measured once per sitting down.
 	Fvector m_netcoop_driver_fit;
@@ -685,6 +691,9 @@ public:
 	Fvector m_netcoop_platform_local = {0.f,0.f,0.f};
 	Fvector m_netcoop_platform_velocity = {0.f,0.f,0.f};
 	Fvector m_netcoop_platform_departure = {0.f,0.f,0.f};
+	Fvector m_netcoop_platform_from = {0.f,0.f,0.f};
+	u32 m_netcoop_platform_sent = 0;
+	u16 m_netcoop_platform_sent_car = 0xffff;
 	u32 m_netcoop_platform_departure_until = 0, m_netcoop_platform_departure_time = 0;
 	u32 m_netcoop_platform_frame = u32(-1), m_netcoop_platform_time = 0;
 	void netcoop_platform_update();

@@ -9,8 +9,8 @@ import re
 
 src = (Path(__file__).resolve().parents[1] / "src/xrGame/Actor_Network.cpp").read_text(encoding="utf-8", errors="replace")
 body = src[src.index("void CActor::netcoop_follow_owner"):]
-refill = "m_netcoop_move_budget = _min(13.f, m_netcoop_move_budget + 12.f * float(now - m_netcoop_move_budget_time) / 1000.f);"
-limit = "const float allowed_h = _min(12.f * dt + 1.f, m_netcoop_move_budget);"
+refill = "m_netcoop_move_budget = _min(m_netcoop_noclip ? 65.f:13.f, m_netcoop_move_budget + (m_netcoop_noclip ? 64.f:12.f) * float(now - m_netcoop_move_budget_time) / 1000.f);"
+limit = "const float allowed_h = _min((m_netcoop_noclip ? 64.f:12.f) * dt + 1.f, m_netcoop_move_budget);"
 spend = "m_netcoop_move_budget = _max(0.f, m_netcoop_move_budget - _sqrt(delta.x * delta.x + delta.z * delta.z));"
 assert body.index(refill) < body.index(limit) < body.index(spend)
 header = (Path(__file__).resolve().parents[1] / "src/xrGame/Actor.h").read_text(encoding="utf-8", errors="replace")

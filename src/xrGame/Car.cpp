@@ -2663,6 +2663,21 @@ u16 CCar::netcoop_door_bone(u16 hit)
 	return BI_NONE;
 }
 
+u16 CCar::netcoop_nearest_entry_door(const Fvector& local)
+{
+	IKinematics* model=smart_cast<IKinematics*>(Visual());
+	if(!model) return BI_NONE;
+	CInifile* ini=model->LL_UserData();
+	u16 found=BI_NONE;float nearest=2.5f*2.5f;
+	for(const auto& door:m_doors) {
+		const u16 id=door.first;
+		if(ini && READ_IF_EXISTS(ini,r_bool,model->LL_GetData(id).name.c_str(),"non_enterable",false)) continue;
+		const float distance=model->LL_GetTransform(id).c.distance_to_sqr(local);
+		if(distance<nearest) {nearest=distance;found=id;}
+	}
+	return found;
+}
+
 u64 CCar::netcoop_broken_glass()
 {
 	u64 mask=0;IKinematics* model=smart_cast<IKinematics*>(Visual());

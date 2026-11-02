@@ -1236,13 +1236,13 @@ void CActor::UpdateCL()
 	m_snd_noise -= 0.3f * Device.fTimeDelta;
 
 	inherited::UpdateCL();
-	netcoop_platform_update();
 	m_pPhysics_support->in_UpdateCL();
 	if (netcoop::pure_client() && this != Level().CurrentControlEntity())
 		netcoop::metric_remote_actor(ID(), !!Remote(), !!g_Alive(), NET.size(),
 			NET.empty() ? -1 : s32(netcoop::snapshot_now() - NET.back().dwTimeStamp));
 	if (g_Alive() && Remote() && netcoop::pure_client())
 		netcoop_update_remote();
+	netcoop_platform_update();
 	// In a car (doc 100): at the car's pose times the seat, after the
 	// snapshot interpolation above.
 	if (netcoop_seated())
@@ -2389,7 +2389,7 @@ extern BOOL g_legs_enabled;
 
 bool canRenderLegs(CActor* actor, CHolderCustom* m_holder) noexcept
 {
-    return g_legs_enabled && actor == Level().CurrentViewEntity()
+    return (g_legs_enabled || actor->netcoop_seated()) && actor == Level().CurrentViewEntity()
         && (legs_in_low_crouch || !(actor->MovingState() & mcCrouch && actor->MovingState() & mcAccel))
         && g_player_hud
         && !m_holder

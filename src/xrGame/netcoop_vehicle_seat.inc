@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 void CActor::netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& local, const Fvector& eye)
 {
+	netcoop_platform_detach(false);
 	if(m_netcoop_noclip)netcoop_set_noclip(false);
 	const bool was_seated = netcoop_seated();
 	m_netcoop_seat_car = car;
@@ -15,6 +16,10 @@ void CActor::netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& lo
 	m_netcoop_seat_eye.set(eye);
 	m_netcoop_seat_yaw_valid = false;
 	m_netcoop_seat_motion.invalidate();
+	m_netcoop_seat_phase=0;m_netcoop_seat_phase_start=0;m_netcoop_seat_door=BI_NONE;
+	for(auto& blend:m_netcoop_seat_blends) blend=nullptr;
+	CCar* vehicle=smart_cast<CCar*>(Level().Objects.net_Find(car));
+	m_netcoop_passenger_pose=vehicle ? READ_IF_EXISTS(pSettings,r_string,vehicle->cNameSect(),"netcoop_passenger_pose","animpoint_sit_high_idle_1"):"animpoint_sit_high_idle_1";
 	m_netcoop_driver_fit.set(0.f, 0.f, 0.f);
 	m_netcoop_driver_fit_at = driver && netcoop::pure_client() ? Device.dwTimeGlobal + 400 : 0;
 	inventory().netcoop_holster_in_vehicle(); // every replica/authority, including seat switches
@@ -52,6 +57,8 @@ void CActor::netcoop_seat_leave(const Fvector& exit)
 	if (!netcoop_seated())
 		return;
 	m_netcoop_seat_car = 0xffff;
+	m_netcoop_seat_phase=0;
+	for(auto& blend:m_netcoop_seat_blends) blend=nullptr;
 	m_netcoop_seat_driver = false;
 	m_netcoop_seat_motion.invalidate();
 	if (this == Level().CurrentControlEntity())
@@ -90,12 +97,21 @@ void CActor::netcoop_seat_place()
 	Fmatrix local = m_netcoop_seat_local;
 	if (m_netcoop_seat_driver)
 		local.c.add(m_netcoop_driver_fit);
+	Fvector eye=m_netcoop_seat_eye;
+	if(m_netcoop_seat_phase) {
+		float t=_max(0.f,_min(1.f,float(s32(Level().timeServer()-m_netcoop_seat_phase_start))/1800.f));
+		t=t*t*(3.f-2.f*t);
+		if(m_netcoop_seat_phase==2) t=1.f-t;
+		local.c.lerp(m_netcoop_seat_outside,local.c,t);
+		Fvector outside_eye=m_netcoop_seat_outside;outside_eye.y+=1.6f;
+		eye.lerp(outside_eye,eye,t);
+	}
 	world.mul_43(car->XFORM(), local);
 	XFORM().set(world);
 	// Hands on the wheel (owner 2026-10-13): once the steering pose plays,
 	// the gap between the middle of the hands and the wheel bone moves the
 	// driver, within 35 cm each way, in the car's space.
-	if (m_netcoop_driver_fit_at && Device.dwTimeGlobal >= m_netcoop_driver_fit_at && m_netcoop_seat_motion.valid())
+	if (!m_netcoop_seat_phase && m_netcoop_driver_fit_at && Device.dwTimeGlobal >= m_netcoop_driver_fit_at && m_netcoop_seat_motion.valid())
 	{
 		m_netcoop_driver_fit_at = 0;
 		IKinematics* body = smart_cast<IKinematics*>(Visual());
@@ -126,7 +142,7 @@ void CActor::netcoop_seat_place()
 			}
 		}
 	}
-	car->XFORM().transform_tiny(m_netcoop_seat_eye_world, m_netcoop_seat_eye);
+	car->XFORM().transform_tiny(m_netcoop_seat_eye_world, eye);
 	if (netcoop::pure_client() && this == Level().CurrentControlEntity())
 	{
 		// The view turns with the car.
@@ -148,29 +164,36 @@ void CActor::netcoop_seat_place()
 
 bool CActor::netcoop_seat_animation()
 {
-	IKinematicsAnimated* k = smart_cast<IKinematicsAnimated*>(Visual());
-	if (!k)
-		return false;
-	MotionID motion;
-	if (m_netcoop_seat_driver)
-	{
-		CCar* car = smart_cast<CCar*>(Level().Objects.net_Find(m_netcoop_seat_car));
-		u16 type = car ? car->DriverAnimationType() : 0;
-		if (type >= SActorVehicleAnims::TYPES_NUMBER)
-			type = 0;
-		SVehicleAnimCollection& anims = m_vehicle_anims->m_vehicles_type_collections[type];
-		const u8 keys = car ? car->m_netcoop_keys : 0;
-		const bool left = !!(keys & CCar::netcoop_key_left), right = !!(keys & CCar::netcoop_key_right);
-		motion = left && !right ? anims.steer_left : right && !left ? anims.steer_right : anims.idles[0];
+	IKinematicsAnimated* k=smart_cast<IKinematicsAnimated*>(Visual());
+	if(!k) return false;
+	CCar* car=smart_cast<CCar*>(Level().Objects.net_Find(m_netcoop_seat_car));
+	MotionID motion;bool freeze=false;float progress=0.f;
+	if(m_netcoop_seat_phase) {
+		string128 name;xr_sprintf(name,"lz_vehicle_%s_%s",m_netcoop_seat_phase==1 ? "enter":"exit",m_netcoop_seat_driver ? "driver":"passenger");
+		motion=k->ID_Cycle_Safe(name);freeze=motion.valid();
+		progress=_max(0.f,_min(.999f,float(s32(Level().timeServer()-m_netcoop_seat_phase_start))/1800.f));
 	}
-	else
-		motion = k->ID_Cycle_Safe("animpoint_sit_high_idle_1");
-	if (!motion.valid())
-		return false;
-	if (motion != m_netcoop_seat_motion)
-	{
-		k->PlayCycle(motion, FALSE);
-		m_netcoop_seat_motion = motion;
+	if(!motion.valid() && m_netcoop_seat_driver) {
+		u16 type=car ? car->DriverAnimationType():0;
+		if(type>=SActorVehicleAnims::TYPES_NUMBER) type=0;
+		SVehicleAnimCollection& anims=m_vehicle_anims->m_vehicles_type_collections[type];
+		const float steering=car ? car->netcoop_steer():0.f;
+		motion=steering<-.015f ? anims.steer_left:steering>.015f ? anims.steer_right:anims.idles[0];
+		freeze=motion!=anims.idles[0];progress=_min(.999f,_abs(steering)/.6f);
+	} else if(!motion.valid()) motion=k->ID_Cycle_Safe(m_netcoop_passenger_pose.c_str());
+	if(!motion.valid()) return false;
+	if(motion!=m_netcoop_seat_motion) {
+		CMotionDef* def=k->LL_GetMotionDef(motion);if(!def) return false;
+		const LPCSTR names[]={"legs","torso","head"};
+		for(u32 i=0;i<3;++i) {
+			const u16 part=k->LL_PartID(names[i]);
+			m_netcoop_seat_blends[i]=part!=BI_NONE ? k->LL_PlayCycle(part,motion,TRUE,5.f,5.f,def->Speed(),FALSE,nullptr,nullptr,0):nullptr;
+		}
+		m_netcoop_seat_motion=motion;
+	}
+	for(auto* blend:m_netcoop_seat_blends) if(blend) {
+		blend->speed=freeze ? 0.f:1.f;
+		if(freeze) blend->timeCurrent=progress*blend->timeTotal;
 	}
 	return true;
 }

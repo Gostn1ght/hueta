@@ -25,6 +25,8 @@ enum
 	vehicle_op_fire, // client -> server: u16 car, vec3 aim direction (the gunner's seat, gun view)
 	vehicle_op_gun, // server -> client: u16 car, vec3 muzzle, vec3 direction (a shot to see and hear)
 	vehicle_op_door, // client -> server: u16 car, u16 physical door/hood/trunk bone
+	vehicle_op_animation, // server -> client: car, count, [actor, phase, time, outside point]
+	vehicle_op_platform, // server -> observers: actor, car, relative feet
 };
 
 // ---------------------------------------------------------------------------
@@ -130,7 +132,7 @@ static VehicleSeats* vehicle_seats(CCar* car)
 		Fvector offset;
 		offset.set(0.f, 0.f, 0.f);
 		_GetItem(item, 0, bone_name, ':');
-		if (_GetItemCount(item, ':') == 4)
+		if (_GetItemCount(item, ':') >= 4)
 		{
 			string32 value;
 			offset.x = float(atof(_GetItem(item, 1, value, ':')));
@@ -143,6 +145,10 @@ static VehicleSeats* vehicle_seats(CCar* car)
 		VehicleSeatPose seat;
 		seat.local.set(K->LL_GetTransform(bone));
 		seat.local.c.add(offset);
+		if(_GetItemCount(item, ':')==5) {
+			string32 value;const float yaw=float(atof(_GetItem(item,4,value,':')));
+			if(_valid(yaw)) {Fmatrix rotation;rotation.rotateY(deg2rad(yaw));seat.local.mulB_43(rotation);}
+		}
 		seat.driver = v.seats.empty();
 		seat.eye.add(seat.local.c, eye_offset);
 		if (eyes[0] && i < _GetItemCount(eyes))
@@ -386,6 +392,7 @@ static bool vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index, bool f
 			Msg("[diag][vehicle] id=%u actor=%u exit refused: standing volume blocked", car->ID(), actor->ID());
 			return false;
 		}
+		if(car && actor->m_netcoop_seat_phase && actor->m_netcoop_seat_door!=BI_NONE) car->DoorClose(actor->m_netcoop_seat_door);
 		actor->netcoop_seat_leave(exit);
 		Msg("[Lost Zone][vehicle] %s leaves seat %u", actor->cName().c_str(), index);
 	}
@@ -397,6 +404,28 @@ static bool vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index, bool f
 	v.seats[index] = vehicle_seat_free;
 	v.dirty = true;
 	return true;
+}
+
+// The authority reserves the seat for the whole transition; no physics joint
+// or client-authored animation completion can grant/release occupancy.
+static bool vehicle_transition(CCar* car,VehicleRuntime& v,const VehicleSeats& poses,u8 index,CActor* actor,bool leaving)
+{
+ if(actor->m_netcoop_seat_phase || index>=poses.seats.size()) return false;
+ Fvector outside=actor->Position();
+ if(leaving) {
+  bool clear=false;outside=vehicle_exit_position(car,poses,poses.seats[index],&clear);
+  if(!clear) return false;
+ } else vehicle_seat_server(car,v,poses,index,actor);
+ Fmatrix inverse;inverse.invert(car->XFORM());inverse.transform_tiny(actor->m_netcoop_seat_outside,outside);
+ actor->m_netcoop_seat_phase=leaving ? 2:1;
+ actor->m_netcoop_seat_phase_start=Level().timeServer();
+ actor->m_netcoop_seat_motion.invalidate();
+ actor->m_netcoop_seat_door=car->netcoop_nearest_entry_door(poses.seats[index].local.c);
+ if(actor->m_netcoop_seat_door!=BI_NONE) car->DoorOpen(actor->m_netcoop_seat_door);
+ if(actor->m_netcoop_seat_driver) {car->netcoop_drive(0);v.keys=0;}
+ v.dirty=true;
+ Msg("[diag][vehicle] car=%u actor=%u seat=%u phase=%u door=%u",car->ID(),actor->ID(),index,actor->m_netcoop_seat_phase,actor->m_netcoop_seat_door);
+ return true;
 }
 
 static VehicleRuntime* vehicle_runtime(CCar* car, const VehicleSeats& poses)

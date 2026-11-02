@@ -64,7 +64,7 @@ for kind in ("torchelo", "detector"):
             assert f"xrr_norm_torso_{base}_{kind}_{action}" in dev, (base, kind, action) and '#include "Flashlight.h"' in anim
 prone=merge.parse(str(actors/'modded_stalker_animations/netcoop_player_prone.omf'))
 expected={f'lz_prone_{grip}_{direction}' for grip in ('empty','knife','pistol','rifle') for direction in ('idle','fwd','back','left','right')}
-assert {d['name'] for d in prone['defs']}==expected
+assert {d['name'] for d in prone['defs']}==expected | {'lz_vehicle_passenger','lz_vehicle_enter_driver','lz_vehicle_exit_driver','lz_vehicle_enter_passenger','lz_vehicle_exit_passenger'}
 assert all(not d['flags']&2 for d in prone['defs']), 'prone movement must loop'
 import hashlib,json
 qa=json.loads((root.parent/'docs/audit/167_PRONE_POSE_QA.json').read_text())

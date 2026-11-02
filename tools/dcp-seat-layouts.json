@@ -1,0 +1,582 @@
+{
+  "physics/vehicles/buggy/veh_buggy_u_01.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/tr13/veh_tr13_u_01.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_05.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.7322,
+          0.0,
+          0.0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/raf/veh_raf_u_01.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.125,
+          0.0,
+          0.0896
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/paz/veh_paz_u_01.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.0041,
+          0.0005,
+          0.0042
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.3459,
+          -0.0595,
+          -0.2758
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7559,
+          -0.0595,
+          -0.2758
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1841,
+          -0.1695,
+          -1.9958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.2459,
+          -0.1695,
+          -1.9958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.3459,
+          -0.1695,
+          -1.9958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7759,
+          -0.1695,
+          -1.9958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1841,
+          -0.1695,
+          -2.7458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.2459,
+          -0.1695,
+          -2.7458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.3459,
+          -0.1695,
+          -2.7458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7759,
+          -0.1695,
+          -2.7458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1841,
+          -0.1695,
+          -3.4958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.2459,
+          -0.1695,
+          -3.4958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.3459,
+          -0.1695,
+          -3.4958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7759,
+          -0.1695,
+          -3.4958
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1841,
+          -0.1695,
+          -4.2458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.2459,
+          -0.1695,
+          -4.2458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.3459,
+          -0.1695,
+          -4.2458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7759,
+          -0.1695,
+          -4.2458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1641,
+          -0.1395,
+          -5.8458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3159,
+          -0.1395,
+          -5.8458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.7959,
+          -0.1395,
+          -5.8458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.2759,
+          -0.1395,
+          -5.8458
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.7559,
+          -0.1395,
+          -5.8458
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/paz/veh_paz_u_02.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0039,
+          0.0044,
+          0.0008
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6439,
+          0.0044,
+          0.0008
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.0161,
+          -0.0856,
+          -2.2892
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.0161,
+          -0.0856,
+          -2.8892
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6639,
+          -0.0856,
+          -2.2892
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6639,
+          -0.0856,
+          -2.8892
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1961,
+          -0.1556,
+          -3.6892
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1961,
+          -0.1556,
+          -4.2892
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1961,
+          -0.1556,
+          -4.8892
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.8439,
+          -0.1556,
+          -3.6892
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.8439,
+          -0.1556,
+          -4.2892
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.8439,
+          -0.1556,
+          -4.8892
+        ],
+        "yaw": -90
+      }
+    ]
+  },
+  "physics/vehicles/zil/veh_zil_u_02.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.0004,
+          -0.0029,
+          0.0045
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.5096,
+          -0.0029,
+          0.0045
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0296,
+          -0.0029,
+          0.0045
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.5204,
+          0.1571,
+          -1.4955
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.5204,
+          0.1571,
+          -2.0955
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.5204,
+          0.1571,
+          -2.6955
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.5204,
+          0.1571,
+          -3.2955
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.5204,
+          0.1571,
+          -3.8955
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.4396,
+          0.1571,
+          -1.4955
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.4396,
+          0.1571,
+          -2.0955
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.4396,
+          0.1571,
+          -2.6955
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.4396,
+          0.1571,
+          -3.2955
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.4396,
+          0.1571,
+          -3.8955
+        ],
+        "yaw": -90
+      }
+    ]
+  },
+  "physics/vehicles/uaz/veh_uaz_van_u_01.ogf": {
+    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0042,
+          -0.0034,
+          0.0009
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0442,
+          -0.0034,
+          0.0009
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.0258,
+          -0.0534,
+          -0.9291
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.5242,
+          -0.0534,
+          -0.9291
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0742,
+          -0.0534,
+          -0.9291
+        ],
+        "yaw": 0
+      }
+    ]
+  }
+}

@@ -698,6 +698,7 @@ public:
 	bool DoorClose(u16 id);
 	bool DoorUse(u16 id);
 	bool DoorSwitch(u16 id);
+	u16 netcoop_nearest_entry_door(const Fvector& local);
 	bool Enter(const Fvector& pos, const Fvector& dir, const Fvector& foot_pos);
 	bool Exit(const Fvector& pos, const Fvector& dir);
 	bool Use(const Fvector& pos, const Fvector& dir, const Fvector& foot_pos);

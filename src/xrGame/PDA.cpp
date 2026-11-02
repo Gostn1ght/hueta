@@ -297,6 +297,15 @@ void CPda::UpdateCL()
 		m_netcoop_state_sync = Device.dwTimeGlobal + 1000;
 	}
 
+	if(netcoop::client_owns_hud_item(this) && IsPending() && CurrStateTime()>5000 &&
+		(GetState()==eShowing || GetState()==eHiding || GetState()==eEmptyBattery)) {
+		const u32 stalled=GetState();
+		Msg("! [diag][pda] completing stalled animation item=%u state=%u elapsed=%u",ID(),stalled,CurrStateTime());
+		StopCurrentAnimWithoutCallback();SetPending(FALSE);
+		if(Actor() && Actor()->inventory().ActiveItem()==this && HudItemData()) OnAnimationEnd(stalled);
+		else {SetState(eHidden);SetNextState(eHidden);}
+	}
+
 	if (!CurrentGameUI() || !ParentIsActor() || !Actor() || Actor()->inventory().ActiveItem() != this)
 		return;
 
@@ -314,14 +323,7 @@ void CPda::UpdateCL()
 
 	u32 state = GetState();
 	bool enoughBatteryPower = hasEnoughBatteryPower();
-	if (netcoop::client_owns_hud_item(this) && IsPending() && CurrStateTime()>5000 &&
-		(state==eShowing || state==eHiding || state==eEmptyBattery))
-	{
-		Msg("! [diag][pda] completing stalled animation item=%u state=%u elapsed=%u",ID(),state,CurrStateTime());
-		StopCurrentAnimWithoutCallback();
-		OnAnimationEnd(state);
-		state=GetState();
-	}
+
 
 	if (pda->IsShown())
 	{
