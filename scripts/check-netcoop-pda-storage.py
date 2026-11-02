@@ -177,3 +177,39 @@ cmd(1,11,'pdanet hello')
 lua.execute('players[11].pda=nil;players[12].pda=1030;items[1030].owner=12')
 assert last(cmd(1,12,'pdanet hack'),'err')=='hack flash drive required'
 print('PASS PDA access: known foreign password, owned factory reset, forgotten-password recovery without data loss, exhausted physical tools')
+
+# A foreign-device permission follows its actual character across servers;
+# ownership return revokes it and changing the password invalidates old sessions.
+lua.execute('''
+tg=tg+10000
+players[14]={char=players[11].char,name="Друг",server=1,pda=1020}
+players[11].pda=nil;items[1020].owner=14
+''')
+st=last(cmd(0,14,'pdanet hello'),'state')
+assert not st.foreign and not st.locked
+assert len(last(cmd(0,14,'pdanet notes'),'notes'))==1
+lua.execute('players[14].pda=nil;players[10].pda=1020;items[1020].owner=10')
+cmd(0,10,'pdanet hello');cmd(0,10,'pdanet unlock shared123')
+cmd(0,10,'pdanet lockset shared123|changed456')
+lua.execute('players[10].pda=nil;players[14].pda=1020;items[1020].owner=14')
+assert last(cmd(0,14,'pdanet hello'),'state').foreign
+assert last(cmd(0,14,'pdanet unlock shared123'),'err')=='wrong password'
+assert not last(cmd(0,14,'pdanet unlock changed456'),'state').foreign
+# Owner session cache is bound to the password digest, not just hardware UUID.
+lua.execute('''
+make_item(1040,"device_pda_1","physical1040");items[1040].owner=11;players[11].pda=1040
+tg=tg+10000
+''')
+cmd(1,11,'pdanet hello');cmd(1,11,'pdanet lockset |first123')
+lua.execute('''
+players[17]={char=players[11].char,name="Владелец",server=1,pda=1040}
+players[11].pda=nil;items[1040].owner=17
+''')
+cmd(0,17,'pdanet hello');cmd(0,17,'pdanet unlock first123')
+lua.execute('players[17].pda=nil;players[11].pda=1040;items[1040].owner=11')
+cmd(1,11,'pdanet hello');cmd(1,11,'pdanet lockset first123|second456')
+lua.execute('players[11].pda=nil;players[17].pda=1040;items[1040].owner=17')
+assert last(cmd(0,17,'pdanet hello'),'state').locked
+assert last(cmd(0,17,'pdanet unlock first123'),'err')=='wrong password'
+assert not last(cmd(0,17,'pdanet unlock second456'),'state').locked
+print('PASS PDA grant survives reconnect, owner return revokes it, changed passwords invalidate old owner-session unlocks')

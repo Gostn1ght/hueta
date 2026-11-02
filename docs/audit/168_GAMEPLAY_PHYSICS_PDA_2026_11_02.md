@@ -190,3 +190,31 @@ cab area and was corrected. Cargo horizontal bench surfaces are at ~1.42-1.44 m,
 body floor ~1.12 m, sides x +/-1.20, rear ~-3.75. Current dcp_zil131 has only
 two cabin seats. Cargo seats, suitable low-bench pose, moving-platform support
 and fall damage remain open; geometry measurement alone is not an implementation.
+
+Owner additions, 2026-11-02: ALL grenades reportedly crash; grenades/bolts/RPG
+travel in jumps; grenade launchers do not fire. No fresh crash log is available
+(owner will supply later); latest local player log is a clean menu exit. Audit
+both projectile lifecycle and interpolation without claiming the exact reported
+crash reproduced. RocketLauncher::DetachRocket dereferences the loaded-list
+iterator in the already-launched-list branch; that iterator may be erased/end.
+Physics import also clears all interpolation samples whenever displacement is
+>3 m, even for a legitimately fast projectile between ordinary snapshots.
+
+Additional required work: placed backpack must become the stash's actual item,
+not remain in the player's inventory; pickup and take-all behavior like original;
+physical backpack on ground, container capacity. Trunks need weight capacity,
+vehicle must stall on overload. Review vehicle bulletproof glass, penetrative
+occupant damage, hull durability (~three RPG hits to destroy as requested),
+third/first-person door entry/exit/steering animations. Source external animation
+assets only with suitable availability/permissions; none has been acquired yet.
+
+Owner clarified moving platforms are NOT seat assignment: standing/walking on
+any suitable flat vehicle deck must retain platform motion. Seat counts must
+match each actual model across the fleet: one-seat buggy must not admit two;
+buses/multiseat cars must not be restricted to two. ZIL-only changes do not meet
+this requirement. All these tasks remain open.
+
+PDA follow-up regression: decryption/known-password permission survives reconnect
+and location changes; returning the device to its owner revokes foreign access.
+Unlocked owner-session cache now includes the current password digest, so an old
+session does not bypass a changed password. Actual two-server fixtures pass.

@@ -746,10 +746,21 @@ local function lock_hash(salt, password)
 end
 
 local function lock_of(char) return read("pda_lock", char) end
+local function unlock_token(char)
+	local lock=lock_of(char)
+	return char..":"..(lock and lock.hash or "")
+end
+local function mark_unlocked(id,char) unlocked[id]=unlock_token(char) end
 
 
 function is_locked(id, char)
-	return lock_of(char) ~= nil and unlocked[id] ~= char
+	if not lock_of(char) then return false end
+	-- Decryption/password permission belongs to the holder's character and
+	-- survives reconnects. Returning the device to its owner revokes it.
+	local rec=read("pda_dev",char)
+	local holder=char_of(id)
+	if rec and rec.owner~=holder and rec.hacked and rec.hacked[holder] then return false end
+	return unlocked[id] ~= unlock_token(char)
 end
 
 -- unlock <password>
@@ -758,7 +769,7 @@ function handlers.unlock(id, me, char, args)
 	if not lock then
 		local d=held_device(id,char_of(id))
 		if d and not d.own and not d.rec.hacked[char_of(id)] then return "foreign device" end
-		unlocked[id] = char; state(id, me) return
+		mark_unlocked(id,char); state(id, me) return
 	end
 	local t = tries[id]
 	if not t or t.device ~= char then t = { device = char, n = 0, until_ms = 0 } end
@@ -775,7 +786,7 @@ function handlers.unlock(id, me, char, args)
 		local _,ok=update("pda_dev",d.uid,function(v) if v then v.hacked=v.hacked or {};v.hacked[char_of(id)]=now();return v end end)
 		if not ok then return "try again" end
 	end
-	unlocked[id] = char
+	mark_unlocked(id,char)
 	state(id, me)
 end
 
@@ -787,13 +798,21 @@ function handlers.lockset(id, me, char, args)
 	if lock and lock_hash(lock.salt, old) ~= lock.hash then return "wrong password" end
 	if new ~= "" and (#new < 3 or #new > 32) then return "password 3-32 characters" end
 	if new == "" then
-		netcoop_store_swap("pda_lock", char, netcoop_store_read("pda_lock", char) or "", "")
+		if not netcoop_store_swap("pda_lock", char, netcoop_store_read("pda_lock", char) or "", "") then return "try again" end
 	else
 		local salt = string.format("%08x", math.random(0, 2147483646))
 		local text = ser({ salt = salt, hash = lock_hash(salt, new) })
 		if not netcoop_store_swap("pda_lock", char, netcoop_store_read("pda_lock", char) or "", text) then return "try again" end
 	end
-	unlocked[id] = char
+	local character=char_of(id)
+	local _,ok=update("pda_dev",char,function(v)
+		if not v then return nil end
+		v.hacked={}
+		if v.owner~=character then v.hacked[character]=now() end
+		return v
+	end)
+	if not ok then return "try again" end
+	mark_unlocked(id,char)
 	state(id, read("pda_prof", char) or me)
 end
 
@@ -1020,7 +1039,7 @@ function handlers.hack(id, me, char, args)
 	local d = held_device(id, char)
 	if not d then return "no device" end
 	if d.own and not is_locked(id,d.uid) then return "own device" end
-	if d.own or not d.rec.hacked[char] then local err = start_hack(id, char, d, "player"); if err then return err end end
+	if d.own or not d.rec.hacked[char] or is_locked(id,d.uid) then local err = start_hack(id, char, d, "player"); if err then return err end end
 	send(id, "device", device_view(id, char, d))
 end
 
@@ -1207,7 +1226,7 @@ local function devices_update(id, char, me)
 					update("pda_dev", h.uid, function(v) if v then v.hacked = v.hacked or {}; v.hacked[char] = now() return v end end)
 					if d then d.rec.hacked[char] = now() end
 				end
-				if d then unlocked[id] = d.uid end
+				if d then mark_unlocked(id,d.uid) end
 			end
 			printf("[Lost Zone] pdanet: %s hacked PDA %s", char, h.uid)
 		elseif h.kind == "npc" then
