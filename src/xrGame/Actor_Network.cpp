@@ -337,6 +337,8 @@ void CActor::net_Export(NET_Packet& P) // export to server
                 Fmatrix inverse;inverse.invert(m_netcoop_platform_object->XFORM());inverse.transform_tiny(relative,Position());
             }
             P.w_vec3(relative);
+            P.w_u16(0x534e); // sequence of THIS position sample, independent of the input channel
+            P.w_u32(m_next_input_sequence-1);
         }
 	}
 	/////////////////////////////////////////////////
@@ -500,6 +502,9 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 	P.r_u8();
 	const u16 move_state = P.r_u16();
 	u16 platform_car=0xffff;Fvector platform_local;platform_local.set(0,0,0);
+    u32 owner_sequence=0;bool owner_sequence_valid=false;
+    // Reordered position datagrams must not spend the movement budget walking backwards.
+    if(m_netcoop_owner_time && time_stamp<m_netcoop_owner_time) return;
 	Fvector accel;
 	accel.set(0.f, 0.f, 0.f);
 	if (P.r_elapsed() >= 2 * sizeof(u16) + 2 * sizeof(u8))
@@ -521,7 +526,14 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 			shared_str owner_visual; P.r_stringZ(owner_visual);
             if(P.r_elapsed()>=18) {
                 const u32 at=P.r_tell();
-                if(P.r_u16()==0x504c) {platform_car=P.r_u16();P.r_vec3(platform_local);}
+                if(P.r_u16()==0x504c) {
+                    platform_car=P.r_u16();P.r_vec3(platform_local);
+                    if(P.r_elapsed()>=8) {
+                        const u32 sequence_at=P.r_tell();
+                        if(P.r_u16()==0x534e) {owner_sequence=P.r_u32();owner_sequence_valid=true;}
+                        else P.r_seek(sequence_at);
+                    }
+                }
                 else P.r_seek(at);
             }
 			if (!m_netcoop_owner_time || time_stamp >= m_netcoop_owner_time)
@@ -637,7 +649,8 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 		if (!m_netcoop_noclip && physics && physics->movement())
 			physics->movement()->SetPosition(accepted);
 		Position().set(accepted);
-		netcoop::platform_publish(this);
+		if(owner_sequence_valid) {m_netcoop_owner_sequence=owner_sequence;m_netcoop_owner_sequence_valid=true;}
+        netcoop::platform_publish(this);
 		// Ground contact impulses are applied once by server_physics_update.
 	}
 	// What the other players see: where this player faces and looks and how

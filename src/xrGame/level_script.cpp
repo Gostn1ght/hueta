@@ -423,6 +423,11 @@ u32 vertex_in_direction(u32 level_vertex_id, Fvector direction, float max_distan
 	return (ai().level_graph().valid_vertex_id(result) ? result : level_vertex_id);
 }
 
+bool valid_vertex(u32 level_vertex_id)
+{
+    return ai().level_graph().valid_vertex_id(level_vertex_id);
+}
+
 Fvector vertex_position(u32 level_vertex_id)
 {
 	if (!ai().level_graph().valid_vertex_id(level_vertex_id))
@@ -2585,7 +2590,8 @@ void CLevel::script_register(lua_State* L)
 			def("rain_wetness", rain_wetness),
 			def("rain_hemi", rain_hemi),
 			def("patrol_path_exists", patrol_path_exists),
-			def("vertex_position", vertex_position),
+			def("valid_vertex", valid_vertex),
+            def("vertex_position", vertex_position),
 			def("name", get_name),
 			def("prefetch_sound", prefetch_sound),
 

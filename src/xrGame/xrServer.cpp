@@ -971,7 +971,14 @@ u32 xrServer::OnMessage(NET_Packet& P, ClientID sender) // Non-Zero means broadc
             CopyMemory(&object_id, P.B.data + 2, sizeof(object_id));
             if (object_id != CL->owner->ID) break; // A client may update only its own actor.
             if (IsGameTypeSingle() && strstr(Core.Params, "-netcoop") &&
-                !gamma_net::valid_coop_actor(P.B.data + 8, P.B.count - 8)) break;
+                !gamma_net::valid_coop_actor(P.B.data + 8, P.B.count - 8)) {
+                static u32 dropped=0,next_log=0;++dropped;
+                if(Device.dwTimeGlobal>=next_log) {
+                    Msg("! [diag][owner-wire] actor=%u rejected=%u bytes=%u: actor layout or numeric validation failed",object_id,dropped,P.B.count-8);
+                    dropped=0;next_log=Device.dwTimeGlobal+1000;
+                }
+                break;
+            }
 			//-------------------------------------------------------------------
 			u32 ClientPing = CL->stats.getPing();
 			P.w_seek(P.r_tell() + 2, &ClientPing, 4);

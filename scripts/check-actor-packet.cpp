@@ -36,6 +36,20 @@ int main()
             require(!gamma_net::valid_coop_actor(p.data(),p.size()));
         }
     }
+    for (bool physics : {false,true}) for (bool sequence : {false,true}) {
+        auto p=packet("actors\\stalker.ogf",physics);
+        const std::size_t at=65+std::strlen("actors\\stalker.ogf")+1;
+        std::vector<unsigned char> extension(16,0);extension[0]=0x4c;extension[1]=0x50;extension[2]=extension[3]=0xff;
+        if(sequence) {extension.resize(22,0);extension[16]=0x4e;extension[17]=0x53;extension[18]=17;}
+        p.insert(p.begin()+at,extension.begin(),extension.end());
+        require(gamma_net::valid_coop_actor(p.data(),p.size()));
+        for(std::size_t n=0;n<p.size();++n) require(!gamma_net::valid_coop_actor(p.data(),n));
+        auto invalid=p;const float nan=std::numeric_limits<float>::quiet_NaN();
+        std::memcpy(invalid.data()+at+4,&nan,4);require(!gamma_net::valid_coop_actor(invalid.data(),invalid.size()));
+        invalid=p;invalid[at]=0x4d;require(!gamma_net::valid_coop_actor(invalid.data(),invalid.size()));
+        if(sequence) {invalid=p;invalid[at+16]=0x4d;require(!gamma_net::valid_coop_actor(invalid.data(),invalid.size()));}
+        invalid=p;invalid.push_back(0);require(!gamma_net::valid_coop_actor(invalid.data(),invalid.size()));
+    }
     std::vector<unsigned char> old(61,0), unterminated(100,'a');
     require(!gamma_net::valid_coop_actor(old.data(),old.size()));
     require(!gamma_net::valid_coop_actor(unterminated.data(),unterminated.size()));

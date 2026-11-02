@@ -323,8 +323,14 @@ jobs:
           python scripts/check-native-level-transition.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-physics-push.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-platform.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-vehicle-controls.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-owner-wire.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-destroy-progress.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-corpse-drag.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

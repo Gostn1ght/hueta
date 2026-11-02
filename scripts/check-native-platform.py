@@ -69,6 +69,9 @@ int main(){
  assert(actor.netcoop_platform_accept(7,local,feet,target,base));
  assert(std::abs(target.x-1)<.001f&&std::abs(base.x-1)<.001f&&std::abs(actor.m_netcoop_platform_velocity.x-20)<.001f);
  actor.m_netcoop_platform_local={.2f,0,0};car.pose.yaw=1.5707963f;
+ Fvector rejected_position{.1f,0,0},rejected_base{9,9,9};
+ fail_ray=rays;assert(!actor.netcoop_platform_accept(7,local,rejected_position,rejected_position,rejected_base));fail_ray=99;
+ assert(rejected_position.x==.1f&&rejected_base.x==9); // alias remains intact on a failed surface probe
  Fvector reported{1.3f,0,0};local={.3f,0,0};
  assert(actor.netcoop_platform_accept(7,local,reported,target,base));
  assert(std::abs(target.z+.3f)<.001f&&std::abs(base.z+.2f)<.001f); // walking remains relative to turning deck

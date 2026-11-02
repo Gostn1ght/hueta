@@ -609,6 +609,8 @@ public:
 	// Owner's real-time clock of the last accepted update, and its offset to
 	// server time (lower envelope of receive time - owner time).
 	u32 m_netcoop_owner_time = 0;
+	u32 m_netcoop_owner_sequence = 0;
+	bool m_netcoop_owner_sequence_valid = false;
 	// Server time when the newest owner update arrived: the time stamp of
 	// this player's snapshots (the owner-clock mapping jumped, s102).
 	u32 m_netcoop_owner_received = 0;

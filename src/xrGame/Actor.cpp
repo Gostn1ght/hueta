@@ -932,6 +932,11 @@ void CActor::SwitchOutBorder(bool new_border_state)
 	m_bOutBorder = new_border_state;
 }
 
+static bool actor_collision_damage_local(CObject* initiator)
+{
+    return !netcoop::pure_client() || !smart_cast<CCar*>(initiator);
+}
+
 void CActor::g_Physics(Fvector& _accel, float jump, float dt)
 {
 	if(m_netcoop_noclip) {
@@ -1005,7 +1010,11 @@ void CActor::g_Physics(Fvector& _accel, float jump, float dt)
 			di->HitDir(hdir);
 			SetHitInfo(initiator, NULL, 0, Fvector().set(0, 0, 0), hdir);
 			//				Hit	(m_PhysicMovementControl->gcontact_HealthLost,hdir,di->DamageInitiator(),m_PhysicMovementControl->ContactBone(),di->HitPos(),0.f,ALife::eHitTypeStrike);//s16(6 + 2*::Random.randI(0,2))
-			if (Level().CurrentControlEntity() == this)
+			// Replica contact solvers report penetration impulses as impact damage,
+            // even when a car is parked. Moving vehicles hit players once on
+            // the authority (vehicle_run_over), never from replica impulses.
+            if (Level().CurrentControlEntity() == this &&
+                actor_collision_damage_local(initiator))
 			{
 				SHit HDS = SHit(mctrl->gcontact_HealthLost,
 				                //.								0.0f,
@@ -1168,11 +1177,14 @@ bool CActor::ServerProcessInputs(float server_dt)
 		CL->m_current_intent.mstate &= ~mcJump;
 		
 		// The snapshot must follow the authoritative physics step.
-		if (!CL->m_has_processed_input)
+		if (!CL->m_has_processed_input || (netcoop::enabled() && !m_netcoop_owner_sequence_valid))
 			return true;
 		NET_Packet P;
 		P.w_begin(M_CL_INPUT_ACK);
-		P.w_u32(CL->m_last_processed_sequence);
+		// Input intent and absolute snapshots travel on different channels. Pair
+        // the ACK with the sequence carried by the accepted position, never a
+        // newer input whose corresponding position has not arrived yet.
+        P.w_u32(netcoop::enabled() ? m_netcoop_owner_sequence:CL->m_last_processed_sequence);
 		P.w_vec3(Position());
 		Fvector vel; vel.set(0,0,0);
 		if (character_physics_support() && character_physics_support()->movement()) {

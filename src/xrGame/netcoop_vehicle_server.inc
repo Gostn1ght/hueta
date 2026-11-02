@@ -57,8 +57,11 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 				return;
 			}
 			// Next to the car: its size plus an arm's length.
-			if (actor->Position().distance_to(car->Position()) > car->Radius() + 2.5f)
-				return;
+			if (actor->Position().distance_to(car->Position()) > car->Radius() + 2.5f) {
+                Msg("[diag][vehicle] enter refused actor=%u car=%u distance=%.2f limit=%.2f",actor->ID(),car->ID(),actor->Position().distance_to(car->Position()),car->Radius()+2.5f);
+                cluster_refuse(server,CL,"Move closer to the vehicle; the server has not received your current position yet");
+                return;
+            }
 			vehicle_transition(car, v, *poses, seat, actor, false);
 		}
 		break;

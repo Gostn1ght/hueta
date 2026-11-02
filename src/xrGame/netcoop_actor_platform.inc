@@ -126,8 +126,8 @@ bool CActor::netcoop_platform_accept(u16 id,const Fvector& local,Fvector reporte
   if(distance<nearest) {nearest=distance;match=&frame;}
  }
  if(!match) return false;
- car->XFORM().transform_tiny(target,local);
- if(netcoop::platform_surface(this,target,car)!=car) return false;
+ Fvector candidate;car->XFORM().transform_tiny(candidate,local);
+ if(netcoop::platform_surface(this,candidate,car)!=car) return false;
  Fvector previous;
  if(m_netcoop_platform_car==id && m_netcoop_platform_object==car) previous=m_netcoop_platform_local;
  else {
@@ -135,7 +135,9 @@ bool CActor::netcoop_platform_accept(u16 id,const Fvector& local,Fvector reporte
   if(Position().distance_to(reported)>2.5f) return false;
   Fmatrix inverse;inverse.invert(match->pose);inverse.transform_tiny(previous,Position());
  }
- car->XFORM().transform_tiny(base,previous);
+ // Commit output arguments only after every rejection check. The caller
+ // aliases target with its incoming owner position.
+ target=candidate;car->XFORM().transform_tiny(base,previous);
  const auto& frames=found->second.frames;
  if(frames.size()>=2) {
   const auto& a=frames[frames.size()-2];const auto& b=frames.back();

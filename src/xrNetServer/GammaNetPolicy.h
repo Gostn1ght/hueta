@@ -18,14 +18,30 @@ inline bool newer(std::uint32_t a, std::uint32_t b)
 }
 
 // CActor::net_Export: 59 movement bytes, three equipment ids, a NUL-terminated
-// visual, then a two-byte body count and optionally one 77-byte physics state.
+// visual, optional owner platform/sample sequence, a two-byte body count,
+// and optionally one 77-byte physics state. Keep legacy clients readable.
 // Validate before the host imports floats into movement/physics state.
 inline bool valid_coop_actor(const unsigned char* data, std::size_t size)
 {
     if (!data || size < 68) return false;
     const auto* end = static_cast<const unsigned char*>(std::memchr(data + 65, 0, size - 65));
     if (!end || end - (data + 65) > 1023) return false;
-    const std::size_t count_offset = std::size_t(end - data) + 1;
+    std::size_t count_offset = std::size_t(end - data) + 1;
+    if (size - count_offset >= 2 && data[count_offset] == 0x4c && data[count_offset + 1] == 0x50)
+    {
+        if (size - count_offset < 18) return false;
+        for (std::size_t offset = count_offset + 4; offset < count_offset + 16; offset += 4)
+        {
+            float value; std::memcpy(&value, data + offset, sizeof(value));
+            if (!std::isfinite(value) || std::fabs(value) > 100000.0f) return false;
+        }
+        count_offset += 16;
+        if (size - count_offset >= 2 && data[count_offset] == 0x4e && data[count_offset + 1] == 0x53)
+        {
+            if (size - count_offset < 8) return false;
+            count_offset += 6;
+        }
+    }
     if (count_offset + 2 > size || data[count_offset + 1] != 0 || data[count_offset] > 1) return false;
     const std::size_t body_offset = count_offset + 2;
     if (size != body_offset + (data[count_offset] ? 77u : 0u)) return false;

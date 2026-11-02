@@ -10,6 +10,7 @@
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "netcoop.h"
 #include "netcoop_corpse_inventory.h"
+#include "netcoop_destroy_tree.h"
 
 xr_string xrServer::ent_name_safe(u16 eid)
 {
@@ -47,12 +48,24 @@ void xrServer::Process_event_destroy(NET_Packet& P, ClientID sender, u32 time, u
 	xrClientData* c_from = ID_to_client(sender); // клиент, кто прислал
 	// A client may only destroy its own objects; a forged or stale event must
 	// not stop the server (it used to be an assertion).
-	if (!c_dest || c_dest != c_from)
+	if (!netcoop::destroy_authorized(pEPack != nullptr, c_from && c_from->flags.bLocal, c_dest && c_dest == c_from))
 	{
 		Msg("! [Lost Zone] GE_DESTROY for entity %u rejected: not owned by the sender", id_dest);
 		return;
 	}
-	u16 parent_id = e_dest->ID_Parent;
+	// Validate the graph before releasing any object or emitting a partial pack.
+    if (!pEPack && !netcoop::destroy_tree_valid(id_dest,
+        [&](unsigned id) -> const xr_vector<u16>* {
+            const auto* object=game->get_entity_from_eid(u16(id));
+            return object ? &object->children:nullptr;
+        },
+        [&](unsigned parent,unsigned child) {
+            const auto* object=game->get_entity_from_eid(u16(child));
+            return object && object->ID_Parent==parent;
+        })) {
+        Msg("! [diag][destroy] root=%u retained: invalid child graph",id_dest);return;
+    }
+    u16 parent_id = e_dest->ID_Parent;
 
 #ifdef MP_LOGGING
 	Msg("--- SV: Process destroy: parent [%d] item [%d][%s]", 
@@ -103,8 +116,13 @@ void xrServer::Process_event_destroy(NET_Packet& P, ClientID sender, u32 time, u
 	{
 		if (!pEventPack) pEventPack = &P2;
 
-		while (!e_dest->children.empty())
-			Process_event_destroy(P, sender, time, *e_dest->children.begin(), pEventPack);
+		if (!netcoop::destroy_children(e_dest->children,[&](u16 child) {
+            Process_event_destroy(P,sender,time,child,pEventPack);
+        })) {
+            Msg("! [diag][destroy] root=%u retained: child destroy made no progress",id_dest);
+            if (!pEPack && pEventPack->B.count>sizeof(u16)) SendBroadcast(BroadcastCID,*pEventPack,MODE);
+            return;
+        }
 	};
 
 	if (0xffff == parent_id && NULL == pEventPack)
