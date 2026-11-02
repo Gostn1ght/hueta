@@ -1,4 +1,5 @@
 #include "StdAfx.h"
+#include "stable_angular_drag.h"
 #include "PHDynamicData.h"
 #include "Physics.h"
 #include "tri-colliderknoopc/dTriList.h"
@@ -547,16 +548,17 @@ void CPHElement::PhDataUpdate(dReal step)
 	//////////////////air resistance/////////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	if (!fis_zero(k_w))
-		dBodyAddTorque(
-			m_body,
-			-angular_velocity[0] * k_w,
-			-angular_velocity[1] * k_w,
-			-angular_velocity[2] * k_w
-		);
-
 	dMass mass;
 	dBodyGetMass(m_body, &mass);
+	const dReal angular_drag = stable_angular_drag(k_w, mass.I, dReal(fixed_step));
+	if (angular_drag > 0)
+		dBodyAddTorque(
+			m_body,
+			-angular_velocity[0] * angular_drag,
+			-angular_velocity[1] * angular_drag,
+			-angular_velocity[2] * angular_drag
+		);
+
 	dReal l_air = linear_velocity_mag * k_l; //force/velocity !!!
 	if (l_air > mass.mass / fixed_step) l_air = mass.mass / fixed_step; //validate
 

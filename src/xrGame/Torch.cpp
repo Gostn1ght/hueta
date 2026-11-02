@@ -135,6 +135,8 @@ void CTorch::Switch()
 
 void CTorch::Switch(bool light_on)
 {
+	CActor* pActor = smart_cast<CActor*>(H_Parent());
+	if (pActor && pActor->netcoop_seated()) light_on = false;
 	// Netcoop: this client's own torch - tell the server (other players see
 	// its light through the server's copy).
 	if (light_on != m_switched_on && netcoop::client_owns_hud_item(this))
@@ -144,7 +146,6 @@ void CTorch::Switch(bool light_on)
 		P.w_u8(light_on ? 1 : 0);
 		u_EventSend(P);
 	}
-	CActor* pActor = smart_cast<CActor*>(H_Parent());
 	if (pActor)
 	{
 		if (light_on && !m_switched_on)
@@ -318,6 +319,9 @@ extern BOOL r_optimize_torch = TRUE;
 void CTorch::UpdateCL()
 {
 	inherited::UpdateCL();
+	if (m_switched_on)
+		if (CActor* actor = smart_cast<CActor*>(H_Parent()))
+			if (actor->netcoop_seated()) Switch(false);
 
 	if (!m_switched_on) return;
 

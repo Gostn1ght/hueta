@@ -95,8 +95,12 @@ void CAI_Trader::BoneCallback(CBoneInstance* B)
 
 void CAI_Trader::LookAtActor(CBoneInstance* B)
 {
+	// Dedicated servers have no local camera entity, including while AI
+	// visibility asks for a trader bone before any player has connected.
+	CObject* target = Level().CurrentEntity();
+	if (!target || target->getDestroy()) return;
 	Fvector dir;
-	dir.sub(Level().CurrentEntity()->Position(), Position());
+	dir.sub(target->Position(), Position());
 
 	float yaw, pitch;
 	dir.getHP(yaw, pitch);

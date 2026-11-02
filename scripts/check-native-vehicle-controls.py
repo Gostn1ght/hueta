@@ -1,4 +1,4 @@
-"""CI-only real ignition input and authoritative entry/exit reservation."""
+"""CI-only real ignition input and authoritative instant entry/exit rollback."""
 import os,subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -34,6 +34,8 @@ struct World{u32 now=1000;u32 timeServer(){return now;}}world;World&Level(){retu
 bool exit_clear=true;unsigned reservations=0;
 Fvector vehicle_exit_position(CCar*,const VehicleSeats&,const Seat&,bool*clear){*clear=exit_clear;return {2,0,0};}
 void vehicle_seat_server(CCar*,VehicleRuntime&v,const VehicleSeats&,u8 i,CActor*a){v.seats[i]=a->ID();a->seated=true;++reservations;}
+CActor* current_actor=nullptr;
+bool vehicle_unseat_server(CCar*,VehicleRuntime&v,u8 i,bool force){if(!exit_clear&&!force)return false;v.seats[i]=65535;current_actor->seated=false;return true;}
 void Msg(const char*,...){}
 '''+method('src/xrGame/Car.cpp','void CCar::netcoop_drive(')+method('src/xrGame/netcoop_vehicles.inc','static bool vehicle_transition(')+r'''
 int main(){
@@ -43,14 +45,13 @@ int main(){
  car.netcoop_drive(1);car.StartEngine();car.netcoop_drive(1);assert(car.started==1&&car.pressed[0]==1);
  car.netcoop_drive(1);assert(car.pressed[0]==1);car.b_engine_on=false;car.netcoop_drive(1);assert(car.released[0]==1&&!car.m_netcoop_keys);
  CCar heli;heli.m_netcoop_heli.on=true;heli.netcoop_drive(16);assert(!heli.started); // collective is not ignition
- CActor actor;VehicleRuntime v;VehicleSeats poses;actor.position={-2,0,0};
- assert(vehicle_transition(&car,v,poses,0,&actor,false));assert(actor.seated&&v.seats[0]==7&&actor.m_netcoop_seat_phase==1&&car.opens==1);
- assert(actor.m_netcoop_seat_outside.x==-2&&actor.m_netcoop_seat_phase_start==1000);
- assert(!vehicle_transition(&car,v,poses,0,&actor,false)&&reservations==1); // repeat cannot reserve again
- actor.m_netcoop_seat_phase=0;exit_clear=false;assert(!vehicle_transition(&car,v,poses,0,&actor,true));assert(actor.seated&&actor.m_netcoop_seat_phase==0);
- exit_clear=true;assert(vehicle_transition(&car,v,poses,0,&actor,true));assert(actor.m_netcoop_seat_phase==2&&actor.m_netcoop_seat_outside.x==2&&v.seats[0]==7);
+ CActor actor;current_actor=&actor;VehicleRuntime v;VehicleSeats poses;actor.position={-2,0,0};
+ assert(vehicle_transition(&car,v,poses,0,&actor,false));assert(actor.seated&&v.seats[0]==7&&actor.m_netcoop_seat_phase==0&&car.opens==0);
+ actor.m_netcoop_seat_phase=1;assert(!vehicle_transition(&car,v,poses,0,&actor,false)&&reservations==1);actor.m_netcoop_seat_phase=0;
+ exit_clear=false;assert(!vehicle_transition(&car,v,poses,0,&actor,true));assert(actor.seated&&v.seats[0]==7);
+ exit_clear=true;assert(vehicle_transition(&car,v,poses,0,&actor,true));assert(!actor.seated&&v.seats[0]==65535&&car.closes==0);
  assert(!vehicle_transition(&car,v,poses,2,&actor,true));
- puts("PASS actual vehicle controls/transitions: manual ignition, held pedal, stall release, steering/handbrake, helicopter collective, seat reservation, duplicate entry, blocked exit and delayed release");
+ puts("PASS actual vehicle controls/transitions: manual ignition, held pedal, stall release, steering/handbrake, helicopter collective, instant seat reservation, no rejected transition clips, blocked exit and release");
 }
 '''
 with TemporaryDirectory() as tmp:

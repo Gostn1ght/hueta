@@ -21,8 +21,9 @@ void CActor::netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& lo
 	CCar* vehicle=smart_cast<CCar*>(Level().Objects.net_Find(car));
 	m_netcoop_passenger_pose=vehicle ? READ_IF_EXISTS(pSettings,r_string,vehicle->cNameSect(),"netcoop_passenger_pose","animpoint_sit_high_idle_1"):"animpoint_sit_high_idle_1";
 	m_netcoop_driver_fit.set(0.f, 0.f, 0.f);
-	m_netcoop_driver_fit_at = driver && netcoop::pure_client() ? Device.dwTimeGlobal + 400 : 0;
+	m_netcoop_driver_fit_at = 0; // the seat anchors the pelvis; never move it to fit the hands
 	inventory().netcoop_holster_in_vehicle(); // every replica/authority, including seat switches
+	if (CTorch* torch = smart_cast<CTorch*>(inventory().ItemFromSlot(TORCH_SLOT))) torch->Switch(false);
 	if (!was_seated)
 	{
 		CPHMovementControl* movement = character_physics_support() ? character_physics_support()->movement() : nullptr;
@@ -95,8 +96,6 @@ void CActor::netcoop_seat_place()
 		car->netcoop_physics_follow();
 	Fmatrix world;
 	Fmatrix local = m_netcoop_seat_local;
-	if (m_netcoop_seat_driver)
-		local.c.add(m_netcoop_driver_fit);
 	Fvector eye=m_netcoop_seat_eye;
 	if(m_netcoop_seat_phase) {
 		float t=_max(0.f,_min(1.f,float(s32(Level().timeServer()-m_netcoop_seat_phase_start))/1800.f));
@@ -108,40 +107,6 @@ void CActor::netcoop_seat_place()
 	}
 	world.mul_43(car->XFORM(), local);
 	XFORM().set(world);
-	// Hands on the wheel (owner 2026-10-13): once the steering pose plays,
-	// the gap between the middle of the hands and the wheel bone moves the
-	// driver, within 35 cm each way, in the car's space.
-	if (!m_netcoop_seat_phase && m_netcoop_driver_fit_at && Device.dwTimeGlobal >= m_netcoop_driver_fit_at && m_netcoop_seat_motion.valid())
-	{
-		m_netcoop_driver_fit_at = 0;
-		IKinematics* body = smart_cast<IKinematics*>(Visual());
-		IKinematics* model = smart_cast<IKinematics*>(car->Visual());
-		const u16 wheel = car->netcoop_steer_bone();
-		const u16 left = body ? body->LL_BoneID("bip01_l_hand") : BI_NONE;
-		const u16 right = body ? body->LL_BoneID("bip01_r_hand") : BI_NONE;
-		if (model && wheel != BI_NONE && left != BI_NONE && right != BI_NONE)
-		{
-			body->CalculateBones_Invalidate();
-			body->CalculateBones(TRUE);
-			model->CalculateBones(TRUE);
-			Fvector hands, grip;
-			hands.add(body->LL_GetTransform(left).c, body->LL_GetTransform(right).c).mul(0.5f);
-			XFORM().transform_tiny(hands); // world
-			car->XFORM().transform_tiny(grip, model->LL_GetTransform(wheel).c);
-			Fmatrix to_car;
-			to_car.invert(car->XFORM());
-			to_car.transform_tiny(hands);
-			to_car.transform_tiny(grip);
-			Fvector fit;
-			fit.sub(grip, hands);
-			clamp(fit.x, -0.35f, 0.35f); clamp(fit.y, -0.35f, 0.35f); clamp(fit.z, -0.35f, 0.35f);
-			if (_valid(fit))
-			{
-				m_netcoop_driver_fit.set(fit);
-				Msg("[Lost Zone][vehicle] %s: driver moved %.2f %.2f %.2f to the wheel", car->cNameSect().c_str(), fit.x, fit.y, fit.z);
-			}
-		}
-	}
 	car->XFORM().transform_tiny(m_netcoop_seat_eye_world, eye);
 	if (netcoop::pure_client() && this == Level().CurrentControlEntity())
 	{

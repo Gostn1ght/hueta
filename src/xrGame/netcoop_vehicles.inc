@@ -406,25 +406,13 @@ static bool vehicle_unseat_server(CCar* car, VehicleRuntime& v, u8 index, bool f
 	return true;
 }
 
-// The authority reserves the seat for the whole transition; no physics joint
-// or client-authored animation completion can grant/release occupancy.
+// Universal door-reaching clips were rejected in the owner playtest. Keep
+// authoritative instant occupancy until model-specific transitions are ready.
 static bool vehicle_transition(CCar* car,VehicleRuntime& v,const VehicleSeats& poses,u8 index,CActor* actor,bool leaving)
 {
  if(actor->m_netcoop_seat_phase || index>=poses.seats.size()) return false;
- Fvector outside=actor->Position();
- if(leaving) {
-  bool clear=false;outside=vehicle_exit_position(car,poses,poses.seats[index],&clear);
-  if(!clear) return false;
- } else vehicle_seat_server(car,v,poses,index,actor);
- Fmatrix inverse;inverse.invert(car->XFORM());inverse.transform_tiny(actor->m_netcoop_seat_outside,outside);
- actor->m_netcoop_seat_phase=leaving ? 2:1;
- actor->m_netcoop_seat_phase_start=Level().timeServer();
- actor->m_netcoop_seat_motion.invalidate();
- actor->m_netcoop_seat_door=car->netcoop_nearest_entry_door(poses.seats[index].local.c);
- if(actor->m_netcoop_seat_door!=BI_NONE) car->DoorOpen(actor->m_netcoop_seat_door);
- if(actor->m_netcoop_seat_driver) {car->netcoop_drive(0);v.keys=0;}
- v.dirty=true;
- Msg("[diag][vehicle] car=%u actor=%u seat=%u phase=%u door=%u",car->ID(),actor->ID(),index,actor->m_netcoop_seat_phase,actor->m_netcoop_seat_door);
+ if(leaving) return vehicle_unseat_server(car,v,index,false);
+ vehicle_seat_server(car,v,poses,index,actor);
  return true;
 }
 
