@@ -1,6 +1,6 @@
 # Gameplay follow-up after 2026.11.02.1
 
-Status: PDA work and follow-up released through 2026.11.02.3.
+Status: PDA, corpse/item/projectile and physical-stash follow-up released through 2026.11.02.5.
 Vehicle, loose-item/corpse physics, prone and PDA rendering work
 remain open. Offline checks do not establish in-game acceptance.
 
@@ -258,3 +258,69 @@ fixture covers actual methods, missing/duplicate/reordered lists and high-speed
 versus teleport trajectories; still no live projectile acceptance or reproduced
 owner grenade crash. Pending-server projectile spawn/first-shot ordering needs
 further review for RG6 and underbarrel variants.
+
+
+2026.11.02.4 delivered: native c7fcbdc647fb6cfb1961b35efda66da82faf19d0,
+mandatory DX11/shader/native fixture/package/private preservation gates passed
+in CI 41447105613 (optional DX8 may still be running). Data 49ced2973,
+resource CI 41448699244 passed. Authenticated patch 000056 payloads:
+client 1, server 3; effective mounted bytes match source. Unpublished 000055
+is superseded, never installed. The RPG/launcher rocket class is CCustomRocket,
+not CMissile: excluded it from the 12 m/s loose-object clamp and foot nudges.
+Server Lua transfers now validate ownership/save safety and roll a refused
+take back to its source through the existing authoritative event path.
+
+Physical backpack stashes preserve the original UID/condition. Deployment is
+queued and bound to item UID; bag pickup packs remaining items without a
+carry-weight refusal. Empty-only removal follows observed live ownership.
+Restart/disconnect, reused IDs, refused transfer, take-all, medical/equipped/
+quest/ammo exclusions and early native notification are covered by actual Lua
+fixtures. Stock client recreation is disabled; legacy saved stashes retain
+one-time old packing behavior. Physical ground-proxy behavior, trunk load
+limits and fleet seating/platforms remain open.
+
+Signed manifest manifests/2026.11.02.4-918683b7.bin, BLAKE3
+918683b7c211a529e284682f82854a6fe60083890d61a7c1ffc4bb60a601de3c,
+151 client files; signature, reconstructed changes, previous protected archives
+and P2P verified. Server ZIP: 2,774,824,364 bytes, 48 entries, SHA256
+99a24497c9dc0517cebdc464575a757fda30243b2be6bbf4783a106638f83f81.
+Owner client, public server and optional local dedicated addon updated; runtime
+and running unchanged master preserved; no game processes launched.
+Receipts: J:/LostZone_Work/_work/world_update_20261102_gameplay_v12.
+Matching private PDB SHA256:
+735bf11f5b0f3880e06885391a37b085f4f59f241319568aff76ff8837398d25.
+Remote hoster installation and actual gameplay acceptance are not claimed.
+
+Russian owner task ledger: ÇÀÄÀ×È_LOST_ZONE.md. Initial version incorrectly
+classified shipped work as entirely open. Reconciled published evidence from
+audits 145-147 and 161-167, with completed components and remaining/recurrent
+symptoms separated. No blanket claim that all cars/crashes are fixed.
+
+Texture report investigation: current local player settings have texture_lod 0,
+anisotropy 8 and mip bias -0.5. Latest available player log contains no texture
+memory-pressure retry message. The loader reduces mips only after allocation
+failure, not on normal success. These local facts do not establish the tester's
+settings, affected assets or the cause of missing multilayer materials.
+
+
+2026.11.02.5 follow-up delivered: engine c7fcbdc64 unchanged, full CI
+41447105613 now completed successfully including optional DX8. Data c20958d57,
+resource CI 41450783338 passed. Server-only patch 000057 preserves all prior
+archives; client data stays 000056. Accepted bag pickup finishes after walking
+away, since reach was already validated when the bag was taken. Added the
+actual delayed-ownership/moving-recipient regression. All older stash tests pass.
+
+Publisher verification initially expected a native binary change; this is a
+server-only follow-up. Corrected the verifier to require exactly README/layout
+changes and independently prove that the reviewed native file Merkle is unchanged.
+The already published signed .5 was verified without republishing or replacing
+protected archives. No release/test gate was bypassed.
+
+Manifest manifests/2026.11.02.5-e52c3127.bin, BLAKE3
+e52c31278db090758b0f6fd17455df123ce2501e70f9075d750e319e962996aa,
+151 files. Signed manifest and changed bytes verified, P2P online. Server ZIP:
+2,774,834,506 bytes, 49 files, SHA256
+270973333e52708831321549bb025aaab4ceeb9fa2159851519f244db46ca1dc.
+Matching client/public server/local dedicated addon delivered; current unchanged
+master, runtime and saves preserved. No game launched and no remote hoster
+installation claimed. Receipts: world_update_20261102_gameplay_v13.
