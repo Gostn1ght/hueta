@@ -643,7 +643,7 @@ public:
 		float rain = 0.f;
 		u32 weather_probe = 0;
 		u32 diagnostic_at = 0;
-		struct Gear {u16 bone=BI_NONE;CODEGeom* geom=nullptr;Fmatrix rest;Fvector travel;Fvector model_travel;};
+		struct Gear {u16 bone=BI_NONE;CODEGeom* geom=nullptr;Fmatrix rest;Fvector travel,model_travel,pivot,model_pivot,axis,model_axis;float angle=0.f;};
 		Gear gears[3];
 		bool gear_supported=false, gear_down=true, airborne=false;
 		float gear_position=1.f, recent_sink=0.f;

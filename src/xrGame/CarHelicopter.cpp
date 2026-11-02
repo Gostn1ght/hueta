@@ -33,6 +33,20 @@
 // ---------------------------------------------------------------------------
 // Lost Zone helicopters (doc 137)
 // ---------------------------------------------------------------------------
+// The same hinge transform is used for visible bones and body-local ODE shapes.
+// A model with angle zero retains the older straight hydraulic travel.
+static void heli_gear_form(Fmatrix& form,const Fvector& axis,const Fvector& pivot,float angle,const Fvector& travel,float amount)
+{
+ const float c=cosf(angle*amount),s=sinf(angle*amount);
+ const auto rotate=[&](Fvector& value) {
+  const Fvector old=value;Fvector cross;cross.crossproduct(axis,old);
+  const float projection=axis.dotproduct(old)*(1.f-c);
+  value.set(old.x*c+cross.x*s+axis.x*projection,old.y*c+cross.y*s+axis.y*projection,old.z*c+cross.z*s+axis.z*projection);
+ };
+ rotate(form.i);rotate(form.j);rotate(form.k);
+ form.c.sub(pivot);rotate(form.c);form.c.add(pivot);form.c.mad(travel,amount);
+}
+
 void CCar::netcoop_heli_load()
 {
 	NetcoopHeli& h = m_netcoop_heli;
@@ -92,6 +106,8 @@ void CCar::netcoop_heli_load()
 	const LPCSTR names[]={"gear_left","gear_right","gear_nose"};
 	const Fvector travel[]={{0.65f,1.35f,0.f},{-0.65f,1.35f,0.f},{0.f,1.15f,-0.5f}};
 	const LPCSTR travel_keys[]={"heli_gear_travel_left","heli_gear_travel_right","heli_gear_travel_nose"};
+ const LPCSTR axis_keys[]={"heli_gear_axis_left","heli_gear_axis_right","heli_gear_axis_nose"};
+ const LPCSTR angle_keys[]={"heli_gear_fold_left","heli_gear_fold_right","heli_gear_fold_nose"};
 	if(root<rest.size()) for(u32 i=0;i<3;++i) {
 		NetcoopHeli::Gear& gear=h.gears[i];gear.bone=K->LL_BoneID(names[i]);
 		if(gear.bone==BI_NONE) continue;
@@ -100,7 +116,14 @@ void CCar::netcoop_heli_load()
 		gear.geom->get_local_form_bt(gear.rest);
 		gear.model_travel=READ_IF_EXISTS(pSettings,r_fvector3,section,travel_keys[i],travel[i]);
 		if(!_valid(gear.model_travel) || gear.model_travel.magnitude()>3.5f) gear.model_travel=travel[i];
-		Fmatrix inverse;inverse.invert(rest[root]);inverse.transform_dir(gear.travel,gear.model_travel);
+		gear.model_axis=READ_IF_EXISTS(pSettings,r_fvector3,section,axis_keys[i],Fvector().set(1.f,0.f,0.f));
+  if(!_valid(gear.model_axis) || gear.model_axis.square_magnitude()<EPS) gear.model_axis.set(1.f,0.f,0.f);
+  gear.model_axis.normalize();
+  gear.angle=READ_IF_EXISTS(pSettings,r_float,section,angle_keys[i],0.f);
+  if(!_valid(gear.angle) || _abs(gear.angle)>180.f) gear.angle=0.f;
+  gear.angle=deg2rad(gear.angle);gear.model_pivot=rest[gear.bone].c;
+  Fmatrix inverse;inverse.invert(rest[root]);inverse.transform_dir(gear.travel,gear.model_travel);
+  inverse.transform_dir(gear.axis,gear.model_axis);inverse.transform_tiny(gear.pivot,gear.model_pivot);
 		K->LL_GetBoneInstance(gear.bone).set_callback(bctCustom,netcoop_heli_gear_bone,this);
 		h.gear_supported=true;
 	}
@@ -113,7 +136,7 @@ void CCar::netcoop_heli_gear_bone(CBoneInstance* bone)
 	for(u32 i=0;model && i<3;++i) {
 		const auto& gear=car->m_netcoop_heli.gears[i];
 		if(gear.bone!=BI_NONE && &model->LL_GetBoneInstance(gear.bone)==bone)
-			bone->mTransform.c.mad(gear.model_travel,1.f-car->m_netcoop_heli.gear_position);
+			heli_gear_form(bone->mTransform,gear.model_axis,gear.model_pivot,gear.angle,gear.model_travel,1.f-car->m_netcoop_heli.gear_position);
 	}
 }
 
@@ -126,7 +149,7 @@ void CCar::netcoop_heli_gear_step(float dt)
 	h.gear_position=h.gear_down ? _min(1.f,before+step):_max(0.f,before-step);
 	if(h.gear_position==before) return;
 	for(auto& gear:h.gears) if(gear.geom) {
-		Fmatrix form=gear.rest;form.c.mad(gear.travel,1.f-h.gear_position);
+		Fmatrix form=gear.rest;heli_gear_form(form,gear.axis,gear.pivot,gear.angle,gear.travel,1.f-h.gear_position);
 		gear.geom->set_local_form_bt(form);gear.geom->clear_cashed_tries();gear.geom->clear_motion_history(true);
 	}
 	if(IKinematics* model=smart_cast<IKinematics*>(Visual())) model->CalculateBones_Invalidate();
@@ -153,7 +176,7 @@ void CCar::netcoop_heli_gear_replica(bool down,float position)
 	if(!_valid(position) || position<0.f || position>1.f) return;
 	m_netcoop_heli.gear_down=down;m_netcoop_heli.gear_position=position;
 	for(auto& gear:m_netcoop_heli.gears) if(gear.geom) {
-		Fmatrix form=gear.rest;form.c.mad(gear.travel,1.f-position);
+		Fmatrix form=gear.rest;heli_gear_form(form,gear.axis,gear.pivot,gear.angle,gear.travel,1.f-position);
 		gear.geom->set_local_form_bt(form);gear.geom->clear_cashed_tries();gear.geom->clear_motion_history(true);
 	}
 	if(IKinematics* model=smart_cast<IKinematics*>(Visual())) model->CalculateBones_Invalidate();

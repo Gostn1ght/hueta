@@ -21,7 +21,7 @@ car = (ROOT / 'src/xrGame/Car.cpp').read_text(encoding='utf-8') + (ROOT / 'src/x
 header = (ROOT / 'src/xrGame/Car.h').read_text(encoding='utf-8')
 flight = body(car, 'void CCar::netcoop_heli_step(')
 safe_cycle = body(car, 'static CBlend* car_play_cycle_safe(')
-gear_code='\n'.join(body(car,signature) for signature in ('void CCar::netcoop_heli_gear_step(', 'void CCar::netcoop_heli_toggle_gear(', 'void CCar::netcoop_heli_gear_replica('))
+gear_code=body(car,'static void heli_gear_form(')+'\n'+'\n'.join(body(car,signature) for signature in ('void CCar::netcoop_heli_gear_step(', 'void CCar::netcoop_heli_toggle_gear(', 'void CCar::netcoop_heli_gear_replica('))
 gravity = '\n'.join(body(car, signature) for signature in (
     'void CCar::PhTune(', 'float CCar::EffectiveGravity(', 'float CCar::AntiGravityAccel('))
 heli = header[header.index('struct NetcoopHeli'):header.index('} m_netcoop_heli;') + len('} m_netcoop_heli;')]
@@ -52,6 +52,9 @@ struct Fvector {
  void set(float a,float b,float c){x=a;y=b;z=c;}
  void mad(const Fvector& v,float f){x+=v.x*f;y+=v.y*f;z+=v.z*f;}
  void sub(const Fvector& a,const Fvector& b){set(a.x-b.x,a.y-b.y,a.z-b.z);}
+ void sub(const Fvector& b){x-=b.x;y-=b.y;z-=b.z;}
+ void add(const Fvector& b){x+=b.x;y+=b.y;z+=b.z;}
+ void crossproduct(const Fvector& a,const Fvector& b){set(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x);}
  float dotproduct(const Fvector& v)const{return x*v.x+y*v.y+z*v.z;}
  float magnitude()const{return std::sqrt(dotproduct(*this));}
 };
@@ -185,6 +188,15 @@ int main(){
  assert(gh.gear_position==1 && shape.form.c.y==0);
  b.netcoop_heli_gear_replica(false,.5f);assert(!gh.gear_down && std::fabs(shape.form.c.y-.675f)<1e-6f);
  b.netcoop_heli_gear_replica(true,2);assert(gh.gear_position==.5f);
+ // A real main leg folds about the model hinge; its physical shape uses
+ // the same transform, preserving axle length and orientation through 90 deg.
+ Fmatrix hinge_form;hinge_form.c.set(-1.35f,-.25f,-2.62f);
+ Fvector pivot{-1.6f,.7f,-2.62f},axis{0,0,1},no_travel{};
+ heli_gear_form(hinge_form,axis,pivot,1.57079632679f,no_travel,1.f);
+ assert(std::fabs(hinge_form.c.x+.65f)<1e-5f && std::fabs(hinge_form.c.y-.95f)<1e-5f);
+ assert(std::fabs(hinge_form.i.y-1.f)<1e-5f && std::fabs(hinge_form.i.magnitude()-1.f)<1e-5f);
+ heli_gear_form(hinge_form,axis,pivot,-1.57079632679f,no_travel,1.f);
+ assert(std::fabs(hinge_form.c.x+1.35f)<1e-5f && std::fabs(hinge_form.c.y+.25f)<1e-5f);
  // Manual Mi-24 controls retain collective on release, not a height hold.
  CPhysicsShell manual_shell;CCar manual;manual.test_shell=&manual_shell;
  auto& mh=manual.m_netcoop_heli;mh.on=true;mh.pilot=true;mh.auto_collective=false;mh.auto_level=false;
