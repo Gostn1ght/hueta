@@ -2,7 +2,7 @@
 -- PDA network: UID, contacts, general channel, private and group chats
 -- (owner 2026-10-10, after New Way's PDA; plan docs/audit/89)
 ----------------------------------------------------------------------
--- Every character has a PDA name and a 6-digit UID. There is no public
+-- Every physical PDA has its own name and a 6-digit network UID. There is no public
 -- list of who is online: two players see each other's status only after
 -- both added the other's UID. Strangers appear as "UID nnnnnn"; contacts by
 -- name and avatar. History of the general channel and of every chat lives
@@ -10,13 +10,13 @@
 -- server, and a message to an offline player waits for him.
 --
 -- Records (netcoop_store, compare-and-swap):
---   pda_prof/<char>  { uid, name, icon, contacts = {uid=true}, chats = {cid=read_seq}, seen,
+--   pda_prof/<device uid>  { uid, name, icon, contacts = {uid=true}, chats = {cid=read_seq}, seen,
 --                      requests = {uid=os time} - who added me and is not my contact yet }
---   pda_uid/<uid>    <char>
+--   pda_uid/<uid>    <device uid>
 --   pda_chat/<cid>   { seq, kind = "general"|"d"|"g", members = {uid=true}, name, icon, msgs = {...} }
---   pda_note/<char>  { cid = seq } - the newest message of each chat for him (delivery across servers)
+--   pda_note/<device uid>  { cid = seq } - the newest message of each chat for him (delivery across servers)
 --   pda_pay/<char>   { sum } - money sent to him, paid out by the server he plays on
---   pda_memo/<char>  { {id, title, text, t, g}, ... } - his notes ("Заметки")
+--   pda_memo/<device uid>  { {id, title, text, t, g}, ... } - his notes ("Р—Р°РјРµС‚РєРё")
 --   pda_audio/<aid>  { cid, parts, secs, by } and pda_audio/<aid>.<n> - a voice
 --                    message / dictaphone record (engine recording, base64)
 --   pda_photo/<pid>  { cid, parts, by, place, g } and pda_photo/<pid>.<n> - a
@@ -58,6 +58,7 @@ local function update(bucket, key, fn)
 end
 local function read(bucket, key) return de(netcoop_store_read(bucket, key)) end
 
+local held_device, device_view -- assigned below; used by physical profiles
 local function char_of(id) return netcoop_actor_character and netcoop_actor_character(id) or "" end
 local function now() return os.time() end
 local function game_minutes()
@@ -77,23 +78,46 @@ local function new_uid(char)
 	return nil
 end
 
--- The profile of the player whose Actor is id (made on first use).
+-- Old character records are claimed by one physical device only. Every
+-- bucket is copied idempotently after the claim, so an interrupted migration
+-- can finish on another location without giving a replacement the same data.
+local function migrate_device(d, character)
+	if not d.own then return true end
+	if netcoop_store_read("pda_profile_ready",d.uid)=="1" then return true end
+	local claim = netcoop_store_read("pda_profile_migrated", character) or ""
+	if claim == "" and netcoop_store_swap("pda_profile_migrated", character, "", d.uid) then claim = d.uid end
+	if claim ~= d.uid then return true end
+	for _, bucket in ipairs({"pda_prof", "pda_note", "pda_memo", "pda_lock", "pda_stash", "map_known"}) do
+		local old = netcoop_store_read(bucket, character) or ""
+		if old ~= "" and (netcoop_store_read(bucket,d.uid) or "")=="" and not netcoop_store_swap(bucket,d.uid,"",old) then return false end
+	end
+	local old = read("pda_prof", d.uid)
+	if old and old.uid then netcoop_store_swap("pda_uid", old.uid, character, d.uid) end
+	return netcoop_store_read("pda_profile_ready",d.uid)=="1" or netcoop_store_swap("pda_profile_ready",d.uid,"","1")
+end
+
+-- Second result is a physical storage key, never an account/character key.
 function profile(id)
-	local char = char_of(id)
-	if char == "" then return nil end
+	local character = char_of(id)
+	if character == "" then return nil end
+	local d = held_device(id, character)
+	if not d then return nil end
+	if netcoop_pda_storage and not netcoop_pda_storage.recover(d.uid) then return nil end
+	d=held_device(id,character)
+	if not migrate_device(d, character) then return nil end
 	local actor = level.object_by_id(id)
-	local name = actor and actor:character_name() or char
+	local name = actor and actor:character_name() or character
 	local icon = actor and actor.character_icon and actor:character_icon() or ""
-	local p = update("pda_prof", char, function(p)
+	local p = update("pda_prof", d.uid, function(p)
 		p = p or {}
 		local changed = false
-		if not p.uid then p.uid = new_uid(char); changed = true end
-		if p.name ~= name or p.icon ~= icon then p.name, p.icon = name, icon; changed = true end
-		if not p.seen or now() - p.seen >= HEARTBEAT then p.seen = now(); changed = true end
+		if not p.uid then p.uid = new_uid(d.uid); changed = true end
+		if d.own and (p.name ~= name or p.icon ~= icon) then p.name, p.icon = name, icon; changed = true end
+		if (d.own or d.rec.hacked[character]) and (not p.seen or now() - p.seen >= HEARTBEAT) then p.seen = now(); changed = true end
 		p.contacts, p.chats = p.contacts or {}, p.chats or {}
 		return changed and p or nil
 	end)
-	return p, char
+	return p, d.uid
 end
 
 local function profile_by_uid(uid)
@@ -120,7 +144,9 @@ end
 -- Delivery
 ----------------------------------------------------------------------
 local function send(id, verb, value)
-	local data = verb .. "|" .. (type(value) == "string" and value or ser(value or {}))
+	local d = held_device and held_device(id, char_of(id))
+	local header = d and (d.item .. "@" .. d.uid .. "|") or "0@none|"
+	local data = header .. verb .. "|" .. (type(value) == "string" and value or ser(value or {}))
 	local total = math.max(1, math.ceil(#data / CHUNK))
 	for n = 1, total do
 		netcoop_send_to_actor(id, "pdanet", n .. "/" .. total .. "|" .. string.sub(data, (n - 1) * CHUNK + 1, n * CHUNK))
@@ -133,7 +159,8 @@ local function local_players()
 	for id in string.gmatch(netcoop_players and netcoop_players() or "", "%d+") do
 		id = tonumber(id)
 		local char = char_of(id)
-		if char ~= "" then out[char] = id end
+		local d = char ~= "" and held_device(id, char)
+		if d then out[d.uid] = id end
 	end
 	return out
 end
@@ -205,7 +232,6 @@ local function summary(me, cid)
 	return s
 end
 
-local held_device, device_view -- Devices, below
 -- The device in the slot; a failure there never takes the network down.
 local function holding(id, char)
 	local ok, d = pcall(held_device, id, char)
@@ -217,7 +243,7 @@ local function state(id, me)
 	local char = char_of(id)
 	local d = holding(id, char)
 	send(id, "device", device_view(id, char, d))
-	if d and not d.own then
+	if not d or (not d.own and not d.rec.hacked[char]) then
 		send(id, "state", { uid = "", name = "", icon = "", contacts = {}, chats = {}, requests = {}, foreign = true })
 		return
 	end
@@ -246,9 +272,9 @@ local function state(id, me)
 			if other then requests[#requests + 1] = { uid = uid, name = other.name, icon = other.icon, t = at } end
 		end
 	end
-	local lock = read("pda_lock", char_of(id))
+	local lock = d and read("pda_lock", d.uid)
 	-- a locked PDA shows nothing of its owner's network
-	if lock and is_locked(id, char_of(id)) then
+	if lock and is_locked(id, d.uid) then
 		send(id, "state", { uid = me.uid, name = me.name, icon = me.icon, contacts = {}, chats = {}, requests = {}, locked = true, has_lock = true })
 		return
 	end
@@ -291,8 +317,8 @@ local handlers = {}
 function handlers.hello(id, me, char)
 	ensure_general()
 	state(id, me)
-	local d = holding(id, char)
-	if d and not d.own then return end -- someone else's PDA
+	local d = holding(id, char_of(id))
+	if not d or (not d.own and not d.rec.hacked[char_of(id)]) or is_locked(id, d.uid) then return end
 	local g = read("pda_chat", "general")
 	send(id, "general", shown(me, g and g.msgs, math.max(0, (g and g.seq or 0) - 60)))
 end
@@ -480,7 +506,9 @@ function handlers.pay(id, me, char, args)
 	if not c or c.kind ~= "d" or not c.members[me.uid] then return "no such chat" end
 	local peer
 	for uid in pairs(c.members) do if uid ~= me.uid then peer = uid end end
-	local pchar = peer and netcoop_store_read("pda_uid", peer)
+	local peer_device = peer and netcoop_store_read("pda_uid", peer)
+	local peer_record = peer_device and read("pda_dev", peer_device)
+	local pchar = peer_record and peer_record.owner
 	if not pchar or pchar == "" then return "no such UID" end
 	local actor = level.object_by_id(id)
 	if not (actor and actor:money() >= amount) then return "not enough money" end
@@ -496,7 +524,7 @@ function handlers.pay(id, me, char, args)
 	send(id, "paid", { amount = -amount })
 end
 
--- members <cid> : who is in a group ("Состав"), as I see them
+-- members <cid> : who is in a group ("РЎРѕСЃС‚Р°РІ"), as I see them
 function handlers.members(id, me, char, args)
 	local cid = string.match(args, "^([%w_]+)$")
 	local c = cid and me.chats[cid] and read("pda_chat", cid)
@@ -584,6 +612,46 @@ function handlers.pbeg(id, me, char, args)
 		at = time_global(), uid = me.uid, char = char }
 end
 
+-- Device libraries share the chunk transport with chat attachments, but have
+-- a physical ACL and no chat membership. USB copies indices, never credentials.
+function handlers.library(id, me, key)
+	send(id, "library", {device=key,photos=read("pda_gallery",key) or {},records=read("pda_records",key) or {},settings=read("pda_settings",key) or {}})
+end
+local function library_begin(id, me, key, args, kind)
+	local aid,total,extra=string.match(args or "", "^(%x+) (%d+) ([%w_]+)$")
+	total=tonumber(total)
+	local photo=kind=="photo"
+	if not aid or #aid~=16 or not total or total<1 or total>(photo and PHOTO_MAX_PARTS or AUDIO_MAX_PARTS) then return "bad record" end
+	if not photo and (not tonumber(extra) or tonumber(extra)<1 or tonumber(extra)>AUDIO_SECS) then return "bad record" end
+	local bucket=photo and "pda_photo" or "pda_audio"
+	if netcoop_store_read(bucket,aid)~="" then return "try again" end
+	uploads[id]={kind=kind,aid=aid,total=total,parts={},got=0,at=time_global(),uid=me.uid,char=key,library=true,
+		place=photo and extra or nil,secs=not photo and tonumber(extra) or nil}
+end
+function handlers.gbeg(id, me, key, args) return library_begin(id,me,key,args,"photo") end
+function handlers.rbeg(id, me, key, args) return library_begin(id,me,key,args,"audio") end
+function handlers.gdel(id, me, key, args)
+	local aid=string.match(args or "", "^(%x+)$")
+	update("pda_gallery",key,function(list)
+		for i,p in ipairs(list or {}) do if p.id==aid then table.remove(list,i);return list end end
+	end)
+	handlers.library(id,me,key)
+end
+function handlers.rdel(id, me, key, args)
+	local aid=string.match(args or "", "^(%x+)$")
+	update("pda_records",key,function(list)
+		for i,p in ipairs(list or {}) do if p.id==aid then table.remove(list,i);return list end end
+	end)
+	handlers.library(id,me,key)
+end
+function handlers.settings(id, me, key, args)
+	local name,value=string.match(args or "", "^([%w_]+) ([%w_]+)$")
+	-- Whitelisted PDA preferences only. Never engine settings or credentials.
+	if not name or not ({notifications=true,theme=true})[name] or #value>24 then return "bad setting" end
+	update("pda_settings",key,function(v) v=v or {};v[name]=value;return v end)
+	handlers.library(id,me,key)
+end
+
 local function upload_done(id, u)
 	uploads[id] = nil
 	local photo = u.kind == "photo"
@@ -595,13 +663,26 @@ local function upload_done(id, u)
 	end
 	local n = math.ceil(#data / AUDIO_PART)
 	for i = 1, n do
-		netcoop_store_swap(bucket, u.aid .. "." .. i, netcoop_store_read(bucket, u.aid .. "." .. i),
-			string.sub(data, (i - 1) * AUDIO_PART + 1, i * AUDIO_PART))
+		if not netcoop_store_swap(bucket, u.aid .. "_" .. i, netcoop_store_read(bucket, u.aid .. "_" .. i),
+			string.sub(data, (i - 1) * AUDIO_PART + 1, i * AUDIO_PART)) then send(id,"err","try again");return end
 	end
-	local meta = photo and { cid = u.cid, parts = n, by = u.uid, place = u.place, g = game_minutes() }
-		or { cid = u.cid, parts = n, secs = u.secs, by = u.uid }
+	local meta = photo and { device=u.char, library=u.library, cid = u.cid, parts = n, by = u.uid, place = u.place, g = game_minutes() }
+		or { device=u.char, library=u.library, cid = u.cid, parts = n, secs = u.secs, by = u.uid }
 	if not netcoop_store_swap(bucket, u.aid, "", ser(meta)) then
 		send(id, "err", "try again") return
+	end
+	if u.library then
+		local index = photo and "pda_gallery" or "pda_records"
+		local _, ok = update(index,u.char,function(list)
+			list=list or {}
+			for _,p in ipairs(list) do if p.id==u.aid then return nil end end
+			table.insert(list,1,{id=u.aid,g=game_minutes(),level=u.place,secs=u.secs,bytes=math.floor(#data*3/4)})
+			while #list>(photo and 60 or 20) do table.remove(list) end
+			return list
+		end)
+		if not ok then send(id,"err","try again");return end
+		send(id,"stored",{device=u.char,id=u.aid,kind=u.kind})
+		return
 	end
 	local msg
 	if photo then msg = post(u.cid, u.uid, "photo", "", u.aid .. " " .. u.place .. " " .. #data)
@@ -627,9 +708,15 @@ local function fetch(id, me, args, bucket, verb, missing)
 	local aid = string.match(args, "^(%x+)$")
 	local meta = aid and read(bucket, aid)
 	if not meta then return missing end
-	if not me.chats[meta.cid] and meta.by ~= me.uid then return missing end
+	local _, key=profile(id)
+	local authorized=false
+	if meta.library then
+		for _,p in ipairs(read(bucket=="pda_photo" and "pda_gallery" or "pda_records",key) or {}) do if p.id==aid then authorized=true end end
+	else authorized=me.chats[meta.cid]~=nil or meta.by==me.uid end
+	if not authorized and netcoop_pda_storage then authorized=netcoop_pda_storage.attachment(key,bucket=="pda_photo" and "photo" or "voice",aid) end
+	if not authorized then return missing end
 	local out = {}
-	for i = 1, tonumber(meta.parts) or 0 do out[i] = netcoop_store_read(bucket, aid .. "." .. i) end
+	for i = 1, tonumber(meta.parts) or 0 do out[i] = netcoop_store_read(bucket, aid .. "_" .. i) end
 	send(id, verb, aid .. "|" .. table.concat(out))
 end
 function handlers.aget(id, me, char, args) return fetch(id, me, args, "pda_audio", "audio", "no such record") end
@@ -639,7 +726,7 @@ function handlers.pget(id, me, char, args) return fetch(id, me, args, "pda_photo
 -- PDA password (owner 2026-10-18): the network tabs of a locked PDA open
 -- after "unlock <password>". Three wrong tries hold the PDA for 30 s. A
 -- password makes the owner's PDA slower to hack (Devices below).
---   pda_lock/<char> { salt, hash }
+--   pda_lock/<device uid> { salt, hash }
 ----------------------------------------------------------------------
 local unlocked, tries = {}, {} -- entity id -> true / { n, until_ms }
 local LOCK_TRIES, LOCK_HOLD_MS = 3, 30000
@@ -662,14 +749,15 @@ local function lock_of(char) return read("pda_lock", char) end
 
 
 function is_locked(id, char)
-	return lock_of(char) ~= nil and not unlocked[id]
+	return lock_of(char) ~= nil and unlocked[id] ~= char
 end
 
 -- unlock <password>
 function handlers.unlock(id, me, char, args)
 	local lock = lock_of(char)
-	if not lock then unlocked[id] = true; state(id, me) return end
-	local t = tries[id] or { n = 0, until_ms = 0 }
+	if not lock then unlocked[id] = char; state(id, me) return end
+	local t = tries[id]
+	if not t or t.device ~= char then t = { device = char, n = 0, until_ms = 0 } end
 	tries[id] = t
 	if time_global() < t.until_ms then return "pda held" end
 	if lock_hash(lock.salt, args or "") ~= lock.hash then
@@ -678,7 +766,7 @@ function handlers.unlock(id, me, char, args)
 		return "wrong password"
 	end
 	t.n = 0
-	unlocked[id] = true
+	unlocked[id] = char
 	state(id, me)
 end
 
@@ -696,7 +784,7 @@ function handlers.lockset(id, me, char, args)
 		local text = ser({ salt = salt, hash = lock_hash(salt, new) })
 		if not netcoop_store_swap("pda_lock", char, netcoop_store_read("pda_lock", char) or "", text) then return "try again" end
 	end
-	unlocked[id] = true
+	unlocked[id] = char
 	state(id, read("pda_prof", char) or me)
 end
 
@@ -783,7 +871,7 @@ function held_device(id, char)
 			if v and v.owner == char and v.sealed then v.sealed, v.hacked, v.lock = nil, {}, nil return v end
 		end)
 	elseif r.owner ~= char and not r.sealed then
-		local lock = read("pda_lock", r.owner) ~= nil
+		local lock = read("pda_lock", uid) ~= nil
 		r = update("pda_dev", uid, function(v)
 			if v and v.owner ~= char and not v.sealed then v.sealed, v.lock = now(), lock return v end
 		end)
@@ -792,6 +880,15 @@ function held_device(id, char)
 	r.hacked = r.hacked or {}
 	return { uid = uid, item = item:id(), rec = r, own = r.owner == char }
 end
+
+function accessible(id, d)
+ local character=char_of(id)
+ return d~=nil and (d.own or d.rec.hacked[character]~=nil) and not is_locked(id,d.uid)
+end
+
+-- The forward declaration is local for calls made earlier in this module.
+-- Map/marks adapters call through the script namespace, so export it too.
+getfenv(1).held_device = held_device
 
 local function hack_progress(id, uid, v)
 	local h = hacking[id]
@@ -804,12 +901,16 @@ end
 function device_view(id, char, d)
 	if not d then return { none = true } end
 	local r = d.rec
-	local v = { serial = r.serial, own = d.own, level = r.level }
+	local v = { uid = d.uid, item = d.item, serial = r.serial, own = d.own, level = r.level }
+	if d.own and netcoop_store_read("pda_profile_migrated",char)==d.uid then
+		local old=read("pda_prof",char)
+		v.legacy_uid=old and old.uid
+	end
 	if not d.own then
 		v.lock = r.lock == true
 		v.hacked = r.hacked[char] ~= nil
 		if v.hacked then
-			local owner = read("pda_prof", r.owner)
+			local owner = read("pda_prof", d.uid)
 			v.owner = owner and owner.name or "?"
 		end
 		hack_progress(id, d.uid, v)
@@ -871,13 +972,31 @@ function handlers.device(id, me, char)
 	send(id, "device", device_view(id, char, held_device(id, char)))
 end
 
+local function inventory_tool(id, section, requested)
+	local actor, found = level.object_by_id(id), nil
+	if not (actor and actor.iterate_inventory) then return nil end
+	actor:iterate_inventory(function(_, item)
+		local parent = item and item:parent()
+		if not found and item and item:section() == section and (not requested or item:id() == requested)
+			and parent and parent:id() == id then
+			local uid = item_uid(item)
+			local uses = uid and read("pda_tool", uid)
+			if uid and (not uses or (uses.left or 0) > 0) then found = {item = item:id(), uid = uid} end
+		end
+	end)
+	return found
+end
+
 -- hack [<NPC PDA item id>]: the PDA in the slot, or an NPC's PDA carried
 local function start_hack(id, char, d, kind)
 	local h = hacking[id]
 	if h and h.uid == d.uid then return end
+	local tool = inventory_tool(id, "lz_pda_hack_usb")
+	if not tool then return "hack flash drive required" end
 	local total = ((HACK_SECONDS[d.rec.level] or 60) + (d.rec.lock and HACK_LOCK_SECONDS or 0)) * 1000
-	hacking[id] = { uid = d.uid, item = d.item, kind = kind, total = total, done_at = time_global() + total }
+	hacking[id] = { uid = d.uid, item = d.item, kind = kind, tool = tool, total = total, done_at = time_global() + total }
 	printf("[Lost Zone] pdanet: %s hacks PDA %s (%s s)", char, d.rec.serial, tostring(total / 1000))
+	return nil
 end
 function handlers.hack(id, me, char, args)
 	local item_id = tonumber(args)
@@ -885,14 +1004,14 @@ function handlers.hack(id, me, char, args)
 		local d = npc_device(id, item_id)
 		if not (d and d.info) then return "no device" end
 		if d.info.state ~= "encrypted" then send(id, "npc", npc_view(id, d)) return end
-		start_hack(id, char, d, "npc")
+		local err = start_hack(id, char, d, "npc"); if err then return err end
 		send(id, "npc", npc_view(id, d))
 		return
 	end
 	local d = held_device(id, char)
 	if not d then return "no device" end
 	if d.own then return "own device" end
-	if not d.rec.hacked[char] then start_hack(id, char, d, "player") end
+	if not d.rec.hacked[char] then local err = start_hack(id, char, d, "player"); if err then return err end end
 	send(id, "device", device_view(id, char, d))
 end
 
@@ -910,10 +1029,10 @@ end
 function handlers.dump(id, me, char)
 	local d = held_device(id, char)
 	if not (d and not d.own and d.rec.hacked[char]) then return "not hacked" end
-	local owner = read("pda_prof", d.rec.owner)
+	local owner = read("pda_prof", d.uid)
 	if not owner then return "no data" end
 	owner.contacts, owner.chats = owner.contacts or {}, owner.chats or {}
-	local sealed = d.rec.sealed or now()
+	local sealed = now()
 	local contacts = {}
 	for uid in pairs(owner.contacts) do
 		local c = view(owner, uid)
@@ -939,7 +1058,7 @@ function handlers.dump(id, me, char)
 	table.sort(chats, function(a, b) return a.t > b.t end)
 	while #chats > DUMP_CHATS do table.remove(chats) end
 	local notes = {}
-	for _, n in ipairs(read("pda_memo", d.rec.owner) or {}) do
+	for _, n in ipairs(read("pda_memo", d.uid) or {}) do
 		if (n.t or 0) <= sealed and #notes < 20 then
 			notes[#notes + 1] = { title = n.title, text = clip(n.text, 600), t = n.t, g = n.g }
 		end
@@ -949,17 +1068,14 @@ function handlers.dump(id, me, char)
 		sealed = sealed, contacts = contacts, chats = chats, notes = notes })
 end
 
--- wipe: a hacked PDA serves its new holder (its owner's network data is
--- the character's and stays his)
+-- Factory reset keeps hardware serial but removes its data and old network ID.
 function handlers.wipe(id, me, char)
 	local d = held_device(id, char)
 	if not (d and not d.own and d.rec.hacked[char]) then return "not hacked" end
-	local previous = d.rec.owner
-	update("pda_dev", d.uid, function(v)
-		if v and v.owner == previous then v.owner, v.sealed, v.hacked, v.lock = char, nil, {}, nil return v end
-	end)
-	printf("[Lost Zone] pdanet: %s reset PDA %s of %s", char, d.rec.serial, previous)
-	state(id, me)
+	if not netcoop_pda_storage or not netcoop_pda_storage.factory_reset(d,char) then return "try again" end
+	unlocked[id] = nil
+	printf("[Lost Zone] pdanet: %s reset physical PDA %s", char, d.rec.serial)
+	state(id, profile(id))
 end
 
 -- npc_open <item id>: GAMMA's messages of an NPC's PDA, from the server
@@ -1021,14 +1137,16 @@ function handlers.npc_stash(id, me, char, args)
 	hint = clip(string.gsub(hint or "", "[%c]", " "), 300)
 	found.stash_read = true
 	save_npc_info(d.item, d.uid, d.info)
-	update("pda_stash", char, function(t)
+	local receiver = held_device(id, char)
+	if not receiver or (not receiver.own and not receiver.rec.hacked[char]) then return "no device" end
+	update("pda_stash", receiver.uid, function(t)
 		t = t or {}
 		if t[found.stash_name] then return nil end
 		t[found.stash_name] = { l = found.stash_level, h = hint }
 		return t
 	end)
 	printf("[Lost Zone] pdanet: %s learned stash %s (%s) from PDA %s", char, found.stash_name, tostring(found.stash_level), d.rec.serial)
-	sync_stashes(id, char)
+	sync_stashes(id, receiver.uid)
 end
 
 -- Every poll: devices changing hands, hacks running, stashes to show.
@@ -1046,10 +1164,21 @@ local function devices_update(id, char, me)
 			still = d and d.uid == h.uid
 		end
 		local actor = level.object_by_id(id)
-		if not still or not (actor and actor:alive()) then
+		local tool = inventory_tool(id, "lz_pda_hack_usb", h.tool.item)
+		if not still or not (actor and actor:alive()) or not tool or tool.uid ~= h.tool.uid then
 			hacking[id] = nil
 			send(id, "err", "hack interrupted")
 		elseif time_global() >= h.done_at then
+			local _, consumed = update("pda_tool", h.tool.uid, function(v)
+				v = v or {left = 5}
+				if v.left <= 0 then return nil end
+				v.left = v.left - 1
+				return v
+			end)
+			if not consumed then hacking[id] = nil; send(id, "err", "hack flash drive exhausted"); return end
+			local tool_item=level.object_by_id(h.tool.item)
+			local uses=read("pda_tool",h.tool.uid)
+			if tool_item and tool_item.set_condition and uses then tool_item:set_condition(math.max(0,(uses.left or 0)/5)) end
 			hacking[id] = nil
 			if h.kind == "npc" then
 				local nd = npc_device(id, h.item)
@@ -1061,7 +1190,7 @@ local function devices_update(id, char, me)
 				end
 			else
 				update("pda_dev", h.uid, function(v) if v then v.hacked = v.hacked or {}; v.hacked[char] = now() return v end end)
-				if d then d.rec.hacked[char] = now() end
+				if d then d.rec.hacked[char] = now(); unlocked[id] = d.uid end
 			end
 			printf("[Lost Zone] pdanet: %s hacked PDA %s", char, h.uid)
 		elseif h.kind == "npc" then
@@ -1071,7 +1200,7 @@ local function devices_update(id, char, me)
 			send(id, "device", device_view(id, char, d))
 		end
 	end
-	foreign_held[id] = d ~= nil and not d.own
+	foreign_held[id] = d ~= nil and not d.own and not d.rec.hacked[char]
 	local key = d and (d.uid .. (d.own and "+" or "-") .. (d.rec.hacked[char] and "h" or "")) or ""
 	if key ~= device_key[id] then
 		device_key[id] = key
@@ -1079,7 +1208,7 @@ local function devices_update(id, char, me)
 	end
 	if time_global() >= (next_stash[id] or 0) then
 		next_stash[id] = time_global() + 10000
-		sync_stashes(id, char)
+		if d then sync_stashes(id, d.uid) end
 	end
 end
 
@@ -1087,10 +1216,10 @@ end
 -- someone else's PDA in the slot).
 local DEVICE_VERBS = { device = true, hack = true, hack_stop = true, dump = true, wipe = true, npc_open = true, npc_stash = true }
 
--- Flood limit for what other players see (README «лимиты сообщений»): per
+-- Flood limit for what other players see (README В«Р»РёРјРёС‚С‹ СЃРѕРѕР±С‰РµРЅРёР№В»): per
 -- player a budget of BURST posts refilled at one per RATE_MS; "aup" parts,
 -- reads and lists are not counted.
-local LIMITED = { say = true, msg = true, dm = true, group = true, pay = true, abeg = true, pbeg = true, add = true }
+local LIMITED = { say = true, msg = true, dm = true, group = true, pay = true, abeg = true, pbeg = true, gbeg = true, rbeg = true, add = true, usb_backup = true, usb_restore = true }
 local BURST, RATE_MS = 6, 1500
 local budget = {} -- entity id -> { n, at }
 local function allowed(id)
@@ -1106,19 +1235,37 @@ end
 
 function command(entity_id, args)
 	local verb, rest = string.match(args or "", "^([%a_]+)%s?(.*)$")
-	if verb == "aup" then return audio_part(entity_id, rest or "") end
+	if verb == "aup" then
+		local u = uploads[entity_id]
+		local d = held_device(entity_id, char_of(entity_id))
+		if not (u and d and d.uid == u.char and (d.own or d.rec.hacked[char_of(entity_id)]) and not is_locked(entity_id, d.uid)) then uploads[entity_id] = nil; return "" end
+		return audio_part(entity_id, rest or "")
+	end
 	local handler = verb and handlers[verb]
+	if verb and string.match(verb, "^usb_") and netcoop_pda_storage then
+		handler = function(id, me, key, rest)
+			local result, err = netcoop_pda_storage.command(id, verb, rest)
+			if err then return err end
+			if verb=="usb_restore" then uploads[id]=nil end
+			send(id, "storage", result)
+			if verb == "usb_restore" then state(id, profile(id)); send_notes(id, key); handlers.library(id,me,key) end
+		end
+	end
 	if not handler then return "" end
 	if LIMITED[verb] and not allowed(entity_id) then
 		send(entity_id, "err", "too many messages, wait a moment")
 		return ""
 	end
-	local me, char = profile(entity_id)
-	if not me then return "" end
+	local me, key = profile(entity_id)
+	local character = char_of(entity_id)
+	local char = DEVICE_VERBS[verb] and character or key
+	if not me and not DEVICE_VERBS[verb] then send(entity_id, "err", "no device"); return "" end
+	if character == "" then return "" end
+	me = me or {contacts = {}, chats = {}}
 	-- someone else's PDA in the slot: only its own verbs
 	if verb ~= "hello" and not DEVICE_VERBS[verb] then
-		local d = holding(entity_id, char)
-		if d and not d.own then
+		local d = holding(entity_id, character)
+		if not d or (not d.own and not d.rec.hacked[character]) then
 			send(entity_id, "err", "foreign device")
 			return ""
 		end
@@ -1163,6 +1310,13 @@ end
 function update_world()
 	if time_global() < next_poll then return end
 	next_poll = time_global() + 2000
+	for actor_id in string.gmatch(netcoop_players and netcoop_players() or "", "%d+") do
+		actor_id = tonumber(actor_id)
+		local current = profile(actor_id)
+		local ok, err = pcall(devices_update, actor_id, char_of(actor_id), current or {})
+		if not ok then printf("! [Lost Zone] pdanet devices: %s", tostring(err)) end
+		pay_out(char_of(actor_id), actor_id)
+	end
 	local here = local_players()
 	-- the general channel
 	local g = read("pda_chat", "general")
@@ -1171,7 +1325,7 @@ function update_world()
 	if seq > general_seq then
 		for char, id in pairs(here) do
 			local me = read("pda_prof", char)
-			if me then send(id, "general", shown(me, g.msgs, general_seq)) end
+			if me and not is_locked(id,char) and not foreign_held[id] then send(id, "general", shown(me, g.msgs, general_seq)) end
 		end
 		general_seq = seq
 	end
@@ -1194,13 +1348,7 @@ function update_world()
 				seen[cid] = s
 			end
 		end
-		pay_out(char, id)
-		-- heartbeat for the online status
 		local current = profile(id)
-		if current then
-			local ok, err = pcall(devices_update, id, char, current)
-			if not ok then printf("! [Lost Zone] pdanet devices: %s", tostring(err)) end
-		end
 		local requests = current and requests_key(current)
 		if current and (time_global() >= (next_state[char] or 0) or (shown_requests[char] and requests ~= shown_requests[char])) then
 			state(id, current)
@@ -1210,7 +1358,7 @@ function update_world()
 	end
 	for char in pairs(pushed) do if not here[char] then pushed[char], next_state[char], shown_requests[char] = nil, nil, nil end end
 	local present = {}
-	for _, id in pairs(here) do present[id] = true end
+	for id in string.gmatch(netcoop_players and netcoop_players() or "", "%d+") do present[tonumber(id)] = true end
 	for id in pairs(device_key) do
 		if not present[id] then device_key[id], hacking[id], stash_sent[id], next_stash[id], foreign_held[id] = nil, nil, nil, nil, nil end
 	end

@@ -105,6 +105,8 @@ jobs:
           python scripts/check-netcoop-pdanet.py
           python scripts/check-netcoop-pdanet-voice.py
           python scripts/check-netcoop-pdanet-photo.py
+          python scripts/check-netcoop-pda-storage.py
+          python scripts/check-netcoop-pda-media.py
           python scripts/check-newway-pda-assets.py
           python scripts/check-netcoop-workshop.py
           python scripts/check-netcoop-npc-loot.py

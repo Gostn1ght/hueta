@@ -2,9 +2,9 @@
 -- Places a player has found (owner 2026-10-24): level changers (with the
 -- map they lead to), named places (misc\smart_names.ltx: bases, Yanov and
 -- the like) and anomaly fields show on his PDA map once he has been near
--- them. They belong to the character (the cluster's shared store), not to
--- the PDA: another PDA shows them too, after a relog and on every server.
---   map_known/<char>  { [level] = { [key] = true } }
+-- them. Discoveries belong to the physical PDA in the cluster store and
+-- move with that device or an explicitly restored USB backup.
+--   map_known/<device uid>  { [level] = { [key] = true } }
 --     key: "c:<changer>", "p:<smart>", "a:<field>"
 -- Server -> client, channel "map_known": one line per place of this map,
 --   "<id> <x> <y> <z> <spot> <kind>|<name>"; the client names it in its own
@@ -142,7 +142,7 @@ function update_world()
 		local actor = level.object_by_id(id)
 		local char = char_of(id)
 		local device = char ~= "" and netcoop_pdanet and netcoop_pdanet.held_device(id, char)
-		local uid = device and device.own and device.uid
+		local uid = device and netcoop_pdanet.accessible(id,device) and device.uid
 		present[id] = true
 		if sent[id] and sent[id].uid ~= uid then netcoop_send_to_actor(id, "map_known", "clear"); sent[id] = nil end
 		if actor and uid then

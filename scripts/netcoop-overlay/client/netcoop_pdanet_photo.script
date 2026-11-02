@@ -15,7 +15,10 @@ local function tip(id, ...)
 	if actor_menu and actor_menu.set_msg then actor_menu.set_msg(1, string.format(tr(id), ...), 3) end
 end
 local function engine() return netcoop_photo_take ~= nil end
-local function my_uid() return netcoop_pdanet_client and netcoop_pdanet_client.me.uid or "" end
+local function my_uid()
+	local uid = netcoop_pda and netcoop_pda.current_device and netcoop_pda.current_device()
+	return type(uid) == "string" and uid:match("^[%w_]+$") and uid or ""
+end
 local function new_id()
 	local t = {}
 	for i = 1, 16 do t[i] = string.format("%x", math.random(0, 15)) end
@@ -37,7 +40,7 @@ local function sound(name)
 end
 
 ----------------------------------------------------------------------
--- Gallery: the shots of this PDA (an index file per character's UID)
+-- Gallery: an index per persistent physical PDA UID.
 ----------------------------------------------------------------------
 photos = {} -- newest first: { id, g (game minutes), level, bytes }
 local loaded_for = nil
@@ -55,26 +58,67 @@ local function save()
 	if not path then return end
 	local f = io.open(path, "wb")
 	if not f then return end
-	for _, p in ipairs(photos) do f:write(string.format("%s|%d|%s|%d\n", p.id, p.g or 0, p.level or "", p.bytes or 0)) end
+	for _, p in ipairs(photos) do f:write(string.format("%s|%d|%s|%d|%d\n", p.id, p.g or 0, p.level or "", p.bytes or 0, p.cloud and 1 or 0)) end
 	f:close()
 end
 function load()
 	local path = index_path()
-	if not path or loaded_for == path then return end
+	if not path then loaded_for, photos = nil, {}; return end
+	if loaded_for == path then return end
 	loaded_for, photos = path, {}
 	local f = io.open(path, "rb")
+	local d=netcoop_pdanet_client and netcoop_pdanet_client.slot_device
+	local legacy=not f and d and d.legacy_uid
+	if legacy and tostring(legacy):match("^%d+$") then f=io.open(getFS():update_path("$app_data_root$","netcoop_gallery_"..legacy..".txt"),"rb") end
 	if not f then return end
 	for line in f:lines() do
-		local id, g, lvl, bytes = string.match(line, "^(%x+)|(%d+)|([%w_]*)|(%d+)")
-		if id then photos[#photos + 1] = { id = id, g = tonumber(g), level = lvl, bytes = tonumber(bytes) } end
+		local id, g, lvl, bytes, cloud = string.match(line, "^(%x+)|(%d+)|([%w_]*)|(%d+)|?(%d*)$")
+		if id then photos[#photos + 1] = { id = id, g = tonumber(g), level = lvl, bytes = tonumber(bytes), cloud = cloud == "1" } end
 	end
 	f:close()
+	if legacy and engine() then
+		for _,p in ipairs(photos) do
+			if not netcoop_photo_exists(file_name(p)) then
+				local data=netcoop_photo_read("g"..legacy.."_"..p.id)
+				if data~="" then netcoop_photo_write(file_name(p),data) end
+			end
+		end
+		save()
+	end
 	-- shots whose file is gone (deleted by hand) leave the list
 	local kept = {}
 	for _, p in ipairs(photos) do
-		if not engine() or netcoop_photo_exists(file_name(p)) then kept[#kept + 1] = p end
+		if p.cloud or not engine() or netcoop_photo_exists(file_name(p)) then kept[#kept + 1] = p end
 	end
 	if #kept ~= #photos then photos = kept; save() end
+end
+
+function reset_content()
+ if active and active() then leave() end
+ photos={};save()
+end
+local gallery_wanted={}
+function on_library(v)
+	if v.device~=my_uid() then return end
+	load()
+	local merged,seen={},{}
+	for _,p in ipairs(v.photos or {}) do
+		p.cloud=true;merged[#merged+1]=p;seen[p.id]=true
+		if engine() and not netcoop_photo_exists(file_name(p)) and not gallery_wanted[p.id] then
+			gallery_wanted[p.id]=true;netcoop_command("pdanet pget "..p.id)
+		end
+	end
+	for _,p in ipairs(photos) do if not p.cloud and not seen[p.id] then merged[#merged+1]=p end end
+	photos=merged;save()
+	for _,p in ipairs(photos) do
+		if not p.cloud and netcoop_pda_media and engine() then
+			netcoop_pda_media.push("photo",p.id,netcoop_photo_read(file_name(p)),p.level~="" and p.level or "unknown")
+		end
+	end
+end
+function on_stored(v)
+	if v.device~=my_uid() then return end
+	for _,p in ipairs(photos) do if p.id==v.id then p.cloud=true;save();return end end
 end
 
 function delete(i)
@@ -82,12 +126,14 @@ function delete(i)
 	local p = photos[i]
 	if not p then return end
 	if engine() then netcoop_photo_delete(file_name(p)) end
+	if netcoop_command then netcoop_command("pdanet gdel "..p.id) end
 	table.remove(photos, i)
 	save()
 end
 
 local function add(p)
 	load()
+	if netcoop_pda_media and engine() then netcoop_pda_media.push("photo",p.id,netcoop_photo_read(file_name(p)),p.level~="" and p.level or "unknown") end
 	table.insert(photos, 1, p)
 	while #photos > MAX_PHOTOS do
 		local old = table.remove(photos)
@@ -154,8 +200,10 @@ end
 function enter()
 	if mode or not db.actor then return end
 	if not engine() then tip("st_pdanet_photo_no_engine") return end
+	local uid = my_uid()
+	if uid == "" then tip("st_pdanet_photo_failed") return end
 	close_pda()
-	mode = { zoom = 1, phase = "aim" }
+	mode = { zoom = 1, phase = "aim", device = uid }
 	db.actor:hide_weapon()
 	level.hide_indicators_safe()
 	netcoop_photo_zoom(1)
@@ -174,7 +222,7 @@ end
 local function shoot()
 	if not mode or mode.phase ~= "aim" then return end
 	mode.id = new_id()
-	mode.name = "g" .. my_uid() .. "_" .. mode.id
+	mode.name = "g" .. mode.device .. "_" .. mode.id
 	mode.phase, mode.frames = "hide", 2 -- the camera frame must not be in the shot
 	overlay_show(false)
 end
@@ -200,6 +248,12 @@ end
 local function camera_update()
 	if not mode then return end
 	if not (db.actor and db.actor:alive()) then leave() return end
+	if my_uid() ~= mode.device then
+		-- A queued screenshot belongs to its originating device. Never add it
+		-- to the replacement's gallery when the renderer completes later.
+		if mode.name then netcoop_photo_delete(mode.name) end
+		leave(); load(); return
+	end
 	if mode.phase == "hide" then
 		mode.frames = mode.frames - 1
 		if mode.frames > 0 then return end
@@ -244,7 +298,7 @@ function send(i, cid)
 	if not p then return false end
 	if not cid then tip("st_pdanet_rec_open_chat") return false end
 	local v = netcoop_pdanet_voice
-	if queue or (v and v.uploading and v.uploading()) then tip("st_pdanet_rec_busy") return false end
+	if queue or (netcoop_pda_media and netcoop_pda_media.busy()) or (v and v.uploading and v.uploading()) then tip("st_pdanet_rec_busy") return false end
 	local data = engine() and netcoop_photo_read(file_name(p)) or ""
 	if data == "" then tip("st_pdanet_photo_failed") return false end
 	local parts = {}
@@ -282,6 +336,10 @@ function message_place(m) return place(string.match(m.d or "", "^%x+ ([%w_]+)"))
 function on_photo(pid, data)
 	if not pid or data == "" or not engine() then return end
 	wanted[pid] = nil
+	if gallery_wanted[pid] then
+		gallery_wanted[pid]=nil
+		for _,p in ipairs(photos) do if p.id==pid then netcoop_photo_write(file_name(p),data);break end end
+	end
 	if not netcoop_photo_write("c_" .. pid, data) then tip("st_pdanet_photo_bad") return end
 	if netcoop_pdanet_client and netcoop_pdanet_client.notify then netcoop_pdanet_client.notify("photo") end
 end
@@ -289,6 +347,7 @@ end
 -- a photo from a chat into the gallery
 function keep(pid, lvl)
 	if not (engine() and pid) then return false end
+	if my_uid() == "" then return false end
 	local data = netcoop_photo_read("c_" .. pid)
 	if data == "" then return false end
 	local id = new_id()

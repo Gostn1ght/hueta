@@ -29,8 +29,8 @@ bool pure=true,g_bDisableAllInput=false,ui_present=true,accept=false;
 unsigned raw=0,item=0,press=0,release=0,hold=0,closed=0;
 namespace netcoop {bool pure_client(){return pure;}}
 EGameActions get_binded_action(int key){return key==DIK_ESCAPE?kQUIT:kRELOAD;}
-struct CPda {bool Action(EGameActions,int){++item;return accept;}} held;
-struct Inv {CPda* ActiveItem(){return &held;}};
+struct CPda {bool Action(EGameActions,int){++item;return accept;}} test_item;
+struct Inv {CPda* ActiveItem(){return &test_item;}};
 struct ActorType {Inv inventory(){return {};}} actor;
 ActorType* Actor(){return &actor;}
 template<class T> T smart_cast(CPda* p){return static_cast<T>(p);}
@@ -41,14 +41,14 @@ struct CUIPdaWnd:Base {
  bool m_pKeyboardCapturer=false;bool IsShown(){return shown;}bool IsEnabled(){return enabled;}
  void HideDialog(){++closed;}bool OnKeyboardAction(int,EUIMessages);
 } window,other;
-CUIPdaWnd* top=&window;
+CUIPdaWnd* test_top=&window;
 struct UI {
- CUIPdaWnd& GetPdaMenu(){return window;}CUIPdaWnd* TopInputReceiver(){return top;}
- void IR_UIOnKeyboardPress(int key){++press;if(top)top->OnKeyboardAction(key,WINDOW_KEY_PRESSED);}
- void IR_UIOnKeyboardRelease(int key){++release;if(top)top->OnKeyboardAction(key,WINDOW_KEY_RELEASED);}
- void IR_UIOnKeyboardHold(int key){++hold;if(top)top->OnKeyboardAction(key,WINDOW_KEY_HOLD);}
-} ui;
-UI* CurrentGameUI(){return ui_present?&ui:nullptr;}
+ CUIPdaWnd& GetPdaMenu(){return window;}CUIPdaWnd* TopInputReceiver(){return test_top;}
+ void IR_UIOnKeyboardPress(int key){++press;if(test_top)test_top->OnKeyboardAction(key,WINDOW_KEY_PRESSED);}
+ void IR_UIOnKeyboardRelease(int key){++release;if(test_top)test_top->OnKeyboardAction(key,WINDOW_KEY_RELEASED);}
+ void IR_UIOnKeyboardHold(int key){++hold;if(test_top)test_top->OnKeyboardAction(key,WINDOW_KEY_HOLD);}
+} test_ui;
+UI* CurrentGameUI(){return ui_present?&test_ui:nullptr;}
 '''+body+helper+r'''
 int main(){
  unsigned cases=0;
@@ -58,13 +58,13 @@ int main(){
  for(auto event:{WINDOW_KEY_PRESSED,WINDOW_KEY_RELEASED,WINDOW_KEY_HOLD}){
   pure=p;window.shown=shown;ui_present=present;window.enabled=enabled;g_bDisableAllInput=disabled;
   window.m_pKeyboardCapturer=capture;other.m_pKeyboardCapturer=capture;accept=handled;
-  top=receiver==0?nullptr:receiver==1?&window:&other;
+  test_top=receiver==0?nullptr:receiver==1?&window:&other;
   raw=item=press=release=hold=closed=0;
   const bool blocked=netcoop_pda_key(key,event);
   assert(blocked==(p&&shown&&present));
   if(blocked&&!disabled){
    if(key!=DIK_ESCAPE&&key<MOUSE_1){assert(raw==1);assert(item==0);}
-   if(key==DIK_ESCAPE){assert(raw==0);assert(item==(event==WINDOW_KEY_PRESSED));}
+   if(key==DIK_ESCAPE){assert(raw==0);assert(item==unsigned(event==WINDOW_KEY_PRESSED));}
   }else assert(raw==0&&item==0&&press==0&&release==0&&hold==0);
   ++cases;
  }

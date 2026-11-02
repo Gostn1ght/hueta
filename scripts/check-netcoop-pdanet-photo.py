@@ -26,8 +26,9 @@ g = lua.globals()
 tmp = tempfile.mkdtemp().replace("\\", "/")
 lua.execute(r'''
 store = {}
-function netcoop_store_read(b, k) return (store[b] or {})[k] or "" end
+function netcoop_store_read(b, k) assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96);return (store[b] or {})[k] or "" end
 function netcoop_store_swap(b, k, old, new)
+    assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96 and #new<=65536, "actual native shared-store bounds")
     store[b] = store[b] or {}
     if (store[b][k] or "") ~= old then return false end
     assert(#new < 65536, "record over 64 KB")
@@ -60,6 +61,24 @@ level = {
     get_time_hours = function() return 12 end, get_time_minutes = function() return 5 end,
 }
 function vector() return {set = function(self, x, y, z) self.x, self.y, self.z = x, y, z; return self end} end
+-- Persistent physical PDAs; the network cannot silently fall back to account identity.
+local actor_by_id = level.object_by_id
+pda_items = {}
+for id=1,3 do
+ local actor = actor_by_id(id)
+ local item_id = 900+id
+ local item = {id=function() return item_id end, section=function() return "device_pda_1" end, parent=function() return actor end}
+ pda_items[item_id]=item
+ players[id].pda_item=item
+end
+level.object_by_id = function(id)
+ if pda_items[id] then return pda_items[id] end
+ local actor=actor_by_id(id)
+ if actor then actor.item_in_slot=function(_,slot) return slot==8 and players[id].pda_item or nil end; actor.id=function() return id end; actor.alive=function() return true end end
+ return actor
+end
+db={actor={item_in_slot=function() return players[1].pda_item end}}
+function netcoop_item_uid(id) return pda_items[id] and ("fixture"..id) or "" end
 function netcoop_players() return "1,2,3" end
 inbox = {}
 function netcoop_send_to_actor(id, ch, data) inbox[id] = inbox[id] or {}; table.insert(inbox[id], data) end
@@ -185,6 +204,14 @@ voice = load("netcoop_pdanet_voice", root / "client/netcoop_pdanet_voice.script"
 photo = load("netcoop_pdanet_photo", root / "client/netcoop_pdanet_photo.script")
 tabs = load("pda_dynamic_tabs", repo / "gamedata/scripts/pda_dynamic_tabs.script")
 mpda = load("netcoop_pda", root / "client/netcoop_pda.script")
+lua.execute('''
+equipped_pda=901
+db.actor.item_in_slot=function(_,slot) return slot==8 and {id=function() return equipped_pda end} end
+tasks_placeable_waypoints={pins={}}
+function tasks_placeable_waypoints.load_state(data) tasks_placeable_waypoints.pins=data.pawsys.pins end
+netcoop_pda.receive("fixture901|901|1/1|")
+''')
+device_uid = 'fixture901'
 ui = load("netcoop_pdanet_ui", root / "client/netcoop_pdanet_ui.script")
 client.on_game_start()
 photo.on_game_start()
@@ -223,7 +250,7 @@ def frame():
 to_client(run(1, "pdanet hello"))
 run(2, "pdanet hello"); run(3, "pdanet hello")
 ua = client.me.uid
-ub = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_prof', 'b_1'))").uid
+ub = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_prof', 'fixture902'))").uid
 run(1, f"pdanet add {ub}")
 run(2, f"pdanet add {ua}")
 to_client(run(1, "pdanet hello"))
@@ -249,7 +276,7 @@ assert len(photo.photos) == 1, len(photo.photos)
 p1 = photo.photos[1]
 assert re.fullmatch(r"[0-9a-f]{16}", p1.id) and p1.level == "k00_marsh" and p1.bytes > 0
 name1 = photo.file_name(p1)
-assert name1 == f"g{ua}_{p1.id}" and g.files[name1]
+assert name1 == f"g{device_uid}_{p1.id}" and g.files[name1]
 assert "pda_camera_shutter" in str(list(g.sound_played.values()))
 assert len(list(g.hud.shown.keys())) == 1          # the camera frame is back
 on_key(337); frame(); frame(); frame()             # a second shot
@@ -267,7 +294,8 @@ on_key(1)                                          # ESC
 assert not photo.active()
 
 # the gallery index survives a reload (a file per UID)
-assert os.path.exists(f"{tmp}/netcoop_gallery_{ua}.txt")
+assert os.path.exists(f"{tmp}/netcoop_gallery_{device_uid}.txt")
+assert not os.path.exists(f"{tmp}/netcoop_gallery_{ua}.txt"), 'character gallery must never receive physical-device photos'
 photo2 = load("netcoop_pdanet_photo", root / "client/netcoop_pdanet_photo.script")
 photo2.load()
 assert len(photo2.photos) == 2 and photo2.photos[2].id == p1.id
@@ -436,4 +464,19 @@ assert '#include "netcoop_photo.inc"' in netcoop_cpp(src_dir.parent, encoding="u
 assert "g_netcoop_photo_zoom > 1.f" in (src_dir / "xrGame/Actor.cpp").read_text(encoding="utf-8", errors="replace")
 inc = (src_dir / "xrGame/netcoop_photo.inc").read_text(encoding="utf-8")
 assert "photo_dds_ok" in inc and "photo_name_ok" in inc and "$game_saves$" in inc
-print("PDA photos, tasks, pin points, unread tab captions: PASS")
+# Physical-device switch, including completion of an asynchronous capture.
+on_key=g.callbacks.on_key_press
+old_count=len(photo.photos)
+lua.execute('netcoop_pda.reset();equipped_pda=82;netcoop_pda.receive("physical_B|82|1/1|")')
+photo.load();assert len(photo.photos)==0
+photo.enter();on_key(337);frame();frame();frame()
+assert len(photo.photos)==1 and photo.file_name(photo.photos[1]).startswith('gphysical_B_')
+on_key(18)
+photo.enter();on_key(337);frame();frame()
+lua.execute('netcoop_pda.reset();equipped_pda=901;netcoop_pda.receive("fixture901|901|1/1|")')
+frame();photo.load()
+assert not photo.active() and len(photo.photos)==old_count, 'late shot cannot enter replacement gallery'
+lua.execute('netcoop_pda.reset();netcoop_pdanet_client.slot_device=nil')
+photo.load();assert len(photo.photos)==0 and not photo.keep(pid,'k00_marsh')
+photo.enter();assert not photo.active(), 'unknown device cannot create an account-global photo'
+print("PDA photos, tasks, pin points, unread tab captions and physical-device isolation/capture switch: PASS")

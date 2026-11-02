@@ -1554,4 +1554,22 @@
   <string id="st_netcoop_life_start"><text>Begin life</text></string>
   <string id="st_netcoop_life_name_invalid"><text>Use at least two Russian letters, spaces or hyphens. Choose a different call sign after death.</text></string>
   <string id="st_netcoop_create_account_link"><text>Create account</text></string>
+<string id="st_pdanet_tab_storage"><text>Data and USB</text></string>
+<string id="st_pdanet_tab_storage_soon"><text>Data and USB</text></string>
+<string id="st_lz_pda_data_usb"><text>Data flash drive</text></string>
+<string id="st_lz_pda_data_usb_descr"><text>Stores one PDA backup. Select this drive in Data and USB, save a backup, equip another PDA and restore it. Hardware serial, network UID and password are never copied; conversations are read-only archives.</text></string>
+<string id="st_lz_pda_hack_usb"><text>Decryption flash drive</text></string>
+<string id="st_lz_pda_hack_usb_descr"><text>Five successful decryptions of foreign or encrypted PDAs. Security level and password increase the time. Keep the device and flash drive until completion. Death or loss of either interrupts decryption.</text></string>
+<string id="st_pdanet_usb_backup"><text>Save backup</text></string>
+<string id="st_pdanet_usb_restore"><text>Restore to this PDA</text></string>
+<string id="st_pdanet_usb_refresh"><text>Refresh</text></string>
+<string id="st_pdanet_usb_sync"><text>Wait for PDA marks, photos and recordings to finish saving.</text></string>
+<string id="st_pdanet_usb_about"><text>PDA %s. Data belongs to this device. Select a flash drive from your backpack.</text></string>
+<string id="st_pdanet_usb_uses"><text>decryptions left: %d</text></string>
+<string id="st_pdanet_usb_source"><text>backup of PDA %s</text></string>
+<string id="st_pdanet_usb_empty"><text>empty</text></string>
+<string id="st_pdanet_usb_confirm"><text>Click again to confirm replacing device data.</text></string>
+<string id="st_pdanet_usb_hint"><text>Restoring replaces personal data. PDA password and network number stay unchanged.</text></string>
+<string id="st_pdanet_usb_archive"><text>Imported conversation archive</text></string>
+<string id="st_pdanet_usb_read_archive"><text>Read conversation archive</text></string>
 </string_table>

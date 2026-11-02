@@ -47,6 +47,23 @@ local function base(self, title)
 	self.clock:Show(false) -- the PDA's global header owns the clock
 	self.status = self.xml:InitStatic("status", self)
 	self.ids, self.tick_at = 0, 0
+	net().on_change(function(what)
+		if what~="device_reset" then return end
+		self.note,self.chat,self.selected,self.viewed,self.confirm=nil,nil,nil,nil,nil
+		self.scroll,self.list_scroll,self.msg_scroll,self.page=0,0,0,0
+		self.saving_new=nil
+		for _,key in ipairs({"input","uid","title_edit","body_edit"}) do if self[key] then self[key]:SetText("") end end
+		for _,group in ipairs({"dlg","pwdlg","lock"}) do
+			local controls=self[group]
+			if controls then for _,key in ipairs({"name","amount","old","new","edit"}) do if controls[key] then controls[key]:SetText("") end end end
+		end
+		if self.Dialog then self:Dialog(nil) end
+		if self.Password then self:Password(false) end
+		if self.Tasks then self:Tasks(false) end
+		if self.View then self:View(false) end
+		if self.arc then for _,w in pairs(self.arc) do w:Show(false) end end
+		if self.Fill then self:Fill() end
+	end)
 end
 -- The lock screen of a PDA with a password (owner 2026-10-18), made on
 -- first use so it is drawn over everything the tab made before.
@@ -940,6 +957,104 @@ function pdanet_notes:OnKeyboard(dik, action)
 end
 
 ----------------------------------------------------------------------
+-- Physical device data, USB selection and read-only imported conversations.
+----------------------------------------------------------------------
+class "pdanet_storage" (CUIScriptWnd)
+function pdanet_storage:__init() super()
+ base(self,"st_pdanet_tab_storage")
+ self.pick,self.scroll,self.confirm=nil,0,nil
+ self.info=static(self,"hint_left",48,150,720,64)
+ self.rows={}
+ for r=1,6 do
+  self.rows[r]=button(self,"",48,224+(r-1)*36,720,32,function() self.pick=self.scroll+r;self.confirm=nil;self:Fill() end,"row")
+ end
+ button(self,"^",48,448,48,28,function() self.scroll=math.max(0,self.scroll-6);self:Fill() end)
+ button(self,"v",102,448,48,28,function() self.scroll=self.scroll+6;self:Fill() end)
+ self.copy=button(self,tr("st_pdanet_usb_backup"),164,448,288,28,function() self:Copy(false) end)
+ self.restore=button(self,tr("st_pdanet_usb_restore"),464,448,304,28,function() self:Copy(true) end)
+ self.reset=button(self,tr("st_pdanet_wipe"),48,488,288,28,function()
+  if self.confirm==tostring((net().slot_device or {}).uid).."/wipe" then net().wipe();self.confirm=nil else self.confirm=tostring((net().slot_device or {}).uid).."/wipe";self:Fill() end
+ end)
+ self.archive=static(self,"hint_left",48,526,720,76)
+ self.archive_btn=button(self,tr("st_pdanet_usb_read_archive"),48,606,720,28,function() self:Archive(1,1) end)
+ self.hint=static(self,"hint_left",48,636,720,30)
+ button(self,tr("st_pdanet_usb_refresh"),464,488,304,28,function() net().ask_storage() end)
+ net().on_change(function(what) if self:IsShown() and (what=="storage" or what=="device") then self:Fill() end end)
+ net().ask_storage();self:Fill()
+end
+function pdanet_storage:Copy(restore)
+ local tools=net().storage.tools or {}
+ local t=self.pick and tools[self.pick]
+ if not t or t.kind~="data" then return end
+ if (netcoop_pda_media and not netcoop_pda_media.ready()) or (netcoop_pdanet_voice and netcoop_pdanet_voice.recording()) then tip("st_pdanet_usb_sync");return end
+ if netcoop_pda and netcoop_pda.flush and not netcoop_pda.flush() then tip("st_pdanet_usb_sync");return end
+ if restore then
+  local target=tostring((net().slot_device or {}).uid).."/"..t.uid
+  if self.confirm~=target then self.confirm=target;self:Fill();return end
+  if netcoop_pda then netcoop_pda.reset() end
+  net().restore(t.id)
+ else net().backup(t.id) end
+ self.confirm=nil
+end
+function pdanet_storage:Fill()
+ local d=net().slot_device or {}
+ text(self.info,string.format(tr("st_pdanet_usb_about"),d.serial or "?"))
+ local list=net().storage.tools or {}
+ for r,w in ipairs(self.rows) do
+  local i=self.scroll+r;local t=list[i];w:Show(t~=nil)
+  if t then
+   local desc=t.kind=="hack" and string.format(tr("st_pdanet_usb_uses"),t.left or 0)
+    or (t.backup and string.format(tr("st_pdanet_usb_source"),t.backup.source or "?") or tr("st_pdanet_usb_empty"))
+   text(w,(i==self.pick and "> " or "")..tr(t.kind=="hack" and "st_lz_pda_hack_usb" or "st_lz_pda_data_usb").."  "..string.upper(string.sub(t.uid,-4)).."   "..desc)
+  end
+ end
+ local t=self.pick and list[self.pick]
+ self.copy:Enable(t~=nil and t.kind=="data")
+ self.restore:Enable(t~=nil and t.kind=="data" and t.backup~=false)
+ self.reset:Show(d.own==false and d.hacked==true)
+ text(self.hint,self.confirm and tr("st_pdanet_usb_confirm") or tr("st_pdanet_usb_hint"))
+ local lines={tr("st_pdanet_usb_archive")}
+ for _,c in ipairs(net().storage.archive or {}) do
+  lines[#lines+1]=(c.name or c.cid or "?").." ("..tostring(c.count or 0)..")"
+ end
+ text(self.archive,table.concat(lines,"\n"))
+ self.archive_btn:Enable(#(net().storage.archive or {})>0)
+ if self.arc and net().storage.view then
+  local v=net().storage.view;local m=v.message or {}
+  text(self.arc.title,(v.name or "").."  "..v.msg.."/"..v.total)
+  text(self.arc.body,net().when(m).."   UID "..tostring(m.f or "").."\n\n"..(m.x or "").."\n"..(m.d or ""))
+ end
+ footer(self,net().last_error and tostring(net().last_error) or "")
+end
+function pdanet_storage:Archive(chat,msg)
+ local list=net().storage.archive or {}
+ if #list==0 then return end
+ chat=math.max(1,math.min(#list,chat))
+ msg=math.max(1,math.min(list[chat].count or 1,msg))
+ if not self.arc then
+  local a={}
+  a.back=static(self,"layer_back",36,110,748,556)
+  a.title=static(self,"msg_name",52,132,716,40)
+  a.body=static(self,"hint_left",52,188,716,360)
+  local function move(dc,dm)
+   local v=net().storage.view or {chat=1,msg=1}
+   self:Archive(v.chat+dc,v.msg+dm)
+  end
+  a.pc=button(self,"<<",52,576,100,30,function() move(-1,0) end)
+  a.pm=button(self,"<",160,576,100,30,function() move(0,-1) end)
+  a.nm=button(self,">",268,576,100,30,function() move(0,1) end)
+  a.nc=button(self,">>",376,576,100,30,function() move(1,0) end)
+  a.close=button(self,tr("st_pdanet_close"),492,576,276,30,function() for _,w in pairs(self.arc) do w:Show(false) end end)
+  self.arc=a
+ end
+ for _,w in pairs(self.arc) do w:Show(true) end
+ net().archive_message(chat,msg)
+end
+function pdanet_storage:Update()
+ CUIScriptWnd.Update(self);tick(self)
+end
+
+----------------------------------------------------------------------
 -- Not made yet (photo, gallery): say so.
 ----------------------------------------------------------------------
 class "pdanet_soon" (CUIScriptWnd)
@@ -989,6 +1104,7 @@ function on_game_start()
 		{ "st_pdanet_tab_photo", photo("photo_window") },
 		{ "st_pdanet_tab_voice", dictaphone },
 		{ "st_pdanet_tab_notes", function() return pdanet_notes() end },
+		{ "st_pdanet_tab_storage", function() return pdanet_storage() end },
 	}
 	for _, t in ipairs(tabs) do
 		after = pda_dynamic_tabs.register(t[1], window(t[1], t[2]), after)

@@ -1,0 +1,56 @@
+-- Background media persistence for the currently authenticated physical PDA.
+-- One transport is shared with chat photos/voice; a device switch cancels the
+-- in-flight upload. Unsynced files are retried from that device's local index.
+local queue, pending, queued, next_at = nil, {}, {}, 0
+local function uid() return netcoop_pda and netcoop_pda.current_device and netcoop_pda.current_device() end
+function reset() queue,pending,queued=nil,{},{} end
+function busy() return queue~=nil end
+function ready() return not queue and #pending==0 end
+function push(kind,id,data,extra)
+ local device=uid()
+ if not device or not data or data=="" then return false end
+ local key=device.."/"..kind.."/"..id
+ if queued[key] then return true end
+ local limit=kind=="photo" and 190 or 700
+ if #data>limit*3800 then return false end
+ local parts={}
+ for n=1,math.ceil(#data/3800) do parts[n]=data:sub((n-1)*3800+1,n*3800) end
+ pending[#pending+1]={device=device,key=key,kind=kind,id=id,parts=parts,extra=tostring(extra),next=1}
+ queued[key]=true
+ return true
+end
+function stored(v)
+ if queue and queue.device==v.device and queue.id==v.id then queued[queue.key]=nil;queue=nil end
+end
+function observed(v)
+ for _,list in ipairs({v.photos or {},v.records or {}}) do
+  for _,p in ipairs(list) do stored({device=v.device,id=p.id}) end
+ end
+end
+local function update()
+ local device=uid()
+ if queue and queue.device~=device then queued[queue.key]=nil;queue=nil end
+ for n=#pending,1,-1 do if pending[n].device~=device then queued[pending[n].key]=nil;table.remove(pending,n) end end
+ if not device then return false end
+ if not queue then
+  local ph,voice=netcoop_pdanet_photo,netcoop_pdanet_voice
+  if (ph and ph.uploading and ph.uploading()) or (voice and voice.uploading and voice.uploading()) then return false end
+  queue=table.remove(pending,1)
+  if not queue then return false end
+  queue.started=time_global()
+  netcoop_command(string.format("pdanet %s %s %d %s",queue.kind=="photo" and "gbeg" or "rbeg",queue.id,#queue.parts,queue.extra))
+ end
+ if time_global()-queue.started>60000 then
+  queued[queue.key]=nil;queue=nil
+  if netcoop_pdanet_client then netcoop_pdanet_client.ask_library() end
+  return false
+ end
+ if time_global()<next_at then return false end
+ next_at=time_global()+50
+ local n=queue.next
+ if n<=#queue.parts then netcoop_command("pdanet aup "..queue.id.." "..n.." "..queue.parts[n]);queue.next=n+1 end
+ return false
+end
+function on_game_start()
+ if netcoop_pure_client and netcoop_pure_client() and AddUniqueCall then AddUniqueCall(update) end
+end

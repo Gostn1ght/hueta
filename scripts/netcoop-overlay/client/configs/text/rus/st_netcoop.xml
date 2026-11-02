@@ -1554,4 +1554,22 @@
   <string id="st_netcoop_life_start"><text>Начать жизнь</text></string>
   <string id="st_netcoop_life_name_invalid"><text>Кличка: только русские буквы, пробел или дефис. Минимум две буквы. Кличка прошлой жизни не подходит.</text></string>
   <string id="st_netcoop_create_account_link"><text>Создать аккаунт</text></string>
+<string id="st_pdanet_tab_storage"><text>Данные и флешки</text></string>
+<string id="st_pdanet_tab_storage_soon"><text>Данные и флешки</text></string>
+<string id="st_lz_pda_data_usb"><text>Флешка для данных</text></string>
+<string id="st_lz_pda_data_usb_descr"><text>Хранит одну резервную копию КПК. Во вкладке «Данные и флешки» выберите флешку и запишите данные. Вставьте другой КПК и восстановите копию. Серийный номер, сетевой UID и пароль не копируются; переписка переносится как архив.</text></string>
+<string id="st_lz_pda_hack_usb"><text>Флешка дешифратора</text></string>
+<string id="st_lz_pda_hack_usb_descr"><text>Пять успешных взломов чужих и зашифрованных КПК. Уровень защиты и пароль увеличивают время. Держите устройство и флешку при себе до завершения. Смерть или потеря устройства прерывает взлом.</text></string>
+<string id="st_pdanet_usb_backup"><text>Записать резервную копию</text></string>
+<string id="st_pdanet_usb_restore"><text>Восстановить на этот КПК</text></string>
+<string id="st_pdanet_usb_refresh"><text>Обновить список</text></string>
+<string id="st_pdanet_usb_sync"><text>Дождитесь сохранения меток, фото и записей КПК.</text></string>
+<string id="st_pdanet_usb_about"><text>КПК %s. Данные принадлежат этому устройству. Выберите флешку из рюкзака.</text></string>
+<string id="st_pdanet_usb_uses"><text>осталось взломов: %d</text></string>
+<string id="st_pdanet_usb_source"><text>копия КПК %s</text></string>
+<string id="st_pdanet_usb_empty"><text>пустая</text></string>
+<string id="st_pdanet_usb_confirm"><text>Нажмите ещё раз для подтверждения замены данных.</text></string>
+<string id="st_pdanet_usb_hint"><text>Копия заменяет личные данные. Пароль и сетевой номер КПК сохраняются.</text></string>
+<string id="st_pdanet_usb_archive"><text>Архив перенесённой переписки</text></string>
+<string id="st_pdanet_usb_read_archive"><text>Читать архив переписки</text></string>
 </string_table>

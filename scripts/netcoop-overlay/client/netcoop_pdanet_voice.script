@@ -24,16 +24,18 @@ local function engine() return netcoop_record_start ~= nil end
 ----------------------------------------------------------------------
 local rec_kind = nil -- "msg" (voice message) or "dict" (dictaphone)
 local rec_chat = nil
+local rec_device = nil
+local function physical_uid() return netcoop_pdanet_client and netcoop_pdanet_client.current_device() end
 
 function recording() return rec_kind ~= nil end
 function recording_kind() return rec_kind end
 function recorded_text() return clock_text(engine() and netcoop_record_seconds() or 0) end
 
 local function start(kind, limit)
-	if rec_kind or not engine() then return false end
+	if rec_kind or not engine() or not physical_uid() then return false end
 	if netcoop_play_stop then netcoop_play_stop() end
 	if not netcoop_record_start(limit) then tip("st_pdanet_rec_no_mic") return false end
-	rec_kind = kind
+	rec_kind, rec_device = kind, physical_uid()
 	if netcoop_voice_ui and netcoop_voice_ui.play then netcoop_voice_ui.play("radio_freq_set") end
 	return true
 end
@@ -58,13 +60,13 @@ end
 function upload(cid, data, secs)
 	-- one upload at a time: the server keeps one per player (photos too)
 	local photo = netcoop_pdanet_photo
-	if queue or (photo and photo.uploading and photo.uploading()) then tip("st_pdanet_rec_busy") return false end
+	if queue or (netcoop_pda_media and netcoop_pda_media.busy()) or (photo and photo.uploading and photo.uploading()) then tip("st_pdanet_rec_busy") return false end
 	if not (cid and data and data ~= "") then return false end
 	local parts = {}
 	for i = 1, math.ceil(#data / PART) do parts[i] = string.sub(data, (i - 1) * PART + 1, i * PART) end
 	if #parts > 700 then tip("st_pdanet_rec_too_long") return false end
 	local aid = new_aid()
-	queue = { aid = aid, parts = parts, next = 1, at = 0 }
+	queue = { aid = aid, device = physical_uid(), parts = parts, next = 1, at = 0 }
 	netcoop_command(string.format("pdanet abeg %s %s %d %d", aid, cid, secs, #parts))
 	return true
 end
@@ -119,6 +121,7 @@ end
 -- channel "pdanet" verb "audio": "<aid>|<data>"
 function on_audio(aid, data)
 	if not aid or data == "" then return end
+	library_audio(aid,data)
 	if cache_n > 12 then cache, cache_n = {}, 0 end
 	if not cache[aid] then cache_n = cache_n + 1 end
 	cache[aid] = data
@@ -140,29 +143,63 @@ records = {} -- newest first: { id, t (game minutes), secs, data }
 local loaded_for = nil
 
 local function store_path()
-	local uid = netcoop_pdanet_client and netcoop_pdanet_client.me.uid or ""
+	local uid = physical_uid() or ""
 	if uid == "" then return nil end
 	return getFS():update_path("$app_data_root$", "netcoop_dictaphone_" .. uid .. ".txt")
 end
+local save
 local function load()
 	local path = store_path()
-	if not path or loaded_for == path then return end
+	if not path then loaded_for,records=nil,{};return end
+	if loaded_for == path then return end
 	loaded_for, records = path, {}
 	local f = io.open(path, "rb")
+	local d=netcoop_pdanet_client and netcoop_pdanet_client.slot_device
+	local legacy=not f and d and d.legacy_uid
+	if legacy and tostring(legacy):match("^%d+$") then f=io.open(getFS():update_path("$app_data_root$","netcoop_dictaphone_"..legacy..".txt"),"rb") end
 	if not f then return end
 	for line in f:lines() do
-		local id, t, secs, data = string.match(line, "^(%x+)|(%d+)|(%d+)|([%w%+/=]+)")
-		if id then records[#records + 1] = { id = id, t = tonumber(t), secs = tonumber(secs), data = data } end
+		local id, t, secs, data, cloud = string.match(line, "^(%x+)|(%d+)|(%d+)|([%w%+/=]*)|?(%d*)$")
+		if id then records[#records + 1] = { id = id, t = tonumber(t), secs = tonumber(secs), data = data, cloud = cloud=="1" } end
 	end
 	f:close()
+	if legacy then save() end
 end
-local function save()
+save = function()
 	local path = store_path()
 	if not path then return end
 	local f = io.open(path, "wb")
 	if not f then return end
-	for _, r in ipairs(records) do f:write(string.format("%s|%d|%d|%s\n", r.id, r.t or 0, r.secs or 0, r.data)) end
+	for _, r in ipairs(records) do f:write(string.format("%s|%d|%d|%s|%d\n", r.id, r.t or 0, r.secs or 0, r.data or "", r.cloud and 1 or 0)) end
 	f:close()
+end
+function reset_content()
+ if rec_kind then finish() end
+ records={};cache,cache_n,want={},0,nil;save()
+end
+local record_wanted={}
+function on_library(v)
+ if v.device~=physical_uid() then return end
+ load()
+ local old={};for _,r in ipairs(records) do old[r.id]=r end
+ local merged,seen={},{}
+ for _,r in ipairs(v.records or {}) do
+  local p=old[r.id];r.t,r.data,r.cloud=r.g,p and p.data or cache[r.id] or "",true
+  merged[#merged+1]=r;seen[r.id]=true
+  if r.data=="" and not record_wanted[r.id] then record_wanted[r.id]=true;netcoop_command("pdanet aget "..r.id) end
+ end
+ for _,r in ipairs(records) do if not r.cloud and not seen[r.id] then merged[#merged+1]=r end end
+ records=merged;save()
+ for _,r in ipairs(records) do if not r.cloud and netcoop_pda_media then netcoop_pda_media.push("audio",r.id,r.data,r.secs) end end
+end
+function on_stored(v)
+ if v.device~=physical_uid() then return end
+ for _,r in ipairs(records) do if r.id==v.id then r.cloud=true;save();return end end
+end
+function library_audio(aid,data)
+ if not record_wanted[aid] then return end
+ record_wanted[aid]=nil
+ for _,r in ipairs(records) do if r.id==aid then r.data=data;save();return end end
 end
 local function game_minutes()
 	local base = game.CTime()
@@ -176,10 +213,13 @@ function dict_start()
 end
 function dict_stop()
 	if rec_kind ~= "dict" then return end
+	local device=rec_device
 	local data, secs = finish()
-	if not data then return end
+	if not data or device~=physical_uid() then return end
 	load()
-	table.insert(records, 1, { id = new_aid(), t = game_minutes(), secs = secs, data = data })
+	local r={id=new_aid(),t=game_minutes(),secs=secs,data=data}
+	table.insert(records,1,r)
+	if netcoop_pda_media then netcoop_pda_media.push("audio",r.id,data,secs) end
 	while #records > MAX_RECORDS do table.remove(records) end
 	save()
 end
@@ -188,6 +228,7 @@ function dict_delete(i)
 	local r = records[i]
 	if not r then return end
 	if playing_id == r.id then netcoop_play_stop(); playing_id = nil end
+	netcoop_command("pdanet rdel "..r.id)
 	table.remove(records, i)
 	save()
 end
@@ -216,6 +257,8 @@ end
 -- Each frame: upload parts, the limits of a recording
 ----------------------------------------------------------------------
 local function update()
+	if rec_kind and rec_device~=physical_uid() then finish() end
+	if queue and queue.device~=physical_uid() then queue=nil end
 	if queue and time_global() >= queue.at then
 		queue.at = time_global() + math.floor(1000 / PARTS_PER_SECOND)
 		local n = queue.next

@@ -57,7 +57,7 @@ level = {name = function() return "l01_escape" end, object_by_id = function(id) 
 players = {}
 function netcoop_players() local t = {} for id in pairs(players) do t[#t + 1] = id end table.sort(t) return table.concat(t, ",") end
 function netcoop_actor_character(id) return players[id] and players[id].char or "" end
-netcoop_pdanet={held_device=function(id,char) return {uid=players[id].uid or char.."-pda",own=true} end}
+netcoop_pdanet={accessible=function(id,d) return not players[id].locked and not players[id].foreign end,held_device=function(id,char) return {uid=players[id].uid or char.."-pda",own=true} end}
 inbox = {}
 function netcoop_send_to_actor(id, ch, data) assert(ch == "map_known"); inbox[id] = (inbox[id] or "") .. data .. "\n" end
 function join(id, char, x, z)
@@ -134,3 +134,9 @@ print("PASS map places: found only near, per character in the shared store, once
 lua.execute('players[7].uid="replacement";inbox[7]=nil;step()')
 assert "clear" in inbox(7)
 print("PASS transitions always visible, map discoveries owned by PDA UID and periodically resent")
+
+lua.execute('players[7].locked=true;inbox[7]=nil;step()')
+assert 'clear' in inbox(7)
+lua.execute('players[7].locked=false;players[7].foreign=true;inbox[7]=nil;step()')
+assert not inbox(7)
+print('PASS PDA map access: password/foreign device clears existing discoveries')

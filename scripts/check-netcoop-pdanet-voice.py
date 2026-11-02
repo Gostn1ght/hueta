@@ -21,8 +21,9 @@ g = lua.globals()
 tmp = tempfile.mkdtemp().replace("\\", "/")
 lua.execute(r'''
 store = {}
-function netcoop_store_read(b, k) return (store[b] or {})[k] or "" end
+function netcoop_store_read(b, k) assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96);return (store[b] or {})[k] or "" end
 function netcoop_store_swap(b, k, old, new)
+    assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96 and #new<=65536, "actual native shared-store bounds")
     store[b] = store[b] or {}
     if (store[b][k] or "") ~= old then return false end
     assert(#new < 65536, "record over 64 KB")
@@ -44,6 +45,24 @@ level = {object_by_id = function(id)
     return {character_name = function() return p.name end, character_icon = function() return "" end,
             money = function() return 1000 end, give_money = function() end}
 end}
+-- Persistent physical PDAs; the network cannot silently fall back to account identity.
+local actor_by_id = level.object_by_id
+pda_items = {}
+for id=1,3 do
+ local actor = actor_by_id(id)
+ local item_id = 900+id
+ local item = {id=function() return item_id end, section=function() return "device_pda_1" end, parent=function() return actor end}
+ pda_items[item_id]=item
+ players[id].pda_item=item
+end
+level.object_by_id = function(id)
+ if pda_items[id] then return pda_items[id] end
+ local actor=actor_by_id(id)
+ if actor then actor.item_in_slot=function(_,slot) return slot==8 and players[id].pda_item or nil end; actor.id=function() return id end; actor.alive=function() return true end end
+ return actor
+end
+db={actor={item_in_slot=function() return players[1].pda_item end}}
+function netcoop_item_uid(id) return pda_items[id] and ("fixture"..id) or "" end
 function netcoop_players() return "1,2,3" end
 inbox = {}
 function netcoop_send_to_actor(id, ch, data) inbox[id] = inbox[id] or {}; table.insert(inbox[id], data) end
@@ -102,7 +121,7 @@ def to_client(chunks):
 to_client(run(1, "pdanet hello"))
 run(2, "pdanet hello"); run(3, "pdanet hello")
 ua, ub = client.me.uid, None
-ub = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_prof', 'b_1'))").uid
+ub = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_prof', 'fixture902'))").uid
 run(1, f"pdanet add {ub}")
 to_client(run(1, f"pdanet dm {ub}"))
 cid = client.opened.id
@@ -138,7 +157,7 @@ for _ in range(10):
 assert all(len(c) <= 4000 for c in replies)
 to_client(replies)
 assert voice.uploading() is None and "<st_pdanet_rec_sent>" in list(g.tips.values())
-meta = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_audio', next(store.pda_audio, nil) and (function() for k in pairs(store.pda_audio) do if not k:find('%.') then return k end end end)()))")
+meta = lua.eval("netcoop_transit.deserialize(netcoop_store_read('pda_audio', next(store.pda_audio, nil) and (function() for k in pairs(store.pda_audio) do if not k:find('_') then return k end end end)()))")
 assert meta.cid == cid and meta.secs == 7 and meta.parts == 1
 # the message in the chat; b fetches it; c (not a member) cannot
 to_client(run(1, f"pdanet open {cid}"))
@@ -168,7 +187,7 @@ assert voice.recording_kind() == "dict" and g.rec.limit == 600
 g.rec.secs = 600          # limit reached: the engine stops
 update()
 assert not voice.recording() and len(voice.records) == 1 and voice.records[1].secs == 600
-assert os.path.exists(f"{tmp}/netcoop_dictaphone_{ua}.txt")
+assert os.path.exists(f"{tmp}/netcoop_dictaphone_fixture901.txt")
 voice2 = load("netcoop_pdanet_voice", root / "client/netcoop_pdanet_voice.script")
 voice2.dict_play(1)
 assert len(voice2.records) == 1 and g.played[len(g.played)] == "RElDVA=="

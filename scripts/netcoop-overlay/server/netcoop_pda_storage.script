@@ -1,0 +1,188 @@
+-- Physical USB backups. No client-supplied profile keys, snapshots or grants.
+-- Payload records are immutable and chunked below the shared store's 64 KiB
+-- limit. A committed restore journal completes after a restart/map transition.
+local PART, LIMIT = 56000, 16 * 1024 * 1024
+local BUCKETS = {"pda_memo", "pda_marks", "pda_stash", "pda_settings", "pda_gallery", "pda_records", "pda_archive", "pda_contacts", "map_known"}
+local function encode(v) return netcoop_transit.serialize(v) end
+local function decode(s)
+ if not s or s == "" then return nil end
+ local ok,v = pcall(netcoop_transit.deserialize,s)
+ return ok and v or nil
+end
+local function read(b,k) return decode(netcoop_store_read(b,k)) end
+local function put(b,k,s)
+ for _=1,8 do
+  local old=netcoop_store_read(b,k) or ""
+  if old==s or netcoop_store_swap(b,k,old,s) then return true end
+ end
+ return false
+end
+local function token()
+ local t={}; for n=1,16 do t[n]=string.format("%x",math.random(0,15)) end
+ return table.concat(t)
+end
+local function prefix(uid, revision, bucket) return uid.."_"..revision.."_"..bucket end
+local function checksum(s)
+ local a,b=1,0
+ for i=1,#s do a=(a+string.byte(s,i))%65521;b=(b+a)%65521 end
+ return b*65536+a
+end
+local function payload(meta,bucket)
+ local entry=meta.sections and meta.sections[bucket]
+ if not entry or entry.parts<1 or entry.parts>300 then return nil end
+ local parts={}
+ for n=1,entry.parts do
+  local part=netcoop_store_read("pda_usb_blob",prefix(meta.usb,meta.revision,bucket).."_"..n) or ""
+  if #part==0 then return nil end
+  parts[n]=part
+ end
+ local s=table.concat(parts)
+ if #s~=entry.bytes or (entry.checksum and checksum(s)~=entry.checksum) then return nil end
+ return entry.empty and "" or s
+end
+local function tools(id)
+ local actor, out=level.object_by_id(id),{}
+ if not (actor and actor.iterate_inventory) then return out end
+ actor:iterate_inventory(function(_,item)
+  local section=item and item:section()
+  if section~="lz_pda_data_usb" and section~="lz_pda_hack_usb" then return end
+  local parent=item:parent()
+  local uid=parent and parent:id()==id and netcoop_item_uid(item:id())
+  if not uid or uid=="" then return end
+  local backup=section=="lz_pda_data_usb" and read("pda_usb",uid)
+  local used=section=="lz_pda_hack_usb" and read("pda_tool",uid)
+  out[#out+1]={id=item:id(),uid=uid,kind=section=="lz_pda_data_usb" and "data" or "hack",
+   backup=backup and {source=backup.source,created=backup.created,revision=backup.revision} or false,
+   left=section=="lz_pda_hack_usb" and (used and used.left or 5) or nil}
+ end)
+ table.sort(out,function(a,b) return a.id<b.id end)
+ return out
+end
+local function archive(uid)
+ local data=read("pda_archive",uid) or {}
+ if data.sections then return decode(payload(data,"pda_archive")) or {} end
+ return data
+end
+function attachment(uid,kind,aid)
+ for _,chat in ipairs(archive(uid)) do
+  for _,m in ipairs(chat.msgs or {}) do
+   if m.k==kind and string.match(m.d or "","^(%x+)")==aid then return true end
+  end
+ end
+ return false
+end
+local function archive_list(uid)
+ local list={}
+ for n,c in ipairs(archive(uid)) do list[#list+1]={index=n,name=c.name or c.cid,source=c.source,count=#(c.msgs or {})} end
+ return list
+end
+local function snapshots(d)
+ local out={}
+ for _,b in ipairs(BUCKETS) do out[b]=netcoop_store_read(b,d.uid) or "" end
+ local profile=read("pda_prof",d.uid) or {}
+ out.pda_contacts=encode(profile.contacts or {})
+ -- Copy chat history as read-only snapshots, never as membership of somebody
+ -- else's live private chats. The recipient's own UID and live chats survive.
+ local saved=archive(d.uid)
+ local seen={}
+ for n,c in ipairs(saved) do seen[(c.source or "").."/"..(c.cid or "")]=n end
+ local chats={}
+ for cid in pairs(profile.chats or {}) do chats[#chats+1]=cid end
+ table.sort(chats)
+ for _,cid in ipairs(chats) do
+  local chat=read("pda_chat",cid)
+  if chat and chat.members and chat.members[profile.uid] then
+   local messages={}
+   for _,m in ipairs(chat.msgs or {}) do messages[#messages+1]=m end
+   local key=d.rec.serial.."/"..cid
+   local record={source=d.rec.serial,cid=cid,name=chat.name or cid,msgs=messages}
+   if seen[key] then saved[seen[key]]=record else saved[#saved+1]=record end
+  end
+ end
+ out.pda_archive=encode(saved)
+ return out
+end
+-- Called before any profile/commands: a restore is temporarily unavailable
+-- until every category is durable. Identity/password are deliberately excluded.
+function recover(uid)
+ local job=read("pda_restore",uid)
+ if not job then return true end
+ if job.wipe then
+  local p=read("pda_prof",uid)
+  if p and p.uid then netcoop_store_swap("pda_uid",p.uid,uid,"") end
+  for _,b in ipairs(BUCKETS) do if b~="pda_contacts" and not put(b,uid,"") then return false end end
+  for _,b in ipairs({"pda_prof","pda_lock","pda_note"}) do if not put(b,uid,"") then return false end end
+  local d=read("pda_dev",uid)
+  if not d then return false end
+  d.owner,d.sealed,d.hacked,d.lock=job.owner,nil,{},nil
+  if not put("pda_dev",uid,encode(d)) or not put("pda_profile_ready",uid,"1") or not put("pda_marks_ready",uid,"1") then return false end
+  return put("pda_restore",uid,"")
+ end
+ local content={}
+ for _,b in ipairs(BUCKETS) do
+  content[b]=payload(job,b)
+  if not content[b] then return false end
+ end
+ for _,b in ipairs(BUCKETS) do
+  if b=="pda_contacts" then
+   local contacts=decode(content[b]) or {}
+   local p=read("pda_prof",uid) or {}
+   p.contacts,p.requests=contacts,{}
+   if not put("pda_prof",uid,encode(p)) then return false end
+  elseif b=="pda_archive" then
+   if not put(b,uid,encode({usb=job.usb,revision=job.revision,sections={pda_archive=job.sections.pda_archive}})) then return false end
+  elseif not put(b,uid,content[b]) then return false end
+ end
+ if not put("pda_restore",uid,"") then return false end
+ printf("[Lost Zone][pda-storage] restore completed device=%s usb=%s revision=%s",uid,job.usb,job.revision)
+ return true
+end
+function factory_reset(d,owner)
+ if not put("pda_restore",d.uid,encode({wipe=true,owner=owner})) then return false end
+ return recover(d.uid)
+end
+function command(id,verb,args)
+ local character=netcoop_actor_character(id)
+ local d=character and netcoop_pdanet.held_device(id,character)
+ if not d or (not d.own and not d.rec.hacked[character]) then return nil,"foreign device" end
+ if netcoop_pdanet.is_locked(id,d.uid) then return nil,"locked" end
+ local list=tools(id)
+ if verb=="usb_archive" then
+  local chat,msg=string.match(args or "","^(%d+) (%d+)$")
+  chat,msg=tonumber(chat),tonumber(msg)
+  local c=chat and archive(d.uid)[chat]
+  local m=c and c.msgs and c.msgs[msg]
+  if not m then return nil,"no archived message" end
+  return {device=d.uid,tools=list,archive=archive_list(d.uid),view={chat=chat,msg=msg,total=#c.msgs,name=c.name or c.cid,message=m}}
+ end
+ if verb=="usb_list" then return {device=d.uid,tools=list,archive=archive_list(d.uid)} end
+ local requested=tonumber(args)
+ local tool
+ for _,t in ipairs(list) do if t.id==requested and t.kind=="data" then tool=t end end
+ if not tool then return nil,"data flash drive required" end
+ if verb=="usb_backup" then
+  local data=snapshots(d)
+  local meta={usb=tool.uid,revision=token(),source=d.rec.serial,created=os.time(),sections={}}
+  local total=0
+  for _,b in ipairs(BUCKETS) do
+   local s=data[b]
+   -- Empty sections still have one encoded chunk so absence is unambiguous.
+   if s=="" then s="~" end
+   total=total+#s; if total>LIMIT or (b~="pda_archive" and #s>=65536) then return nil,"backup too large" end
+   local n=math.ceil(#s/PART)
+   meta.sections[b]={parts=n,bytes=#s,checksum=checksum(s),empty=data[b]==""}
+   for i=1,n do
+    if not put("pda_usb_blob",prefix(tool.uid,meta.revision,b).."_"..i,s:sub((i-1)*PART+1,i*PART)) then return nil,"try again" end
+   end
+  end
+  if not put("pda_usb",tool.uid,encode(meta)) then return nil,"try again" end
+  printf("[Lost Zone][pda-storage] backup device=%s usb=%s bytes=%s",d.uid,tool.uid,total)
+ elseif verb=="usb_restore" then
+  local meta=read("pda_usb",tool.uid)
+  if not meta then return nil,"empty flash drive" end
+  -- Validate all data before committing the recoverable operation.
+  for _,b in ipairs(BUCKETS) do if not payload(meta,b) then return nil,"damaged backup" end end
+  if not put("pda_restore",d.uid,encode(meta)) or not recover(d.uid) then return nil,"restore pending" end
+ else return nil,"unknown operation" end
+ return {device=d.uid,tools=tools(id),done=verb,archive=archive_list(d.uid)}
+end

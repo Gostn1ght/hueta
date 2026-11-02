@@ -62,7 +62,7 @@ server.execute(r'''
 chars = {[1] = "anna_1", [2] = "boris_1"}
 function netcoop_actor_character(id) return chars[id] or "" end
 held={[1]="device-A",[2]="device-B"}; own=true
-netcoop_pdanet={held_device=function(id) return held[id] and {uid=held[id],item=81,own=own} end}
+netcoop_pdanet={is_locked=function() return false end,held_device=function(id) return held[id] and {uid=held[id],item=81,own=own,rec={hacked={}}} end}
 outbox = {}
 function netcoop_send_to_actor(id, ch, data) outbox[#outbox + 1] = {id, ch, data} end
 ''')
@@ -74,6 +74,8 @@ load(c1, "client/netcoop_pda.script", "netcoop_pda")
 c1.execute(r'''
 netcoop_pda.on_game_start()
 netcoop_pda.receive("device-A|81|1/1|")
+local uid, item = netcoop_pda.current_device()
+assert(uid == "device-A" and item == 81)
 local paw = tasks_placeable_waypoints
 local pos = vector():set(120.5, 2, -310.25)
 local se = paw.alife_create("script_zone", pos, 4567, 89)   -- PAW: register_script_zone
@@ -139,4 +141,16 @@ print("PASS physical PDA: UID isolation, ownership checks, device transfer, repl
 
 # A delayed read for a removed device cannot load its marks into its replacement.
 c2.execute('netcoop_pda.reset();db.actor.item_in_slot=function() return {id=function() return 82 end} end;netcoop_pda.receive("device-A|81|1/1|");sent={};tick=30000;callbacks.actor_on_update();assert(sent[1]=="pda get")')
+c2.execute('assert(netcoop_pda.current_device()==nil)')
 print("PASS physical PDA: delayed read bound to the actual equipped item")
+
+# Received map data is a bounded data grammar; it cannot execute a previous
+# holder's Lua or loop forever, even though legacy saves used Lua literals.
+c2.execute(r'''
+netcoop_pda.reset()
+local code='{[1]=(function() _G.pda_ran_code=true return 1 end)()}'
+local hex=code:gsub('.',function(c) return string.format('%02x',c:byte()) end)
+netcoop_pda.receive('untrusted|82|1/1|'..hex)
+assert(not pda_ran_code)
+''')
+print("PASS PDA imported marks are parsed as bounded data, never executed")

@@ -17,8 +17,9 @@ lua = LuaRuntime(unpack_returned_tuples=True)
 g = lua.globals()
 lua.execute(r'''
 store = {}
-function netcoop_store_read(b, k) return (store[b] or {})[k] or "" end
+function netcoop_store_read(b, k) assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96);return (store[b] or {})[k] or "" end
 function netcoop_store_swap(b, k, old, new)
+    assert(b:match("^[%w_%-]+$") and k:match("^[%w_%-]+$") and #k<=96 and #new<=65536, "actual native shared-store bounds")
     store[b] = store[b] or {}
     if (store[b][k] or "") ~= old then return false end
     store[b][k] = new ~= "" and new or nil
@@ -42,6 +43,7 @@ level = {object_by_id = function(id)
     return {character_name = function() return p.name end, character_icon = function() return "icon_" .. p.char end,
             money = function() return p.money end, give_money = function(_, n) p.money = p.money + n end,
             id = function() return id end, alive = function() return p.alive ~= false end,
+            iterate_inventory = function(_, fn) for _, item in pairs(items) do if item.owner == id then fn(nil, item.obj) end end end,
             item_in_slot = function(_, slot) return slot == 8 and p.pda and items[p.pda] and items[p.pda].obj or nil end}
 end}
 -- PDAs (Devices): items[id] = { section, uid, owner = Actor id carrying it }
@@ -92,6 +94,7 @@ for i in range(2):
     t = lua.table()
     lua.execute("local env = ...; setfenv(assert(loadstring(select(2, ...))), setmetatable(env,{__index=_G}))()", t, src)
     servers.append(t)
+    assert t.held_device is not None, 'physical-device API must be exported to the marks/map modules'
 lua.execute(r'''
 function take(id)  -- reassemble chunked messages -> list of {verb, value}
     local out, buf = {}, {}
@@ -100,6 +103,7 @@ function take(id)  -- reassemble chunked messages -> list of {verb, value}
         buf[#buf + 1] = rest
         if n == total then
             local all = table.concat(buf); buf = {}
+            all=all:gsub("^%d+@[%w_]+|", "")
             local verb, ser = string.match(all, "^(%a+)|(.*)$")
             local ok, v = pcall(netcoop_transit.deserialize, ser)
             out[#out + 1] = {verb, ok and v or ser}
@@ -109,6 +113,9 @@ function take(id)  -- reassemble chunked messages -> list of {verb, value}
     return out
 end
 ''')
+g.netcoop_pdanet=servers[0]
+g.netcoop_pda_storage=lua.table()
+lua.execute("local env = ...; setfenv(assert(loadstring(select(2, ...))), setmetatable(env,{__index=_G}))()", g.netcoop_pda_storage, (root/'server/netcoop_pda_storage.script').read_text(encoding='utf-8'))
 take = g.take
 def cmd(server, pid, text):
     g.current_server = server + 1
@@ -126,6 +133,7 @@ def last(msgs, verb):
     return got[-1]
 
 lua.execute('players[1] = {char = "a_1", name = "Bashka", server = 1}; players[2] = {char = "b_1", name = "Yura", server = 2}; players[3] = {char = "c_1", name = "Docent", server = 1}')
+lua.execute('make_item(500, "device_pda_2", "u500"); players[1].pda=500; items[500].owner=1; make_item(502,"device_pda_1","u502"); players[2].pda=502; items[502].owner=2; make_item(503,"device_pda_1","u503"); players[3].pda=503; items[503].owner=3; make_item(700,"lz_pda_hack_usb","hack700"); items[700].owner=3; make_item(701,"lz_pda_hack_usb","hack701"); items[701].owner=9')
 sa = last(cmd(0, 1, "pdanet hello"), "state")
 sb = last(cmd(1, 2, "pdanet hello"), "state")
 sc = last(cmd(0, 3, "pdanet hello"), "state")
@@ -274,6 +282,7 @@ assert len(o.msgs) == 5  # 3 + two transfers
 # Client: the server's real chunks through netcoop_pdanet_client.
 client = lua.table()
 lua.execute(r"""
+db={actor=level.object_by_id(1)}
 listeners_fired = 0
 function netcoop_pure_client() return true end
 function RegisterScriptCallback() end
@@ -354,7 +363,7 @@ lua.execute("players[1].server = 1")
 srv = servers[0]
 lua.execute("""for k in pairs(package.loaded) do end""")
 # a new session (relog): the entity id is new, the PDA is locked again
-lua.execute('players[9] = {char = "a_1", name = "Bashka", server = 1}')
+lua.execute('players[9] = {char = "a_1", name = "Bashka", server = 1, pda = 500}; players[1].pda=nil; items[500].owner=9')
 st = last(cmd(0, 9, "pdanet hello"), "state")
 assert st.locked and len(st.contacts) == 0 and len(st.chats) == 0, "a locked PDA shows nothing"
 assert last(cmd(0, 9, "pdanet notes"), "err") == "locked"
@@ -367,7 +376,7 @@ assert not st.locked and len(st.contacts) > 0
 assert last(cmd(0, 9, "pdanet lockset wrong|x123"), "err") == "wrong password"
 st = last(cmd(0, 9, "pdanet lockset secret1|"), "state")
 assert not st.has_lock, "removed with the old password"
-assert "secret1" not in (lua.eval("netcoop_store_read('pda_lock', 'a_1')") or ""), "never stored in clear"
+assert "secret1" not in (lua.eval("netcoop_store_read('pda_lock', 'u500')") or ""), "never stored in clear"
 # Devices (owner 2026-10-23): every PDA its own serial; someone else's PDA
 # shows nothing of its holder's network, is hacked in time, shows what its
 # owner had until it left him, and can be reset. An NPC's PDA keeps GAMMA's
@@ -383,6 +392,8 @@ def poll_for(seconds, pids):
     return out
 lua.execute('make_item(500, "device_pda_2", "u500"); players[9].pda = 500; items[500].owner = 9')
 r = cmd(0, 9, "pdanet hello")
+held = servers[0].held_device(9, "a_1")
+assert held.uid == 'u500' and held.item == 500 and held.own
 dev = last(r, "device")
 assert dev.own and len(dev.serial) == 9 and dev.serial[4] == "-", dev.serial
 serial = dev.serial
@@ -408,11 +419,11 @@ assert any(k == "device" and v.hacked and v.owner == "Bashka" for k, v in got), 
 d = last(cmd(0, 3, "pdanet dump"), "dump")
 assert d.serial == serial and d.owner.name == "Bashka" and d.owner.uid == ua
 texts = [m.x for c in d.chats.values() for m in c.msgs.values()]
-assert "Let's go hunting" in texts and "after the PDA was gone" not in texts, texts
+assert "Let's go hunting" in texts and "after the PDA was gone" in texts, texts
 assert any(c.uid == ub for c in d.contacts.values())
 # Reset: the PDA serves Docent; his own network is back.
 r = cmd(0, 3, "pdanet wipe")
-assert last(r, "device").own and last(r, "state").uid == uc
+assert last(r, "device").own and last(r, "state").uid not in (ua, uc), "factory reset gets a fresh network ID, not the holders other PDA"
 # Taken away during a hack: the hack stops.
 lua.execute('players[3].pda = nil; players[9].pda = 500; items[500].owner = 9')
 poll(0); drain(9)
@@ -421,13 +432,13 @@ lua.execute('players[9].pda = nil')
 got = poll_for(3, [9])[9]
 assert ("err", "hack interrupted") in got, got
 # Bashka's lock (he had a password): a PDA leaving him is slower to hack.
-cmd(0, 9, "pdanet lockset |secret2")
 lua.execute('make_item(501, "device_pda_1", "u501"); players[9].pda = 501; items[501].owner = 9')
+cmd(0, 9, "pdanet lockset |secret2")
 poll(0)
 lua.execute('players[9].pda = nil; players[3].pda = 501; items[501].owner = 3')
 poll(0); drain(3)
 assert last(cmd(0, 3, "pdanet hack"), "device").hack_total == (20 + 30) * 1000
-cmd(0, 3, "pdanet hack_stop"); lua.execute('players[3].pda = nil')
+cmd(0, 3, "pdanet hack_stop"); lua.execute('players[3].pda = 503')
 
 # An NPC's encrypted PDA with a stash message.
 lua.execute(r"""
@@ -458,6 +469,6 @@ assert lua.eval("treasure_manager.filled") == 1, "filled once"
 lua.execute("treasure_manager.caches[77] = true")  # someone opened it
 got = poll_for(12, [3])[3]
 assert any(k == "spot" and v.id == 77 and not v.add for k, v in got), "the mark goes once it is opened"
-assert lua.eval("netcoop_store_read('pda_stash', 'c_1')") in ("", lua.eval("netcoop_transit.serialize({})"))
+assert lua.eval("netcoop_store_read('pda_stash', 'u503')") in ("", lua.eval("netcoop_transit.serialize({})"))
 print("netcoop pdanet devices: serial, foreign PDA, hack, owner's data until it left him, reset, interrupted hack, NPC PDA, stash")
 print("netcoop pdanet: OK")

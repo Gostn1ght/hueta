@@ -74,6 +74,9 @@ last_error = nil
 local KEEP = 150
 local listeners = {}
 local parts = {}
+local physical_id = nil
+storage = {tools={},archive={}}
+library = {photos={},records={},settings={}}
 local map_retry_at = 0
 local told_requests = {} -- uid -> true: the request was announced this session
 
@@ -103,6 +106,12 @@ local function update_map_friends()
 		end
 	end
 	return false
+end
+
+function current_device()
+ local item=db and db.actor and db.actor:item_in_slot(8)
+ local d=slot_device
+ if d and item and d.item==item:id() and d.uid and not foreign and not locked then return d.uid,d.item end
 end
 
 function equipped()
@@ -142,8 +151,26 @@ local function list(t)
 	return out
 end
 
+local function clear_device()
+ me,contacts,chats,requests,general,notes,typing,members={uid="",name="",icon=""},{},{},{},{},{},{},{}
+ opened,dump,slot_device=nil,nil,nil
+ locked,has_lock,foreign=false,false,false
+ storage,library={tools={},archive={}},{photos={},records={},settings={}}
+ told_requests,parts={},{}
+ if netcoop_map_friends_clear then netcoop_map_friends_clear() end
+ changed("device_reset")
+end
+
+local function replace_content()
+ if netcoop_pda_media then netcoop_pda_media.reset() end
+ if netcoop_pdanet_photo and netcoop_pdanet_photo.reset_content then netcoop_pdanet_photo.reset_content() end
+ if netcoop_pdanet_voice and netcoop_pdanet_voice.reset_content then netcoop_pdanet_voice.reset_content() end
+ local d=slot_device
+ clear_device();slot_device=d
+end
 local function apply(verb, v)
 	if verb == "state" and type(v) == "table" then
+		if me.uid~="" and v.uid and v.uid~="" and me.uid~=v.uid then replace_content();if netcoop_pda then netcoop_pda.reset() end end
 		me = { uid = v.uid or "", name = v.name or "", icon = v.icon or "" }
 		locked, has_lock = v.locked == true, v.has_lock == true
 		if (v.foreign == true) ~= foreign then dump = nil end
@@ -212,6 +239,19 @@ local function apply(verb, v)
 		if actor_menu and actor_menu.set_msg then
 			actor_menu.set_msg(1, string.format(game.translate_string(n > 0 and "st_pdanet_paid_in" or "st_pdanet_paid_out"), math.abs(n)), 4)
 		end
+	elseif verb == "storage" and type(v)=="table" then
+		if v.done=="usb_restore" then replace_content() end
+		storage=v
+		if v.done=="usb_restore" and netcoop_pda and netcoop_pda.reset then netcoop_pda.reset() end
+	elseif verb == "library" and type(v)=="table" then
+		library=v
+		if netcoop_pda_media then netcoop_pda_media.observed(v) end
+		if netcoop_pdanet_photo and netcoop_pdanet_photo.on_library then netcoop_pdanet_photo.on_library(v) end
+		if netcoop_pdanet_voice and netcoop_pdanet_voice.on_library then netcoop_pdanet_voice.on_library(v) end
+	elseif verb == "stored" and type(v)=="table" then
+		if netcoop_pda_media then netcoop_pda_media.stored(v) end
+		if v.kind=="photo" and netcoop_pdanet_photo and netcoop_pdanet_photo.on_stored then netcoop_pdanet_photo.on_stored(v) end
+		if v.kind=="audio" and netcoop_pdanet_voice and netcoop_pdanet_voice.on_stored then netcoop_pdanet_voice.on_stored(v) end
 	elseif verb == "device" and type(v) == "table" then
 		v.at = time_global()
 		if not (slot_device and slot_device.serial == v.serial) then dump = nil end
@@ -244,6 +284,13 @@ function receive(data)
 	if n < total then return end
 	local all = table.concat(parts)
 	parts = {}
+	local item_id,uid,body=string.match(all,"^(%d+)@([%w_]+)|(.*)$")
+	if item_id then
+		local held=db and db.actor and db.actor:item_in_slot(8)
+		if tonumber(item_id)~=0 and (not held or held:id()~=tonumber(item_id)) then return end
+		if physical_id~=tonumber(item_id) then clear_device();physical_id=tonumber(item_id) end
+		all=body
+	end
 	local verb, body = string.match(all, "^(%a+)|(.*)$")
 	if not verb then return end
 	if verb == "err" then apply(verb, body) return end
@@ -270,6 +317,11 @@ end
 local function send(text) if netcoop_command then netcoop_command("pdanet " .. text) end end
 
 function hello() send("hello") end
+function ask_storage() send("usb_list") end
+function archive_message(chat,msg) send("usb_archive "..tostring(chat).." "..tostring(msg)) end
+function backup(item) send("usb_backup "..tostring(item)) end
+function restore(item) send("usb_restore "..tostring(item)) end
+function ask_library() send("library") end
 function add_contact(uid) send("add " .. tostring(uid)) end
 function deny_request(uid) send("deny " .. tostring(uid)) end
 function unlock(password) send("unlock " .. string.gsub(password or "", "[%c|]", "")) end
@@ -542,10 +594,24 @@ function install_npc_pda()
 	end
 end
 
-local function on_first_update() hello(); ask_notes() end
+local function on_first_update() hello(); ask_notes(); ask_library() end
+local next_device_check=0
+local function device_update()
+ local held=db and db.actor and db.actor:item_in_slot(8)
+ local id=held and held:id() or 0
+ if id~=physical_id then
+  clear_device();physical_id=id;next_device_check=0
+  if netcoop_pda and netcoop_pda.reset then netcoop_pda.reset() end
+ end
+ if id~=0 and time_global()>=next_device_check then
+  next_device_check=time_global()+10000
+  hello();ask_notes();ask_library()
+ end
+ return false
+end
 function on_game_start()
 	if not (netcoop_pure_client and netcoop_pure_client()) then return end
-	if AddUniqueCall then AddUniqueCall(update_map_friends) end
+	if AddUniqueCall then AddUniqueCall(update_map_friends);AddUniqueCall(device_update) end
 	RegisterScriptCallback("actor_on_first_update", on_first_update)
 	install_npc_pda()
 	-- keep the task list for "send a task" (netcoop_client_compat logs them)

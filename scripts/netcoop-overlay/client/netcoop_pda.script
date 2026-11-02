@@ -18,6 +18,19 @@ local last_sent = nil
 local next_check = 0
 local device_uid, device_id, sending
 
+-- The physical device identity, never the character's chat/profile UID.
+-- An old read cannot authenticate a newly equipped object with another ID.
+function current_device()
+	local net=netcoop_pdanet_client
+	local item = db.actor and db.actor:item_in_slot(8)
+	local d=net and net.slot_device
+	if net and (net.foreign or net.locked) then return nil end
+	if d and item and d.item==item:id() and d.uid and not net.foreign and not net.locked then return d.uid,d.item end
+	if loaded and device_uid and item and item:id() == device_id then
+		return device_uid, device_id
+	end
+end
+
 local function paw() return rawget(_G, "tasks_placeable_waypoints") or tasks_placeable_waypoints end
 
 ---------------------------------------------------------------- data
@@ -38,13 +51,57 @@ local function serialize(value, depth)
 	return "{" .. table.concat(parts, ",") .. "}"
 end
 
+-- Legacy PAW files are Lua table literals, not executable scripts. Parse only
+-- the emitted data grammar with bounded size/depth; a traded PDA cannot run code.
 local function deserialize(text)
-	if type(text) ~= "string" or text == "" then return nil end
-	local chunk = loadstring("return " .. text)
-	if not chunk then return nil end
-	setfenv(chunk, {})
-	local ok, value = pcall(chunk)
-	return ok and type(value) == "table" and value or nil
+ if type(text)~="string" or #text==0 or #text>65536 then return nil end
+ local pos,nodes=1,0
+ local function skip() local _,last=text:find("^%s*",pos);pos=(last or pos-1)+1 end
+ local function expect(token)
+  skip();assert(text:sub(pos,pos+#token-1)==token,"invalid PDA data");pos=pos+#token
+ end
+ local parse
+ parse=function(depth)
+  nodes=nodes+1;assert(depth<=10 and nodes<=8192,"PDA data limit")
+  skip();local c=text:sub(pos,pos)
+  if c=="{" then
+   pos=pos+1;local out={};skip()
+   while text:sub(pos,pos)~="}" do
+    expect("[");local key=parse(depth+1);assert(type(key)=="string" or type(key)=="number","bad PDA key")
+    expect("]");expect("=");out[key]=parse(depth+1);skip()
+    if text:sub(pos,pos)~="}" then expect(",") end
+   end
+   pos=pos+1;return out
+  elseif c=='"' then
+   pos=pos+1;local out={}
+   while true do
+    c=text:sub(pos,pos);assert(c~="","unfinished PDA string");pos=pos+1
+    if c=='"' then return table.concat(out) end
+    if c=="\\" then
+     local e=text:sub(pos,pos);assert(e~="","unfinished PDA escape");pos=pos+1
+     if e:match("%d") then
+      local digits=e
+      for _=1,2 do local d=text:sub(pos,pos);if not d:match("%d") then break end;digits=digits..d;pos=pos+1 end
+      local byte=tonumber(digits);assert(byte<=255,"bad PDA escape");c=string.char(byte)
+     else
+      local escapes={a="\a",b="\b",f="\f",n="\n",r="\r",t="\t",v="\v",['"']='"',["\\"]="\\",["\n"]="\n"}
+      c=escapes[e];assert(c,"bad PDA escape")
+     end
+    end
+    out[#out+1]=c
+   end
+  end
+  for token,value in pairs({["true"]=true,["false"]=false}) do
+   if text:sub(pos,pos+#token-1)==token then pos=pos+#token;return value end
+  end
+  if text:sub(pos,pos+2)=="nil" then pos=pos+3;return nil end
+  local start,last=text:find("^[%+%-]?[%d%.]+[eE]?[%+%-]?%d*",pos)
+  assert(start,"bad PDA value")
+  local value=tonumber(text:sub(start,last));assert(value and value==value and value~=math.huge and value~=-math.huge,"bad PDA number")
+  pos=last+1;return value
+ end
+ local ok,value=pcall(parse,0);skip()
+ return ok and pos==#text+1 and type(value)=="table" and value or nil
 end
 
 local function to_hex(s) return (string.gsub(s, ".", function(c) return string.format("%02x", string.byte(c)) end)) end
@@ -180,6 +237,13 @@ local function save_if_changed()
 	end
 end
 
+-- Backups wait for the latest map snapshot to be acknowledged.
+function flush()
+ if not loaded then return false end
+ save_if_changed()
+ return sending==nil
+end
+
 local function apply(text)
 	local data = deserialize(text)
 	local m = paw()
@@ -238,6 +302,7 @@ function receive(data)
 end
 
 local function update()
+	install_paw() -- PAW may be loaded after our game-start callback
 	local t = time_global()
 	local item = db.actor and db.actor:item_in_slot(8)
 	local id = item and item:id()
