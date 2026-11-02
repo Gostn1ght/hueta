@@ -284,13 +284,11 @@ player.position=function() return vector():set(0,0,0) end
 local obj=make_item(id,'chair_phy',1); obj.clsid=function() return 0 end
 assert(f_pick(player, obj, "petr")~='','only the placer picks it up')
 assert(f_pick(player, obj, "ivan")=='' and picked and owned_t()[id]==nil)
--- backpack stash: made at the player, spot to the owner, packed up when emptied
-local pack=make_item(70,'itm_stash_pack',1)
-assert(s_create(player, pack, "My|stash\n", "ivan")=='')
-local stash=next_id
-assert(owned_t()[stash].kind=='stash' and owned_t()[stash].name=='Mystash')
-assert(sent[#sent][2]=='stash_spot' and sent[#sent][3]==stash..'|Mystash')
+-- Legacy saved stashes without an embedded physical bag still pack once.
+local stash=next_id+1
+owned_t()[stash]={kind='stash',section='itm_stash_pack',owner='ivan'}
 local box=make_item(stash,'inv_backpack',1); box.is_inv_box_empty=function() return true end; objects[stash]=box
+netcoop_backpack_stash={changed=function() return false end}
 box_changed(stash, 91)
 assert(owned_t()[stash]==nil and created[#created]=='itm_stash_pack' and sent[#sent][2]=='stash_spot_remove')
 ''')

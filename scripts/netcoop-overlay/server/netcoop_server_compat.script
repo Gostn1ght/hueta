@@ -1428,6 +1428,7 @@ function on_game_start()
 	install_hide_hud()
 	install_trade_profiles()
 	install_player_tasks()
+	if netcoop_backpack_stash then netcoop_backpack_stash.install() end
 	if death_manager and death_manager.init_drop_settings then
 		local ok, err = pcall(death_manager.init_drop_settings)
 		if not ok then printf("[Lost Zone] death_manager init error: %s", tostring(err)) end
@@ -1606,6 +1607,7 @@ end
 function can_access(object_id, login)
 	local entry = owned()[object_id]
 	if not entry then return true end
+	if entry.bag_phase == "deploy" or entry.bag_phase == "pack" then return false end
 	return entry.owner == login or (entry.access ~= nil and entry.access[login] == true)
 end
 
@@ -1751,46 +1753,31 @@ local function new_stash(actor, item_section, name, login)
 	return se
 end
 
--- A stash item (item_backpack's UICreateStash): a stash at the player.
+-- The real backpack remains an inventory object inside the stash.
 local function stash_create(actor, item, name, login)
-	name = string.sub(string.gsub(name or "", "[|%c]", ""), 1, 40)
-	if not new_stash(actor, item:section(), name, login) then return "could not make a stash" end
-	alife_release(item)
-	return ""
+ local plan,why=netcoop_backpack_stash.prepare(actor,item,false)
+ if not plan then return why end
+ name=string.sub(string.gsub(name or "","[|%c]",""),1,40)
+ local se=new_stash(actor,item:section(),name,login)
+ if not se then return "could not make a stash" end
+ netcoop_backpack_stash.begin(se.id,actor,plan)
+ return ""
 end
 
--- The worn backpack used (itm_actor_backpack): a stash with the rucksack's
--- contents, as item_backpack.actor_on_item_use does.
 local function backpack_deploy(actor, login)
-	local backpack = actor:item_in_slot(13)
-	if not backpack then return "no backpack is worn" end
-	local se = new_stash(actor, backpack:section(), nil, login)
-	if not se then return "could not make a stash" end
-	local backpack_id = backpack:id()
-	alife_release(backpack)
-	local keep = {}
-	local ini = ini_file("items\\settings\\backpack_stash.ltx")
-	if ini and utils_data then keep = utils_data.collect_section(ini, "actor_backpack_keep_items", true) or {} end
-	local actor_id = actor:id()
-	CreateTimeEvent("netcoop_backpack", tostring(se.id), 0, function(stash_id)
-		local box, owner = level.object_by_id(stash_id), level.object_by_id(actor_id)
-		if not (box and owner) then return false end
-		owner:iterate_inventory(function(_, it)
-			if it and it:id() ~= backpack_id and keep[it:section()] == nil
-				and not (IsAmmo(it) and item_backpack and item_backpack.is_ammo_for_wpn and item_backpack.is_ammo_for_wpn(it:section()))
-				and ini_sys:r_string_ex(it:section(), "kind") ~= "i_medical"
-				and not ini_sys:r_bool_ex(it:section(), "quest_item", false)
-				and not owner:is_on_belt(it) and not (item_backpack and item_backpack.is_in_slot and item_backpack.is_in_slot(it)) then
-				owner:transfer_item(it, box)
-			end
-		end)
-		return true
-	end, se.id)
-	return ""
+ local backpack=actor and actor:item_in_slot(13)
+ if not backpack then return "no backpack is worn" end
+ local plan,why=netcoop_backpack_stash.prepare(actor,backpack,true)
+ if not plan then return why end
+ local se=new_stash(actor,backpack:section(),nil,login)
+ if not se then return "could not make a stash" end
+ netcoop_backpack_stash.begin(se.id,actor,plan)
+ return ""
 end
 
 -- Engine (netcoop_transfer.inc) after something was taken from a box.
 function on_box_changed(box_id, actor_id)
+	if netcoop_backpack_stash.changed(box_id, actor_id) then return end
 	local box = level.object_by_id(box_id)
 	local entry = owned()[box_id]
 	if not (box and entry and entry.kind == "stash" and box:section() == "inv_backpack" and box:is_inv_box_empty()) then return end

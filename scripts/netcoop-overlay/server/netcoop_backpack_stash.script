@@ -1,0 +1,201 @@
+-- Real backpack instances inside player stashes. Persistent phases survive
+-- restart; delayed ownership events never justify deleting unconfirmed loot.
+local next_update, installed = 0, false
+local retry, waiting = {}, {}
+local function entries()
+ local state=alife_storage_manager.get_state()
+ state.netcoop_owned=state.netcoop_owned or {}
+ return state.netcoop_owned
+end
+local function uid(item)
+ return item and netcoop_item_uid(item:id()) or ""
+end
+local function parent_id(item)
+ local parent=item and item:parent()
+ return parent and parent:id() or 65535
+end
+local function snapshot(holder,box)
+ local list={}
+ local visit=function(_,item) if item then list[#list+1]=item end end
+ if box then holder:iterate_inventory_box(visit,holder) else holder:iterate_inventory(visit) end
+ return list
+end
+local function actor_with_bag(entry)
+ for id in string.gmatch(netcoop_players(),"%d+") do
+  id=tonumber(id)
+  local actor=level.object_by_id(id)
+  local login=netcoop_actor_login(id)
+  if actor and actor:alive() and login==entry.bag_actor then
+   for _,item in ipairs(snapshot(actor)) do
+    if uid(item)==entry.bag_uid and parent_id(item)==id then return actor,item end
+   end
+  end
+ end
+end
+local function remove_empty(box_id,entry,actor)
+ local box=level.object_by_id(box_id)
+ if not box or not box:is_inv_box_empty() then return false end
+ local data={stash_id=box_id,cancel=false}
+ SendScriptCallback("actor_on_stash_remove",data)
+ if data.cancel then return false end
+ local se=alife_object(box_id)
+ if not se then return false end
+ alife_release(se)
+ local state=alife_storage_manager.get_state()
+ if state.player_created_stashes then state.player_created_stashes[box_id]=nil end
+ entries()[box_id]=nil;retry[box_id]=nil;waiting[box_id]=nil
+ for id in string.gmatch(netcoop_players(),"%d+") do
+  if netcoop_send_to_actor then netcoop_send_to_actor(tonumber(id),"stash_spot_remove",tostring(box_id)) end
+ end
+ printf("[Lost Zone][stash] physical backpack %s packed; box=%s recipient=%s",entry.bag_uid,box_id,actor and actor:id() or "cancelled deployment")
+ return true
+end
+
+-- Called before creating any box, so a missing UID or repeat cannot consume
+-- the bag or leave a second stash. Capture items now, never a future inventory.
+function prepare(actor,bag,contents)
+ local key=uid(bag)
+ if not actor or not bag or key=="" or parent_id(bag)~=actor:id() then return nil,"backpack is not ready" end
+ for _,entry in pairs(entries()) do
+  if entry.bag_uid==key then return nil,"this backpack already has a stash" end
+ end
+ local plan={{id=bag:id(),uid=key}}
+ if contents then
+  local keep={}
+  local ini=ini_file("items\\settings\\backpack_stash.ltx")
+  if ini and utils_data then keep=utils_data.collect_section(ini,"actor_backpack_keep_items",true) or {} end
+  for _,item in ipairs(snapshot(actor)) do
+   if item:id()~=bag:id() and keep[item:section()]==nil
+    and not (IsAmmo(item) and item_backpack and item_backpack.is_ammo_for_wpn and item_backpack.is_ammo_for_wpn(item:section()))
+    and ini_sys:r_string_ex(item:section(),"kind")~="i_medical"
+    and not ini_sys:r_bool_ex(item:section(),"quest_item",false)
+    and not actor:is_on_belt(item) and not (item_backpack and item_backpack.is_in_slot and item_backpack.is_in_slot(item)) then
+    local item_uid=uid(item)
+    if item_uid=="" then return nil,"inventory is not ready" end
+    plan[#plan+1]={id=item:id(),uid=item_uid}
+   end
+  end
+ end
+ return plan
+end
+
+function begin(box_id,actor,plan)
+ local entry=entries()[box_id]
+ entry.bag_box_name=alife_object(box_id):name()
+ entry.bag_uid,entry.bag_id=plan[1].uid,plan[1].id
+ entry.bag_actor,entry.bag_phase=netcoop_actor_login(actor:id()),"deploy"
+ entry.bag_deposit=plan
+ waiting[box_id]=time_global()
+ alife():set_switch_online(box_id,true)
+ printf("[Lost Zone][stash] deploy box=%s backpack=%s actor=%s items=%s",box_id,entry.bag_uid,actor:id(),#plan)
+end
+
+function changed(box_id,actor_id)
+ local entry=entries()[box_id]
+ if not (entry and entry.bag_uid) then return false end
+ local actor=level.object_by_id(actor_id)
+ local bag=level.object_by_id(entry.bag_id)
+ local login=netcoop_actor_login(actor_id)
+ if actor and login~="" and (login==entry.owner or (entry.access and entry.access[login]))
+  and actor:alive() and uid(bag)==entry.bag_uid and parent_id(bag)==actor_id then
+  entry.bag_actor=login
+  if entry.bag_phase~="pack" and entry.bag_phase~="pack_wait" then
+   entry.bag_phase="pack_wait";waiting[box_id]=time_global()+750
+   printf("[Lost Zone][stash] backpack %s taken; packing box=%s for actor=%s",entry.bag_uid,box_id,actor_id)
+  end
+ end
+ return true -- native/stock callbacks must not manufacture a second backpack
+end
+
+local function update_one(box_id,entry,now)
+ local box=level.object_by_id(box_id)
+ if not box then return end -- offline/unavailable is never proof of empty
+ if box:section()~="inv_backpack" or box:name()~=entry.bag_box_name then return end
+ local bag=level.object_by_id(entry.bag_id)
+ if uid(bag)~=entry.bag_uid then bag=nil end -- object IDs can be reused
+ if entry.bag_phase=="idle" then
+  -- The native transaction sees its server entity before H_Parent's queued
+  -- event reaches the live object. Observe that later rather than missing
+  -- the pickup forever. This also covers script transfers and restart.
+  if bag and parent_id(bag)~=box_id then changed(box_id,parent_id(bag)) end
+  return
+ end
+ if bag and parent_id(bag)==box_id and (entry.bag_phase=="pack" or entry.bag_phase=="pack_wait") then
+  entry.bag_phase="idle";waiting[box_id]=nil;return -- the player put it back
+ end
+ if entry.bag_phase=="deploy" then
+  waiting[box_id]=waiting[box_id] or now
+  local actor=actor_with_bag(entry)
+  local deposited=bag and parent_id(bag)==box_id
+  if not deposited and now-waiting[box_id]>10000 and box:is_inv_box_empty() then
+   remove_empty(box_id,entry);return -- refused deployment keeps the real bag
+  end
+  if not actor and not deposited then
+   if now-waiting[box_id]>10000 then remove_empty(box_id,entry) end
+   return
+  end
+  -- After the bag enters the box, locate the same connected owner for the
+  -- captured remainder. Do not deposit from a corpse or a new holder.
+  if not actor then
+   for id in string.gmatch(netcoop_players(),"%d+") do
+    id=tonumber(id)
+    local candidate=level.object_by_id(id)
+    if candidate and candidate:alive() and netcoop_actor_login(id)==entry.bag_actor then actor=candidate;break end
+   end
+  end
+  if not actor then entry.bag_phase="idle";entry.bag_deposit=nil;return end
+  local plan=entry.bag_deposit or {}
+  for n=#plan,1,-1 do
+   local row=plan[n];local item=level.object_by_id(row.id)
+   if not item or uid(item)~=row.uid or parent_id(item)==box_id or parent_id(item)~=actor:id() then table.remove(plan,n) end
+  end
+  if #plan==0 then entry.bag_phase="idle";entry.bag_deposit=nil;waiting[box_id]=nil;return end
+  -- The bag always goes first; ownership settles before depositing loot.
+  local limit=deposited and math.min(#plan,16) or 1
+  for n=1,limit do actor:transfer_item(level.object_by_id(plan[n].id),box) end
+ elseif entry.bag_phase=="pack_wait" or entry.bag_phase=="pack" then
+  if entry.bag_phase=="pack_wait" then
+   waiting[box_id]=waiting[box_id] or now+750
+   if now<waiting[box_id] then return end
+  end
+  local actor,held=actor_with_bag(entry)
+  if not actor or actor:position():distance_to(box:position())>4 then return end
+  entry.bag_id=held:id();entry.bag_phase="pack"
+  local items=snapshot(box,true)
+  if #items==0 then remove_empty(box_id,entry,actor);return end
+  -- No weight refusal: the stock actor movement rules enforce overload.
+  -- Native atomic transfer retains anything refused by save-safety checks.
+  for n=1,math.min(#items,16) do box:transfer_item(items[n],actor) end
+ end
+end
+
+function update()
+ local now=time_global()
+ if now<next_update then return false end
+ next_update=now+250
+ for id,entry in pairs(entries()) do
+  if entry.bag_uid and now>=(retry[id] or 0) then
+   retry[id]=now+1000
+   local ok,err=pcall(update_one,id,entry,now)
+   if not ok then printf("! [Lost Zone][stash] box=%s phase=%s update failed: %s",id,entry.bag_phase,tostring(err)) end
+  end
+ end
+ return false
+end
+
+function install()
+ if installed then return end
+ installed=true
+ local stock=item_backpack and item_backpack.actor_on_item_take_from_box
+ if stock then
+  UnregisterScriptCallback("actor_on_item_take_from_box",stock)
+  RegisterScriptCallback("actor_on_item_take_from_box",function(box,item)
+   local entry=box and entries()[box:id()]
+   if entry and entry.kind=="stash" then
+    local parent=item and item:parent()
+    if parent then netcoop_server_compat.on_box_changed(box:id(),parent:id()) end
+   else stock(box,item) end
+  end)
+ end
+ AddUniqueCall(update)
+end

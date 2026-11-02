@@ -1081,6 +1081,12 @@ local function install_server_furniture()
 	local ib = item_backpack
 	if ib and not ib.__netcoop then
 		ib.__netcoop = true
+        -- Packing/recreation is authoritative. The stock callback would
+        -- create a second bag locally when the replicated box becomes empty.
+        if type(ib.actor_on_item_take_from_box) == "function" then
+            UnregisterScriptCallback("actor_on_item_take_from_box", ib.actor_on_item_take_from_box)
+            ib.actor_on_item_take_from_box = function() end
+        end
 		if ib.UICreateStash then
 			ib.UICreateStash.OnAccept = function(self)
 				local name = self.input and self.input:GetText() or ""

@@ -56,6 +56,7 @@ jobs:
           python scripts/check-netcoop-ai.py
           python scripts/check-netcoop-vision-cadence.py
           python scripts/check-netcoop-items.py
+          python scripts/check-netcoop-backpack-stash.py
           python scripts/check-netcoop-loot-policy.py
           python scripts/check-netcoop-mines.py
           python scripts/check-lzpack.py
