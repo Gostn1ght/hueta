@@ -72,6 +72,7 @@ jobs:
           python scripts/check-netcoop-respawn-state.py
           python scripts/check-netcoop-survival.py
           python scripts/check-netcoop-player-state.py
+          python scripts/check-netcoop-hud-reconnect.py
           python scripts/check-netcoop-full-map-plan.py
           python scripts/check-dist-windows-batch.py
           python scripts/check-netcoop-legacy-dialog.py

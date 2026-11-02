@@ -3783,6 +3783,15 @@ function actor_on_first_update()
 		RegisterScriptCallback("actor_on_update", check_for_main_ui)
 	end
 	validate_object_tables()
+    if cfg.netcoop_restart then
+        cfg.netcoop_restart=nil
+        if not cfg.disable_addon and not check_for_dependencies(true) then
+            set_killswitch(false)
+            set_handler_callbacks()
+            -- Co-op handoffs do not always emit the single-player loading event.
+            on_loading_screen_dismissed()
+        end
+    end
 end
 
 function on_loading_screen_dismissed()
@@ -6584,7 +6593,13 @@ end
 -- modules survive. Never keep old widget userdata or multi-minute deadlines.
 function netcoop_reset_actor()
     maingameui, hmm, popin_active = nil, nil, nil
-    anim_playing = false
+    scanning, anim_playing = false, false
+    cfg.netcoop_restart = true
+    cfg.held_key, cfg.held_mod, cfg.holding = nil, nil, nil
+    cfg.use_release_time, cfg.last_tap, cfg.block_loot_window = nil, nil, nil
+    cfg.loot_flag_reason, cfg.hidden_before_anim, cfg.active_campfire = nil, nil, nil
+    cfg.heal_cooldown_active, cfg.reverting_toggle = false, false
+    if RemoveTimeEvent then RemoveTimeEvent("dotmark_scan_delay",0) end
     next_near_scan, next_early_scan, next_tut_check, next_mute_check, next_hint_refresh = 0,0,0,0,0
     scanned = {}
     cfg.markers, cfg.pending_actions = {}, {}

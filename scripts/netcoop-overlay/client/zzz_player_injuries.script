@@ -1859,6 +1859,22 @@ end
 -- Lost Zone: UI objects and location-clock deadlines belong to one connection.
 -- Limb health itself is restored separately from the authoritative snapshot.
 function netcoop_reset_actor()
+    -- Current HUD roots may survive while cached child bars do not. Rebuild
+    -- only this addon's roots to avoid layering old red bars under new ones.
+    local hud = get_hud and get_hud()
+    if hud then
+        local names={"body_health_system","body_health_system_text","bhs_stamina_bar","bhs_stamina_bar_bg","bhs_health_bar","bhs_health_bar_bg","bhs_garbage"}
+        if showtexthud==2 then names[#names+1]="cop_debug" end
+        for limb in pairs(maxhp) do
+            for _,suffix in ipairs({"_bar","_bar_green","_bar_bg"}) do names[#names+1]="bhs_health_"..limb..suffix end
+        end
+        for _,name in ipairs(names) do
+            for _,ratio in ipairs({"","_43","_1610"}) do
+                local id=name..ratio
+                if hud:GetCustomStatic(id) then hud:RemoveCustomStatic(id) end
+            end
+        end
+    end
     init, scuffed_fix, xml = false, false, nil
     progress_stamina, progress_health = nil, nil
     progress_health_head, progress_health_torso = nil, nil
