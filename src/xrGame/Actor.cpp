@@ -1,4 +1,4 @@
-#include "pch_script.h"
+﻿#include "pch_script.h"
 #include "netcoop.h"
 #include "Actor_Flags.h"
 #include "hudmanager.h"
@@ -22,6 +22,7 @@
 #include "CustomOutfit.h"
 #include "actorcondition.h"
 #include "UIGameCustom.h"
+#include "ui/UIPdaWnd.h"
 #include "../xrphysics/matrix_utils.h"
 #include "clsid_game.h"
 #include "Grenade.h"
@@ -937,14 +938,25 @@ void CActor::g_Physics(Fvector& _accel, float jump, float dt)
 		if(this==Level().CurrentControlEntity() && netcoop::pure_client()) {
 			auto held=[](EGameActions action) {for(int n=0;n<2;++n){const int dik=get_action_dik(action,n);if(dik && pInput->iGetAsyncKeyState(dik))return true;}return false;};
 			Fvector direction;direction.set(0.f,0.f,0.f);
-			Fvector forward=cam_Active()->vDirection,right;right.crossproduct(Fvector().set(0.f,1.f,0.f),forward);right.normalize_safe();
+			// Read the live camera angles. This branch skips normal actor
+			// orientation; its old model yaw otherwise kept the view facing north.
+			CCameraBase* camera=cam_Active();
+			Fvector forward,right;forward.setHP(-camera->yaw,-camera->pitch);
+			right.setHP(-camera->yaw+PI_DIV_2,0.f);
 			if(held(kFWD))direction.add(forward);if(held(kBACK))direction.sub(forward);
 			if(held(kR_STRAFE))direction.add(right);if(held(kL_STRAFE))direction.sub(right);
 			if(held(kJUMP))direction.y+=1.f;if(held(kCROUCH))direction.y-=1.f;
 			if(direction.square_magnitude()>1.f)direction.normalize_safe();
-			const float speed=held(kSPRINT_TOGGLE) ? 10.f:4.f;
+			const bool editing=CurrentGameUI() && CurrentGameUI()->GetPdaMenu().IsShown();
+			if(editing) direction.set(0.f,0.f,0.f);
+			const float speed=held(kSPRINT_TOGGLE) ? 64.f:16.f;
 			Fvector position;position.mad(Position(),direction,_min(.1f,dt)*speed);
 			if(Level().ObjectSpace.GetBoundingVolume().contains(position))Position().set(position);
+			r_torso.yaw=unaffected_r_torso.yaw=r_model_yaw=r_model_yaw_dest=-camera->yaw;
+			r_torso.pitch=unaffected_r_torso.pitch=camera->pitch;
+			r_torso.roll=unaffected_r_torso.roll=0.f;
+			Fvector xyz;xyz.set(0.f,r_model_yaw,0.f);XFORM().setXYZi(xyz);XFORM().c.set(position);
+			spatial_move();
 		}
 		return;
 	}
@@ -1224,6 +1236,7 @@ void CActor::UpdateCL()
 	m_snd_noise -= 0.3f * Device.fTimeDelta;
 
 	inherited::UpdateCL();
+	netcoop_platform_update();
 	m_pPhysics_support->in_UpdateCL();
 	if (netcoop::pure_client() && this != Level().CurrentControlEntity())
 		netcoop::metric_remote_actor(ID(), !!Remote(), !!g_Alive(), NET.size(),
@@ -3179,3 +3192,5 @@ void CActor::removeFPCam()
 	}
 }
 
+
+#include "netcoop_actor_platform.inc"

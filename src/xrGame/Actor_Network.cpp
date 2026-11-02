@@ -1,4 +1,4 @@
-#include "pch_script.h"
+﻿#include "pch_script.h"
 #include "netcoop.h"
 #include "actor.h"
 #include "hudmanager.h"
@@ -161,6 +161,9 @@ void CActor::net_ImportInputAck(NET_Packet& P)
 	// local position and pulling the player toward the spawn point.
 	if (!has_prediction_at_ack)
 		return;
+    // World-space ACKs refer to the server car pose, whereas the owner draws
+    // an interpolated car. Walking is validated in its reported platform frame.
+    if(m_netcoop_platform_car!=0xffff) return;
 	Fvector error;
 	error.sub(auth_pos, predicted_at_ack);
 	m_prediction_error = error.magnitude();
@@ -326,6 +329,15 @@ void CActor::net_Export(NET_Packet& P) // export to server
 		P.w_u16(outfit ? outfit->object_id() : u16(-1));
 		P.w_u16(helmet ? helmet->object_id() : u16(-1));
 		P.w_stringZ(cNameVisual());
+        if (netcoop::pure_client() && Local()) {
+            P.w_u16(0x504c); // optional owner-only platform frame, before legacy physics tail
+            P.w_u16(m_netcoop_platform_car);
+            Fvector relative;relative.set(0,0,0);
+            if(m_netcoop_platform_object && Level().Objects.net_Find(m_netcoop_platform_car)==m_netcoop_platform_object) {
+                Fmatrix inverse;inverse.invert(m_netcoop_platform_object->XFORM());inverse.transform_tiny(relative,Position());
+            }
+            P.w_vec3(relative);
+        }
 	}
 	/////////////////////////////////////////////////
 	P.w_u16(0); // physics sync items (MP only)
@@ -487,6 +499,7 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 	P.r_u8();
 	P.r_u8();
 	const u16 move_state = P.r_u16();
+	u16 platform_car=0xffff;Fvector platform_local;platform_local.set(0,0,0);
 	Fvector accel;
 	accel.set(0.f, 0.f, 0.f);
 	if (P.r_elapsed() >= 2 * sizeof(u16) + 2 * sizeof(u8))
@@ -506,6 +519,11 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 		{
 			const u16 hands = P.r_u16(), outfit = P.r_u16(), helmet = P.r_u16();
 			shared_str owner_visual; P.r_stringZ(owner_visual);
+            if(P.r_elapsed()>=18) {
+                const u32 at=P.r_tell();
+                if(P.r_u16()==0x504c) {platform_car=P.r_u16();P.r_vec3(platform_local);}
+                else P.r_seek(at);
+            }
 			if (!m_netcoop_owner_time || time_stamp >= m_netcoop_owner_time)
 			{
 				PIItem held = smart_cast<CInventoryItem*>(Level().Objects.net_Find(hands));
@@ -535,6 +553,13 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 
 	// A seated player (doc 100) is placed by the server at the car's seat:
 	// their claimed position is not followed, the car's speed is not theirs.
+	if(m_netcoop_owner_teleport_until) {
+		// UDP snapshots sent before a reliable admin teleport can arrive later.
+		// Following one of them pulled a long-distance teleport back through
+		// terrain before the owner's first destination snapshot arrived.
+		if(Level().timeServer()<m_netcoop_owner_teleport_until && position.distance_to(Position())>3.f) return;
+		m_netcoop_owner_teleport_until=0;
+	}
 	if (_valid(position) && !netcoop_seated())
 	{
 		// Speed check instead of a per-update step limit: a step longer than
@@ -553,7 +578,7 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 		// up, so updates bunched after a lag still fit) bounds the steps.
 		const u32 now = Level().timeServer();
 		if (m_netcoop_move_budget_time)
-			m_netcoop_move_budget = _min(13.f, m_netcoop_move_budget + 12.f * float(now - m_netcoop_move_budget_time) / 1000.f);
+			m_netcoop_move_budget = _min(m_netcoop_noclip ? 65.f:13.f, m_netcoop_move_budget + (m_netcoop_noclip ? 64.f:12.f) * float(now - m_netcoop_move_budget_time) / 1000.f);
 		m_netcoop_move_budget_time = now;
 		if (!m_netcoop_owner_time || time_stamp > m_netcoop_owner_time)
 		{
@@ -579,11 +604,19 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 			m_netcoop_owner_offset_valid = true;
 		}
 
+        Fvector movement_base=Position();
+        const bool riding=netcoop_platform_accept(platform_car,platform_local,position,position,movement_base);
+        if(!riding) netcoop_platform_detach(false);
+		if(!riding && (move_state & (mcJump|mcFall)) && now<m_netcoop_platform_departure_until) {
+			const float elapsed=_min(.25f,float(now-m_netcoop_platform_departure_time)/1000.f);
+			movement_base.mad(m_netcoop_platform_departure,elapsed);
+			m_netcoop_platform_departure_time=now;
+		} else if(!riding) m_netcoop_platform_departure_until=0;
 		Fvector delta;
-		delta.sub(position, Position());
+		delta.sub(position, movement_base);
 		const float horizontal = _sqrt(delta.x * delta.x + delta.z * delta.z);
-		const float allowed_h = _min(12.f * dt + 1.f, m_netcoop_move_budget);
-		const float allowed_up = 8.f * dt + 1.f;
+		const float allowed_h = _min((m_netcoop_noclip ? 64.f:12.f) * dt + 1.f, m_netcoop_move_budget);
+		const float allowed_up = (m_netcoop_noclip ? 64.f:8.f) * dt + 1.f;
 		const bool limited = horizontal > allowed_h || delta.y > allowed_up;
 		if (horizontal > allowed_h)
 		{
@@ -598,7 +631,8 @@ void CActor::netcoop_follow_owner(NET_Packet& P)
 			netcoop::metric_owner_step_rejected(position.distance_to(Position()));
 
 		Fvector accepted;
-		accepted.add(Position(), delta);
+		accepted.add(movement_base, delta);
+        if(riding) {Fmatrix inverse;inverse.invert(m_netcoop_platform_pose);inverse.transform_tiny(m_netcoop_platform_local,accepted);}
 		CCharacterPhysicsSupport* physics = character_physics_support();
 		if (!m_netcoop_noclip && physics && physics->movement())
 			physics->movement()->SetPosition(accepted);

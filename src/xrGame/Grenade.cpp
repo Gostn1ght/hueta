@@ -104,7 +104,10 @@ void CGrenade::State(u32 state, u32 old_state)
 	{
 	case eThrowEnd:
 		{
-			if (m_thrown)
+			// Online the server consumes the inventory grenade only after its
+			// child reject has been processed (netcoop_thrown). Animation state
+			// packets can arrive first and must not destroy the child's parent.
+			if (m_thrown && !(netcoop::enabled() && smart_cast<CActor*>(H_Parent())))
 			{
 				if (m_pPhysicsShell)
 					m_pPhysicsShell->Deactivate();

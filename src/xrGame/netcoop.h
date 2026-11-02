@@ -23,6 +23,7 @@ class CCustomZone;
 class CCustomDevice;
 struct SConsolePlayer;
 class CCar;
+namespace netcoop { void platform_record(CCar* car); }
 
 // Console: netcoop_smooth (0 = old network presentation, 1 = doc 38 stage 1),
 // netcoop_interp_ms (interpolation delay for remote objects on a client),

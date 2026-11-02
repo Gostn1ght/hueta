@@ -94,6 +94,7 @@ void server_physics_update(xrServer* server)
 		// Cars (doc 100): the server drives them; clients show replicas.
 		const bool vehicle = !item_or_corpse && smart_cast<CCar*>(object) != nullptr;
 		if (!item_or_corpse && !prop && !vehicle) continue;
+		if (vehicle) platform_record(smart_cast<CCar*>(object));
 		const bool projectile = smart_cast<CMissile*>(object) || smart_cast<CCustomRocket*>(object);
 		if (prop && s_physics_sent.find(holder->ID()) == s_physics_sent.end())
 		{
@@ -945,6 +946,9 @@ bool script_admin_teleport(u16 actor_id, const Fvector& position)
 	Fvector rotation;
 	rotation.set(-CL->m_current_intent.pitch, CL->m_current_intent.yaw, 0.f);
 	actor->MoveActor(position, rotation);
+	actor->netcoop_platform_detach(false);
+	actor->m_netcoop_owner_teleport_until=Level().timeServer()+3000;
+	Msg("[diag][teleport] actor=%u target=%.3f,%.3f,%.3f awaiting owner at destination",actor_id,position.x,position.y,position.z);
 	CL->owner->o_Position.set(actor->Position());
 	CL->m_pending_inputs.clear();
 	CL->m_pending_jump_edge = false;

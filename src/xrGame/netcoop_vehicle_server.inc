@@ -92,6 +92,7 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 			if (v.seats.empty() || v.seats[0] != actor->ID() || what > 2)
 				return;
 			car->netcoop_toggle(what);
+			if(what==0) car->netcoop_drive(v.keys); // recompute held pedals after ignition/stall
 			v.dirty = true;
 		}
 		break;
@@ -507,7 +508,8 @@ static void vehicle_run_over(CCar* car, VehicleRuntime& v, u32 now)
 	{
 		CActor* player = smart_cast<CActor*>(Level().Objects.o_get_by_iterator(n));
 		if (!player || player->ID() == 0 || !player->g_Alive() || player->getDestroy() ||
-			player->m_netcoop_seat_car == car->ID()) continue;
+			player->m_netcoop_seat_car == car->ID() ||
+            (player->m_netcoop_platform_car == car->ID() && now-player->m_netcoop_platform_time<1000)) continue;
 		Fvector local, centre = player->Position();
 		centre.y += 0.9f;
 		to_car.transform_tiny(local, centre);

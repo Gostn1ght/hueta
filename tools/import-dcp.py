@@ -121,9 +121,7 @@ def seats_for(dcp, visual, profile):
     rear = any("back" in n and "door" in n for n in names)
     if rear and len(ordered) == 2:
         ordered += [ordered[0] + ":0:0:-0.85", ordered[1] + ":0:0:-0.85"]
-    if len(ordered) == 1:
-        ordered.append(ordered[0] + ":0.6:0:0")  # one seat bone: the passenger beside the driver
-    return ordered[:8]
+    return ordered[:64]
 
 
 def scale_texture(job):

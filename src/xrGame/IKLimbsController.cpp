@@ -1,6 +1,7 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 
 #include "IKLimbsController.h"
+#include "Actor.h"
 
 #include "IK/IKLimb.h"
 #include "physicsshellholder.h"
@@ -347,6 +348,8 @@ void _stdcall CIKLimbsController::IKVisualCallback(IKinematics* K)
 #endif
 
 	CGameObject* O = ((CGameObject*)K->GetUpdateCallbackParam());
+	CActor* actor=smart_cast<CActor*>(O);
+	if(actor && actor->netcoop_authored_pose()) return;
 	CPhysicsShellHolder* Sh = smart_cast<CPhysicsShellHolder*>(O);
 	VERIFY(Sh);
 	CIKLimbsController* ik = Sh->character_ik_controller();

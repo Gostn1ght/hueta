@@ -314,6 +314,14 @@ void CPda::UpdateCL()
 
 	u32 state = GetState();
 	bool enoughBatteryPower = hasEnoughBatteryPower();
+	if (netcoop::client_owns_hud_item(this) && IsPending() && CurrStateTime()>5000 &&
+		(state==eShowing || state==eHiding || state==eEmptyBattery))
+	{
+		Msg("! [diag][pda] completing stalled animation item=%u state=%u elapsed=%u",ID(),state,CurrStateTime());
+		StopCurrentAnimWithoutCallback();
+		OnAnimationEnd(state);
+		state=GetState();
+	}
 
 	if (pda->IsShown())
 	{

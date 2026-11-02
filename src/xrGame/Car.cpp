@@ -2582,24 +2582,19 @@ Fvector CCar::ExitPosition()
 // ---------------------------------------------------------------------------
 void CCar::netcoop_drive(u8 keys)
 {
+	// Normalize before computing edges. A pedal held while the engine is off
+	// must generate a fresh press after manual ignition, never call Starter.
+	if (!m_netcoop_heli.on && !b_engine_on)
+		keys &= ~(netcoop_key_forward | netcoop_key_back);
 	const u8 changed = keys ^ m_netcoop_keys;
 	if (!changed)
 		return;
 	if (m_netcoop_heli.on)
 	{
-		// The flight model reads the held keys every physics step; raising
-		// the collective starts the engine.
-		if ((keys & netcoop_key_handbrake) && !b_engine_on)
-			StartEngine();
+		// Collective and ignition are separate controls, as in ground vehicles.
 		m_netcoop_keys = keys;
 		PPhysicsShell()->Enable();
 		return;
-	}
-	// The engine starts by itself when the driver presses a pedal.
-	if ((keys & (netcoop_key_forward | netcoop_key_back)) && !b_engine_on)
-	{
-		StartEngine();
-		Clutch();
 	}
 	struct KeyMap { u8 bit; void (CCar::*press)(); void (CCar::*release)(); };
 	static const KeyMap map[] = {

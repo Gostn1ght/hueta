@@ -50,7 +50,7 @@ bool box_anchor_within_reach(u16 box, const Fvector& from)
 	return from.distance_to(anchor->Position()) <= anchor->Radius() + 2.5f;
 }
 static const u16 vehicle_seat_free = 0xffff;
-static const u8 vehicle_max_seats = 8;
+static const u8 vehicle_max_seats = 64;
 
 struct VehicleSeatPose
 {
@@ -96,14 +96,14 @@ static VehicleSeats* vehicle_seats(CCar* car)
 	LPCSTR section = car->cNameSect().c_str();
 	LPCSTR driver_bone = model && model->line_exist("car_definition", "driver_place") ?
 		model->r_string("car_definition", "driver_place") : "seat_left";
-	string1024 list;
+	string4096 list;
 	if (pSettings->line_exist(section, "netcoop_seats"))
 		xr_strcpy(list, pSettings->r_string(section, "netcoop_seats"));
 	else
 		xr_sprintf(list, "%s,seat_right,seat_back", driver_bone);
 	// Optional model-space eyes for cabins with different seat heights.
 	// Body roots follow their sitting animations; an eye is not that root.
-	string1024 eyes = "";
+	string4096 eyes = "";
 	if (pSettings->line_exist(section, "netcoop_seat_eyes"))
 		xr_strcpy(eyes, pSettings->r_string(section, "netcoop_seat_eyes"));
 	// The passenger pose (sitting on a chair) has its root on the floor, the

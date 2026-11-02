@@ -116,7 +116,10 @@ void xrServer::Process_event_destroy(NET_Packet& P, ClientID sender, u32 time, u
 		NET_Packet tmpP;
 		if (0xffff != parent_id && Process_event_reject(P, sender, time, parent_id, ID, false))
 		{
-			game->u_EventGen(tmpP, GE_OWNERSHIP_REJECT, parent_id);
+			// A packed child detach must have the same time as its parent's
+			// destroy. Generating "now" sorts it AFTER an older destroy event.
+			tmpP.w_begin(M_EVENT); tmpP.w_u32(time);
+			tmpP.w_u16(GE_OWNERSHIP_REJECT); tmpP.w_u16(parent_id);
 			tmpP.w_u16(id_dest);
 			tmpP.w_u8(1);
 
@@ -126,7 +129,8 @@ void xrServer::Process_event_destroy(NET_Packet& P, ClientID sender, u32 time, u
 			pEventPack->w(&tmpP.B.data, tmpP.B.count);
 		};
 
-		game->u_EventGen(tmpP, GE_DESTROY, id_dest);
+		tmpP.w_begin(M_EVENT); tmpP.w_u32(time);
+		tmpP.w_u16(GE_DESTROY); tmpP.w_u16(id_dest);
 
 		pEventPack->w_u8(u8(tmpP.B.count));
 		pEventPack->w(&tmpP.B.data, tmpP.B.count);

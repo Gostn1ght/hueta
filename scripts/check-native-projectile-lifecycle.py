@@ -17,6 +17,11 @@ start=missile.index('case GE_OWNERSHIP_TAKE:',missile.index('void CMissile::OnEv
 take=missile[start:missile.index('case GE_OWNERSHIP_REJECT:',start)]
 take=take.replace('case GE_OWNERSHIP_TAKE:','case 1:')
 native+='\nvoid CMissile::take(NET_Packet& P) {u16 id;switch(1){'+take+'}}\n'
+release=method('src/xrGame/Missile.cpp','void CMissile::net_Relcase(')
+# Production ownership cleanup, before independent sound/physics relcase work.
+release=release[:release.index('\tCHudItem::net_Relcase(O);')]+'}\n'
+native+='\n'+release
+
 fire=method('src/xrGame/WeaponRG6.cpp','void CWeaponRG6::FireStart()')
 # The real input gate and network dispatch; legacy ballistic code is exercised
 # separately by the complete production build.
@@ -37,7 +42,7 @@ struct CObject{virtual~CObject()=default;u16 fixture_id=1;bool destroyed=false;
  u16 ID(){return fixture_id;}bool getDestroy(){return destroyed;}};
 struct CGameObject:CObject{CGameObject*parent=nullptr;unsigned detach=0;Fvector position;
  CGameObject*H_Parent(){return parent;}CGameObject*H_Root(){return parent?parent:this;}
- void H_SetParent(CGameObject*p){if(parent&&!p)++detach;parent=p;}Fvector&Position(){return position;}};
+ void setDestroy(bool v){destroyed=v;}void H_SetParent(CGameObject*p,bool=false){if(parent&&!p)++detach;parent=p;}Fvector&Position(){return position;}};
 struct CCustomRocket:CGameObject{CGameObject*m_pOwner=nullptr;bool m_bLaunched=false;};
 template<class T>T smart_cast(CObject*p){return dynamic_cast<T>(p);}
 struct Objects{std::map<u16,CObject*>values;CObject*net_Find(u16 id){auto i=values.find(id);return i==values.end()?nullptr:i->second;}};
@@ -48,10 +53,10 @@ struct CRocketLauncher{using ROCKETIT=std::vector<CCustomRocket*>::iterator;
 bool authority=true;bool OnServer(){return authority;}
 struct NET_Packet{u16 id=0;void r_u16(u16&v){v=id;}};
 struct CMissile:CGameObject{CMissile*m_fake_missile=nullptr;bool m_netcoop_throw_pending=false;unsigned throws=0;
- void netcoop_server_throw(){++throws;}void take(NET_Packet&);};
+ void netcoop_server_throw(){++throws;}void take(NET_Packet&);void net_Relcase(CObject*);};
 namespace netcoop{bool on=true,client=true;bool enabled(){return on;}bool pure_client(){return client;}bool server_player_copy(CObject*){return !client;}}
 struct Shotgun{unsigned started=0;void FireStart(){++started;}};
-constexpr int eIdle=0;
+constexpr int eIdle=0;constexpr bool TRUE=true;
 struct CWeaponRG6:Shotgun{using inheritedSG=Shotgun;int state=0,iAmmoElapsed=1;unsigned rockets=0;bool actor=true;CGameObject parent;
  int GetState(){return state;}unsigned getRocketCount(){return rockets;}bool ParentIsActor(){return actor;}
  CGameObject*H_Parent(){return &parent;}void FireStart();};
@@ -71,6 +76,14 @@ int main(){
  CMissile held,child;held.fixture_id=3;child.fixture_id=4;world.Objects.values[u16(4)]=&child;
  NET_Packet packet;packet.id=99;held.take(packet);assert(!held.m_fake_missile);
  packet.id=4;held.m_netcoop_throw_pending=true;held.take(packet);assert(held.m_fake_missile==&child&&child.parent==&held&&held.throws==1);
+
+ // A parent removed before its hidden projectile is detached must never
+ // leave a pointer used by ObjectList's recursive parent update.
+ held.net_Relcase(&child);assert(!held.m_fake_missile);
+ child.net_Relcase(&held);assert(!child.parent&&child.destroyed&&child.detach==1);
+ child.net_Relcase(&held);assert(child.detach==1);
+ CMissile carried;carried.parent=&owner;carried.net_Relcase(&owner);
+ assert(!carried.parent&&!carried.destroyed);
  // 15 metres per snapshot is normal at 300 m/s. A genuine relocation
  // with no matching velocity still resets interpolation immediately.
  SPHNetState a,b;a.linear_vel.z=b.linear_vel.z=300;b.position.z=15;

@@ -6579,3 +6579,16 @@ function on_game_start()
 	alert("[%s] ERROR: Initialization failed%s!\n" ..
 		"! DotMarks startup aborted, skipping callback registration", script_name, failmsg)
 end
+
+-- A map transition replaces the UI and resets the location clock while Lua
+-- modules survive. Never keep old widget userdata or multi-minute deadlines.
+function netcoop_reset_actor()
+    maingameui, hmm, popin_active = nil, nil, nil
+    anim_playing = false
+    next_near_scan, next_early_scan, next_tut_check, next_mute_check, next_hint_refresh = 0,0,0,0,0
+    scanned = {}
+    cfg.markers, cfg.pending_actions = {}, {}
+    cfg.available_pickup, cfg.next_container_update = nil, 0
+    cfg.main_ui_drawn = false
+    reset_nearby_item_tables()
+end

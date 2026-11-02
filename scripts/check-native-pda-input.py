@@ -18,6 +18,7 @@ for method,event in [('Press','PRESSED'),('Release','RELEASED'),('Hold','HOLD')]
     start=level.index('void CLevel::IR_OnKeyboard'+method+'(')
     function=level[start:level.index('\n}',start)]
     assert function.index('netcoop_pda_key(key, WINDOW_KEY_'+event+')') < function.index('level_input.on_key'), method
+stop=pda[pda.index('bool CUIPdaWnd::StopAnyMove()'):pda.index('bool CUIPdaWnd::OnKeyboardAction(')]
 source=r'''
 #include <cassert>
 #include <cstdio>
@@ -41,7 +42,7 @@ struct Flags {bool test(int){return true;}} psActorFlags;
 struct Base {bool OnKeyboardAction(int,EUIMessages){++raw;return accept;}};
 struct CUIPdaWnd:Base {
  using inherited=Base;bool shown=true,enabled=true,captured=false;
- bool m_pKeyboardCapturer=false;bool IsShown(){return shown;}bool IsEnabled(){return enabled;}
+ bool StopAnyMove();bool m_pKeyboardCapturer=false;bool IsShown(){return shown;}bool IsEnabled(){return enabled;}
  void HideDialog(){++closed;}bool OnKeyboardAction(int,EUIMessages);
 } window,other;
 CUIPdaWnd* test_top=&window;
@@ -52,14 +53,14 @@ struct UI {
  void IR_UIOnKeyboardHold(int key){++hold;if(test_top)test_top->OnKeyboardAction(key,WINDOW_KEY_HOLD);}
 } test_ui;
 UI* CurrentGameUI(){return ui_present?&test_ui:nullptr;}
-'''+body+helper+r'''
+'''+stop+body+helper+r'''
 int main(){
  unsigned cases=0;
  for(bool p:{false,true})for(bool shown:{false,true})for(bool present:{false,true})
  for(bool enabled:{false,true})for(bool disabled:{false,true})for(bool capture:{false,true})
  for(bool handled:{false,true})for(int receiver:{0,1,2})for(int key:{1,18,28,44,15,29,47,57,33,MOUSE_1})
  for(auto event:{WINDOW_KEY_PRESSED,WINDOW_KEY_RELEASED,WINDOW_KEY_HOLD}){
-  pure=p;window.shown=shown;ui_present=present;window.enabled=enabled;g_bDisableAllInput=disabled;
+  pure=p;assert(window.StopAnyMove()==p);window.shown=shown;ui_present=present;window.enabled=enabled;g_bDisableAllInput=disabled;
   window.m_pKeyboardCapturer=capture;other.m_pKeyboardCapturer=capture;accept=handled;
   test_top=receiver==0?nullptr:receiver==1?&window:&other;
   raw=item=press=release=hold=closed=cleanup=0;

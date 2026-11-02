@@ -1,4 +1,5 @@
 #pragma once
+class CCar;
 
 #include "../xrEngine/feel_touch.h"
 #include "../xrEngine/feel_sound.h"
@@ -664,17 +665,31 @@ public:
 	bool m_netcoop_seat_yaw_valid = false;
 	bool m_netcoop_seat_character = false; // had a character capsule before sitting down
 	bool m_netcoop_noclip = false;
+	u32 m_netcoop_owner_teleport_until = 0;
 	void netcoop_set_noclip(bool enabled);
 	MotionID m_netcoop_seat_motion;
 	// The driver is moved (in the car's space) until the hands of the steering
 	// pose meet the model's steering wheel bone; measured once per sitting down.
 	Fvector m_netcoop_driver_fit;
 	u32 m_netcoop_driver_fit_at = 0; // 0: measured; else the time to measure
+	bool netcoop_authored_pose() const { return m_netcoop_prone_motion.valid() || netcoop_seated(); }
 	bool netcoop_seated() const { return m_netcoop_seat_car != 0xffff; }
 	void netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& local, const Fvector& eye);
 	void netcoop_seat_leave(const Fvector& exit);
 	void netcoop_seat_place();
 	bool netcoop_seat_animation();
+	// Walking on a moving car is independent of occupying a seat.
+	u16 m_netcoop_platform_car = 0xffff;
+	CCar* m_netcoop_platform_object = nullptr;
+	Fmatrix m_netcoop_platform_pose;
+	Fvector m_netcoop_platform_local = {0.f,0.f,0.f};
+	Fvector m_netcoop_platform_velocity = {0.f,0.f,0.f};
+	Fvector m_netcoop_platform_departure = {0.f,0.f,0.f};
+	u32 m_netcoop_platform_departure_until = 0, m_netcoop_platform_departure_time = 0;
+	u32 m_netcoop_platform_frame = u32(-1), m_netcoop_platform_time = 0;
+	void netcoop_platform_update();
+	void netcoop_platform_detach(bool inherit_velocity);
+	bool netcoop_platform_accept(u16 car, const Fvector& local, Fvector reported, Fvector& target, Fvector& base);
 	// Offset = the least delay seen in the current and the previous second:
 	// the first updates after a join arrive seconds late, and a minimum over
 	// all time made the player's snapshot times jump back by those seconds.

@@ -510,6 +510,13 @@ void CUIPdaWnd::Enable(bool status)
 	inherited::Enable(status);
 }
 
+bool CUIPdaWnd::StopAnyMove()
+{
+	// DialogHolder also forwards declined keys directly to the actor. The
+	// level's raw-input gate alone cannot prevent crouching through that path.
+	return netcoop::pure_client();
+}
+
 bool CUIPdaWnd::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 {
 	// A focused edit (including an edit inside a script tab) owns raw keys.

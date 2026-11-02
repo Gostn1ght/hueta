@@ -108,6 +108,7 @@ struct World{::Objects Objects;u32 timeServer(){return fixture_now;}} world;
 World& Level(){return world;}
 namespace netcoop{bool fixture_client=false;bool pure_client(){return fixture_client;}
 void server_corpse_drag_update(xrServer*){}
+void platform_record(CCar*){}
 bool server_corpse_dragging(CObject*){return false;}
 '''+loop+r'''
 void vehicle_server_update(xrServer*){}

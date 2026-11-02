@@ -571,8 +571,8 @@ void CMissile::netcoop_server_throw()
 	m_fake_missile->m_throw_direction = m_throw_direction;
 	m_fake_missile->m_throw_matrix = m_throw_matrix;
 	m_fake_missile->m_fThrowForce = m_netcoop_throw_force;
-	netcoop_arm(m_fake_missile);
 	m_netcoop_throw_sent = true;
+	Msg("[diag][projectile] throw parent=%u child=%u force=%.3f direction=%.3f,%.3f,%.3f",ID(),m_fake_missile->ID(),m_netcoop_throw_force,m_throw_direction.x,m_throw_direction.y,m_throw_direction.z);
 	NET_Packet P;
 	u_EventGen(P, GE_OWNERSHIP_REJECT, ID());
 	P.w_u16(u16(m_fake_missile->ID()));
@@ -682,6 +682,7 @@ void CMissile::OnEvent(NET_Packet& P, u16 type)
 			if (IsFakeMissile && OnServer() && m_netcoop_throw_sent)
 			{
 				m_netcoop_throw_sent = false;
+				netcoop_arm(missile); // start the fuse only after actual release
 				netcoop_thrown();
 			}
 			break;
@@ -862,6 +863,16 @@ void CMissile::activate_physic_shell()
 
 void CMissile::net_Relcase(CObject* O)
 {
+	if (m_fake_missile == O) m_fake_missile = nullptr;
+	if (H_Parent() == O)
+	{
+		// A delayed reject/destroy can delete the inventory grenade before
+		// its hidden child. Never leave H_Parent pointing into freed memory:
+		// ObjectList recursively updates it on the very next frame.
+		const bool hidden_child = smart_cast<CMissile*>(O) != nullptr;
+		H_SetParent(nullptr, true);
+		if (hidden_child) setDestroy(TRUE);
+	}
 	CHudItem::net_Relcase(O);
 	if (PPhysicsShell() && PPhysicsShell()->isActive())
 	{
