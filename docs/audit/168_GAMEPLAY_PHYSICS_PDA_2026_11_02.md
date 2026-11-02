@@ -1,6 +1,8 @@
 # Gameplay follow-up after 2026.11.02.1
 
-Status: investigating; no fixes in this audit are released yet.
+Status: PDA work released in 2026.11.02.2; follow-up 2026.11.02.3 is being
+validated. Vehicle, loose-item/corpse physics, prone and PDA rendering work
+remain open. Offline checks do not establish in-game acceptance.
 
 Owner evidence: eleven attached screenshots, 2026-11-02. The previous isolated
 fixtures did not establish game acceptance. In particular the added primitive
@@ -38,7 +40,7 @@ Owner additions: all physical PDA data is isolated, with a data USB drive for
 explicit copy/restore and a separate decryption USB; gameplay keys must not leak
 through the open PDA, Escape closes it and editing keys remain usable.
 
-Implemented in source, pending release and in-game acceptance:
+PDA implementation (released in .2; subsequent refinements pending .3):
 
 - The actual `held_device` local forward declaration was never exported. Real
   logs repeatedly showed `netcoop_map_known:144` and `netcoop_pda_store:8` calling
@@ -114,3 +116,27 @@ bulk downloads of every long recording at login. Actual scripted USB/notes tab
 constructors are exercised with widgets stubbed; private edit drafts clear on
 physical device change. Unpublished candidate 000052/v9 is superseded by
 000053/v10 before publication. Native binary remains exact CI 41397841797.
+
+Follow-up .3: native CI 41402744980 at 26c27baa0 passed shaders, offline
+checks, DX11/DX8 builds and the real PDA keyboard fixture. Opening the PDA
+while holding jump/use could swallow their release and leave jump/pickup
+latched. Only the stop edges now reach the actor directly; the open PDA still
+blocks new gameplay, RP/global shortcuts and ordinary game input.
+
+Lua refinements: the known password opens a foreign physical PDA without a
+hacking charge; an owner can use the physical decryption tool to remove a
+forgotten password without losing data or changing UID. Owned unlocked devices
+can be explicitly factory-reset; locked devices cannot bypass protection by
+resetting. Actual USB tab constructors and foreign password controls run in
+the Lua UI fixture. Imported photo/voice attachments open through the existing
+authorized media helpers; stale overlays/drafts clear on device changes.
+
+The fixed one-minute media upload deadline broke full-length recordings even
+after raising the chunk limit. A complete 8 MiB base64 upload at 10 ticks/s now
+passes the real transport/server persistence fixture. The acknowledgment timeout
+starts after the last chunk, with an absolute 10-minute ceiling.
+
+Owner explicitly asked again about corpses, loose-item physics and ZIL-131.
+Confirmed these are NOT complete: dragging/pushing bodies, item friction,
+cargo seats/platform movement and fall damage still need implementation and
+verification. This PDA release does not fulfill those gameplay tasks.

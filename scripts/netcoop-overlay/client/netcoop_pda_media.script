@@ -40,7 +40,7 @@ local function update()
   queue.started=time_global()
   netcoop_command(string.format("pdanet %s %s %d %s",queue.kind=="photo" and "gbeg" or "rbeg",queue.id,#queue.parts,queue.extra))
  end
- if time_global()-queue.started>60000 then
+ if (queue.done_at and time_global()-queue.done_at>30000) or time_global()-queue.started>600000 then
   queued[queue.key]=nil;queue=nil
   if netcoop_pdanet_client then netcoop_pdanet_client.ask_library() end
   return false
@@ -48,7 +48,8 @@ local function update()
  if time_global()<next_at then return false end
  next_at=time_global()+50
  local n=queue.next
- if n<=#queue.parts then netcoop_command("pdanet aup "..queue.id.." "..n.." "..queue.parts[n]);queue.next=n+1 end
+ if n<=#queue.parts then netcoop_command("pdanet aup "..queue.id.." "..n.." "..queue.parts[n]);queue.next=n+1
+ elseif not queue.done_at then queue.done_at=time_global() end
  return false
 end
 function on_game_start()

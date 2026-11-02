@@ -86,3 +86,65 @@ to_client(run(1,'pdanet hello'))
 assert notes_window.title_edit.GetText(notes_window.title_edit)==''
 assert notes_window.body_edit.GetText(notes_window.body_edit)==''
 print('PASS actual USB tab construction and cached notes draft reset on device change')
+
+# Imported attachments use the same authorized media helpers as live chats.
+# Their storage identifiers must not replace a photo or recording in the UI.
+g.archive_window=storage_window
+lua.execute('''
+local ph,vo=netcoop_pdanet_photo,netcoop_pdanet_voice
+local oldphoto,oldplay=ph.message_photo,vo.play_message
+ph.message_photo=function(m) assert(m.k=="photo");return "fixture/archive_photo" end
+archive_played=false
+vo.play_message=function(m) assert(m.k=="voice");archive_played=true end
+local n=netcoop_pdanet_client
+n.storage.archive={{name="Saved conversation",count=2}}
+archive_window:Archive(1,1)
+n.storage.view={name="Saved conversation",chat=1,msg=1,total=2,message={k="photo",d="abcdef1234567890 l01_escape",t=1}}
+n.notify("storage")
+assert(archive_window.arc.img.shown and archive_window.arc.img.texture=="fixture/archive_photo")
+assert(not archive_window.arc.body.text:find("abcdef1234567890",1,true))
+archive_window._cb[archive_window._ids[archive_window.arc.close]]()
+n.notify("photo")
+assert(not archive_window.arc.img.shown and not archive_window.arc_open)
+archive_window:Archive(1,2)
+assert(not archive_window.arc.img.shown and not archive_window.arc.play.shown)
+n.storage.view={name="Saved conversation",chat=1,msg=2,total=2,message={k="voice",d="bbbbbbbbbbbbbbbb 7",t=1}}
+n.notify("storage")
+assert(archive_window.arc.play.shown and not archive_window.arc.img.shown)
+archive_window._cb[archive_window._ids[archive_window.arc.play]]()
+assert(archive_played and not archive_window.arc.body.text:find("bbbbbbbbbbbbbbbb",1,true))
+n.notify("device_reset")
+assert(not archive_window.arc_open and not archive_window.arc.play.shown)
+ph.message_photo,vo.play_message=oldphoto,oldplay
+''')
+print('PASS imported photo/voice UI, hidden media IDs, closed-overlay and device-change isolation')
+
+# A known foreign-device password must also have a reachable UI control.
+lua.execute('''
+local n=netcoop_pdanet_client
+local old=n.slot_device
+n.foreign=true;n.slot_device={serial="TEST",lock=true,hacked=false,level=1}
+archive_window.tick_at=0;archive_window:Update()
+assert(archive_window.dev.edit.shown and archive_window.dev.unlock.shown)
+archive_window.dev.edit:SetText("known-password")
+n.notify("device_reset")
+assert(archive_window.dev.edit:GetText()=="")
+n.foreign=false;n.slot_device=old
+archive_window.tick_at=0;archive_window:Update()
+assert(not archive_window.dev.edit.shown and not archive_window.dev.unlock.shown)
+''')
+print('PASS foreign-password entry is reachable and cleared when the device changes')
+
+# Complete the native 6 MiB/8 MiB-base64 recording at a slow 10 upload ticks/s.
+# The previous fixed one-minute deadline silently killed long uploads halfway.
+big_id='e'*16
+big='QUJD'*(2*1024*1024)
+lua.execute('commands={}')
+assert media.push('audio',big_id,big,600)
+for _ in range(2400):
+ g.tg+=100;g.media_tick();to_client(flush(1))
+ if media.ready(): break
+assert media.ready()
+meta=lua.eval('function(id) return netcoop_transit.deserialize(netcoop_store_read("pda_audio",id)) end')(big_id)
+assert meta and meta.library and meta.device=='fixture905' and meta.parts>100
+print('PASS full 8 MiB recording persisted at 10 ticks/s without the old one-minute timeout')

@@ -755,7 +755,11 @@ end
 -- unlock <password>
 function handlers.unlock(id, me, char, args)
 	local lock = lock_of(char)
-	if not lock then unlocked[id] = char; state(id, me) return end
+	if not lock then
+		local d=held_device(id,char_of(id))
+		if d and not d.own and not d.rec.hacked[char_of(id)] then return "foreign device" end
+		unlocked[id] = char; state(id, me) return
+	end
 	local t = tries[id]
 	if not t or t.device ~= char then t = { device = char, n = 0, until_ms = 0 } end
 	tries[id] = t
@@ -766,6 +770,11 @@ function handlers.unlock(id, me, char, args)
 		return "wrong password"
 	end
 	t.n = 0
+	local d=held_device(id,char_of(id))
+	if d and not d.own then
+		local _,ok=update("pda_dev",d.uid,function(v) if v then v.hacked=v.hacked or {};v.hacked[char_of(id)]=now();return v end end)
+		if not ok then return "try again" end
+	end
 	unlocked[id] = char
 	state(id, me)
 end
@@ -913,8 +922,8 @@ function device_view(id, char, d)
 			local owner = read("pda_prof", d.uid)
 			v.owner = owner and owner.name or "?"
 		end
-		hack_progress(id, d.uid, v)
 	end
+	hack_progress(id,d.uid,v)
 	return v
 end
 
@@ -993,7 +1002,7 @@ local function start_hack(id, char, d, kind)
 	if h and h.uid == d.uid then return end
 	local tool = inventory_tool(id, "lz_pda_hack_usb")
 	if not tool then return "hack flash drive required" end
-	local total = ((HACK_SECONDS[d.rec.level] or 60) + (d.rec.lock and HACK_LOCK_SECONDS or 0)) * 1000
+	local total = ((HACK_SECONDS[d.rec.level] or 60) + ((d.rec.lock or read("pda_lock",d.uid)) and HACK_LOCK_SECONDS or 0)) * 1000
 	hacking[id] = { uid = d.uid, item = d.item, kind = kind, tool = tool, total = total, done_at = time_global() + total }
 	printf("[Lost Zone] pdanet: %s hacks PDA %s (%s s)", char, d.rec.serial, tostring(total / 1000))
 	return nil
@@ -1010,8 +1019,8 @@ function handlers.hack(id, me, char, args)
 	end
 	local d = held_device(id, char)
 	if not d then return "no device" end
-	if d.own then return "own device" end
-	if not d.rec.hacked[char] then local err = start_hack(id, char, d, "player"); if err then return err end end
+	if d.own and not is_locked(id,d.uid) then return "own device" end
+	if d.own or not d.rec.hacked[char] then local err = start_hack(id, char, d, "player"); if err then return err end end
 	send(id, "device", device_view(id, char, d))
 end
 
@@ -1071,7 +1080,7 @@ end
 -- Factory reset keeps hardware serial but removes its data and old network ID.
 function handlers.wipe(id, me, char)
 	local d = held_device(id, char)
-	if not (d and not d.own and d.rec.hacked[char]) then return "not hacked" end
+	if not accessible(id,d) then return "not hacked" end
 	uploads[id]=nil
 	if not netcoop_pda_storage or not netcoop_pda_storage.factory_reset(d,char) then return "try again" end
 	unlocked[id] = nil
@@ -1190,8 +1199,15 @@ local function devices_update(id, char, me)
 					send(id, "npc", npc_view(id, nd))
 				end
 			else
-				update("pda_dev", h.uid, function(v) if v then v.hacked = v.hacked or {}; v.hacked[char] = now() return v end end)
-				if d then d.rec.hacked[char] = now(); unlocked[id] = d.uid end
+				if d and d.own then
+					local old=netcoop_store_read("pda_lock",d.uid) or ""
+					if not netcoop_store_swap("pda_lock",d.uid,old,"") then send(id,"err","try again");return end
+					device_key[id]=nil
+				else
+					update("pda_dev", h.uid, function(v) if v then v.hacked = v.hacked or {}; v.hacked[char] = now() return v end end)
+					if d then d.rec.hacked[char] = now() end
+				end
+				if d then unlocked[id] = d.uid end
 			end
 			printf("[Lost Zone] pdanet: %s hacked PDA %s", char, h.uid)
 		elseif h.kind == "npc" then
@@ -1220,7 +1236,7 @@ local DEVICE_VERBS = { device = true, hack = true, hack_stop = true, dump = true
 -- Flood limit for what other players see (README В«Р»РёРјРёС‚С‹ СЃРѕРѕР±С‰РµРЅРёР№В»): per
 -- player a budget of BURST posts refilled at one per RATE_MS; "aup" parts,
 -- reads and lists are not counted.
-local LIMITED = { say = true, msg = true, dm = true, group = true, pay = true, abeg = true, pbeg = true, gbeg = true, rbeg = true, add = true, usb_backup = true, usb_restore = true }
+local LIMITED = { unlock = true, lockset = true, say = true, msg = true, dm = true, group = true, pay = true, abeg = true, pbeg = true, gbeg = true, rbeg = true, add = true, usb_backup = true, usb_restore = true }
 local BURST, RATE_MS = 6, 1500
 local budget = {} -- entity id -> { n, at }
 local function allowed(id)
@@ -1265,7 +1281,7 @@ function command(entity_id, args)
 	if character == "" then return "" end
 	me = me or {contacts = {}, chats = {}}
 	-- someone else's PDA in the slot: only its own verbs
-	if verb ~= "hello" and not DEVICE_VERBS[verb] then
+	if verb ~= "hello" and verb ~= "unlock" and not DEVICE_VERBS[verb] then
 		local d = holding(entity_id, character)
 		if not d or (not d.own and not d.rec.hacked[character]) then
 			send(entity_id, "err", "foreign device")

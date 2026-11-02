@@ -53,7 +53,7 @@ local function base(self, title)
 		self.scroll,self.list_scroll,self.msg_scroll,self.page=0,0,0,0
 		self.saving_new=nil
 		for _,key in ipairs({"input","uid","title_edit","body_edit"}) do if self[key] then self[key]:SetText("") end end
-		for _,group in ipairs({"dlg","pwdlg","lock"}) do
+		for _,group in ipairs({"dlg","pwdlg","lock","dev"}) do
 			local controls=self[group]
 			if controls then for _,key in ipairs({"name","amount","old","new","edit"}) do if controls[key] then controls[key]:SetText("") end end end
 		end
@@ -61,6 +61,7 @@ local function base(self, title)
 		if self.Password then self:Password(false) end
 		if self.Tasks then self:Tasks(false) end
 		if self.View then self:View(false) end
+		self.arc_open=false
 		if self.arc then for _,w in pairs(self.arc) do w:Show(false) end end
 		if self.Fill then self:Fill() end
 	end)
@@ -86,6 +87,13 @@ local function lock_layer(self)
 	end, self)
 	l.err = self.xml:InitStatic("msg_head", self)
 	l.err:SetWndPos(vector2():set(260, 414)); l.err:SetWndSize(vector2():set(300, 22))
+	l.hack=self.xml:Init3tButton("button",self)
+	l.hack:SetWndPos(vector2():set(260,450));l.hack:SetWndSize(vector2():set(300,30))
+	l.hack:TextControl():SetText(tr("st_pdanet_hack_password"))
+	self:Register(l.hack,"pda_hack_password")
+	self:AddCallback("pda_hack_password",ui_events.BUTTON_CLICKED,function()
+		if net().hack_left(net().slot_device) then net().hack_stop() else net().hack() end
+	end,self)
 	self.lock = l
 	return l
 end
@@ -96,7 +104,10 @@ local function show_lock(self)
 	for _, w in pairs(l) do w:Show(on) end
 	if on then
 		local e = net().last_error
-		l.err:TextControl():SetText((e == "wrong password" and tr("st_pdanet_wrong_password")) or (e == "pda held" and tr("st_pdanet_pda_held")) or "")
+		local left=net().hack_left(net().slot_device)
+		local error=(e == "wrong password" and tr("st_pdanet_wrong_password")) or (e == "pda held" and tr("st_pdanet_pda_held")) or e or ""
+		l.err:TextControl():SetText(left and tostring(math.ceil(left/1000)).." s" or tostring(error))
+		l.hack:TextControl():SetText(tr(left and "st_pdanet_hack_stop" or "st_pdanet_hack_password"))
 	end
 end
 
@@ -307,6 +318,9 @@ local function device_layer(self)
 	end)
 	l.data = button(self, tr("st_pdanet_dump"), 240, 208, 170, 30, function() net().ask_dump() end)
 	l.wipe = button(self, tr("st_pdanet_wipe"), 420, 208, 170, 30, function() net().wipe() end)
+	l.edit=at(self.xml:InitEditBox("edit",self),60,252,440,32)
+	l.unlock=button(self,tr("st_pdanet_unlock"),512,252,250,32,function() net().unlock(edit_text(l.edit));l.edit:SetText("") end)
+	l.error=static(self,"hint_left",60,292,700,40)
 	for r = 1, DEVICE_ROWS do
 		l.rows[r] = button(self, "", 60, 252 + (r - 1) * 40, 230, 36, function()
 			l.pick = l.scroll + r; device_fill(self)
@@ -324,7 +338,7 @@ show_device = function(self)
 	local on = net().foreign == true
 	if not on and not self.dev then return end
 	local l = device_layer(self)
-	for _, w in pairs({ l.back, l.title, l.info, l.progress, l.hack, l.data, l.wipe }) do w:Show(on) end
+	for _, w in pairs({ l.back, l.title, l.info, l.progress, l.hack, l.data, l.wipe, l.edit, l.unlock, l.error }) do w:Show(on) end
 	if not on then
 		for _, w in ipairs(l.rows) do w:Show(false) end
 		l.up:Show(false); l.down:Show(false); l.view:Show(false)
@@ -346,6 +360,9 @@ show_device = function(self)
 	l.hack:Show(not hacked)
 	text(l.hack, tr((left and left > 0) and "st_pdanet_hack_stop" or "st_pdanet_hack"))
 	l.data:Show(hacked); l.wipe:Show(hacked)
+	l.edit:Show(not hacked and v.lock==true);l.unlock:Show(not hacked and v.lock==true)
+	l.error:Show(not hacked)
+	text(l.error,net().last_error=="wrong password" and tr("st_pdanet_wrong_password") or net().last_error or "")
 	device_fill(self)
 end
 
@@ -979,7 +996,7 @@ function pdanet_storage:__init() super()
  self.archive_btn=button(self,tr("st_pdanet_usb_read_archive"),48,606,720,28,function() self:Archive(1,1) end)
  self.hint=static(self,"hint_left",48,636,720,30)
  button(self,tr("st_pdanet_usb_refresh"),464,488,304,28,function() net().ask_storage() end)
- net().on_change(function(what) if self:IsShown() and (what=="storage" or what=="device") then self:Fill() end end)
+ net().on_change(function(what) if self:IsShown() and (what=="storage" or what=="device" or what=="photo" or what=="audio") then self:Fill() end end)
  net().ask_storage();self:Fill()
 end
 function pdanet_storage:Copy(restore)
@@ -1011,7 +1028,7 @@ function pdanet_storage:Fill()
  local t=self.pick and list[self.pick]
  self.copy:Enable(t~=nil and t.kind=="data")
  self.restore:Enable(t~=nil and t.kind=="data" and t.backup~=false)
- self.reset:Show(d.own==false and d.hacked==true)
+ self.reset:Show((d.own==true and not net().locked) or d.hacked==true)
  text(self.hint,self.confirm and tr("st_pdanet_usb_confirm") or tr("st_pdanet_usb_hint"))
  local lines={tr("st_pdanet_usb_archive")}
  for _,c in ipairs(net().storage.archive or {}) do
@@ -1019,10 +1036,16 @@ function pdanet_storage:Fill()
  end
  text(self.archive,table.concat(lines,"\n"))
  self.archive_btn:Enable(#(net().storage.archive or {})>0)
- if self.arc and net().storage.view then
+ if self.arc_open and net().storage.view then
   local v=net().storage.view;local m=v.message or {}
   text(self.arc.title,(v.name or "").."  "..v.msg.."/"..v.total)
-  text(self.arc.body,net().when(m).."   UID "..tostring(m.f or "").."\n\n"..(m.x or "").."\n"..(m.d or ""))
+  local photo=m.k=="photo" and netcoop_pdanet_photo
+  local tex=photo and photo.message_photo(m)
+  at(self.arc.body,52,188,716,photo and 40 or 330)
+  text(self.arc.body,net().when(m).."\n"..(message_body(m) or ""))
+  self.arc.img:Show(tex~=nil and tex~=false)
+  if tex then self.arc.img:InitTexture(tex) end
+  self.arc.play:Show(m.k=="voice")
  end
  footer(self,net().last_error and tostring(net().last_error) or "")
 end
@@ -1036,6 +1059,11 @@ function pdanet_storage:Archive(chat,msg)
   a.back=static(self,"layer_back",36,110,748,556)
   a.title=static(self,"msg_name",52,132,716,40)
   a.body=static(self,"hint_left",52,188,716,360)
+  a.img=static(self,"photo",88,234,640,330)
+  a.play=button(self,">",52,532,716,30,function()
+   local v=net().storage.view;local m=v and v.message
+   if m and m.k=="voice" and netcoop_pdanet_voice then netcoop_pdanet_voice.play_message(m) end
+  end)
   local function move(dc,dm)
    local v=net().storage.view or {chat=1,msg=1}
    self:Archive(v.chat+dc,v.msg+dm)
@@ -1044,10 +1072,14 @@ function pdanet_storage:Archive(chat,msg)
   a.pm=button(self,"<",160,576,100,30,function() move(0,-1) end)
   a.nm=button(self,">",268,576,100,30,function() move(0,1) end)
   a.nc=button(self,">>",376,576,100,30,function() move(1,0) end)
-  a.close=button(self,tr("st_pdanet_close"),492,576,276,30,function() for _,w in pairs(self.arc) do w:Show(false) end end)
+  a.close=button(self,tr("st_pdanet_close"),492,576,276,30,function() self.arc_open=false;for _,w in pairs(self.arc) do w:Show(false) end end)
   self.arc=a
  end
+ self.arc_open=true
+ net().storage.view=nil
  for _,w in pairs(self.arc) do w:Show(true) end
+ self.arc.img:Show(false);self.arc.play:Show(false)
+ text(self.arc.title,"");text(self.arc.body,"")
  net().archive_message(chat,msg)
 end
 function pdanet_storage:Update()

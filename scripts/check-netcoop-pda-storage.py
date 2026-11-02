@@ -135,3 +135,45 @@ large='c'*16
 replies=cmd(0,10,f'pdanet rbeg {large} 2300 600')
 assert not any(k=='err' for k,v in replies), replies
 print('PASS PDA library accepts the native recorder upper bound (2300 transport chunks)')
+
+# Known device passwords grant access without spending a hacking charge.
+lua.execute('''
+make_item(1020,"device_pda_1","physical1020");items[1020].owner=10;players[10].pda=1020
+''')
+cmd(0,10,'pdanet hello');cmd(0,10,'pdanet lockset |shared123')
+cmd(0,10,'pdanet note new|Borrowed|Authorized by the owner password')
+lua.execute('players[10].pda=1000;players[11].pda=1020;items[1020].owner=11;items[1003].owner=10')
+assert last(cmd(1,11,'pdanet hello'),'state').foreign
+assert last(cmd(1,11,'pdanet unlock wrong'),'err')=='wrong password'
+assert not last(cmd(1,11,'pdanet unlock shared123'),'state').foreign
+assert len(last(cmd(1,11,'pdanet notes'),'notes'))==1
+assert read('pda_tool','usb1003').left==4
+# An owner may explicitly reset an unlocked owned device too.
+lua.execute('players[11].pda=1001')
+uid_before=last(cmd(1,11,'pdanet hello'),'state').uid
+assert last(cmd(1,11,'pdanet wipe'),'state').uid!=uid_before
+# Forgotten own password: another actor session, same character/PDA; a real
+# decryption drive resets only the password, keeping UID/notes/gallery intact.
+cmd(0,10,'pdanet lockset |forgotten123')
+lua.execute('''
+players[12]={char="legacy10",name="Леший",server=2,pda=1000}
+players[10].pda=nil;items[1000].owner=12;items[1003].owner=12
+''')
+locked=last(cmd(1,12,'pdanet hello'),'state');assert locked.locked
+assert last(cmd(1,12,'pdanet hack'),'device').hack_total==70000
+assert last(cmd(1,12,'pdanet wipe'),'err')=='not hacked', 'locked owned PDA cannot bypass its password by resetting'
+g.tg+=71000;g.current_server=2;servers[1].update_world()
+st=last(cmd(1,12,'pdanet hello'),'state')
+assert st.uid==locked.uid and not st.has_lock
+assert len(last(cmd(1,12,'pdanet notes'),'notes'))==2
+assert read('pda_tool','usb1003').left==3
+# Exhausted tools remain exhausted after changing hands and servers.
+lua.execute('''
+local old=netcoop_store_read("pda_tool","usb1003")
+assert(netcoop_store_swap("pda_tool","usb1003",old,netcoop_transit.serialize({left=0})))
+make_item(1030,"device_pda_1","physical1030");items[1030].owner=11;players[11].pda=1030
+''')
+cmd(1,11,'pdanet hello')
+lua.execute('players[11].pda=nil;players[12].pda=1030;items[1030].owner=12')
+assert last(cmd(1,12,'pdanet hack'),'err')=='hack flash drive required'
+print('PASS PDA access: known foreign password, owned factory reset, forgotten-password recovery without data loss, exhausted physical tools')
