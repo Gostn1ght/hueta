@@ -218,3 +218,22 @@ PDA follow-up regression: decryption/known-password permission survives reconnec
 and location changes; returning the device to its owner revokes foreign access.
 Unlocked owner-session cache now includes the current password digest, so an old
 session does not bypass a changed password. Actual two-server fixtures pass.
+
+Native candidate update: CI 41439611063 passed the offline fixtures but the
+full DX11 compiler rejected two overly permissive fixture assumptions: actor
+HideAllWeapons is private, and CPhysicsElement has public m_SelfID (BoneID is
+a JOINT API). Switched to the real public SetWeaponHideState API and m_SelfID;
+updated the fixture to the actual declarations. No candidate native binary
+has been published or installed.
+
+Projectile source fixes prepared: one detach for a rocket present in either or
+both launcher lists, never dereference the erased/end loaded iterator; ignore
+missing/duplicate attachment safely; guard missing missile ownership objects.
+RG6-family client firing no longer requires receiving the server's child rocket
+replica before requesting a loaded shot. Snapshot discontinuity uses residual
+from mean-velocity travel rather than a fixed 3 m displacement cutoff, retaining
+fast/ballistic projectile samples while rejecting genuine relocations. New native
+fixture covers actual methods, missing/duplicate/reordered lists and high-speed
+versus teleport trajectories; still no live projectile acceptance or reproduced
+owner grenade crash. Pending-server projectile spawn/first-shot ordering needs
+further review for RG6 and underbarrel variants.

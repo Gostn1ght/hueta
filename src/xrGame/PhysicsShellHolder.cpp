@@ -568,6 +568,17 @@ void CPhysicsShellHolder::UpdateCL()
 	netcoop_physics_update();
 }
 
+static bool netcoop_physics_discontinuous(const SPHNetState& before, const SPHNetState& after, u32 elapsed)
+{
+	// Displacement alone is not a teleport: an RPG can travel many metres
+	// between ordinary snapshots. Compare with its mean-velocity trajectory.
+	const float seconds = float(elapsed) / 1000.f;
+	const float x = after.position.x - before.position.x - (before.linear_vel.x + after.linear_vel.x) * .5f * seconds;
+	const float y = after.position.y - before.position.y - (before.linear_vel.y + after.linear_vel.y) * .5f * seconds;
+	const float z = after.position.z - before.position.z - (before.linear_vel.z + after.linear_vel.z) * .5f * seconds;
+	return x*x + y*y + z*z > 9.f;
+}
+
 void CPhysicsShellHolder::netcoop_physics_import(NET_Packet& P)
 {
 	NetcoopPhysicsSnapshot snapshot;
@@ -603,7 +614,7 @@ void CPhysicsShellHolder::netcoop_physics_import(NET_Packet& P)
 		// A sleeping body is sent once and then every 10 s (stage 6); after
 		// such a gap the old samples would stretch the interpolation delay.
 		if (snapshot.states.size() != m_netcoop_physics.back().states.size() ||
-			snapshot.states[0].position.distance_to(m_netcoop_physics.back().states[0].position) > 3.f ||
+			netcoop_physics_discontinuous(m_netcoop_physics.back().states[0], snapshot.states[0], snapshot.stamp - m_netcoop_physics.back().stamp) ||
 			s32(snapshot.stamp - m_netcoop_physics.back().stamp) > 500)
 			m_netcoop_physics.clear();
 	}

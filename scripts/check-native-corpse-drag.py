@@ -32,7 +32,7 @@ struct Fvector{float x=0,y=0,z=0;void sub(const Fvector&a,const Fvector&b){x=a.x
  float distance_to(const Fvector&b)const{Fvector d;d.sub(*this,b);return d.magnitude();}};
 bool _valid(float f){return std::isfinite(f);}bool _valid(const Fvector&v){return _valid(v.x)&&_valid(v.y)&&_valid(v.z);}
 struct SPHNetState{Fvector position={0,0.2f,1};};
-struct CPhysicsElement{u16 bone=1;SPHNetState state;u16 BoneID(){return bone;}void get_State(SPHNetState&s){s=state;}};
+struct CPhysicsElement{u16 m_SelfID=1;SPHNetState state;void get_State(SPHNetState&s){s=state;}};
 struct CPhysicsShell{float mass=70;bool active=true;unsigned wakes=0;CPhysicsElement element;
  float getMass(){return mass;}bool isActive(){return active;}void Enable(){++wakes;}
  CPhysicsElement*get_ElementByStoreOrder(u16){return &element;}};
@@ -49,7 +49,7 @@ struct CPHMovementControl{bool exists=true,fail_start=false;IPHCapture capture;b
  void PHReleaseObject(){++releases;holding=false;}};
 struct Physics{CPHMovementControl move;CPHMovementControl*movement(){return &move;}};
 struct CActor:CEntityAlive{bool seated=false,m_netcoop_noclip=false,hidden=false;Physics physics;
- Physics*character_physics_support(){return &physics;}bool netcoop_seated(){return seated;}void HideAllWeapons(bool v){hidden=v;}};
+ Physics*character_physics_support(){return &physics;}bool netcoop_seated(){return seated;}void SetWeaponHideState(u16,bool v){hidden=v;}};
 template<class T>T smart_cast(CObject*o){return dynamic_cast<T>(o);}
 struct Owner{u16 ID=9;};
 struct xrClientData{Owner*owner=nullptr;struct{bool bConnected=true;}flags;bool accepts=true;};
@@ -59,7 +59,7 @@ namespace collide{struct rq_result{};constexpr int rqtStatic=1;}
 struct Objects{std::map<u16,CObject*>objects;CObject*net_Find(u16 id){auto i=objects.find(id);return i==objects.end()?nullptr:i->second;}};
 struct Space{bool blocked=false;bool RayPick(const Fvector&,const Fvector&,float,int,collide::rq_result&,CObject*){return blocked;}};
 struct World{::Objects Objects;Space ObjectSpace;CActor*current=nullptr;CActor*CurrentControlEntity(){return current;}}world;
-World&Level(){return world;}int present=1;int*g_pGameLevel=&present;constexpr u16 M_NETANOMALY_CMD=1;
+World&Level(){return world;}int present=1;int*g_pGameLevel=&present;constexpr u16 M_NETANOMALY_CMD=1,INV_STATE_BLOCK_ALL=2;
 namespace netcoop{
 bool remote=false;bool pure_client(){return remote;}
 bool server_character_accepts(xrClientData*c,u16){return c&&c->accepts;}

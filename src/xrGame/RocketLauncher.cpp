@@ -54,40 +54,31 @@ void CRocketLauncher::SpawnRocket(const shared_str& rocket_section, CGameObject*
 void CRocketLauncher::AttachRocket(u16 rocket_id, CGameObject* parent_rocket_launcher)
 {
 	CCustomRocket* pRocket = smart_cast<CCustomRocket*>(Level().Objects.net_Find(rocket_id));
+	if (!pRocket || !parent_rocket_launcher || pRocket->getDestroy())
+	{
+		Msg("! [diag][projectile] attach missing rocket=%u", rocket_id);
+		return;
+	}
 	pRocket->m_pOwner = smart_cast<CGameObject*>(parent_rocket_launcher->H_Root());
 	VERIFY(pRocket->m_pOwner);
 	pRocket->H_SetParent(parent_rocket_launcher);
-	m_rockets.push_back(pRocket);
+	if (std::find(m_rockets.begin(), m_rockets.end(), pRocket) == m_rockets.end()) m_rockets.push_back(pRocket);
 }
 
 void CRocketLauncher::DetachRocket(u16 rocket_id, bool bLaunch)
 {
 	CCustomRocket* pRocket = smart_cast<CCustomRocket*>(Level().Objects.net_Find(rocket_id));
-	if (!pRocket && OnClient()) return;
-
-	VERIFY(pRocket);
+	if (!pRocket) return;
 	ROCKETIT It = std::find(m_rockets.begin(), m_rockets.end(), pRocket);
 	ROCKETIT It_l = std::find(m_launched_rockets.begin(), m_launched_rockets.end(), pRocket);
 
-	if (OnServer())
-	{
-		VERIFY((It != m_rockets.end())||
-			(It_l != m_launched_rockets.end()));
-	};
-
-	if (It != m_rockets.end())
-	{
-		(*It)->m_bLaunched = bLaunch;
-		(*It)->H_SetParent(NULL);
-		m_rockets.erase(It);
-	};
-
-	if (It_l != m_launched_rockets.end())
-	{
-		(*It)->m_bLaunched = bLaunch;
-		(*It_l)->H_SetParent(NULL);
-		m_launched_rockets.erase(It_l);
-	}
+	if (It == m_rockets.end() && It_l == m_launched_rockets.end()) return;
+	// LaunchRocket places the same pointer in both lists. Detach once, before
+	// erasing either iterator; the loaded iterator may already be end/invalid.
+	pRocket->m_bLaunched = bLaunch;
+	if (pRocket->H_Parent()) pRocket->H_SetParent(NULL);
+	if (It != m_rockets.end()) m_rockets.erase(It);
+	if (It_l != m_launched_rockets.end()) m_launched_rockets.erase(It_l);
 }
 
 

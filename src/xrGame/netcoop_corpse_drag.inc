@@ -26,10 +26,10 @@ void corpse_drag_client_state(bool active)
 {
     CActor* actor = g_pGameLevel ? smart_cast<CActor*>(Level().CurrentControlEntity()) : nullptr;
     if (s_drag_client_actor == actor && actor && s_drag_client_active && !active)
-        actor->HideAllWeapons(false);
+        actor->SetWeaponHideState(INV_STATE_BLOCK_ALL, false);
     s_drag_client_actor = actor;
     s_drag_client_active = active && actor && actor->g_Alive();
-    if (s_drag_client_active) actor->HideAllWeapons(true);
+    if (s_drag_client_active) actor->SetWeaponHideState(INV_STATE_BLOCK_ALL, true);
 }
 
 bool corpse_drag_use(CActor* actor, CObject* target, u16 bone, bool shift)
@@ -56,7 +56,7 @@ static void corpse_drag_stop(u16 id, const CorpseDrag& drag, LPCSTR reason)
     {
         CPHMovementControl* movement = actor->character_physics_support()->movement();
         if (movement && movement->PHCapture() == drag.capture) movement->PHReleaseObject();
-        actor->HideAllWeapons(false);
+        actor->SetWeaponHideState(INV_STATE_BLOCK_ALL, false);
         script_send_to_actor(id, "netcoop_corpse_drag", "0");
     }
     Msg("[diag][corpse_drag] release actor=%u body=%u reason=%s", id, drag.body_id, reason);
@@ -98,7 +98,7 @@ bool server_corpse_drag_command(xrServer* server, xrClientData* client, LPCSTR t
     for (u16 i = 0; i < count; ++i)
     {
         CPhysicsElement* element = shell->get_ElementByStoreOrder(i);
-        if (element->BoneID() != bone) continue;
+        if (element->m_SelfID != bone) continue;
         SPHNetState state;
         body->PHGetSyncItem(i)->get_State(state);
         point = state.position;

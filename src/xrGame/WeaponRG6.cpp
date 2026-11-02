@@ -55,12 +55,16 @@ void CWeaponRG6::Load(LPCSTR section)
 
 void CWeaponRG6::FireStart()
 {
-	if (GetState() == eIdle && getRocketCount() && iAmmoElapsed)
+	const bool network_player = netcoop::enabled() && ParentIsActor() &&
+		(netcoop::pure_client() || netcoop::server_player_copy(H_Parent()));
+	// A client's launcher may not have received its child projectile yet.
+	// The round in the magazine, not that replica, permits requesting a shot.
+	if (GetState() == eIdle && iAmmoElapsed && (network_player || getRocketCount()))
 	{
 		inheritedSG::FireStart();
 		// A player's grenade: the owner sends the shot (FireTrace), the server
 		// launches it (netcoop_fire_shot); here only the shot animation plays.
-		if (netcoop::enabled() && ParentIsActor() && (netcoop::pure_client() || netcoop::server_player_copy(H_Parent())))
+		if (network_player)
 			return;
 #ifdef CROCKETLAUNCHER_CHANGE
 		LPCSTR ammo_name = m_ammoTypes[m_ammoType].c_str();

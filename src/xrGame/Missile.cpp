@@ -632,6 +632,11 @@ void CMissile::OnEvent(NET_Packet& P, u16 type)
 		{
 			P.r_u16(id);
 			CMissile* missile = smart_cast<CMissile*>(Level().Objects.net_Find(id));
+			if (!missile || missile == this || missile->getDestroy())
+			{
+				Msg("! [diag][projectile] ownership arrived without missile=%u parent=%u", id, ID());
+				break;
+			}
 			m_fake_missile = missile;
 			missile->H_SetParent(this);
 			missile->Position().set(Position());
