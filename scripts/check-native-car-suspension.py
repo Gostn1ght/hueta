@@ -18,6 +18,8 @@ def method(path, signature):
     return text[start:end]
 
 
+contact=method('src/xrGame/CarWheels.cpp','IC void CCar::SWheel::applywheelCollisionParams(')
+multiply=method('src/xrphysics/PhysicsCommon.h','IC void MulSprDmp(')
 source=r'''
 #include <cassert>
 #include <algorithm>
@@ -28,7 +30,21 @@ source=r'''
 #include <string>
 #include <limits>
 #include <initializer_list>
+#ifdef _MSC_VER
+// Preserve the production callback signature; some legacy arguments are unused.
+#pragma warning(disable:4100)
+#endif
 using u32=uint32_t;using LPCSTR=const char*;
+#define IC
+struct dSurfaceParameters{float soft_cfm=.0002f,soft_erp=.2f,mu=1;};
+struct dContact{dSurfaceParameters surface;};struct SGameMtl{};
+struct Callbacks{bool active=true;template<class T>bool HasCallback(T){return active;}};
+struct dxGeomUserData{Callbacks* object_callbacks=nullptr;void* callback_data=nullptr;};
+struct CCar{struct SWheel{
+ struct SWheelCollisionParams{float spring_factor=1,damping_factor=1,mu_factor=1;};
+ static void WheellCollisionCallback(){}
+ static void applywheelCollisionParams(const dxGeomUserData*,bool&,dContact&,SGameMtl*,SGameMtl*);
+};};
 bool _valid(float x){return std::isfinite(x);}
 float fixed_step=.01f;const float hinge2_spring=20000,hinge2_damping=1000;
 const float world_spring=10000,world_damping=100;
@@ -48,9 +64,26 @@ struct CInifile{
  float r_float(LPCSTR s,LPCSTR k){return values.at({s,k});}
  void set(LPCSTR section,LPCSTR key,float value){values[{section,key}]=value;}
 };
-'''+method('src/xrPhysics/PHJoint.cpp','void CPHJoint::SetJointSDfactors(')+'\n'+method(
+'''+multiply+'\n'+contact+'\n'+method('src/xrPhysics/PHJoint.cpp','void CPHJoint::SetJointSDfactors(')+'\n'+method(
     'src/xrGame/CarWheels.cpp','static bool car_apply_suspension_profile(')+r'''
 int main(){
+ // Actual wheel callback and actual spring/damper conversion. Verify both
+ // independent coefficients against the spring/damping equations at each step.
+ for(float spring:{.5f,1.f,3.f})for(float damping:{1.f,2.f,5.f}){
+  CCar::SWheel::SWheelCollisionParams params;params.spring_factor=spring;params.damping_factor=damping;params.mu_factor=.7f;
+  Callbacks callbacks;dxGeomUserData ud{&callbacks,&params};dContact contact;bool collide=true;
+  const float cfm=contact.surface.soft_cfm,erp=contact.surface.soft_erp;
+  const float k=erp/cfm/fixed_step,d=(1-erp)/cfm;
+  CCar::SWheel::applywheelCollisionParams(&ud,collide,contact,nullptr,nullptr);
+  assert(std::fabs(contact.surface.soft_cfm-CFM(k*spring,d*damping))<1e-9f);
+  assert(std::fabs(contact.surface.soft_erp-ERP(k*spring,d*damping))<1e-6f);
+  assert(std::fabs(contact.surface.mu-.7f)<1e-6f);
+  callbacks.active=false;const auto before=contact.surface;
+  CCar::SWheel::applywheelCollisionParams(&ud,collide,contact,nullptr,nullptr);
+  assert(contact.surface.soft_cfm==before.soft_cfm && contact.surface.soft_erp==before.soft_erp && contact.surface.mu==before.mu);
+  CCar::SWheel::applywheelCollisionParams(nullptr,collide,contact,nullptr,nullptr);
+  assert(contact.surface.soft_cfm==before.soft_cfm);
+ }
  CInifile ini;CPHJoint joint;
  assert(!car_apply_suspension_profile(&ini,&joint,"wheel")&&joint.writes==0);
  ini.set("wheels_params","spring_factor",2);ini.set("wheels_params","damping_factor",3);

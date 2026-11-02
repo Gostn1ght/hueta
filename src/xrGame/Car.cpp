@@ -1697,7 +1697,7 @@ void CCar::PhTune(float step)
 {
 	// The rotor already balances the world's full gravity in its flight
 	// controller. The legacy car's half-gravity compensation adds free lift.
-	if (m_netcoop_heli.on)
+	if (m_netcoop_heli.on || netcoop::enabled())
 		return;
 #ifdef CAR_NEW
     if (m_car_drone)
@@ -1717,7 +1717,7 @@ void CCar::PhTune(float step)
 
 float CCar::EffectiveGravity()
 {
-	if (m_netcoop_heli.on)
+	if (m_netcoop_heli.on || netcoop::enabled())
 		return physics_world()->Gravity();
 #ifdef CAR_NEW
     if (m_car_drone)

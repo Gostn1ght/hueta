@@ -47,6 +47,8 @@ void CCar::netcoop_heli_load()
 	h.auto_collective = READ_IF_EXISTS(pSettings, r_bool, section, "heli_auto_collective", true);
 	h.auto_level = READ_IF_EXISTS(pSettings, r_bool, section, "heli_auto_level", true);
 	h.ground_clearance = READ_IF_EXISTS(pSettings, r_float, section, "heli_ground_clearance", 0.f);
+	h.gear_clearance = READ_IF_EXISTS(pSettings, r_float, section, "heli_gear_clearance", 0.95f);
+	if(!_valid(h.gear_clearance) || h.gear_clearance<0.f || h.gear_clearance>3.f) h.gear_clearance=0.95f;
 	h.lift_ratio = READ_IF_EXISTS(pSettings, r_float, section, "heli_lift_ratio", h.lift_ratio);
 	h.max_pitch = deg2rad(READ_IF_EXISTS(pSettings, r_float, section, "heli_max_pitch", rad2deg(h.max_pitch)));
 	h.max_roll = deg2rad(READ_IF_EXISTS(pSettings, r_float, section, "heli_max_roll", rad2deg(h.max_roll)));
@@ -89,13 +91,16 @@ void CCar::netcoop_heli_load()
 	const u16 root=K->LL_BoneID("root");
 	const LPCSTR names[]={"gear_left","gear_right","gear_nose"};
 	const Fvector travel[]={{0.65f,1.35f,0.f},{-0.65f,1.35f,0.f},{0.f,1.15f,-0.5f}};
+	const LPCSTR travel_keys[]={"heli_gear_travel_left","heli_gear_travel_right","heli_gear_travel_nose"};
 	if(root<rest.size()) for(u32 i=0;i<3;++i) {
 		NetcoopHeli::Gear& gear=h.gears[i];gear.bone=K->LL_BoneID(names[i]);
 		if(gear.bone==BI_NONE) continue;
 		gear.geom=PPhysicsShell() ? PPhysicsShell()->get_GeomByID(gear.bone):nullptr;
 		if(!gear.geom || !gear.geom->geometry_transform()) {gear.bone=BI_NONE;gear.geom=nullptr;continue;}
 		gear.geom->get_local_form_bt(gear.rest);
-		Fmatrix inverse;inverse.invert(rest[root]);inverse.transform_dir(gear.travel,travel[i]);
+		gear.model_travel=READ_IF_EXISTS(pSettings,r_fvector3,section,travel_keys[i],travel[i]);
+		if(!_valid(gear.model_travel) || gear.model_travel.magnitude()>3.5f) gear.model_travel=travel[i];
+		Fmatrix inverse;inverse.invert(rest[root]);inverse.transform_dir(gear.travel,gear.model_travel);
 		K->LL_GetBoneInstance(gear.bone).set_callback(bctCustom,netcoop_heli_gear_bone,this);
 		h.gear_supported=true;
 	}
@@ -105,11 +110,10 @@ void CCar::netcoop_heli_gear_bone(CBoneInstance* bone)
 {
 	CCar* car=static_cast<CCar*>(bone->callback_param());
 	IKinematics* model=smart_cast<IKinematics*>(car->Visual());
-	const Fvector travel[]={{0.65f,1.35f,0.f},{-0.65f,1.35f,0.f},{0.f,1.15f,-0.5f}};
 	for(u32 i=0;model && i<3;++i) {
 		const auto& gear=car->m_netcoop_heli.gears[i];
 		if(gear.bone!=BI_NONE && &model->LL_GetBoneInstance(gear.bone)==bone)
-			bone->mTransform.c.mad(travel[i],1.f-car->m_netcoop_heli.gear_position);
+			bone->mTransform.c.mad(gear.model_travel,1.f-car->m_netcoop_heli.gear_position);
 	}
 }
 
@@ -252,7 +256,7 @@ void CCar::netcoop_heli_step(float dt)
 		Fvector start = xform.c, down;
 		down.set(0.f, -1.f, 0.f);
 		start.y += 0.5f;
-		const float clearance=h.ground_clearance+(h.gear_supported ? h.gear_position*0.95f:0.f);
+		const float clearance=h.ground_clearance+(h.gear_supported ? h.gear_position*h.gear_clearance:0.f);
 		h.ground_height = Level().ObjectSpace.RayPick(start, down, h.rotor_diameter+clearance, collide::rqtStatic, hit, this)
 			? _max(0.f,hit.range - 0.5f-clearance) : 100.f;
 	}

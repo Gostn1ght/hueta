@@ -638,12 +638,12 @@ public:
 		bool on = false;
 		float collective = 0.f, rotor = 0.f; // 0..1
 		bool auto_collective = true, auto_level = true;
-		float manual_collective = 0.f, ground_clearance = 0.f;
+		float manual_collective = 0.f, ground_clearance = 0.f, gear_clearance = 0.95f;
 		Fvector wind = {0.f,0.f,0.f};
 		float rain = 0.f;
 		u32 weather_probe = 0;
 		u32 diagnostic_at = 0;
-		struct Gear {u16 bone=BI_NONE;CODEGeom* geom=nullptr;Fmatrix rest;Fvector travel;};
+		struct Gear {u16 bone=BI_NONE;CODEGeom* geom=nullptr;Fmatrix rest;Fvector travel;Fvector model_travel;};
 		Gear gears[3];
 		bool gear_supported=false, gear_down=true, airborne=false;
 		float gear_position=1.f, recent_sink=0.f;

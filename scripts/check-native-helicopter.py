@@ -66,7 +66,7 @@ struct IKinematicsAnimated{
  CBlend* PlayCycle(MotionID motion,bool){assert(motion.valid());last=motion;++played;return &blend;}
 };
 struct IKinematics{void CalculateBones_Invalidate(){}};
-namespace netcoop{bool pure_client(){return false;}}
+namespace netcoop{bool active=false;bool enabled(){return active;}bool pure_client(){return false;}}
 template<class T>T smart_cast(IKinematics* k){return static_cast<T>(k);}
 struct CPhysicsElement {
  Fmatrix form;Fvector force,torque;unsigned force_calls=0;
@@ -136,6 +136,9 @@ int main(){
  CPhysicsShell road;CCar car;car.test_shell=&road;
  assert(std::fabs(car.EffectiveGravity()-4.905f)<1e-6f);
  car.PhTune(.01f);assert(std::fabs(road.element.force.y-2500*4.905f)<.01f);
+ netcoop::active=true;road.element.force.set(0,0,0);car.PhTune(.01f);
+ assert(std::fabs(car.EffectiveGravity()-9.81f)<1e-6f && road.element.force.y==0);
+ netcoop::active=false;
  a.m_netcoop_heli.rotor=b.m_netcoop_heli.rotor=1;
  a.m_netcoop_heli.collective=b.m_netcoop_heli.collective=.7f;
  // A second vehicle may have been constructed last. No shared bone map is

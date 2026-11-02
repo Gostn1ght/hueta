@@ -27,7 +27,9 @@ IC void CCar::SWheel::applywheelCollisionParams(const dxGeomUserData* ud, bool& 
 		SWheelCollisionParams& cp = *((SWheelCollisionParams*)(ud->callback_data));
 		dSurfaceParameters& sp = c.surface;
 		sp.mu *= cp.mu_factor;
-		MulSprDmp(sp.soft_cfm, sp.soft_cfm, cp.spring_factor, cp.damping_factor);
+		// CFM and ERP are distinct coefficients. Aliasing CFM twice discarded
+		// the damping ERP change and scaled compliance twice on every wheel contact.
+		MulSprDmp(sp.soft_cfm, sp.soft_erp, cp.spring_factor, cp.damping_factor);
 	}
 }
 
