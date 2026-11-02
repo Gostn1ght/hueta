@@ -125,6 +125,7 @@ local D_HELP       = DIK_keys.DIK_H
 -------------------------------------------------------------------
 GUI = nil -- instance, don't touch
 function start(owner)
+    if netcoop_pure_client and netcoop_pure_client() and not (netcoop_role and netcoop_role()==2) then return end
 	-- Hide the owner
 	if owner then
 		if (owner:IsShown()) then
