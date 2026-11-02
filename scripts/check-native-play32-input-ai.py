@@ -41,7 +41,8 @@ pda=r'''
 using u16=unsigned short;
 enum EUIMessages{WINDOW_KEY_PRESSED,WINDOW_KEY_RELEASED,WINDOW_KEY_OTHER};
 enum EGameActions{kQUIT=1,kINVENTORY=2,kACTIVE_JOBS=3,kOTHER=4};
-constexpr int AF_3D_PDA=1,CMD_START=1,CMD_STOP=2;
+constexpr int AF_3D_PDA=1,CMD_START=1,CMD_STOP=2,DIK_ESCAPE=1,MOUSE_1=337,MOUSE_8=344;
+namespace netcoop {bool pure_client(){return false;}}
 struct Flags{bool three=true;bool test(int){return three;}}psActorFlags;
 EGameActions get_binded_action(int key){return key==1?kQUIT:key==2?kINVENTORY:key==3?kACTIVE_JOBS:kOTHER;}
 struct CUIWindow{virtual ~CUIWindow()=default;int calls=0;CUIWindow* m_pKeyboardCapturer=nullptr;
