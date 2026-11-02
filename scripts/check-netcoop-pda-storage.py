@@ -87,7 +87,9 @@ assert len(last(cmd(1,11,'pdanet notes'),'notes'))==2
 # Factory reset erases this device; it does not load the new holder's other
 # PDA or resurrect legacy data. The hardware serial survives; network UID rotates.
 serial=last(cmd(1,11,'pdanet device'),'device').serial
+cmd(1,11,'pdanet gbeg '+('b'*16)+' 1 l01_escape')
 st=last(cmd(1,11,'pdanet wipe'),'state');assert st.uid not in (a.uid,b.uid)
+assert not any(k=='stored' for k,v in cmd(1,11,'pdanet aup '+('b'*16)+' 1 RERTIAQUJD')), 'reset cancels in-flight media'
 assert last(cmd(1,11,'pdanet device'),'device').serial==serial
 assert len(last(cmd(1,11,'pdanet notes'),'notes'))==0
 assert len(last(cmd(1,11,'pdanet library'),'library').photos)==0
@@ -112,3 +114,17 @@ assert last(cmd(1,10,'pdanet hello'),'state').uid==a.uid
 assert len(last(cmd(1,10,'pdanet notes'),'notes'))==2
 assert g.netcoop_store_read('pda_restore','physical1000')==''
 print('PASS physical PDA: one-time legacy migration; independent accounts/devices/locks; USB inventory ACL; full paged chat archive; photo bytes; interrupted and charged hacking; reset; cross-server interrupted restore recovery; actual native storage bounds')
+
+# Same-length storage corruption is detected before journalling any target writes.
+lua.execute(r'''
+items[1002].owner=10
+local meta=netcoop_transit.deserialize(netcoop_store_read("pda_usb","usb1002"))
+corrupt_key=meta.usb.."_"..meta.revision.."_pda_memo_1"
+original_blob=netcoop_store_read("pda_usb_blob",corrupt_key)
+assert(real_swap("pda_usb_blob",corrupt_key,original_blob,"X"..original_blob:sub(2)))
+''')
+assert last(cmd(0,10,'pdanet usb_restore 1002'),'err')=='damaged backup'
+assert g.netcoop_store_read('pda_restore','physical1000')==''
+assert len(last(cmd(0,10,'pdanet notes'),'notes'))==2
+lua.execute('assert(real_swap("pda_usb_blob",corrupt_key,netcoop_store_read("pda_usb_blob",corrupt_key),original_blob))')
+print('PASS USB backup checksum rejects same-length damaged data without altering the target')

@@ -306,7 +306,7 @@ function send(i, cid)
 	if #parts > 190 then tip("st_pdanet_photo_failed") return false end
 	local pid = new_id()
 	netcoop_photo_write("c_" .. pid, data) -- own message shows without a fetch
-	queue = { pid = pid, parts = parts, next = 1, at = 0 }
+	queue = { pid = pid, device = my_uid(), parts = parts, next = 1, at = 0 }
 	netcoop_command(string.format("pdanet pbeg %s %s %d %s", pid, cid, #parts, (p.level ~= "" and p.level) or "unknown"))
 	tip("st_pdanet_rec_sending")
 	return true
@@ -358,6 +358,7 @@ function keep(pid, lvl)
 end
 
 local function update()
+	if queue and queue.device~=my_uid() then queue=nil end
 	camera_update()
 	if queue and time_global() >= queue.at then
 		queue.at = time_global() + math.floor(1000 / PARTS_PER_SECOND)

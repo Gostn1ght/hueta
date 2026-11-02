@@ -86,3 +86,13 @@ USB ACL/migration/media/archive, interrupted restore/hack, cache-free media reco
 and stale-reply/recording isolation. These fixtures do not establish in-game UI,
 model, physics, shader or performance acceptance. All other initial audit items
 remain open; this PDA change must not be described as completing vehicle work.
+
+
+Offline Mi-24 inspection (not a model fix): original FBX has 1009 welded
+connected components. The original textured twin nose tyres are components
+42/43 in `J:/LostZone_Work/_work/mi24_original_gear_inspect/components.json`.
+Their bounds are x +/-0.058..0.294, y 1.147..1.656, z 0.489..0.999 in the
+builder's normalized Blender coordinates. Components 49/50 are main bay DOORS,
+not tyres (confirmed with an offline colored underbelly render). Main gear
+requires further segmentation; do not label these doors as wheels or ship them
+as a completed landing-gear solution. Offline QA only; no owner game launched.

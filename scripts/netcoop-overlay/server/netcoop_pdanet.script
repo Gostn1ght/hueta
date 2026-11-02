@@ -597,7 +597,7 @@ function handlers.abeg(id, me, char, args)
 	local c = me.chats[cid] and read("pda_chat", cid)
 	if not c or not c.members[me.uid] then return "no such chat" end -- chats only, not the general channel
 	if netcoop_store_read("pda_audio", aid) ~= "" then return "try again" end
-	uploads[id] = { kind = "audio", aid = aid, cid = cid, secs = secs, total = total, parts = {}, got = 0, at = time_global(), uid = me.uid, char = char }
+	uploads[id] = { kind = "audio", aid = aid, cid = cid, secs = secs, total = total, parts = {}, got = 0, at = time_global(), uid = me.uid, char = char, holder = char_of(id) }
 end
 
 -- pbeg <pid> <cid> <parts> <level> : a photo for a chat or group
@@ -609,7 +609,7 @@ function handlers.pbeg(id, me, char, args)
 	if not c or not c.members[me.uid] then return "no such chat" end
 	if netcoop_store_read("pda_photo", pid) ~= "" then return "try again" end
 	uploads[id] = { kind = "photo", aid = pid, cid = cid, place = string.sub(place, 1, 40), total = total, parts = {}, got = 0,
-		at = time_global(), uid = me.uid, char = char }
+		at = time_global(), uid = me.uid, char = char, holder = char_of(id) }
 end
 
 -- Device libraries share the chunk transport with chat attachments, but have
@@ -625,7 +625,7 @@ local function library_begin(id, me, key, args, kind)
 	if not photo and (not tonumber(extra) or tonumber(extra)<1 or tonumber(extra)>AUDIO_SECS) then return "bad record" end
 	local bucket=photo and "pda_photo" or "pda_audio"
 	if netcoop_store_read(bucket,aid)~="" then return "try again" end
-	uploads[id]={kind=kind,aid=aid,total=total,parts={},got=0,at=time_global(),uid=me.uid,char=key,library=true,
+	uploads[id]={kind=kind,aid=aid,total=total,parts={},got=0,at=time_global(),uid=me.uid,char=key,holder=char_of(id),library=true,
 		place=photo and extra or nil,secs=not photo and tonumber(extra) or nil}
 end
 function handlers.gbeg(id, me, key, args) return library_begin(id,me,key,args,"photo") end
@@ -1072,6 +1072,7 @@ end
 function handlers.wipe(id, me, char)
 	local d = held_device(id, char)
 	if not (d and not d.own and d.rec.hacked[char]) then return "not hacked" end
+	uploads[id]=nil
 	if not netcoop_pda_storage or not netcoop_pda_storage.factory_reset(d,char) then return "try again" end
 	unlocked[id] = nil
 	printf("[Lost Zone] pdanet: %s reset physical PDA %s", char, d.rec.serial)
@@ -1238,12 +1239,13 @@ function command(entity_id, args)
 	if verb == "aup" then
 		local u = uploads[entity_id]
 		local d = held_device(entity_id, char_of(entity_id))
-		if not (u and d and d.uid == u.char and (d.own or d.rec.hacked[char_of(entity_id)]) and not is_locked(entity_id, d.uid)) then uploads[entity_id] = nil; return "" end
+		if not (u and u.holder==char_of(entity_id) and d and d.uid == u.char and (d.own or d.rec.hacked[char_of(entity_id)]) and not is_locked(entity_id, d.uid)) then uploads[entity_id] = nil; return "" end
 		return audio_part(entity_id, rest or "")
 	end
 	local handler = verb and handlers[verb]
 	if verb and string.match(verb, "^usb_") and netcoop_pda_storage then
 		handler = function(id, me, key, rest)
+			if verb=="usb_restore" then uploads[id]=nil end
 			local result, err = netcoop_pda_storage.command(id, verb, rest)
 			if err then return err end
 			if verb=="usb_restore" then uploads[id]=nil end
