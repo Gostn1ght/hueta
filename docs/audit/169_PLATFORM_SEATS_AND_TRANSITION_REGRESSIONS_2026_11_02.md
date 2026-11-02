@@ -73,3 +73,18 @@ must be rerun and all mandatory gates succeed before binary packaging.
 Offline all-fleet and animation checks pass with the latest 287-seat layouts
 and rebuilt five vehicle clips. Local Windows dummy batch test timed out;
 Ubuntu full resource CI passed, no native-test exception was taken.
+
+All 50 physical OGF collision shapes were subsequently read independently from
+their packed shape flags, OBB basis and hierarchical bind matrices. Every
+recorded seat bone agrees with the Blender coordinates within 1 mm. The model
+audit now records potential horizontal physical box faces and exact seat
+matrices; these do not claim floor reachability or standing head clearance.
+Enlarged truck cutaways identified side benches in Ural and both army Kamaz
+variants: corrected layouts are Ural 15, army Kamaz 17 each; total 287.
+Actual human meshes were rendered in buggy, both PAZ layouts, ZIL131, Ural
+and army Kamaz at the configured seat matrices (private seat_bodies_qa.png).
+Russian per-model report: 169_ПРОВЕРКА_ТРАНСПОРТА.md.
+Resources-only CI 41492923707 at 81d38fbba succeeded. Native full CI
+41491162142 at d9857eab2 passed all actual native fixtures and is compiling
+the full DX11 binary. Data 000059 is authenticated and reconstructed against
+installed .5 for both roles; unused draft 000058 was not published or installed.
