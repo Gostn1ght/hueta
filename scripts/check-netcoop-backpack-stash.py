@@ -102,8 +102,10 @@ assert(s_create(player,bag,'again','ivan')~='','cannot deploy an already stored 
 -- Bag pickup packs ALL loot despite arbitrarily low carrying capacity.
 local loot=make(71,'heavy_loot',box);player.capacity=1;loot.weight=500
 box:transfer_item(bag,player);flush();assert(objects[id] and loot:parent()==box)
+player.pos=vector():set(50,0,0) -- walking away must not strand the authorized pickup
 tick();flush();tick()
 assert(not objects[id] and not owned_t()[id] and bag:parent()==player and loot:parent()==player)
+player.pos=vector():set(0,0,0)
 assert(bag:condition()==.73 and #released==1 and sent[#sent][2]=='stash_spot_remove')
 -- Take-all has already queued its own requests: wait for them, never duplicate.
 local id2,box2=deploy(bag,false);local extra=make(72,'loot',box2)

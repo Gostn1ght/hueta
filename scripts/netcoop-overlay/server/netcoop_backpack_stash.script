@@ -159,7 +159,9 @@ local function update_one(box_id,entry,now)
    if now<waiting[box_id] then return end
   end
   local actor,held=actor_with_bag(entry)
-  if not actor or actor:position():distance_to(box:position())>4 then return end
+  -- Reach was checked when the real bag was taken. Finish that operation
+  -- even if the player walks away while queued ownership events settle.
+  if not actor then return end
   entry.bag_id=held:id();entry.bag_phase="pack"
   local items=snapshot(box,true)
   if #items==0 then remove_empty(box_id,entry,actor);return end
