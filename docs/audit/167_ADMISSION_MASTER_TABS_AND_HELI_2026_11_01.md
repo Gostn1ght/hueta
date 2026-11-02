@@ -1,6 +1,6 @@
 # Follow-up: admission, master tabs, observer animation and Mi-24
 
-Status: urgent admission/master fix delivered as 2026.11.01.2. Helicopter/observer/prone follow-up awaits CI and release packaging.
+Status: urgent admission/master fix delivered as 2026.11.01.2. Helicopter/observer/prone follow-up published and delivered as 2026.11.02.1.
 
 ## Confirmed failures
 
@@ -18,19 +18,35 @@ Signed client manifest `manifests/2026.11.01.2-780d5c0e.bin`, BLAKE3 `780d5c0e12
 
 Public `J:/LostZone_Work/Lost Zone Server.zip`: 2,718,811,843 bytes, 41 files, all hashes and CRC verified, SHA256 `4448338c3ee3db82b10fed87209fef66e23641ac6e07359845e4ded110472767`. Client/server/save preservation and delivery receipts: `J:/LostZone_Work/_work/world_hotfix_20261101_v7`. No local game tests were run.
 
-## Next source work (not part of .2)
+## Helicopter/observer/prone follow-up (2026.11.02.1, not part of .2)
 
 Full original Mi-24 airframe/rotor mesh retained, split into 16-bit draw chunks without decimation. Three new rigid landing-gear assemblies and eight independently hideable, ray-pickable/no-physics glass groups. Gear hydraulic travel and physical collision shapes share a position; server validates pilot ownership, weight-on-wheels/power lock, emergency extension and touchdown damage. N/night-vision binding toggles gear only while seated. Manual Mi-24 collective/attitude control replaces automatic height/level holds; slow spool, wheel-plane ground probe, supported-weight friction and bounded server weather forces. Mi-2 retains assisted controls.
 
-The body normal maps retain original 4K resolution; detail/rotor source normals remain 2K. DX11 helicopter-only material adds weather-driven glass drops/trails; legacy renderer fallback retains normal transparency. Real shader compilation and native flight/gear fixtures are required before release. Actual in-game appearance, flight model, gear collision and bullet/glass geometry still require owner testing.
+The body normal maps retain original 4K resolution; detail/rotor source normals remain 2K. DX11 helicopter-only material adds weather-driven glass drops/trails; legacy renderer fallback retains normal transparency. Real shader compilation and native flight/gear fixtures passed in GitHub. Actual in-game appearance, flight model, gear collision and bullet/glass geometry still require owner testing.
 
-Observer animation work resets old-model RP/use caches, provides a missing-specific-motion fallback, and logs body/movement/held item/clip phases. Pistol poses accept generic BAS pistol classes by grip, independent of magazine capacity, and exclude binoculars/knives. The separate authored prone set is enabled in source, but is not yet delivered.
+Observer animation work resets old-model RP/use caches, provides a missing-specific-motion fallback, and logs body/movement/held item/clip phases. Pistol poses accept generic BAS pistol classes by grip, independent of magazine capacity, and exclude binoculars/knives. The separate authored prone set is included in 2026.11.02.1.
 
 
-Prone source update: 20 original full-body clips (empty/knife/pistol/rifle, idle/forward/back/left/right) now use an analytic two-segment joint solve on the common human bind skeleton. They are isolated `lz_prone_` names, so existing NPC animation names are untouched. Partition bone mappings match the main actor OMF exactly. QA receipt `167_PRONE_POSE_QA.json` binds sampled low head/foot positions and gait variation to the exact OMF SHA256; offline Blender frames of empty and rifle poses were inspected. Native low-stance selection, overlay preservation, grip/direction changes and recovery still require GitHub execution; multiplayer appearance is not locally tested.
+Prone source update: 20 original full-body clips (empty/knife/pistol/rifle, idle/forward/back/left/right) now use an analytic two-segment joint solve on the common human bind skeleton. They are isolated `lz_prone_` names, so existing NPC animation names are untouched. Partition bone mappings match the main actor OMF exactly. QA receipt `167_PRONE_POSE_QA.json` binds sampled low head/foot positions and gait variation to the exact OMF SHA256; offline Blender frames of empty and rifle poses were inspected. Native low-stance selection, overlay preservation, grip/direction changes and recovery passed GitHub execution; multiplayer appearance is not locally tested.
 
 ## Follow-up packaging and CI
 
 The first 000050 candidate classified the client overlay model as a client-only asset. That candidate was never published. The headless simulation also reads its bones/collision, so clean release patches now put client model/animation assets and dependencies in the shared input namespace; explicitly server-specific assets retain role overrides. Both role archives receive the exact new Mi-24 model and prone OMF. Authenticated full archive integrity, final mounted precedence and payload equality passed for all 13 client and 10 server effective updates (`delta50-reviewed.json`); the checked candidate is `patch_000050_shared_publish`, source ad5763637. Resources-only CI 41349689337 passed at that exact commit.
 
-Native CI 41349298423 stopped on strict warning errors caused by fixture member names `movement` and `model` shadowing the extracted function locals. The fixture members were renamed (no warnings disabled). Run 41349896783 at f1cab7553 now checks the same gameplay implementation plus corrected fixture and shared packaging. Native build, shader compilation and release remain pending; 2026.11.01.2 stays the published version until they pass.
+Native CI 41349298423 stopped on strict warning errors caused by fixture member names `movement` and `model` shadowing the extracted function locals. The fixture members were renamed (no warnings disabled). Run 41349896783 at f1cab7553 then exposed a production integration error: prone used the obsolete `m_PhysicMovementControl` name found in legacy comments. It now reads `character_physics_support()->movement()` and the fixture uses that same interface. No native checks were executed locally.
+
+The shader-check script previously was not invoked by CI. A required Windows shader job now compiles the menu and Mi-24 pixel shader and all six variants of its deployed `model_env_lq` vertex shader. The private fixture is a 52,336-byte ZIP of actual deployed headers, SHA256 `a5c2747187dce8986fcb4109560dc2661829aa7f62392eade11741f81aee7a49`. It stays in a draft release, not a public source or game distribution. Reading draft assets requires a contents-write job token; a read-only attempt failed closed before native compilation.
+
+The original full-height hull physics box masked the eight glass groups during CCF_Skeleton ray-picking. The final resource-only change splits lower hull and narrower upper cabin/engine deck, retaining the root mass centre and rigid attachment. `167_MI24_COLLISION_QA.json` binds eight unobstructed external glass-ray checks to the final OGF hash. The corrected candidate is `patch_000050_glass_publish` at e4e7e4153; CI 41351828938 passed, and both effective resource layouts matched all 13 client and 10 server updates exactly. Earlier 000050 staging candidates were never published.
+
+## Release 2026.11.02.1
+
+Native commit `666c48f57f2b6a63b62b8170258409c95b19a0bb`, CI `41351066444`: checks, real Direct3D shader compilation, native fixtures, DX11 build, package and private runtime/symbol preservation passed; the complete run succeeded. Client/server executable SHA256 `8520a110c1d6c6da28df2cb9a35c618666e8ccefa7bbf7cf7877f4d6a3227930`. The only source changes after this native build are the reviewed Mi-24 resource/tool/QA changes in e4e7e4153, checked by resource CI `41351828938`. Production master stays the unchanged reviewed be1423662 build from run `41344434446`, including the background-tab visibility fix.
+
+Signed client manifest `manifests/2026.11.02.1-74401ba0.bin`, BLAKE3 `74401ba01cdf2cd0256917b5f76af02193e8a14c3a13c01686ebaa9e8bd636f8`, 145 files. Signature and all changed files reconstructed from published chunks passed; previous protected archive bytes are unchanged, P2P online. No HTTP mirror was claimed.
+
+Canonical server ZIP: 2,774,280,633 bytes, 43 files, SHA256 `59d127f86da436d753da261cd3a1f9795b3d150acc5dfae53681e45ebf3b0659`; all file SHA256 and ZIP CRC checks passed. Matching CI symbols were downloaded, verified against the private release metadata and kept outside public packages; PDB SHA256 `7ed82bd6dec7b1adaf3edd61f7fbbb96902fdf1f3d49c24f23f5f455c55e4303`.
+
+Delivery completed to owner client `J:/LostZone/Lost Zone`, public server folder `J:/LostZone_Work/Lost Zone Server` and public `J:/LostZone_Work/Lost Zone Server.zip`. Both installed manifests report 2026.11.02.1; six files changed per role. All installed source bytes and final ZIP hash matched. Runtime/save/account data was preserved, and no local game/location/world-master process was launched for testing. The pre-existing distribution service was reused without opening another listener.
+
+Receipts/candidates: `J:/LostZone_Work/_work/world_update_20261102_v8`. Controls: N/night-vision binding toggles gear while piloting; Space/Ctrl change Mi-24 collective; Ctrl+Shift selects the low crawling stance. Existing Mi-2 assistance is retained. This is a game flight-model adjustment, not a validated real-aircraft simulation. PDA/item-use/RP observer appearance, ground handling, actual ODE landing and glass-shot behaviour still need multiplayer testing. Older unresolved scope in audit 166 is not represented as complete by this release.
