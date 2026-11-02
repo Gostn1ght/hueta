@@ -33,8 +33,8 @@ using u16=unsigned short;using u32=unsigned;using LPCSTR=const char*;
 template<class...T>void Msg(LPCSTR,T...){}
 struct Fvector{float x=0,y=0,z=0;void set(const Fvector&v){*this=v;}};
 struct SPHNetState{Fvector position,linear_vel;};
-struct CObject{virtual~CObject()=default;u16 id=1;bool destroyed=false;
- u16 ID(){return id;}bool getDestroy(){return destroyed;}};
+struct CObject{virtual~CObject()=default;u16 fixture_id=1;bool destroyed=false;
+ u16 ID(){return fixture_id;}bool getDestroy(){return destroyed;}};
 struct CGameObject:CObject{CGameObject*parent=nullptr;unsigned detach=0;Fvector position;
  CGameObject*H_Parent(){return parent;}CGameObject*H_Root(){return parent?parent:this;}
  void H_SetParent(CGameObject*p){if(parent&&!p)++detach;parent=p;}Fvector&Position(){return position;}};
@@ -57,7 +57,7 @@ struct CWeaponRG6:Shotgun{using inheritedSG=Shotgun;int state=0,iAmmoElapsed=1;u
  CGameObject*H_Parent(){return &parent;}void FireStart();};
 '''+native+r'''
 int main(){
- CGameObject owner;CCustomRocket rocket;rocket.id=2;world.Objects.values[u16(2)]=&rocket;
+ CGameObject owner;CCustomRocket rocket;rocket.fixture_id=2;world.Objects.values[u16(2)]=&rocket;
  CRocketLauncher launcher;launcher.AttachRocket(99,&owner);assert(launcher.m_rockets.empty());
  launcher.AttachRocket(2,&owner);launcher.AttachRocket(2,&owner);assert(launcher.m_rockets.size()==1);
  launcher.m_launched_rockets.push_back(&rocket);launcher.DetachRocket(2,true);
@@ -68,7 +68,7 @@ int main(){
  rocket.parent=&owner;launcher.m_rockets.push_back(&rocket);launcher.DetachRocket(2,false);
  assert(rocket.detach==3&&!rocket.m_bLaunched&&launcher.m_rockets.empty());
  launcher.DetachRocket(99,true);
- CMissile held,child;held.id=3;child.id=4;world.Objects.values[u16(4)]=&child;
+ CMissile held,child;held.fixture_id=3;child.fixture_id=4;world.Objects.values[u16(4)]=&child;
  NET_Packet packet;packet.id=99;held.take(packet);assert(!held.m_fake_missile);
  packet.id=4;held.m_netcoop_throw_pending=true;held.take(packet);assert(held.m_fake_missile==&child&&child.parent==&held&&held.throws==1);
  // 15 metres per snapshot is normal at 300 m/s. A genuine relocation

@@ -1,7 +1,7 @@
 # Gameplay follow-up after 2026.11.02.1
 
-Status: PDA work released in 2026.11.02.2; follow-up 2026.11.02.3 is being
-validated. Vehicle, loose-item/corpse physics, prone and PDA rendering work
+Status: PDA work and follow-up released through 2026.11.02.3.
+Vehicle, loose-item/corpse physics, prone and PDA rendering work
 remain open. Offline checks do not establish in-game acceptance.
 
 Owner evidence: eleven attached screenshots, 2026-11-02. The previous isolated
@@ -26,6 +26,10 @@ Required work:
 - PDA marks can be created and remain on their own physical device.
 - Each physical PDA has independent photos and other device data, including
   switching devices, transfer, reconnect and interrupted photo capture.
+- Investigate tester-reported texture quality regression against GAMMA:
+  apparently lower resolution and missing multilayer materials. Unverified;
+  compare matching assets, effective graphics settings and packaged dependencies
+  before assigning a cause or claiming that every GAMMA texture was 4K.
 
 All native compilation and fixture execution remain in GitHub Actions. No
 owner game/client/location/master is launched for testing without a new request.
@@ -39,6 +43,17 @@ when committing a completed photo, so a device switch can misattribute data.
 Owner additions: all physical PDA data is isolated, with a data USB drive for
 explicit copy/restore and a separate decryption USB; gameplay keys must not leak
 through the open PDA, Escape closes it and editing keys remain usable.
+
+Tester addition, 2026-11-02 — texture quality (OPEN, not yet reproduced):
+the tester reports that GAMMA had HD/4K textures, whereas Lost Zone appears
+noticeably lower resolution and lacks many of GAMMA's multilayer materials.
+This is a visual report, not a verified inventory of source texture sizes.
+Compare the same objects/surfaces in GAMMA and Lost Zone: source versus shipped
+DDS dimensions and mip chains, runtime texture quality/LOD settings, and material
+references to detail, normal/bump and other layer textures. Check transfer and
+archive contents for missing dependencies or lower-quality overrides. Record
+specific affected assets and matched screenshots; correct confirmed regressions
+with appropriate memory/performance checks rather than blanket 4K upscaling.
 
 PDA implementation (released in .2; subsequent refinements pending .3):
 
@@ -207,6 +222,12 @@ vehicle must stall on overload. Review vehicle bulletproof glass, penetrative
 occupant damage, hull durability (~three RPG hits to destroy as requested),
 third/first-person door entry/exit/steering animations. Source external animation
 assets only with suitable availability/permissions; none has been acquired yet.
+
+Owner confirmed backpack pickup behavior: taking the actual backpack transfers
+all remaining stash contents to the character, then removes the emptied stash.
+Carry-weight overflow does not refuse the transfer; the overweight character
+cannot move. Do not add a character inventory slot limit or require emptying the
+stash first. Interrupted or incomplete transfers must preserve remaining loot.
 
 Owner clarified moving platforms are NOT seat assignment: standing/walking on
 any suitable flat vehicle deck must retain platform motion. Seat counts must

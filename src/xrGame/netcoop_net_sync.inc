@@ -11,6 +11,7 @@
 #include "enemy_manager.h"
 #include "visual_memory_manager.h"
 #include "Car.h"
+#include "CustomRocket.h"
 #include "actor_anim_defs.h"
 #include "../xrEngine/CameraBase.h"
 #include "HUDManager.h"
@@ -92,6 +93,7 @@ void server_physics_update(xrServer* server)
 			(smart_cast<CPhysicObject*>(object) || smart_cast<CPhysicsSkeletonObject*>(object));
 		// Cars (doc 100): the server drives them; clients show replicas.
 		const bool vehicle = !item_or_corpse && smart_cast<CCar*>(object) != nullptr;
+		const bool projectile = smart_cast<CMissile*>(object) || smart_cast<CCustomRocket*>(object);
 		if (!item_or_corpse && !prop && !vehicle) continue;
 		if (prop && s_physics_sent.find(holder->ID()) == s_physics_sent.end())
 		{
@@ -107,7 +109,7 @@ void server_physics_update(xrServer* server)
 		// movement contact to props/fragments, including sleeping ones.
 		for (const FootContact& foot : feet)
 		{
-			if (vehicle || (creature && server_corpse_dragging(object))) break;
+			if (vehicle || projectile || (creature && server_corpse_dragging(object))) break;
 			for (u16 i = 0; i < count; ++i)
 			{
 				SPHNetState body; holder->PHGetSyncItem(i)->get_State(body);
@@ -145,10 +147,10 @@ void server_physics_update(xrServer* server)
 			if (!awake) continue; // untouched props still consume no pose traffic
 			Msg("[Lost Zone][physics] prop %s (%u) moved: its pose goes to the players", holder->cName().c_str(), holder->ID());
 		}
-		if (awake && !creature && !vehicle && !smart_cast<CMissile*>(object))
+		if (awake && !creature && !vehicle && !projectile)
 		{
-			// Loose props/debris are limited; thrown grenades and bolts keep
-			// their configured ballistics (CMissile is their common base).
+			// Loose props/debris are limited. Launcher rockets derive from
+			// CCustomRocket, not CMissile; all projectiles keep their ballistics.
 			for (u16 i = 0; i < count; ++i)
 			{
 				SPHNetState state; holder->PHGetSyncItem(i)->get_State(state);

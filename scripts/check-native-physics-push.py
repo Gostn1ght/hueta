@@ -77,6 +77,7 @@ struct CInventoryItem:CPhysicsShellHolder{};
 struct CMissile:CInventoryItem{};
 struct CGrenade:CMissile{};
 struct CBolt:CMissile{};
+struct CCustomRocket:CInventoryItem{};
 struct CPhysicObject:CPhysicsShellHolder{};
 struct CPhysicsSkeletonObject:CPhysicsShellHolder{};
 struct CCar:CPhysicsShellHolder{};
@@ -155,15 +156,17 @@ int main(){
  excluded.shell.elements[0].state.position.set(0,0.2f,0.3f);server.room=false;unsigned sent=server.sends;
  tick(server);assert(excluded.shell.enabled&&server.sends==sent);
  excluded.shell.enabled=false;tick(server);assert(server.sends==sent+1); // the final pose of a sleeping body ignores backpressure (no hovering)
- actor.move=0;CInventoryItem loose;CGrenade grenade;CBolt bolt;
+ actor.move=0;CInventoryItem loose;CGrenade grenade;CBolt bolt;CCustomRocket rocket;
  place(loose,16,0.2f,5.f);place(grenade,17,0.2f,5.f);place(bolt,18,0.2f,5.f);
- for(CPhysicsShellHolder* body:{static_cast<CPhysicsShellHolder*>(&loose),static_cast<CPhysicsShellHolder*>(&grenade),static_cast<CPhysicsShellHolder*>(&bolt)}){
+ place(rocket,19,0.2f,0.3f);
+ for(CPhysicsShellHolder* body:{static_cast<CPhysicsShellHolder*>(&loose),static_cast<CPhysicsShellHolder*>(&grenade),static_cast<CPhysicsShellHolder*>(&bolt),static_cast<CPhysicsShellHolder*>(&rocket)}){
   body->shell.enabled=true;body->shell.elements[0].state.linear_vel.set(24,0,0);
  }
- world.Objects.values={&loose,&grenade,&bolt};tick(server);
+ actor.move=mcFwd;world.Objects.values={&actor,&loose,&grenade,&bolt,&rocket};tick(server);
  assert(loose.shell.elements[0].state.linear_vel.x==12);
  assert(grenade.shell.elements[0].state.linear_vel.x==24&&bolt.shell.elements[0].state.linear_vel.x==24);
- std::puts("PASS actual server physics: authority pushes, real masses, corpse limbs, final sleeping pose, loose-item velocity limit and grenade/bolt ballistics retained.");
+ assert(rocket.shell.elements[0].state.linear_vel.x==24&&rocket.shell.elements[0].impulses==0);
+ std::puts("PASS actual server physics: authority pushes, real masses, corpse limbs, final sleeping pose, loose-item velocity limit and grenade/bolt/rocket ballistics retained without foot nudges.");
 }
 '''
 with TemporaryDirectory() as tmp:
