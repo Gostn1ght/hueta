@@ -1,6 +1,6 @@
 {
   "models": 50,
-  "source": "All 50 donor OGF models inspected offline; no game run",
+  "source": "All 50 donor OGF models inspected offline; enlarged buses and trucks, no game run",
   "visual_contact_sheet": "Private work directory vehicle_four_tasks_169/all_fleet_cutaway.png",
   "rows": [
     {
@@ -404,7 +404,7 @@
     {
       "section": "dcp_kamaz_army",
       "model_sha256": "0e736b143d6f44f793b4558f1a6c754a656e38b10a068bcccd9ab3c292afacb8",
-      "seats": 3,
+      "seats": 17,
       "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
       "cargo_or_open_deck": true,
       "visual_bounds_blender": [
@@ -435,7 +435,7 @@
     {
       "section": "dcp_kamaz_army_tent",
       "model_sha256": "98080838d7d19e22bba59beb5de1cecab73909d35d4b99431cc462a68afa487d",
-      "seats": 3,
+      "seats": 17,
       "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
       "cargo_or_open_deck": true,
       "visual_bounds_blender": [
@@ -1349,7 +1349,7 @@
     {
       "section": "dcp_ural",
       "model_sha256": "f6ab193dee12ed80d3d01bd2e6f8c37fc68b51c4cefc3e55a613bbe78fd31efc",
-      "seats": 3,
+      "seats": 15,
       "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
       "cargo_or_open_deck": true,
       "visual_bounds_blender": [

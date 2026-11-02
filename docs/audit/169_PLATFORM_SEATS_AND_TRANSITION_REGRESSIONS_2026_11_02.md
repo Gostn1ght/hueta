@@ -31,8 +31,8 @@ old widgets, pending interactions and deadlines after location clock reset.
 ## Four active requested items — implemented candidate, not installed
 - All 50 actual donor meshes inspected offline in Blender (full cutaway contact
   sheet, enlarged bus/van/truck interiors and bind-space measurements). Explicit
-  layouts now contain 247 seats, range 1–24, with passenger pelvis normalized to
-  zero and side-bench yaw. Buggy is one seat; PAZ 24, PAZ3206 12, ZIL131 13.
+  layouts now contain 287 seats, range 1–24, with passenger pelvis normalized to
+  zero and side-bench yaw. Buggy is one seat; PAZ 24, PAZ3206 12, ZIL131 13, Ural 15, army Kamaz variants 17 each.
   Audit 169_FLEET_SEATS_AND_DECKS.json records each model hash and layout count.
   check-netcoop-dcp validates exact coverage, config parity, unique positions,
   named model bones, physics profile and imported layout equality for all 50.
@@ -70,6 +70,6 @@ validation, manual ignition/held pedals/transition reservation, projectile
 attachment/relcase cleanup, prone selector and 11520 PDA routing cases.
 The harnesses now include the new state and phase completion checks; full CI
 must be rerun and all mandatory gates succeed before binary packaging.
-Offline all-fleet and animation checks pass with the latest 247-seat layouts
+Offline all-fleet and animation checks pass with the latest 287-seat layouts
 and rebuilt five vehicle clips. Local Windows dummy batch test timed out;
 Ubuntu full resource CI passed, no native-test exception was taken.

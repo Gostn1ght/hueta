@@ -185,5 +185,5 @@ for need in ('if (spot) light_render->set_cone(', 'ini->line_exist(section, "spo
              'ini->line_exist(section, "glow_texture")', 'READ_IF_EXISTS(ini, r_s32, section, "type"',
              '"headlights","stoplights","reverselights","indoorlights"'):
     assert need in lights, need
-assert sum(len(v['seats']) for v in layouts.values())==247
+assert sum(len(v['seats']) for v in layouts.values())==287
 print("PASS DCP: %d complete models, physical shapes/masses, wheel and door joints, profile bone references, client/server configs and seat names; %d old cars cut" % (len(cars), len(old)))

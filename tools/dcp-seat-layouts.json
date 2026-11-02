@@ -1216,7 +1216,7 @@
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_04.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
     "seats": [
       {
         "bone": "seat_left",
@@ -1244,11 +1244,137 @@
           0
         ],
         "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -2.0843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -2.7843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -3.4843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -4.1843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -4.8843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -5.5843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -6.2843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -2.0843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -2.7843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -3.4843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -4.1843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -4.8843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -5.5843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -6.2843
+        ],
+        "yaw": -90
       }
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_03.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
     "seats": [
       {
         "bone": "seat_left",
@@ -1276,6 +1402,132 @@
           0
         ],
         "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -2.0843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -2.7843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -3.4843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -4.1843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -4.8843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -5.5843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4082,
+          0.21,
+          -6.2843
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -2.0843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -2.7843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -3.4843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -4.1843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -4.8843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -5.5843
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.6918,
+          0.21,
+          -6.2843
+        ],
+        "yaw": -90
       }
     ]
   },
@@ -2245,7 +2497,7 @@
     ]
   },
   "physics/vehicles/ural/veh_ural_u_01.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
     "seats": [
       {
         "bone": "seat_left",
@@ -2273,6 +2525,114 @@
           0
         ],
         "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -1.3339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -2.0339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -2.7339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -3.4339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -4.1339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.473,
+          -0.0061,
+          -4.8339
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -1.3339
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -2.0339
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -2.7339
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -3.4339
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -4.1339
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.477,
+          -0.0061,
+          -4.8339
+        ],
+        "yaw": -90
       }
     ]
   },
