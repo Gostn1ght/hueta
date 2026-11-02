@@ -79,6 +79,29 @@ static void transfer_step(xrServer* server, u16 type, u16 holder, u16 item)
 	}
 }
 
+bool server_script_transfer(u16 from, u16 to, u16 item_id)
+{
+	if (!enabled() || pure_client() || !g_pGameLevel || !Level().Server) return false;
+	xrServer* server = Level().Server;
+	if (!server->GetServerClient() || from == to || item_id == to || item_id == from) return false;
+	CSE_Abstract* item = server->game->get_entity_from_eid(item_id);
+	if (!item || item->ID_Parent != from || !server->game->get_entity_from_eid(from) ||
+		!server->game->get_entity_from_eid(to) ||
+		!smart_cast<CInventoryItem*>(Level().Objects.net_Find(item_id))) return false;
+	if (LPCSTR failure = server_inventory_take_failure(server, to, item_id))
+	{
+		Msg("! [Lost Zone][inv] script transfer item=%u from=%u to=%u refused: %s", item_id, from, to, failure);
+		return false;
+	}
+	transfer_step(server, GE_TRADE_SELL, from, item_id);
+	transfer_step(server, GE_TRADE_BUY, to, item_id);
+	const bool ok = item->ID_Parent == to;
+	if (!ok && item->ID_Parent == 0xffff) transfer_step(server, GE_TRADE_BUY, from, item_id);
+	Msg("%s[Lost Zone][inv] script transfer item=%u from=%u to=%u parent=%u %s", ok ? "" : "! ",
+		item_id, from, to, item->ID_Parent, ok ? "ok" : "refused, source retained or restored");
+	return ok;
+}
+
 void server_on_transfer(xrServer* server, xrClientData* CL, NET_Packet& P)
 {
 	if (!enabled() || !CL || !CL->owner || !g_pGameLevel || !server->GetServerClient()) return;

@@ -386,6 +386,7 @@ bool client_transfer(u16 from, u16 to, u16 item);
 u32 client_next_txid();
 void client_on_transfer_result(NET_Packet& P);
 void server_on_transfer(xrServer* server, xrClientData* CL, NET_Packet& P);
+bool server_script_transfer(u16 from, u16 to, u16 item);
 // Lua (client): netcoop_item_action(kind, item, target, action) - the server
 // runs an item action (stage 3): kind 0 = menu functor "module.function",
 // kind 1 = item dropped on item ("battery_swap"). Target 65535 = none.

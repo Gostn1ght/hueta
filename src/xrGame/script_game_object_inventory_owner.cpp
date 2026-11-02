@@ -628,6 +628,13 @@ void CScriptGameObject::TransferItem(CScriptGameObject* pItem, CScriptGameObject
 	// Netcoop: one server transaction instead of two independent events.
 	if (netcoop::client_transfer(object().ID(), pForWho->object().ID(), pIItem->object().ID()))
 		return;
+	if (netcoop::enabled() && !netcoop::pure_client())
+	{
+		// Lua stash packing uses the same atomic ownership steps as client
+		// requests. A refused take must return to its source, never the floor.
+		netcoop::server_script_transfer(object().ID(), pForWho->object().ID(), pIItem->object().ID());
+		return;
+	}
 
 	// выбросить у себя
 	NET_Packet P;

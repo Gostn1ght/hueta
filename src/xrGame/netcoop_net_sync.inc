@@ -93,8 +93,8 @@ void server_physics_update(xrServer* server)
 			(smart_cast<CPhysicObject*>(object) || smart_cast<CPhysicsSkeletonObject*>(object));
 		// Cars (doc 100): the server drives them; clients show replicas.
 		const bool vehicle = !item_or_corpse && smart_cast<CCar*>(object) != nullptr;
-		const bool projectile = smart_cast<CMissile*>(object) || smart_cast<CCustomRocket*>(object);
 		if (!item_or_corpse && !prop && !vehicle) continue;
+		const bool projectile = smart_cast<CMissile*>(object) || smart_cast<CCustomRocket*>(object);
 		if (prop && s_physics_sent.find(holder->ID()) == s_physics_sent.end())
 		{
 			if (settling) continue;

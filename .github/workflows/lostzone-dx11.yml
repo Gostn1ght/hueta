@@ -342,6 +342,7 @@ jobs:
           python scripts/check-native-projectile-shot.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-projectile-lifecycle.py
+          python scripts/check-native-script-transfer.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-voice-resources.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
