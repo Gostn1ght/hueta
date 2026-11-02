@@ -17,7 +17,7 @@ body=body[:end]
 for method,event in [('Press','PRESSED'),('Release','RELEASED'),('Hold','HOLD')]:
     start=level.index('void CLevel::IR_OnKeyboard'+method+'(')
     function=level[start:level.index('\n}',start)]
-    assert function.index('netcoop_pda_key(key, WINDOW_KEY_'+event+')') < function.index('actor_on_key'), method
+    assert function.index('netcoop_pda_key(key, WINDOW_KEY_'+event+')') < function.index('level_input.on_key'), method
 source=r'''
 #include <cassert>
 #include <cstdio>
