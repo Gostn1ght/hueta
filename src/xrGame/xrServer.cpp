@@ -1116,6 +1116,7 @@ u32 xrServer::OnMessage(NET_Packet& P, ClientID sender) // Non-Zero means broadc
 			string4096 na_text;
 			na_text[0] = 0;
 			P.r_stringZ(na_text);
+			if (netcoop::server_corpse_drag_command(this, CL, na_text)) break;
 			xrClientData* na_cl = ID_to_client(sender);
 			LPCSTR na_name = (na_cl && na_cl->netcoop_login.size()) ? na_cl->netcoop_login.c_str()
 				: (na_cl && na_cl->name.size()) ? na_cl->name.c_str() : "unknown";

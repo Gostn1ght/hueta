@@ -50,6 +50,7 @@ void client_on_script(NET_Packet& P)
 		return;
 	if (!xr_strcmp(channel, "netcoop_transfer")) return client_cluster_transfer(data);
 	if (!xr_strcmp(channel, "netcoop_zones")) return client_on_zones(data);
+	if (!xr_strcmp(channel, "netcoop_corpse_drag")) return corpse_drag_client_state(!xr_strcmp(data, "1"));
 	if (!xr_strcmp(channel,"netcoop_life_ended")) {
 		::luabind::functor<void> ended;
 		if(ai().script_engine().functor("netcoop_login_ui.on_life_ended",ended)) {

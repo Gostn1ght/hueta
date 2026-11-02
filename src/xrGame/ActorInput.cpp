@@ -543,6 +543,8 @@ bool CActor::use_Holder(CHolderCustom* holder)
 
 void CActor::ActorUse()
 {
+	const collide::rq_result& drag_target = HUD().GetRQ();
+	if (netcoop::corpse_drag_use(this, drag_target.O, u16(drag_target.element), !!Level().IR_GetKeyState(DIK_LSHIFT))) return;
 	if (m_holder)
 	{
 		CGameObject* GO = smart_cast<CGameObject*>(m_holder);

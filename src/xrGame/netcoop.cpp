@@ -291,4 +291,5 @@ static void call_lua(LPCSTR function, bool ok, u8 role, LPCSTR message)
 #include "netcoop_news.inc"
 #include "netcoop_script_messages.inc"
 #include "netcoop_net_sync.inc"
+#include "netcoop_corpse_drag.inc"
 #include "netcoop_rp_anims.inc"

@@ -43,6 +43,7 @@ void server_physics_update(xrServer* server)
 	if (!g_pGameLevel || pure_client()) return;
 	// Seated players follow their seats every frame (doc 100).
 	vehicle_server_update(server);
+	server_corpse_drag_update(server);
 	static u32 previous = 0;
 	static u32 tick = 0;
 	const u32 now = real_time_ms();

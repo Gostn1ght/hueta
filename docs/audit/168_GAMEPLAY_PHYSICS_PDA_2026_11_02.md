@@ -140,3 +140,22 @@ Owner explicitly asked again about corpses, loose-item physics and ZIL-131.
 Confirmed these are NOT complete: dragging/pushing bodies, item friction,
 cargo seats/platform movement and fall damage still need implementation and
 verification. This PDA release does not fulfill those gameplay tasks.
+
+2026.11.02.3 delivered: native 26c27baa0, CI 41402744980; Lua/resources
+22f852072, CI 41435413583; patch 000054. Signed manifest
+manifests/2026.11.02.3-c696b141.bin was verified and changed file bytes
+reconstructed. Public J:/LostZone_Work/Lost Zone Server.zip: 2,774,644,926 bytes,
+47 entries, SHA256 1bd9c364cbc898d3eef00a6a9cca1a8f99b245dda6798b1a35891aa42ee825a1.
+All CRC/SHA checks passed. Owner client, public server folder and optional local
+dedicated addon updated; runtime/saves preserved; no game/master launched.
+Remote hoster installation still requires transferring this archive.
+
+Next native candidate, NOT part of published .3: Shift+F corpse dragging routes
+to the existing authoritative PHCapture joint instead of fixing a local replica.
+Server validates connected character, live unseated capturer, actual physical
+bone, dead unparented ragdoll, <=2.5 m reach, static wall visibility and body
+exclusivity. Capture stops on F, failed joint, death/disconnect/transition or
+object replacement. Client acknowledges hand/weapon state from the server.
+Candidate CI fixture exercises the actual bridge with physics/network stubs;
+it does not establish ODE dynamics or in-game dragging acceptance. Loose-item
+friction, pushable bodies and ZIL-131 riding remain separate open work.

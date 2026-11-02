@@ -160,6 +160,10 @@ void script_preview_clear();
 bool script_preview_model(LPCSTR model, int pose);
 void script_preview_draw();
 void script_command(LPCSTR text);
+bool corpse_drag_use(CActor* actor, CObject* target, u16 bone, bool shift);
+void corpse_drag_client_state(bool active);
+bool server_corpse_drag_command(xrServer* server, xrClientData* client, LPCSTR text);
+void server_corpse_drag_update(xrServer* server);
 bool script_pure_client();
 
 // ---- server ------------------------------------------------------------
