@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "script_callback_ex.h"
 #include "netcoop.h"
 #include <dinput.h>
@@ -178,6 +178,15 @@ static bool netcoop_pda_key(int key, EUIMessages action)
 	auto* ui = CurrentGameUI();
 	auto& pda = ui->GetPdaMenu();
 	if (!pda.IsShown()) return false;
+	// A jump/pickup held BEFORE opening the PDA still needs its stop edge.
+	// Forward only these cleanup releases directly to the actor, without Lua,
+	// RP hotkeys, drop/weapon actions or any new gameplay press/hold.
+	if (action == WINDOW_KEY_RELEASED)
+	{
+		const auto command = get_binded_action(key);
+		if ((command == kJUMP || command == kUSE) && Actor())
+			Actor()->IR_OnKeyboardRelease(command);
+	}
 	if (g_bDisableAllInput) return true;
 	auto* top = ui->TopInputReceiver();
 	if (top && (top != &pda || pda.IsEnabled()))

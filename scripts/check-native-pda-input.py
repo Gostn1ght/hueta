@@ -23,15 +23,18 @@ source=r'''
 #include <cstdio>
 #include <initializer_list>
 enum EUIMessages {WINDOW_KEY_PRESSED,WINDOW_KEY_RELEASED,WINDOW_KEY_HOLD};
-enum EGameActions {kQUIT,kINVENTORY,kACTIVE_JOBS,kRELOAD};
+enum EGameActions {kQUIT,kINVENTORY,kACTIVE_JOBS,kRELOAD,kJUMP,kUSE};
 constexpr int DIK_ESCAPE=1,MOUSE_1=337,MOUSE_8=344,CMD_START=1,CMD_STOP=0,AF_3D_PDA=1;
 bool pure=true,g_bDisableAllInput=false,ui_present=true,accept=false;
-unsigned raw=0,item=0,press=0,release=0,hold=0,closed=0;
+unsigned raw=0,item=0,press=0,release=0,hold=0,closed=0,cleanup=0;
+bool jump_latched=false,pickup_latched=false;
 namespace netcoop {bool pure_client(){return pure;}}
-EGameActions get_binded_action(int key){return key==DIK_ESCAPE?kQUIT:kRELOAD;}
+EGameActions get_binded_action(int key){return key==DIK_ESCAPE?kQUIT:key==57?kJUMP:key==33?kUSE:kRELOAD;}
 struct CPda {bool Action(EGameActions,int){++item;return accept;}} test_item;
 struct Inv {CPda* ActiveItem(){return &test_item;}};
-struct ActorType {Inv inventory(){return {};}} actor;
+struct ActorType {Inv inventory(){return {};}void IR_OnKeyboardRelease(EGameActions command){
+ ++cleanup;if(command==kJUMP)jump_latched=false;if(command==kUSE)pickup_latched=false;
+}} actor;
 ActorType* Actor(){return &actor;}
 template<class T> T smart_cast(CPda* p){return static_cast<T>(p);}
 struct Flags {bool test(int){return true;}} psActorFlags;
@@ -54,14 +57,18 @@ int main(){
  unsigned cases=0;
  for(bool p:{false,true})for(bool shown:{false,true})for(bool present:{false,true})
  for(bool enabled:{false,true})for(bool disabled:{false,true})for(bool capture:{false,true})
- for(bool handled:{false,true})for(int receiver:{0,1,2})for(int key:{1,18,28,44,15,29,47,MOUSE_1})
+ for(bool handled:{false,true})for(int receiver:{0,1,2})for(int key:{1,18,28,44,15,29,47,57,33,MOUSE_1})
  for(auto event:{WINDOW_KEY_PRESSED,WINDOW_KEY_RELEASED,WINDOW_KEY_HOLD}){
   pure=p;window.shown=shown;ui_present=present;window.enabled=enabled;g_bDisableAllInput=disabled;
   window.m_pKeyboardCapturer=capture;other.m_pKeyboardCapturer=capture;accept=handled;
   test_top=receiver==0?nullptr:receiver==1?&window:&other;
-  raw=item=press=release=hold=closed=0;
+  raw=item=press=release=hold=closed=cleanup=0;
+  jump_latched=pickup_latched=true;
   const bool blocked=netcoop_pda_key(key,event);
   assert(blocked==(p&&shown&&present));
+  const bool stop=blocked&&event==WINDOW_KEY_RELEASED&&(key==57||key==33);
+  assert(cleanup==unsigned(stop));
+  assert(jump_latched==!(stop&&key==57));assert(pickup_latched==!(stop&&key==33));
   if(blocked&&!disabled){
    if(key!=DIK_ESCAPE&&key<MOUSE_1){assert(raw==1);assert(item==0);}
    if(key==DIK_ESCAPE){assert(raw==0);assert(item==unsigned(event==WINDOW_KEY_PRESSED));}
