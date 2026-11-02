@@ -46,6 +46,14 @@ assert media.ready() and voice.records[1].cloud
 voice=load('netcoop_pdanet_voice',root/'client/netcoop_pdanet_voice.script')
 to_client(run(1,'pdanet library'));to_client(flush(1))
 assert any(r.id==aid and r.data=='RElDVA==' for r in voice.records.values())
+# A remote library lists a large record without eagerly fetching its audio.
+lua.execute('commands={};netcoop_pdanet_voice.reset_content()')
+to_client(run(1,'pdanet library'))
+assert not any('pdanet aget' in c for c in g.commands.values())
+# Requesting playback fetches this recording, and no other library item.
+lua.execute('function netcoop_play_start() return 7 end')
+voice.dict_play(1);to_client(flush(1))
+assert voice.records[1].data=='RElDVA=='
 # Neither a late reply nor an unfinished recording/capture can fill a replacement.
 late=run(1,'pdanet notes')
 voice.dict_start()
@@ -62,3 +70,19 @@ assert client.slot_device.uid=='fixture904' and len(photo.photos)==0 and len(voi
 assert not voice.recording()
 assert media.ready()
 print('PASS real PDA media flow: physical gallery/recorder, background upload acknowledgments, cache-free client recovery, new-device isolation, stale reply rejection and interrupted recording')
+
+# Real scripted tab constructors and stale edit drafts, with engine widgets
+# stubbed. A physical-device change must clear even a cached notes window.
+notes_window=g.pdanet_notes()
+storage_window=g.pdanet_storage()
+notes_window.title_edit.SetText(notes_window.title_edit,'Old PDA private draft')
+notes_window.body_edit.SetText(notes_window.body_edit,'Must not enter a replacement')
+lua.execute('''
+equipped_pda=905
+local item={id=function() return 905 end,section=function() return "device_pda_1" end}
+pda_items[905]=item;players[1].pda_item=item
+''')
+to_client(run(1,'pdanet hello'))
+assert notes_window.title_edit.GetText(notes_window.title_edit)==''
+assert notes_window.body_edit.GetText(notes_window.body_edit)==''
+print('PASS actual USB tab construction and cached notes draft reset on device change')

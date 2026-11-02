@@ -64,7 +64,7 @@ function upload(cid, data, secs)
 	if not (physical_uid() and cid and data and data ~= "") then return false end
 	local parts = {}
 	for i = 1, math.ceil(#data / PART) do parts[i] = string.sub(data, (i - 1) * PART + 1, i * PART) end
-	if #parts > 700 then tip("st_pdanet_rec_too_long") return false end
+	if #parts > 2300 then tip("st_pdanet_rec_too_long") return false end
 	local aid = new_aid()
 	queue = { aid = aid, device = physical_uid(), parts = parts, next = 1, at = 0 }
 	netcoop_command(string.format("pdanet abeg %s %s %d %d", aid, cid, secs, #parts))
@@ -186,7 +186,7 @@ function on_library(v)
  for _,r in ipairs(v.records or {}) do
   local p=old[r.id];r.t,r.data,r.cloud=r.g,p and p.data or cache[r.id] or "",true
   merged[#merged+1]=r;seen[r.id]=true
-  if r.data=="" and not record_wanted[r.id] then record_wanted[r.id]=true;netcoop_command("pdanet aget "..r.id) end
+  -- Large recordings download only when played or explicitly sent, not at login.
  end
  for _,r in ipairs(records) do if not r.cloud and not seen[r.id] then merged[#merged+1]=r end end
  records=merged;save()
@@ -236,6 +236,7 @@ function dict_play(i, from)
 	load()
 	local r = records[i]
 	if not (r and engine()) or rec_kind then return end
+	if not r.data or r.data=="" then record_wanted[r.id]=true;want=r.id;netcoop_command("pdanet aget "..r.id);return end
 	if playing_id == r.id and netcoop_play_pos() >= 0 and not from then
 		netcoop_play_pause(not netcoop_play_paused())
 		return
@@ -250,6 +251,7 @@ function dict_send(i)
 	local o = netcoop_pdanet_client and netcoop_pdanet_client.opened
 	if not r then return end
 	if not o then tip("st_pdanet_rec_open_chat") return end
+	if not r.data or r.data=="" then record_wanted[r.id]=true;netcoop_command("pdanet aget "..r.id);tip("st_pdanet_rec_loading");return end
 	if upload(o.id, r.data, r.secs) then tip("st_pdanet_rec_sending") end
 end
 

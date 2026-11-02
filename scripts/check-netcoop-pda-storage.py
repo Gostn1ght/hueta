@@ -128,3 +128,10 @@ assert g.netcoop_store_read('pda_restore','physical1000')==''
 assert len(last(cmd(0,10,'pdanet notes'),'notes'))==2
 lua.execute('assert(real_swap("pda_usb_blob",corrupt_key,netcoop_store_read("pda_usb_blob",corrupt_key),original_blob))')
 print('PASS USB backup checksum rejects same-length damaged data without altering the target')
+
+# The native recorder permits 6 MiB of binary data (8 MiB in base64). Its
+# library upload must accept that size instead of silently remaining local.
+large='c'*16
+replies=cmd(0,10,f'pdanet rbeg {large} 2300 600')
+assert not any(k=='err' for k,v in replies), replies
+print('PASS PDA library accepts the native recorder upper bound (2300 transport chunks)')

@@ -104,3 +104,13 @@ candidate's managed shared assets did not. Extracted the authenticated original
 meshes and their real texture/THM into the shared overlay; both roles now receive
 the exact dependencies. Staged, unpublished patch 000051 is superseded by 000052;
 its directory is retained as an unused candidate, never published or installed.
+
+
+Final pre-publication regression: native recordings can reach 6 MiB binary
+(8 MiB base64), above the old 700-command transport ceiling. Raised the library
+and chat transport bound to 2300 chunks, retaining the native 600-second limit.
+Remote dictaphone entries download audio only on explicit play/send, avoiding
+bulk downloads of every long recording at login. Actual scripted USB/notes tab
+constructors are exercised with widgets stubbed; private edit drafts clear on
+physical device change. Unpublished candidate 000052/v9 is superseded by
+000053/v10 before publication. Native binary remains exact CI 41397841797.

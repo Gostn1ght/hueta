@@ -1572,4 +1572,5 @@
 <string id="st_pdanet_usb_hint"><text>Копия заменяет личные данные. Пароль и сетевой номер КПК сохраняются.</text></string>
 <string id="st_pdanet_usb_archive"><text>Архив перенесённой переписки</text></string>
 <string id="st_pdanet_usb_read_archive"><text>Читать архив переписки</text></string>
+<string id="st_pdanet_rec_loading"><text>Запись загружается. Повторите отправку после загрузки.</text></string>
 </string_table>

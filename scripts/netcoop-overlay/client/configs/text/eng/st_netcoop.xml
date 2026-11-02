@@ -1572,4 +1572,5 @@
 <string id="st_pdanet_usb_hint"><text>Restoring replaces personal data. PDA password and network number stay unchanged.</text></string>
 <string id="st_pdanet_usb_archive"><text>Imported conversation archive</text></string>
 <string id="st_pdanet_usb_read_archive"><text>Read conversation archive</text></string>
+<string id="st_pdanet_rec_loading"><text>Recording is loading. Send it again after the download finishes.</text></string>
 </string_table>

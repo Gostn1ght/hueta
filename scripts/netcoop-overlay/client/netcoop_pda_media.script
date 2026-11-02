@@ -11,7 +11,7 @@ function push(kind,id,data,extra)
  if not device or not data or data=="" then return false end
  local key=device.."/"..kind.."/"..id
  if queued[key] then return true end
- local limit=kind=="photo" and 190 or 700
+ local limit=kind=="photo" and 190 or 2300
  if #data>limit*3800 then return false end
  local parts={}
  for n=1,math.ceil(#data/3800) do parts[n]=data:sub((n-1)*3800+1,n*3800) end

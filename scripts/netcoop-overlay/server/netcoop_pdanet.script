@@ -35,7 +35,7 @@ local MAX_CONTACTS, MAX_CHATS, MAX_GROUP = 200, 100, 20
 local KINDS = { text = true, point = true, voice = true, task = true }
 local MAX_PAY = 1000000
 local NOTES, NOTE_TITLE, NOTE_TEXT = 40, 60, 1200
-local AUDIO_MAX_PARTS, AUDIO_PART, AUDIO_SECS = 700, 56000, 600
+local AUDIO_MAX_PARTS, AUDIO_PART, AUDIO_SECS = 2300, 56000, 600
 local PHOTO_MAX_PARTS = 190 -- 3800 characters each: a 640x360 photo is ~41 parts
 
 local ser = function(v) return netcoop_transit.serialize(v) end
