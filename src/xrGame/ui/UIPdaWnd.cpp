@@ -3,6 +3,9 @@
 #include "../../xrServerEntities/script_engine.h"
 #include "UIPdaWnd.h"
 #include "../Pda.h"
+#include "../netcoop.h"
+#include "../xr_level_controller.h"
+#include <dinput.h>
 
 #include "xrUIXmlParser.h"
 #include "UIXmlInit.h"
@@ -513,6 +516,23 @@ bool CUIPdaWnd::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 	// The 3D PDA used to translate them into item actions before the captured
 	// child received anything, so letters, paste and backspace never arrived.
 	if (!IsShown()) return false;
+	if (netcoop::pure_client())
+	{
+		// Only Escape closes a network PDA. Raw letters, Tab, Enter and
+		// Ctrl shortcuts go to its controls without invoking inventory actions.
+		if (dik == DIK_ESCAPE)
+		{
+			if (keyboard_action == WINDOW_KEY_PRESSED)
+			{
+				CPda* held = Actor() ? smart_cast<CPda*>(Actor()->inventory().ActiveItem()) : nullptr;
+				if (!held || !held->Action(kQUIT, CMD_START)) HideDialog();
+			}
+			return true;
+		}
+		if (m_pKeyboardCapturer || dik < MOUSE_1 || dik > MOUSE_8)
+			return inherited::OnKeyboardAction(dik, keyboard_action);
+		// Mouse buttons still focus and operate the 3D PDA itself.
+	}
 	if (m_pKeyboardCapturer)
 		return inherited::OnKeyboardAction(dik, keyboard_action);
 	if (IsShown() && (keyboard_action == WINDOW_KEY_PRESSED || keyboard_action == WINDOW_KEY_RELEASED))

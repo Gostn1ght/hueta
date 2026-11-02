@@ -55,6 +55,11 @@ extern float g_fTimeFactor;
 void CLevel::IR_OnMouseWheel(int direction)
 {
 	if (g_bDisableAllInput) return;
+	if (netcoop::pure_client() && CurrentGameUI() && CurrentGameUI()->GetPdaMenu().IsShown())
+	{
+		CurrentGameUI()->IR_UIOnMouseWheel(direction);
+		return;
+	}
 
 	/* avo: script callback */
 #ifdef MOUSE_INPUT_CALLBACKS
@@ -107,6 +112,12 @@ void CLevel::IR_OnMouseHold(int btn)
 
 void CLevel::IR_OnMouseMove(int dx, int dy)
 {
+	if (netcoop::pure_client() && CurrentGameUI() && CurrentGameUI()->GetPdaMenu().IsShown() &&
+		CurrentGameUI()->GetPdaMenu().IsEnabled())
+	{
+		if (!g_bDisableAllInput) CurrentGameUI()->IR_UIOnMouseMove(dx, dy);
+		return;
+	}
     ::luabind::functor<bool> funct;
     if (ai().script_engine().functor("level_input.on_mouse_move", funct))
     {
@@ -159,6 +170,26 @@ extern bool g_block_all_except_movement;
 
 extern string_path g_last_saved_game;
 
+// A shown PDA owns raw input before RP, GAMMA hotkeys and gameplay callbacks.
+// An edit may decline a key; that must never make Z open the animation wheel.
+static bool netcoop_pda_key(int key, EUIMessages action)
+{
+	if (!netcoop::pure_client() || !CurrentGameUI()) return false;
+	auto* ui = CurrentGameUI();
+	auto& pda = ui->GetPdaMenu();
+	if (!pda.IsShown()) return false;
+	if (g_bDisableAllInput) return true;
+	auto* top = ui->TopInputReceiver();
+	if (top && (top != &pda || pda.IsEnabled()))
+	{
+		if (action == WINDOW_KEY_PRESSED) ui->IR_UIOnKeyboardPress(key);
+		else if (action == WINDOW_KEY_RELEASED) ui->IR_UIOnKeyboardRelease(key);
+		else if (action == WINDOW_KEY_HOLD) ui->IR_UIOnKeyboardHold(key);
+	}
+	else pda.OnKeyboardAction(key, action); // disabled 3D PDA: click to focus, Escape to close
+	return true;
+}
+
 void CLevel::IR_OnKeyboardPress(int key)
 {
 	if (Device.dwPrecacheFrame)
@@ -166,6 +197,7 @@ void CLevel::IR_OnKeyboardPress(int key)
 	// Netcoop: after this client's player died, SPACE asks for a respawn.
 	if (netcoop::client_death_key(key))
 		return;
+	if (netcoop_pda_key(key, WINDOW_KEY_PRESSED)) return;
 
 	bool b_ui_exist = (!!CurrentGameUI());
 	// Voice keys (Controls): talking works in poses; a window with a cursor
@@ -612,6 +644,7 @@ void CLevel::IR_OnKeyboardRelease(int key)
 	if (!bReady) return;
 	// A voice key always stops talking, whatever opened meanwhile.
 	if (netcoop::client_voice_key(get_binded_action(key), false)) return;
+	if (netcoop_pda_key(key, WINDOW_KEY_RELEASED)) return;
 
     ::luabind::functor<bool> funct;
     if (ai().script_engine().functor("level_input.on_key_release", funct))
@@ -646,6 +679,7 @@ void CLevel::IR_OnKeyboardRelease(int key)
 
 void CLevel::IR_OnKeyboardHold(int key)
 {
+	if (netcoop_pda_key(key, WINDOW_KEY_HOLD)) return;
     ::luabind::functor<bool> funct;
     if (ai().script_engine().functor("level_input.on_key_hold", funct))
     {

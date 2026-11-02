@@ -20,7 +20,7 @@ constexpr int DIK_Z=1, MOUSE_1=2, MOUSE_2=3, MOVE=4, USE=5, QUIT=6, CONSOLE=7, S
 bool pure=false,g_bDisableAllInput=false,ui_present=false,top=false,consumed=false,has_actor=false;
 unsigned ui_calls=0,fallthrough=0;
 unsigned stop_clicks=0;
-enum EUIMessages {WINDOW_LBUTTON_DOWN=10,WINDOW_LBUTTON_DB_CLICK,WINDOW_LBUTTON_UP,WINDOW_MOUSE_MOVE,BUTTON_DOWN,BUTTON_CLICKED};
+enum EUIMessages {WINDOW_KEY_PRESSED, WINDOW_LBUTTON_DOWN=10,WINDOW_LBUTTON_DB_CLICK,WINDOW_LBUTTON_UP,WINDOW_MOUSE_MOVE,BUTTON_DOWN,BUTTON_CLICKED};
 enum {BUTTON_NORMAL=0,BUTTON_PUSHED,BUTTON_UP};
 struct CUIButton;
 struct Target {void SendMessage(CUIButton*,int msg,void* =nullptr){if(msg==BUTTON_CLICKED)++stop_clicks;}} target;
@@ -44,7 +44,7 @@ AI& ai(){return ai_object;}
 EGameActions get_binded_action(int key){return key==QUIT?kQUIT:key==CONSOLE?kCONSOLE:key==SCREENSHOT?kSCREENSHOT:
  key==CAM1?kCAM_1:key==CAM2?kCAM_2:key==CAM3?kCAM_3:kOTHER;}
 struct CLevel {CActor* CurrentControlEntity(){return has_actor?&test_actor:nullptr;}void IR_OnKeyboardPress(int key);};
-''' + prefix + r'''
+''' + 'static bool netcoop_pda_key(int,EUIMessages){return false;}\n' + prefix + r'''
  ++fallthrough;
 }
 int main(){
