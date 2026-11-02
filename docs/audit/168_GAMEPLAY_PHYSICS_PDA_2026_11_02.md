@@ -96,3 +96,11 @@ builder's normalized Blender coordinates. Components 49/50 are main bay DOORS,
 not tyres (confirmed with an offline colored underbelly render). Main gear
 requires further segmentation; do not label these doors as wheels or ship them
 as a completed landing-gear solution. Offline QA only; no owner game launched.
+
+
+Packaging correction before release: client base archive has the two stock
+`dev_flash_1/2` meshes and `prop/prop_item3` texture, but the dedicated-only
+candidate's managed shared assets did not. Extracted the authenticated original
+meshes and their real texture/THM into the shared overlay; both roles now receive
+the exact dependencies. Staged, unpublished patch 000051 is superseded by 000052;
+its directory is retained as an unused candidate, never published or installed.
