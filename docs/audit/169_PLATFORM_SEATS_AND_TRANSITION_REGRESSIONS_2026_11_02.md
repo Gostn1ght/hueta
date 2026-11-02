@@ -1,6 +1,6 @@
-# Candidate 169: vehicle platforms and recurring transition failures
+# Release 169: vehicle platforms and recurring transition failures
 
-Not released. Installed public version remains 2026.11.02.5.
+Published and installed: 2026.11.02.6 / data 000059.
 Native builds and execution of native fixtures are restricted to GitHub Actions.
 No owner game/client/location/master is launched for testing.
 
@@ -28,7 +28,7 @@ Its new per-connection reset drops UI references and previews without healing
 limbs; authoritative limb restore remains separate. DotMarks likewise discards
 old widgets, pending interactions and deadlines after location clock reset.
 
-## Four active requested items — implemented candidate, not installed
+## Four active requested items — implemented and delivered .6
 - All 50 actual donor meshes inspected offline in Blender (full cutaway contact
   sheet, enlarged bus/van/truck interiors and bind-space measurements). Explicit
   layouts now contain 287 seats, range 1–24, with passenger pelvis normalized to
@@ -59,7 +59,7 @@ old widgets, pending interactions and deadlines after location clock reset.
   a generic transition, not model-specific mocap/hand IK for every doorway.
 
 ## Verification and release status
-Installed public version remains 2026.11.02.5. No owner game, client, location
+Installed public version is 2026.11.02.6. No owner game, client, location
 server or master was launched for tests. Native builds/fixtures run only in CI.
 Full CI 41488364942 at f916b80af995df971acc107c341cb281f1aaa79b:
 resource checks and DX11 shaders succeeded; engine job stopped before the main
@@ -88,3 +88,24 @@ Resources-only CI 41492923707 at 81d38fbba succeeded. Native full CI
 41491162142 at d9857eab2 passed all actual native fixtures and is compiling
 the full DX11 binary. Data 000059 is authenticated and reconstructed against
 installed .5 for both roles; unused draft 000058 was not published or installed.
+
+## Delivered receipt
+DX11 source d9857eab2a479900d16f2fa30f51598a1f2788e2, mandatory native,
+shader, packaging and private runtime/symbol gates passed in CI 41491162142.
+Optional DX8 follow-up was superseded by the next build, not used for DX11.
+EXE SHA256 2c24686946a1a44cac83cb07cd9f0d1d7ab2beffe88a5367f4e8655616ab3b9e.
+Matching private PDB SHA256 b2ff6c400f33e1fae5f00b5cd6f29b3fd27a1f2560c50bc5b67cb118914b08e9.
+Data source 81d38fbba; resource CI 41492923707 succeeded. Both-role exact
+payloads authenticated/reconstructed in delta59-reviewed.json against .5.
+Signed launcher manifest manifests/2026.11.02.6-50dbb2ab.bin, BLAKE3
+50dbb2ab1ec641abae3df049c01cd0b09f4a68fd30722e410dad505ad5fc475e;
+154 player files, all changed bytes reconstructed; previous archive Merkle
+values unchanged, P2P online. No HTTP delivery claim.
+ZIP J:/LostZone_Work/Lost Zone Server.zip: 2,775,163,814 bytes, 51 files,
+SHA256 ee75392428e6727397bb14063264c0d1cdb519102fc6544a030e1129b05f3bca;
+CRC and every file hash checked. Public server folder, owner client and existing
+optional local dedicated addon updated atomically, runtime/saves preserved.
+No owner game/client/location/master was launched for tests or restarted.
+Distribution node was no longer listening; resumed the existing installed
+NetAnomalyServer.exe --no-browser in its own directory, hidden, PID 49204.
+Remote hoster has not been updated. No live game-physics acceptance claim.
