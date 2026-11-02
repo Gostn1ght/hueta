@@ -21,7 +21,7 @@ car = (ROOT / 'src/xrGame/Car.cpp').read_text(encoding='utf-8') + (ROOT / 'src/x
 header = (ROOT / 'src/xrGame/Car.h').read_text(encoding='utf-8')
 flight = body(car, 'void CCar::netcoop_heli_step(')
 safe_cycle = body(car, 'static CBlend* car_play_cycle_safe(')
-gear_code=body(car,'static void heli_gear_form(')+'\n'+'\n'.join(body(car,signature) for signature in ('void CCar::netcoop_heli_gear_step(', 'void CCar::netcoop_heli_toggle_gear(', 'void CCar::netcoop_heli_gear_replica('))
+gear_code=body(car,'static void heli_gear_body_frame(')+'\n'+body(car,'static void heli_gear_form(')+'\n'+'\n'.join(body(car,signature) for signature in ('void CCar::netcoop_heli_gear_step(', 'void CCar::netcoop_heli_toggle_gear(', 'void CCar::netcoop_heli_gear_replica('))
 gravity = '\n'.join(body(car, signature) for signature in (
     'void CCar::PhTune(', 'float CCar::EffectiveGravity(', 'float CCar::AntiGravityAccel('))
 heli = header[header.index('struct NetcoopHeli'):header.index('} m_netcoop_heli;') + len('} m_netcoop_heli;')]
@@ -59,7 +59,13 @@ struct Fvector {
  float magnitude()const{return std::sqrt(dotproduct(*this));}
 };
 bool _valid(const Fvector& v){return _valid(v.x)&&_valid(v.y)&&_valid(v.z);}
-struct Fmatrix{Fvector i{1,0,0},j{0,1,0},k{0,0,1},c{0,5,0};};
+struct Fmatrix{
+ Fvector i{1,0,0},j{0,1,0},k{0,0,1},c{0,5,0};
+ void transform_dir(Fvector& out,const Fvector& v)const{out.set(i.x*v.x+j.x*v.y+k.x*v.z,i.y*v.x+j.y*v.y+k.y*v.z,i.z*v.x+j.z*v.y+k.z*v.z);}
+ void transform_tiny(Fvector& out,const Fvector& v)const{transform_dir(out,v);out.add(c);}
+ void mul_43(const Fmatrix& a,const Fmatrix& b){a.transform_dir(i,b.i);a.transform_dir(j,b.j);a.transform_dir(k,b.k);a.transform_tiny(c,b.c);}
+ void invert(const Fmatrix& a){i.set(a.i.x,a.j.x,a.k.x);j.set(a.i.y,a.j.y,a.k.y);k.set(a.i.z,a.j.z,a.k.z);Fvector neg{-a.c.x,-a.c.y,-a.c.z};transform_dir(c,neg);}
+};
 struct CODEGeom {Fmatrix form;unsigned moved=0;void set_local_form_bt(const Fmatrix& f){form=f;++moved;}void clear_cashed_tries(){}void clear_motion_history(bool){}};
 struct CBlend{float speed=0;};
 struct MotionID{int id=-1;bool valid()const{return id>=0;}};
@@ -197,6 +203,15 @@ int main(){
  assert(std::fabs(hinge_form.i.y-1.f)<1e-5f && std::fabs(hinge_form.i.magnitude()-1.f)<1e-5f);
  heli_gear_form(hinge_form,axis,pivot,-1.57079632679f,no_travel,1.f);
  assert(std::fabs(hinge_form.c.x+1.35f)<1e-5f && std::fabs(hinge_form.c.y+.25f)<1e-5f);
+ // Centre-of-mass offset and a rotated body must not change the hinge's
+ // world position. Exercise the actual frame recovery, not root-bone axes.
+ Fmatrix body_world;body_world.i.set(0,0,-1);body_world.k.set(1,0,0);body_world.c.set(11,7,13);
+ Fmatrix shape_local;shape_local.c.set(-.5f,.3f,2);Fmatrix world_shape;world_shape.mul_43(body_world,shape_local);
+ Fmatrix model_world;model_world.c.set(10,5,10);Fmatrix to_body;
+ heli_gear_body_frame(world_shape,shape_local,model_world,to_body);
+ Fvector expected,actual,model_point{1,.8f,-2};model_world.transform_tiny(expected,model_point);
+ Fvector local_point;to_body.transform_tiny(local_point,model_point);body_world.transform_tiny(actual,local_point);
+ assert(std::fabs(actual.x-expected.x)<1e-5f && std::fabs(actual.y-expected.y)<1e-5f && std::fabs(actual.z-expected.z)<1e-5f);
  // Manual Mi-24 controls retain collective on release, not a height hold.
  CPhysicsShell manual_shell;CCar manual;manual.test_shell=&manual_shell;
  auto& mh=manual.m_netcoop_heli;mh.on=true;mh.pilot=true;mh.auto_collective=false;mh.auto_level=false;

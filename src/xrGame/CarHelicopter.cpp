@@ -47,6 +47,15 @@ static void heli_gear_form(Fmatrix& form,const Fvector& axis,const Fvector& pivo
  form.c.sub(pivot);rotate(form.c);form.c.add(pivot);form.c.mad(travel,amount);
 }
 
+// Geometry local forms are measured from the ODE body's centre of mass,
+// not the root bone. Recover that frame from the actual built shape pair.
+static void heli_gear_body_frame(const Fmatrix& world_shape,const Fmatrix& body_shape,const Fmatrix& model_world,Fmatrix& model_to_body)
+{
+ Fmatrix inverse_shape,body_world,inverse_body;
+ inverse_shape.invert(body_shape);body_world.mul_43(world_shape,inverse_shape);
+ inverse_body.invert(body_world);model_to_body.mul_43(inverse_body,model_world);
+}
+
 void CCar::netcoop_heli_load()
 {
 	NetcoopHeli& h = m_netcoop_heli;
@@ -122,8 +131,10 @@ void CCar::netcoop_heli_load()
   gear.angle=READ_IF_EXISTS(pSettings,r_float,section,angle_keys[i],0.f);
   if(!_valid(gear.angle) || _abs(gear.angle)>180.f) gear.angle=0.f;
   gear.angle=deg2rad(gear.angle);gear.model_pivot=rest[gear.bone].c;
-  Fmatrix inverse;inverse.invert(rest[root]);inverse.transform_dir(gear.travel,gear.model_travel);
-  inverse.transform_dir(gear.axis,gear.model_axis);inverse.transform_tiny(gear.pivot,gear.model_pivot);
+  Fmatrix world_shape,to_body;gear.geom->get_xform(world_shape);
+  heli_gear_body_frame(world_shape,gear.rest,XFORM(),to_body);
+  to_body.transform_dir(gear.travel,gear.model_travel);
+  to_body.transform_dir(gear.axis,gear.model_axis);to_body.transform_tiny(gear.pivot,gear.model_pivot);
 		K->LL_GetBoneInstance(gear.bone).set_callback(bctCustom,netcoop_heli_gear_bone,this);
 		h.gear_supported=true;
 	}
