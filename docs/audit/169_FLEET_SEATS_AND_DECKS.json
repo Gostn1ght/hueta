@@ -1,0 +1,1567 @@
+{
+  "models": 50,
+  "source": "All 50 donor OGF models inspected offline; no game run",
+  "visual_contact_sheet": "Private work directory vehicle_four_tasks_169/all_fleet_cutaway.png",
+  "rows": [
+    {
+      "section": "dcp_bmw5",
+      "model_sha256": "014348a3c582cca475c97185c0b0e3460d8b2d8b30d0deee76a7b92d257ad657",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9905996918678284,
+          -2.6672818660736084,
+          -0.08894124627113342
+        ],
+        [
+          0.9908843636512756,
+          2.397007703781128,
+          1.4982407093048096
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.39473599195480347,
+          0.5326864719390869,
+          -0.06712384521961212
+        ],
+        "seat_right": [
+          0.39473599195480347,
+          0.5326864719390869,
+          -0.06712384521961212
+        ]
+      }
+    },
+    {
+      "section": "dcp_bmw7",
+      "model_sha256": "c15e77d1467e2448f72eacfbfed0459373ad84106e2b9953704d09d470ce3ac0",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0445562601089478,
+          -2.7156219482421875,
+          -0.14083361625671387
+        ],
+        [
+          1.0445562601089478,
+          2.6358611583709717,
+          1.4385284185409546
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3849790096282959,
+          0.5049574375152588,
+          0.09830986708402634
+        ],
+        "seat_right": [
+          0.3849790096282959,
+          0.5049574375152588,
+          0.09830986708402634
+        ]
+      }
+    },
+    {
+      "section": "dcp_brdm",
+      "model_sha256": "90b0c7dfd9708994f58fc61704c3c56e160fa45128063fd6fca27af3fd6ec521",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.2428035736083984,
+          -2.9052493572235107,
+          0.07295465469360352
+        ],
+        [
+          1.2428046464920044,
+          3.188777208328247,
+          3.4677600860595703
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.32151898741722107,
+          1.3051079511642456,
+          1.571142554283142
+        ],
+        "seat_right": [
+          0.32151898741722107,
+          1.3051079511642456,
+          1.571142554283142
+        ]
+      }
+    },
+    {
+      "section": "dcp_btr",
+      "model_sha256": "2876b155c2211515814659c6eda493db3a6fcc46b35275acb2530d26df4abc9b",
+      "seats": 10,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.5001357793807983,
+          -3.8562798500061035,
+          -0.08572005480527878
+        ],
+        [
+          1.5001357793807983,
+          3.8321211338043213,
+          2.5458834171295166
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.39489999413490295,
+          1.2298349142074585,
+          2.168330430984497
+        ],
+        "seat_right": [
+          0.4300277531147003,
+          1.2290507555007935,
+          2.115792989730835
+        ]
+      }
+    },
+    {
+      "section": "dcp_btr82",
+      "model_sha256": "cea210f33d90748f39c5a9c0e1ade276abcf0f32f66bf99305ce36a8350371cf",
+      "seats": 10,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.5529297590255737,
+          -3.836379051208496,
+          -0.08757056295871735
+        ],
+        [
+          1.53892982006073,
+          4.218297958374023,
+          3.6251814365386963
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.31713390350341797,
+          0.9289300441741943,
+          2.1442294120788574
+        ],
+        "seat_right": [
+          0.3164557218551636,
+          0.9289300441741943,
+          2.1442294120788574
+        ]
+      }
+    },
+    {
+      "section": "dcp_buggy",
+      "model_sha256": "1956f2803035f9eb3f66c3ee713c48e19fe419a5f322371582a58ee8bc91fa14",
+      "seats": 1,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.1661674976348877,
+          -1.8965693712234497,
+          -0.09510591626167297
+        ],
+        [
+          1.1661678552627563,
+          1.8980664014816284,
+          1.6375975608825684
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.22615167498588562,
+          0.5950957536697388,
+          -0.4091692566871643
+        ]
+      }
+    },
+    {
+      "section": "dcp_dacia",
+      "model_sha256": "8df08585a3a58188f0ad4b8d9ce1d48275cf3fb8a3ba43188d6bb027f3dd504b",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9294816851615906,
+          -2.0656445026397705,
+          -0.07905678451061249
+        ],
+        [
+          0.9294818639755249,
+          2.6740546226501465,
+          1.7073661088943481
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3221689462661743,
+          0.6373744606971741,
+          0.39401906728744507
+        ],
+        "seat_right": [
+          0.3221689462661743,
+          0.6373744606971741,
+          0.39401906728744507
+        ]
+      }
+    },
+    {
+      "section": "dcp_dt75",
+      "model_sha256": "44a8506f5b1f9f78b15eca8d86bbbaaecbddea43eaf187b012c34f9d2460af31",
+      "seats": 2,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9096580743789673,
+          -2.043565034866333,
+          -0.050747718662023544
+        ],
+        [
+          0.8888440132141113,
+          2.202383041381836,
+          2.349653482437134
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_right": [
+          0.33637386560440063,
+          1.440525770187378,
+          -0.5333489775657654
+        ],
+        "seat_left": [
+          -0.2398180067539215,
+          1.440525770187378,
+          -0.5333489775657654
+        ]
+      }
+    },
+    {
+      "section": "dcp_gaz21",
+      "model_sha256": "73e7d7d2810ab725425d0d2b081b2f7487950f78b20507b0712d86380de9a48a",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.93133544921875,
+          -2.4051573276519775,
+          -0.020773082971572876
+        ],
+        [
+          0.93133544921875,
+          2.4695000648498535,
+          1.9283000230789185
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.35249999165534973,
+          0.7567521929740906,
+          0.18056784570217133
+        ],
+        "seat_right": [
+          0.35249999165534973,
+          0.7567523121833801,
+          0.18056760728359222
+        ]
+      }
+    },
+    {
+      "section": "dcp_gaz21_2",
+      "model_sha256": "6397d62a90efb9318d5afd715b801e4108b2bb4718f59181e7eab53e46cd12b2",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.93133544921875,
+          -2.4051573276519775,
+          -0.020773082971572876
+        ],
+        [
+          0.93133544921875,
+          2.4695000648498535,
+          1.9283000230789185
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.35249999165534973,
+          0.7567521929740906,
+          0.18056784570217133
+        ],
+        "seat_right": [
+          0.35249999165534973,
+          0.7567523121833801,
+          0.18056760728359222
+        ]
+      }
+    },
+    {
+      "section": "dcp_gaz24",
+      "model_sha256": "7d7ca3c74c1ab41a8c179b4c09fa8f5fc056a4560b429e479210cbe7057e871c",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9997267127037048,
+          -2.553699493408203,
+          -0.03507217764854431
+        ],
+        [
+          0.9997268319129944,
+          2.517103433609009,
+          1.6298009157180786
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.4322730004787445,
+          0.6974871158599854,
+          0.2012762874364853
+        ],
+        "seat_right": [
+          0.4322730004787445,
+          0.6974871158599854,
+          0.2012762874364853
+        ]
+      }
+    },
+    {
+      "section": "dcp_golf",
+      "model_sha256": "4946c083bf8ece06ba57c930324df3aad1db46be90e426e94b4b75e4f77fc95b",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9869178533554077,
+          -2.0490472316741943,
+          -0.12724503874778748
+        ],
+        [
+          0.9869179725646973,
+          2.2363882064819336,
+          1.5515170097351074
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.35393598675727844,
+          0.6409342288970947,
+          0.055429939180612564
+        ],
+        "seat_right": [
+          0.35393598675727844,
+          0.6409342288970947,
+          0.055429935455322266
+        ]
+      }
+    },
+    {
+      "section": "dcp_kamaz",
+      "model_sha256": "b78daaeceba740717f7ba5730df0a8c6686ccbe5e8c894d3ee425585a4092c99",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.2608699798583984,
+          -4.4888200759887695,
+          -0.050000037997961044
+        ],
+        [
+          1.2608699798583984,
+          4.287499904632568,
+          3.9097700119018555
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.7058500051498413,
+          1.7864400148391724,
+          2.8475401401519775
+        ],
+        "seat_right": [
+          0.6544299721717834,
+          1.7864400148391724,
+          2.8475401401519775
+        ]
+      }
+    },
+    {
+      "section": "dcp_kamaz_army",
+      "model_sha256": "0e736b143d6f44f793b4558f1a6c754a656e38b10a068bcccd9ab3c292afacb8",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.5024170875549316,
+          -4.519166946411133,
+          -0.11209996789693832
+        ],
+        [
+          1.537029504776001,
+          3.870858907699585,
+          3.1166605949401855
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.6417580246925354,
+          1.780025839805603,
+          2.4843204021453857
+        ],
+        "seat_right": [
+          0.41754499077796936,
+          1.780025839805603,
+          2.4843204021453857
+        ]
+      }
+    },
+    {
+      "section": "dcp_kamaz_army_tent",
+      "model_sha256": "98080838d7d19e22bba59beb5de1cecab73909d35d4b99431cc462a68afa487d",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.5024170875549316,
+          -4.519166946411133,
+          -0.11209996789693832
+        ],
+        [
+          1.537029504776001,
+          3.870858907699585,
+          3.370500087738037
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.6417580246925354,
+          1.780025839805603,
+          2.4843204021453857
+        ],
+        "seat_right": [
+          0.41754499077796936,
+          1.780025839805603,
+          2.4843204021453857
+        ]
+      }
+    },
+    {
+      "section": "dcp_kamaz_fura",
+      "model_sha256": "96d955ec27b8201c858422e3eaffff18d7abbf422d838a915a34d8a1ad73416a",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.257667899131775,
+          -3.061009407043457,
+          -0.050000037997961044
+        ],
+        [
+          1.257667899131775,
+          4.281251430511475,
+          3.471438407897949
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.7058500051498413,
+          1.7864400148391724,
+          2.8475401401519775
+        ],
+        "seat_right": [
+          0.6544299721717834,
+          1.7864400148391724,
+          2.8475401401519775
+        ]
+      }
+    },
+    {
+      "section": "dcp_lada_2101",
+      "model_sha256": "99310dbd6278c00cd4181d8c878ac06c7df12b904c88e581cee84f59896cdfaa",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9470521211624146,
+          -2.200338125228882,
+          -0.08313199132680893
+        ],
+        [
+          0.947052001953125,
+          2.200338125228882,
+          1.542348027229309
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.34462806582450867,
+          0.5722724795341492,
+          0.1922210156917572
+        ],
+        "seat_right": [
+          0.37211400270462036,
+          0.5722724795341492,
+          0.1922210156917572
+        ]
+      }
+    },
+    {
+      "section": "dcp_lada_2107",
+      "model_sha256": "f7ee6b4b53a7ed0aa8ec707399ef240b63b2d82403581a55c20cb886e4bd5e6d",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9588707685470581,
+          -2.196394205093384,
+          -0.08920972049236298
+        ],
+        [
+          0.9589911699295044,
+          2.1990816593170166,
+          1.6040934324264526
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.35025501251220703,
+          0.5504385232925415,
+          0.18338805437088013
+        ],
+        "seat_right": [
+          0.35025501251220703,
+          0.5504385232925415,
+          0.18338805437088013
+        ]
+      }
+    },
+    {
+      "section": "dcp_lada_2108",
+      "model_sha256": "86794b718f927ce0ede09263474f9b74d094f8e82d4c15ade50bde655d98143a",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.991135835647583,
+          -1.801705002784729,
+          -0.07868887484073639
+        ],
+        [
+          0.9911355376243591,
+          2.472168207168579,
+          1.5029804706573486
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36915096640586853,
+          0.560417652130127,
+          0.2643735408782959
+        ],
+        "seat_right": [
+          0.36915096640586853,
+          0.560417652130127,
+          0.2643735408782959
+        ]
+      }
+    },
+    {
+      "section": "dcp_lada_2109",
+      "model_sha256": "129bfeb12b59045c9936764f4e1a5d1160bca47b2b9858d1550cf637a868df93",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9345275163650513,
+          -1.8337066173553467,
+          -0.11113038659095764
+        ],
+        [
+          0.9345178604125977,
+          2.4375672340393066,
+          1.43166184425354
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36607199907302856,
+          0.4551945924758911,
+          0.29088449478149414
+        ],
+        "seat_right": [
+          0.36607199907302856,
+          0.4551945924758911,
+          0.29088449478149414
+        ]
+      }
+    },
+    {
+      "section": "dcp_luaz",
+      "model_sha256": "544b14b60db538ba4501872e8541f0d8768df59d862d9d296396d367299b4e99",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -0.9026520848274231,
+          -1.7542650699615479,
+          -0.15121302008628845
+        ],
+        [
+          0.8910959362983704,
+          1.9797091484069824,
+          1.8513141870498657
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.39158201217651367,
+          0.8663689494132996,
+          0.2236500233411789
+        ],
+        "seat_right": [
+          0.39782601594924927,
+          0.8663689494132996,
+          0.2236500382423401
+        ]
+      }
+    },
+    {
+      "section": "dcp_luaz_2",
+      "model_sha256": "c255e71566d2f05bd7d3b2d24322cc7f15569571aa63ec91dbeba22071a4d6f4",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -0.9026520848274231,
+          -1.7542650699615479,
+          -0.15121302008628845
+        ],
+        [
+          0.8910959362983704,
+          1.9797091484069824,
+          1.8513141870498657
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.39158201217651367,
+          0.8663689494132996,
+          0.2236500233411789
+        ],
+        "seat_right": [
+          0.39782601594924927,
+          0.8663689494132996,
+          0.2236500382423401
+        ]
+      }
+    },
+    {
+      "section": "dcp_mercedes",
+      "model_sha256": "0671513668ca767cd8871c0b4df001b65b0f91480c4d4c1e74528a728354e3ac",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0392957925796509,
+          -2.567257881164551,
+          -0.04970690608024597
+        ],
+        [
+          0.984831690788269,
+          2.5031673908233643,
+          1.9346568584442139
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.37168699502944946,
+          0.6900778412818909,
+          0.033493779599666595
+        ],
+        "seat_right": [
+          0.37168699502944946,
+          0.6900778412818909,
+          0.033493779599666595
+        ]
+      }
+    },
+    {
+      "section": "dcp_mercedes_2",
+      "model_sha256": "0b24b657e6e35d1cdd07d0592ea9492a894c503a7d91883f53a787668ce57f73",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0392957925796509,
+          -2.567257881164551,
+          -0.04970690608024597
+        ],
+        [
+          0.984831690788269,
+          2.5031673908233643,
+          1.9346568584442139
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.37168699502944946,
+          0.6900778412818909,
+          0.033493779599666595
+        ],
+        "seat_right": [
+          0.37168699502944946,
+          0.6900778412818909,
+          0.033493779599666595
+        ]
+      }
+    },
+    {
+      "section": "dcp_mercedes_retro",
+      "model_sha256": "af85dba8723c07c02a46ed4fa0edae8b81e4972a3c9bce1f8fd3b97f3e939d80",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0282471179962158,
+          -2.541745185852051,
+          -0.07402744889259338
+        ],
+        [
+          1.0282471179962158,
+          2.57261061668396,
+          1.5591466426849365
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3892120122909546,
+          0.6422725319862366,
+          0.1362210512161255
+        ],
+        "seat_right": [
+          0.3892120122909546,
+          0.6422725319862366,
+          0.1362210512161255
+        ]
+      }
+    },
+    {
+      "section": "dcp_moskvich",
+      "model_sha256": "a8bdb95a64dfdfd31e7ab2b768206cda1654d9a2e54cf6fe206935d75fcded95",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.8462063074111938,
+          -2.3937485218048096,
+          -0.0001938299828907475
+        ],
+        [
+          0.8462056517601013,
+          1.9902859926223755,
+          1.8083640336990356
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.30636098980903625,
+          0.8277753591537476,
+          -0.17728185653686523
+        ],
+        "seat_right": [
+          0.30636098980903625,
+          0.8277754783630371,
+          -0.17728209495544434
+        ]
+      }
+    },
+    {
+      "section": "dcp_moskvich_2715",
+      "model_sha256": "191f14de75e4f1ea3804bc971d37a956bf49c5c5c63e3a368ad3472637b92751",
+      "seats": 2,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.968414843082428,
+          -2.1758666038513184,
+          -0.13229788839817047
+        ],
+        [
+          0.9684147238731384,
+          2.2693958282470703,
+          1.85257887840271
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36607998609542847,
+          0.5722724795341492,
+          0.11670798808336258
+        ],
+        "seat_right": [
+          0.36607998609542847,
+          0.5722724795341492,
+          0.11670800298452377
+        ]
+      }
+    },
+    {
+      "section": "dcp_moskvich_2715tun",
+      "model_sha256": "812903aee6fba86d488f3e81980f28f8294f7c3226f4b2723a0291f4f508b4e2",
+      "seats": 2,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -0.9684149026870728,
+          -2.3489203453063965,
+          -0.4131167232990265
+        ],
+        [
+          0.9684146642684937,
+          2.4203038215637207,
+          1.5579863786697388
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36607998609542847,
+          0.5722724795341492,
+          0.11670798808336258
+        ],
+        "seat_right": [
+          0.36607998609542847,
+          0.5722724795341492,
+          0.11670800298452377
+        ]
+      }
+    },
+    {
+      "section": "dcp_moskvich_412",
+      "model_sha256": "1a93af9ae25c34f65d7172467c168c62aa8216fb6524c30fe0bb13334b2822bf",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.960924506187439,
+          -2.3489205837249756,
+          -0.13229788839817047
+        ],
+        [
+          0.8753801584243774,
+          2.2693958282470703,
+          1.558919906616211
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36607998609542847,
+          0.5722724795341492,
+          0.11670798808336258
+        ],
+        "seat_right": [
+          0.36607998609542847,
+          0.5722724795341492,
+          0.11670800298452377
+        ]
+      }
+    },
+    {
+      "section": "dcp_moskvich_tunned",
+      "model_sha256": "f225c811a072707a14063743ae485cb0fd55a21ca7a605651ea8a4680948df1e",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9549896717071533,
+          -2.348940134048462,
+          -0.13229788839817047
+        ],
+        [
+          0.8753801584243774,
+          2.251540422439575,
+          1.7296030521392822
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.36607998609542847,
+          0.5722724795341492,
+          0.11670798808336258
+        ],
+        "seat_right": [
+          0.36607998609542847,
+          0.5722724795341492,
+          0.11670800298452377
+        ]
+      }
+    },
+    {
+      "section": "dcp_niva_green",
+      "model_sha256": "4c1e726ba3016f11c70d706b4d16394bdccbda5a31ca0c5fd2ce49774793c58b",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.037261724472046,
+          -1.9972671270370483,
+          -0.08560273051261902
+        ],
+        [
+          1.0375686883926392,
+          1.946887493133545,
+          1.8163877725601196
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3950635492801666,
+          0.8289951682090759,
+          -0.1499677151441574
+        ],
+        "seat_right": [
+          0.3950636088848114,
+          0.8289951682090759,
+          -0.1499677151441574
+        ]
+      }
+    },
+    {
+      "section": "dcp_niva_white",
+      "model_sha256": "b1a6b9d199533154f6fd91945ef5e71579805807153123f3c81953c640a10695",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.037261724472046,
+          -1.9972671270370483,
+          -0.08560273051261902
+        ],
+        [
+          1.0375686883926392,
+          1.946887493133545,
+          1.8163877725601196
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3950635492801666,
+          0.8289951682090759,
+          -0.1499677151441574
+        ],
+        "seat_right": [
+          0.3950636088848114,
+          0.8289951682090759,
+          -0.1499677151441574
+        ]
+      }
+    },
+    {
+      "section": "dcp_oka",
+      "model_sha256": "e71762d9deb1bcab40233a95aa13d2c80b959bf0cc3659f6b71eab86ba42d06f",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.9099449515342712,
+          -1.6696325540542603,
+          -0.08092927187681198
+        ],
+        [
+          0.9099305272102356,
+          1.7860435247421265,
+          1.5033154487609863
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3633018732070923,
+          0.514065682888031,
+          -0.10688117146492004
+        ],
+        "seat_right": [
+          0.3633018434047699,
+          0.5140659213066101,
+          -0.1068810522556305
+        ]
+      }
+    },
+    {
+      "section": "dcp_paz",
+      "model_sha256": "72f9fe775b57849f77ab4da6939d54d663e0e0eb987b721a2523c9fdbcfe1540",
+      "seats": 24,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.3481061458587646,
+          -4.4095964431762695,
+          -0.0953514575958252
+        ],
+        [
+          1.3481019735336304,
+          3.36431884765625,
+          2.923790693283081
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.7959437966346741,
+          1.3895432949066162,
+          1.9958457946777344
+        ],
+        "seat_right": [
+          0.782033383846283,
+          1.3283590078353882,
+          1.7627885341644287
+        ],
+        "seats_left": [
+          -0.7702597975730896,
+          0.9900581240653992,
+          -0.5263285040855408
+        ],
+        "seats_right": [
+          0.7702599763870239,
+          0.9900581240653992,
+          -0.5263285040855408
+        ]
+      }
+    },
+    {
+      "section": "dcp_paz3206",
+      "model_sha256": "7f6b0a4e91ec779171a11c320ea2e54f62655a356a19c9e13d3b117b4cce5c0d",
+      "seats": 12,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.500826358795166,
+          -4.161620616912842,
+          -0.2589840888977051
+        ],
+        [
+          1.5197398662567139,
+          3.2509708404541016,
+          3.6687865257263184
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.8239319920539856,
+          1.3856470584869385,
+          2.039212942123413
+        ],
+        "seat_right": [
+          0.8239319920539856,
+          1.3856470584869385,
+          2.039212942123413
+        ],
+        "seats_left": [
+          -0.8416270613670349,
+          1.0859739780426025,
+          -0.44763508439064026
+        ],
+        "seats_right": [
+          0.841627299785614,
+          1.0859739780426025,
+          -0.6572821140289307
+        ]
+      }
+    },
+    {
+      "section": "dcp_raf",
+      "model_sha256": "f6abd673a7b66648922535f5da4c7bc8d8abc99ee4149638520ef340db634ba4",
+      "seats": 2,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.1475712060928345,
+          -2.7203006744384766,
+          -0.13980498909950256
+        ],
+        [
+          1.147572636604309,
+          2.6052346229553223,
+          2.0622787475585938
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.5625064969062805,
+          0.9698819518089294,
+          1.350309133529663
+        ],
+        "seat_right": [
+          0.5625064969062805,
+          0.9698819518089294,
+          1.4398953914642334
+        ]
+      }
+    },
+    {
+      "section": "dcp_super_niva",
+      "model_sha256": "074c23bde8d07b8de48140a018a470f5b8f54bc6addbeee572e28ecec2da5582",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0971983671188354,
+          -2.382843494415283,
+          -0.08284974098205566
+        ],
+        [
+          1.1423919200897217,
+          2.5464236736297607,
+          2.077824592590332
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.44170600175857544,
+          0.8762704730033875,
+          0.28484001755714417
+        ],
+        "seat_right": [
+          0.44170600175857544,
+          0.8762704730033875,
+          0.28484001755714417
+        ]
+      }
+    },
+    {
+      "section": "dcp_toyota",
+      "model_sha256": "d8aeb8ae46110c064cea20e59c7e6ccb367f44ca566b6ec41ef0abe03aafa410",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0331907272338867,
+          -2.2014143466949463,
+          -0.0048370361328125
+        ],
+        [
+          1.032540202140808,
+          2.0490832328796387,
+          1.5956016778945923
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3792695105075836,
+          0.6749979257583618,
+          -0.06543215364217758
+        ],
+        "seat_right": [
+          0.3796941936016083,
+          0.6749980449676514,
+          -0.06543239206075668
+        ]
+      }
+    },
+    {
+      "section": "dcp_tractor",
+      "model_sha256": "0975966bff331c9b9653310c29639b4fd27038e7b6dd9e43ef04c10192202747",
+      "seats": 1,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.1068081855773926,
+          -2.239556074142456,
+          -0.09018299728631973
+        ],
+        [
+          1.106808066368103,
+          1.6856296062469482,
+          2.659416437149048
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          0.04296046495437622,
+          1.7216908931732178,
+          -1.1304762363433838
+        ]
+      }
+    },
+    {
+      "section": "dcp_uaz",
+      "model_sha256": "ca8aab2a5fb38d387f402b0cac99fc4b0cea1be85c5b144d994f8aacf1df105c",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.0343763828277588,
+          -2.3264353275299072,
+          -0.09609246253967285
+        ],
+        [
+          1.034376621246338,
+          2.019550085067749,
+          2.1237080097198486
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.4362240135669708,
+          1.0936013460159302,
+          -0.10170012712478638
+        ],
+        "seat_right": [
+          0.4362240135669708,
+          1.0936013460159302,
+          -0.10170012712478638
+        ]
+      }
+    },
+    {
+      "section": "dcp_uaz_army_gun",
+      "model_sha256": "8b438dd2ce5024b01fec5a7adf719514ca0aaeb329e44ed83d9220dd8b68ad87",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.1075713634490967,
+          -2.054619789123535,
+          -0.11630818247795105
+        ],
+        [
+          1.1075701713562012,
+          2.1807830333709717,
+          2.577241897583008
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.42928677797317505,
+          1.071166753768921,
+          -0.023544099181890488
+        ],
+        "seat_right": [
+          0.4198766052722931,
+          1.0711662769317627,
+          -0.02354305423796177
+        ]
+      }
+    },
+    {
+      "section": "dcp_uaz_jag",
+      "model_sha256": "5015ee449acdb007929aff7bdf93cd88ba74173ec0d55b47fb0334b999bb275a",
+      "seats": 2,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.0865850448608398,
+          -2.4124221801757812,
+          -0.08266444504261017
+        ],
+        [
+          1.0865850448608398,
+          2.553158760070801,
+          2.2054481506347656
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.44886499643325806,
+          1.144614338874817,
+          -0.033918194472789764
+        ],
+        "seat_right": [
+          0.4993155598640442,
+          1.144614338874817,
+          -0.033918194472789764
+        ]
+      }
+    },
+    {
+      "section": "dcp_uaz_van",
+      "model_sha256": "bf8449cdaa6add1efa253f23e0dcaa49376fc6b43ab339c15ff1f5cb0486e100",
+      "seats": 5,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -1.2026503086090088,
+          -2.2702291011810303,
+          -0.0803011879324913
+        ],
+        [
+          1.2026481628417969,
+          2.346994638442993,
+          2.123656749725342
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.5242180228233337,
+          1.0734260082244873,
+          1.1291295289993286
+        ],
+        "seat_right": [
+          0.5242180228233337,
+          1.0734260082244873,
+          1.1291292905807495
+        ]
+      }
+    },
+    {
+      "section": "dcp_ural",
+      "model_sha256": "f6ab193dee12ed80d3d01bd2e6f8c37fc68b51c4cefc3e55a613bbe78fd31efc",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.3675739765167236,
+          -4.211573123931885,
+          -0.12703096866607666
+        ],
+        [
+          1.405985951423645,
+          4.0809550285339355,
+          2.869270086288452
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.4870322048664093,
+          1.8361382484436035,
+          0.9839275479316711
+        ],
+        "seat_right": [
+          0.3501361012458801,
+          1.8361382484436035,
+          0.9839275479316711
+        ]
+      }
+    },
+    {
+      "section": "dcp_zaz",
+      "model_sha256": "af4922cb163803360bf1a4590f102211d83d2e08308e0a7383eb039e25381686",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.7520431876182556,
+          -1.9179940223693848,
+          -0.04508991166949272
+        ],
+        [
+          0.7519851326942444,
+          1.6369078159332275,
+          1.5895590782165527
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.2689470052719116,
+          0.6518591046333313,
+          0.0027714071329683065
+        ],
+        "seat_right": [
+          0.2689470052719116,
+          0.6518593430519104,
+          0.00277152587659657
+        ]
+      }
+    },
+    {
+      "section": "dcp_zaz968",
+      "model_sha256": "5dd3c33ddf6d098bdfea829076025a7c5176e5a3016f3d04b2d6108a8bddd866",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.840765655040741,
+          -2.0351011753082275,
+          -0.11575525999069214
+        ],
+        [
+          0.8352905511856079,
+          2.0172948837280273,
+          1.428868293762207
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3277060091495514,
+          0.47807925939559937,
+          0.11613579839468002
+        ],
+        "seat_right": [
+          0.3277060091495514,
+          0.47807925939559937,
+          0.11613579839468002
+        ]
+      }
+    },
+    {
+      "section": "dcp_zaz968_2",
+      "model_sha256": "6950e6af5e30aafc1ed0eced095e094b68dc94e8814e6dcaec03d83c0ecc5175",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.840765655040741,
+          -2.0351011753082275,
+          -0.11575525999069214
+        ],
+        [
+          0.8352905511856079,
+          2.0172948837280273,
+          1.428868293762207
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.3277060091495514,
+          0.47807925939559937,
+          0.11613579839468002
+        ],
+        "seat_right": [
+          0.3277060091495514,
+          0.47807925939559937,
+          0.11613579839468002
+        ]
+      }
+    },
+    {
+      "section": "dcp_zaz_2",
+      "model_sha256": "3ec3c866cc617022de838d4a816ff44bf6d6e5bf01db208dcac706fc61b829d8",
+      "seats": 4,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": false,
+      "visual_bounds_blender": [
+        [
+          -0.7520431876182556,
+          -1.9179940223693848,
+          -0.04508991166949272
+        ],
+        [
+          0.7519851326942444,
+          1.6369078159332275,
+          1.5895590782165527
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.2689470052719116,
+          0.6518591046333313,
+          0.0027714071329683065
+        ],
+        "seat_right": [
+          0.2689470052719116,
+          0.6518593430519104,
+          0.00277152587659657
+        ]
+      }
+    },
+    {
+      "section": "dcp_zil",
+      "model_sha256": "8481a18fe341ce29a63eef0aa003148ebdd1285b1f73d3490dccc3d5583a1c84",
+      "seats": 3,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.5319758653640747,
+          -3.8935601711273193,
+          -0.14278200268745422
+        ],
+        [
+          1.5320836305618286,
+          3.7326266765594482,
+          2.5749826431274414
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.49285998940467834,
+          1.4932692050933838,
+          1.2144452333450317
+        ],
+        "seat_right": [
+          0.49285998940467834,
+          1.4932692050933838,
+          1.2144452333450317
+        ]
+      }
+    },
+    {
+      "section": "dcp_zil131",
+      "model_sha256": "44725b4898ea1cd53d68eb753e7a3b511e969bb2f595fea5920fe9518da1ead2",
+      "seats": 13,
+      "standing_support": "actual horizontal collider, three contacts, slope <=41 degrees",
+      "cargo_or_open_deck": true,
+      "visual_bounds_blender": [
+        [
+          -1.3657667636871338,
+          -3.803239583969116,
+          -0.3093950152397156
+        ],
+        [
+          1.4225085973739624,
+          3.569796562194824,
+          2.3310141563415527
+        ]
+      ],
+      "seat_bones_game": {
+        "seat_left": [
+          -0.4596180021762848,
+          1.2828700542449951,
+          1.0454862117767334
+        ],
+        "seat_right": [
+          0.4596180021762848,
+          1.2828700542449951,
+          1.0454862117767334
+        ]
+      }
+    }
+  ]
+}

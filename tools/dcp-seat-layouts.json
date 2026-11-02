@@ -578,5 +578,1898 @@
         "yaw": 0
       }
     ]
+  },
+  "physics/vehicles/bmw/veh_bmw_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3947,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/bmw/veh_bmw_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.385,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/brdm/veh_brdm_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.1585,
+          -0.1051,
+          -1.0211
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.8015,
+          -0.1051,
+          -1.0211
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/btr/veh_btr_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.3551,
+          -0.1798,
+          -1.3183
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.3551,
+          -0.1798,
+          -2.0183
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.3551,
+          -0.1798,
+          -2.7183
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.3551,
+          -0.1798,
+          -3.4183
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.1449,
+          -0.1798,
+          -1.3183
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.1449,
+          -0.1798,
+          -2.0183
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.1449,
+          -0.1798,
+          -2.7183
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.1449,
+          -0.1798,
+          -3.4183
+        ],
+        "yaw": -90
+      }
+    ]
+  },
+  "physics/vehicles/btr/veh_btr_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4329,
+          0.0411,
+          -1.2942
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4329,
+          0.0411,
+          -1.9942
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4329,
+          0.0411,
+          -2.6942
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          -0.4329,
+          0.0411,
+          -3.3942
+        ],
+        "yaw": 90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0671,
+          0.0411,
+          -1.2942
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0671,
+          0.0411,
+          -1.9942
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0671,
+          0.0411,
+          -2.6942
+        ],
+        "yaw": -90
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          1.0671,
+          0.0411,
+          -3.3942
+        ],
+        "yaw": -90
+      }
+    ]
+  },
+  "physics/vehicles/dacia/veh_dacia_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3222,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/tr13/veh_dt75_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/volga/veh_gaz21_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3525,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/volga/veh_gaz21_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3525,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/volga/veh_gaz24_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.4323,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/golf/veh_golf_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3539,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_04.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_03.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/lada/veh_lada_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3446,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/lada/veh_lada_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3503,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/lada/veh_lada_u_03.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3692,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/lada/veh_lada_u_05.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3661,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/luaz/veh_luaz_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/luaz/veh_luaz_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3717,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_03.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3717,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3892,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3064,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_06.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_03.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3661,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3661,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/niva/veh_niva_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/niva/veh_niva_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/oka/veh_oka_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/niva/veh_super_niva.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/toyota/veh_toyota_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.3793,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/uaz/veh_uaz_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.4362,
+          0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/uaz/veh_uaz_u_05_gun.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/uaz/veh_uaz_jag.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/ural/veh_ural_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/zaz/veh_zaz_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/zaz968/veh_zaz_968_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/zaz968/veh_zaz_968_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/zaz/veh_zaz_u_02.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_left",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.0,
+          0.0,
+          -0.85
+        ],
+        "yaw": 0
+      }
+    ]
+  },
+  "physics/vehicles/zil/veh_zil_u_01.ogf": {
+    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "seats": [
+      {
+        "bone": "seat_left",
+        "offset": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          -0.46,
+          0,
+          0
+        ],
+        "yaw": 0
+      },
+      {
+        "bone": "seat_right",
+        "offset": [
+          0.1,
+          0,
+          0
+        ],
+        "yaw": 0
+      }
+    ]
   }
 }

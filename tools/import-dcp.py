@@ -113,7 +113,7 @@ def adapt_panels(data, panels):
 
 def seats_for(dcp, visual, profile):
     normalized=visual.replace("\\", "/")
-    layouts=json.loads((Path(__file__).with_name("dcp-seat-layouts.json")).read_text())
+    layouts=json.loads((Path(__file__).with_name("dcp-seat-layouts.json")).read_text(encoding="utf-8"))
     if normalized in layouts:
         return [q["bone"]+":"+":".join(str(v) for v in (*q["offset"],q["yaw"])) for q in layouts[normalized]["seats"]]
     names = model_bones(dcp / "meshes" / normalized)

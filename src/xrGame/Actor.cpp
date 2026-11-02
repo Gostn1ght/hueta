@@ -2390,7 +2390,7 @@ extern BOOL g_legs_enabled;
 bool canRenderLegs(CActor* actor, CHolderCustom* m_holder) noexcept
 {
     return (g_legs_enabled || actor->netcoop_seated()) && actor == Level().CurrentViewEntity()
-        && (legs_in_low_crouch || !(actor->MovingState() & mcCrouch && actor->MovingState() & mcAccel))
+        && (actor->netcoop_seated() || legs_in_low_crouch || !(actor->MovingState() & mcCrouch && actor->MovingState() & mcAccel))
         && g_player_hud
         && !m_holder
         && (legs_in_demo_record || pDemoRecords.empty())

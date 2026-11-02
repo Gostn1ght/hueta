@@ -28,16 +28,48 @@ Its new per-connection reset drops UI references and previews without healing
 limbs; authoritative limb restore remains separate. DotMarks likewise discards
 old widgets, pending interactions and deadlines after location clock reset.
 
-## Four active requested items
-- Seats: native ceiling raised to 64, importer no longer invents a second
-  seat for one-seat models. Actual fleet config corrections still pending.
-- Moving decks: candidate three-contact car support, previous-to-current rigid
-  frame transport, local walking validated against bounded car history,
-  velocity inheritance and a short server departure budget. Needs CI and game QA.
-- Prone: authored poses bypass standing foot IK and spine/head callbacks;
-  visual QA and playback-speed verification pending.
-- Enter/exit/open/close/steering: full animation phase and first-person body
-  integration still pending; do not claim this item complete.
+## Four active requested items — implemented candidate, not installed
+- All 50 actual donor meshes inspected offline in Blender (full cutaway contact
+  sheet, enlarged bus/van/truck interiors and bind-space measurements). Explicit
+  layouts now contain 247 seats, range 1–24, with passenger pelvis normalized to
+  zero and side-bench yaw. Buggy is one seat; PAZ 24, PAZ3206 12, ZIL131 13.
+  Audit 169_FLEET_SEATS_AND_DECKS.json records each model hash and layout count.
+  check-netcoop-dcp validates exact coverage, config parity, unique positions,
+  named model bones, physics profile and imported layout equality for all 50.
+  This is geometry evidence, not an in-game seated-body clipping acceptance.
+- Standing decks: three contacts on an actual horizontal vehicle collider,
+  previous/current rigid frame transport, bounded car-history owner validation,
+  walking relative to the deck, point velocity inheritance and departure budget.
+  Applies to flat supported surfaces throughout the fleet, not just ZIL131.
+  Nearby observers receive separate car-local rider positions; their render
+  placement follows the same interpolated vehicle pose. Destroy/death/jump/
+  noclip/seat transitions detach. No extra invisible seat for standing riders.
+- Prone: 20 authored grip/direction cycles retained byte-for-byte. Standing
+  foot IK and spine/head callbacks bypass authored prone and vehicle poses.
+  Actual human mesh rendered offline with four rifle crawl phases and entry
+  poses. The renderer confirms moving limbs and low body; live network and
+  terrain animation acceptance remains for owner testing after native delivery.
+- Entry/exit/open/close/steering: server reserves a real seat, opens the nearest
+  enterable physical door, runs a 1.8-second body/eye transition and closes the
+  door. Exit is preflighted and rechecks a clear standing volume at completion.
+  Five authored vehicle clips appended to the existing shared animation file;
+  hand reach pulses, driver/passenger poses, exit reverse. Third-person and
+  first-person full body follow the same seat frame. Steering reads actual
+  wheel angle and freezes the corresponding authored pose by angle. This is
+  a generic transition, not model-specific mocap/hand IK for every doorway.
 
-Offline Lua state, vehicle, source/model audit, respawn and scope checks pass.
-No vehicle models, textures or authored clips have been changed in this candidate.
+## Verification and release status
+Installed public version remains 2026.11.02.5. No owner game, client, location
+server or master was launched for tests. Native builds/fixtures run only in CI.
+Full CI 41488364942 at f916b80af995df971acc107c341cb281f1aaa79b:
+resource checks and DX11 shaders succeeded; engine job stopped before the main
+build on two outdated test harness assumptions (teleport actor/world stub lacked
+new platform/fence members; exit check expected the old immediate-unseat call).
+Other actual native fixtures passed, including three-contact/history platform
+validation, manual ignition/held pedals/transition reservation, projectile
+attachment/relcase cleanup, prone selector and 11520 PDA routing cases.
+The harnesses now include the new state and phase completion checks; full CI
+must be rerun and all mandatory gates succeed before binary packaging.
+Offline all-fleet and animation checks pass with the latest 247-seat layouts
+and rebuilt five vehicle clips. Local Windows dummy batch test timed out;
+Ubuntu full resource CI passed, no native-test exception was taken.

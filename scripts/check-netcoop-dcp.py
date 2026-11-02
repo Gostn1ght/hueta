@@ -6,6 +6,7 @@ import re
 import json
 import struct
 import math
+import hashlib
 import importlib.util
 from pathlib import Path
 
@@ -112,7 +113,12 @@ for side in (CLIENT, SERVER):
                 if 'particle' in key and key.endswith(('particles', 'particles1', 'particles2')) and value:
                     assert value in particle_names, (side.name, path.name, section, key, 'missing particle', value)
 assert (CLIENT / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes() == (SERVER / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes()
-assert len(cars) >= 40, len(cars)
+layouts=json.loads((ROOT/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
+audit=json.loads((ROOT/'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text(encoding='utf-8'))
+rows={r['section']:r for r in audit['rows']}
+assert len(cars)==len(layouts)==len(rows)==audit['models']==50
+assert set(rows)==set(cars)
+assert set(layouts)=={k['visual'].replace('\\','/') for k in cars.values()}
 names = (CLIENT / "configs/text/rus/st_lz_dcp_vehicles.xml").read_text(encoding="cp1251")
 for name, keys in cars.items():
     assert name.startswith("dcp_"), name
@@ -122,6 +128,21 @@ for name, keys in cars.items():
     assert include, (name, "no profile include")
     for side in (CLIENT, SERVER):
         assert (side / "configs" / include.group(1).replace("\\", "/")).is_file(), (name, side.name, include.group(1))
+    layout=layouts[keys['visual'].replace('\\','/')]
+    expected=dcp_import.seats_for(CLIENT,keys['visual'],{})
+    actual=[s.strip() for s in keys['netcoop_seats'].split(',')]
+    assert actual==expected and 1<=len(actual)<=64, (name,'layout/config mismatch')
+    row=rows[name]
+    assert row['model_sha256']==hashlib.sha256(data).hexdigest()
+    assert row['seats']==len(actual)
+    positions=[]
+    for seat in layout['seats']:
+        assert len(seat['offset'])==3 and all(math.isfinite(v) for v in (*seat['offset'],seat['yaw']))
+        assert seat['bone'] in row['seat_bones_game'], (name,seat['bone'])
+        pos=[a+b for a,b in zip(row['seat_bones_game'][seat['bone']],seat['offset'])]
+        assert all(sum((a-b)**2 for a,b in zip(pos,other))>.2**2 for other in positions), (name,'overlapping seats')
+        positions.append(pos)
+    assert keys['netcoop_passenger_pose']=='lz_vehicle_passenger' and float(keys['netcoop_passenger_drop'])==0
     bones = model_physics(data)
     profile = dcp_import.sections(profile_text(CLIENT / 'configs' / include.group(1).replace('\\', '/')))
     definition = profile['car_definition']
@@ -164,4 +185,5 @@ for need in ('if (spot) light_render->set_cone(', 'ini->line_exist(section, "spo
              'ini->line_exist(section, "glow_texture")', 'READ_IF_EXISTS(ini, r_s32, section, "type"',
              '"headlights","stoplights","reverselights","indoorlights"'):
     assert need in lights, need
+assert sum(len(v['seats']) for v in layouts.values())==247
 print("PASS DCP: %d complete models, physical shapes/masses, wheel and door joints, profile bone references, client/server configs and seat names; %d old cars cut" % (len(cars), len(old)))

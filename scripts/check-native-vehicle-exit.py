@@ -114,7 +114,8 @@ int main(){
 }
 '''
 server = (ROOT/'src/xrGame/netcoop_vehicle_server.inc').read_text(encoding='utf-8')
-assert 'it->second, i, false)' in server
+assert 'vehicle_transition(current,it->second,*config,i,actor,true)' in server
+assert 'vehicle_unseat_server(car,v,i,false)' in server
 seat = (ROOT/'src/xrGame/netcoop_vehicle_seat.inc').read_text(encoding='utf-8')
 leave = seat[seat.index('void CActor::netcoop_seat_leave('):seat.index('void CActor::netcoop_seat_place(')]
 assert leave.index('movement->SetPosition(exit)') < leave.index('movement->CreateCharacter()')

@@ -45,6 +45,8 @@ struct CPHMovementControl {bool exists=true;unsigned created=0,destroyed=0;Fvect
 struct Physics {CPHMovementControl control;CPHMovementControl* movement(){return &control;}};
 struct CActor:CObject{
  Physics physics;bool seated=false,m_netcoop_noclip=false;
+ u32 m_netcoop_owner_teleport_until=0;unsigned platform_detaches=0;
+ void netcoop_platform_detach(bool inherit){assert(!inherit);++platform_detaches;}
  Physics* character_physics_support(){return &physics;}bool netcoop_seated(){return seated;}
  void netcoop_set_noclip(bool);
  u16 id=0;bool alive=true;unsigned moves=0,next_sequence=501,last_ack=490;
@@ -77,7 +79,7 @@ struct Server{
 struct Objects{std::map<u16,CObject*> values;CObject* net_Find(u16 id){auto i=values.find(id);return i==values.end()?nullptr:i->second;}};
 struct Box{bool contains(const Fvector& p)const{return std::abs(p.x)<=100&&std::abs(p.y)<=100&&std::abs(p.z)<=100;}};
 struct Space{Box box;const Box& GetBoundingVolume(){return box;}};
-struct World{::Server* Server=nullptr;::Objects Objects;Space ObjectSpace;CObject* control=nullptr;CObject* CurrentControlEntity(){return control;}}world;
+struct World{u32 timeServer()const{return 1000;}::Server* Server=nullptr;::Objects Objects;Space ObjectSpace;CObject* control=nullptr;CObject* CurrentControlEntity(){return control;}}world;
 World& Level(){return world;}bool g_pGameLevel=true,enabled_flag=true,pure_flag=false,admin_flag=true;
 namespace netcoop{
  constexpr int role_admin=2;std::vector<std::string> commands;
@@ -123,6 +125,7 @@ int main(){
  world.Server=nullptr;assert(!netcoop::script_admin_teleport(7,dest));world.Server=&server;
  assert(netcoop::script_admin_teleport(7,dest));
  assert(actor.moves==1&&same(actor.Position(),dest)&&same(a.o_Position,dest));
+ assert(actor.platform_detaches==1&&actor.m_netcoop_owner_teleport_until==4000);
  assert(admin.m_pending_inputs.empty()&&!admin.m_pending_jump_edge&&admin.m_current_intent.mstate==0);
  assert(admin.received==500&&admin.processed==490);
  assert(server.sends==1&&server.last_client==77&&server.last_flags==3);

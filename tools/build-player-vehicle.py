@@ -73,7 +73,15 @@ for role,target in targets.items():
    u=1-t if exit else t
    source=locals_for(chair,'lead_0_sit_down_0',min(.98,u))
    w=smooth(max(0,min(1,(u-.30)/.70)))
-   return {n:source[n].lerp(target[n],w) for n in source}
+   result={n:source[n].lerp(target[n],w) for n in source}
+   # Reach toward the outer door before stepping in and before closure.
+   # Exit uses the exact reverse articulation, including the two hand reaches.
+   reach=math.sin(math.pi*u/.30) if u<.30 else math.sin(math.pi*(u-.65)/.35) if u>.65 else 0.
+   side='l' if role=='driver' else 'r';sign=1 if side=='l' else -1
+   arm='bip01_'+side+'_upperarm';forearm='bip01_'+side+'_forearm'
+   result[arm]=result[arm]@Matrix.Rotation(sign*math.radians(45)*reach,4,'Y')
+   result[forearm]=result[forearm]@Matrix.Rotation(math.radians(25)*reach,4,'X')
+   return result
   emit('lz_vehicle_'+('exit_' if exit else 'enter_')+role,pose,55,True)
 bpy.ops.object.select_all(action='DESELECT');rig.select_set(True);bpy.context.view_layer.objects.active=rig
 args.output.parent.mkdir(parents=True,exist_ok=True)
