@@ -159,3 +159,18 @@ object replacement. Client acknowledges hand/weapon state from the server.
 Candidate CI fixture exercises the actual bridge with physics/network stubs;
 it does not establish ODE dynamics or in-game dragging acceptance. Loose-item
 friction, pushable bodies and ZIL-131 riding remain separate open work.
+
+Loose-item candidate: ordinary live-player drops previously forced 3 m/s
+forward +1.5 m/s upward and a strong fixed spin, with every item starting at
+exactly the same point. Replaced with a gentle 0.45 m/s horizontal drop, lower
+spin, and per-inventory short burst position reservations sized to the model.
+Static walls and existing loose items reject candidate positions. Reservation
+happens before inventory mutation; if the bounded search is full, normal native
+shape correction is retained instead of desynchronizing already rejected shared
+ownership. Sales/destruction, dead-player/NPC drops and missile throwing are
+excluded. New CI fixture covers 64-item separation, large footprints, blocked
+candidates, per-inventory isolation and clock wrap; no live physics acceptance.
+
+First corpse-drag CI 41437420636 stopped in its test harness on MSVC warnings:
+CRT sscanf deprecation and int-to-u16 map fixture keys. Updated the harness to
+match project CRT settings and use explicit u16 keys; not a claimed runtime fix.

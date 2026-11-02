@@ -432,7 +432,7 @@ void CPhysicsShellHolder::activate_physic_shell()
 	{
 		ActivationSpeedOverriden(overriden_vel, true); // drop a stale override
 		m_pPhysicsShell->set_LinearVel(m_netcoop_throw_velocity);
-		Fvector spin; spin.set(0.7f, 0.3f, 1.2f);
+		Fvector spin; spin.set(0.12f, 0.06f, 0.18f);
 		m_pPhysicsShell->set_AngularVel(spin);
 	}
 	else if (ActivationSpeedOverriden(overriden_vel, true))

@@ -15,6 +15,7 @@ server=(root/'src/xrGame/xrServer.cpp').read_text(encoding='latin-1')
 command=server[server.index('case M_NETANOMALY_CMD:'):]
 assert command.index('server_corpse_drag_command(this, CL, na_text)')<command.index('netanomaly_server.on_client_command')
 source=r'''
+#define _CRT_SECURE_NO_WARNINGS
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -70,7 +71,7 @@ void script_command(LPCSTR v){commands.push_back(v);}
 int main(){
  using namespace netcoop;
  CActor actor;actor.id=9;actor.alive=true;CEntityAlive body;body.id=10;
- world.Objects.objects={{9,&actor},{10,&body}};world.current=&actor;
+ world.Objects.objects={{u16(9),&actor},{u16(10),&body}};world.current=&actor;
  Owner owner;xrClientData client;client.owner=&owner;xrServer server;server.client=&client;
  auto use=[&](const char*s){return server_corpse_drag_command(&server,&client,s);};
  assert(!use("other")&&!use("corpse_drag_bad"));

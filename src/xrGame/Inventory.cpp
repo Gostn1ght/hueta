@@ -268,6 +268,44 @@ bool CInventory::DropItem(CGameObject* pObj, bool just_before_destroy, bool dont
 	VERIFY(pIItem->m_pInventory);
 	VERIFY(pIItem->m_pInventory==this);
 	VERIFY(pIItem->m_ItemCurrPlace.type!=eItemPlaceUndefined);
+	CActor* drop_actor = smart_cast<CActor*>(m_pOwner);
+	CPhysicsShellHolder* drop_holder = smart_cast<CPhysicsShellHolder*>(pObj);
+	const bool network_drop = !just_before_destroy && !dont_create_shell && drop_actor && drop_actor->g_Alive() && drop_holder &&
+		OnServer() && netcoop::server_player_copy(drop_actor);
+	Fmatrix drop_start;
+	Fvector drop_velocity;
+	if (network_drop)
+	{
+		drop_start.rotateY(-drop_actor->netcoop_model_yaw());
+		Fvector origin = drop_actor->Position(); origin.y += 1.f;
+		const Fvector forward = drop_start.k;
+		xr_vector<CObject*> nearby;
+		auto free = [&](const Fvector& point, float radius)
+		{
+			Fvector direction; direction.sub(point, origin);
+			const float distance = direction.magnitude();
+			if (distance > .01f)
+			{
+				direction.mul(1.f / distance);
+				collide::rq_result hit;
+				if (Level().ObjectSpace.RayPick(origin, direction, distance + radius, collide::rqtStatic, hit, drop_actor)) return false;
+			}
+			nearby.clear();
+			Level().ObjectSpace.GetNearest(nearby, point, radius + .8f, pObj);
+			for (CObject* other : nearby)
+				if (!other->getDestroy() && !other->H_Parent() && smart_cast<CInventoryItem*>(other) &&
+					point.distance_to(other->Position()) < radius + _min(.7f, other->Radius()) + .04f) return false;
+			return true;
+		};
+		if (!m_netcoop_drop_layout.reserve(Device.dwTimeGlobal, pObj->Radius(), origin, forward, drop_start.c, free))
+		{
+			// Ownership rejection has already been accepted by xrServer. Do not
+			// leave runtime inventory attached after the shared entity detached.
+			drop_start.c.mad(origin, forward, .75f);
+			Msg("! [diag][item_drop] no separate position actor=%u item=%u; native collision correction used", drop_actor->ID(), pObj->ID());
+		}
+		drop_velocity.mul(forward, .45f); // place/drop, not a grenade-style upward throw
+	}
 
 	pIItem->object().processing_activate();
 
@@ -356,28 +394,9 @@ bool CInventory::DropItem(CGameObject* pObj, bool just_before_destroy, bool dont
 		if (Level().CurrentViewEntity() == pActor_owner)
 			CurrentGameUI()->OnInventoryAction(pIItem, GE_OWNERSHIP_REJECT);
 	};
-	CObject* netcoop_dropper = smart_cast<CObject*>(m_pOwner);
-	CPhysicsShellHolder* netcoop_thrown = smart_cast<CPhysicsShellHolder*>(pObj);
-	if (!just_before_destroy && netcoop_thrown && netcoop_dropper && OnServer() &&
-		netcoop::server_player_copy(netcoop_dropper))
+	if (network_drop)
 	{
-		// Netcoop: a player's dropped item leaves the chest forward along the
-		// player's facing with a small arc, instead of appearing at the feet
-		// (weapons were thrown along the server's anchor Actor facing).
-		const CActor* player = smart_cast<const CActor*>(netcoop_dropper);
-		Fmatrix start;
-		start.rotateY(player ? -player->netcoop_model_yaw() : 0.f);
-		Fvector forward = start.k;
-		forward.y = 0.f;
-		if (forward.square_magnitude() < EPS)
-			forward.set(0.f, 0.f, 1.f);
-		forward.normalize();
-		start.c.mad(netcoop_dropper->Position(), forward, 0.5f);
-		start.c.y += 1.2f;
-		Fvector velocity;
-		velocity.mul(forward, 3.f);
-		velocity.y += 1.5f;
-		netcoop_thrown->netcoop_set_throw(start, velocity);
+		drop_holder->netcoop_set_throw(drop_start, drop_velocity);
 		pObj->H_SetParent(nullptr, dont_create_shell);
 		return true;
 	}

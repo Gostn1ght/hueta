@@ -1,5 +1,6 @@
 #pragma once
 #include "inventory_item.h"
+#include "netcoop_drop_layout.h"
 
 class CInventory;
 class CInventoryItem;
@@ -199,6 +200,7 @@ private:
 	u32 m_next_item_iteration_time;
 
 	std::vector<u8> m_blocked_slots;
+	NetcoopDropLayout m_netcoop_drop_layout;
 	bool IsSlotBlocked(u16 slot_id) const;
 	void TryActivatePrevSlot();
 	void TryDeactivateActiveSlot();
