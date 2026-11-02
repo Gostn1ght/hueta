@@ -55,6 +55,7 @@ struct CPhysicsElement{
 struct Shell{
  bool enabled=false;unsigned wakes=0;xr_vector<CPhysicsElement> elements{CPhysicsElement()};
  bool isEnabled(){return enabled;}
+ float getMass(){float result=0;for(const auto& e:elements)result+=e.mass;return result;}
  void Enable(){enabled=true;++wakes;}
  CPhysicsElement* get_ElementByStoreOrder(u16 i){return &elements.at(i);}
 };
@@ -106,6 +107,7 @@ struct World{::Objects Objects;u32 timeServer(){return fixture_now;}} world;
 World& Level(){return world;}
 namespace netcoop{bool fixture_client=false;bool pure_client(){return fixture_client;}
 void server_corpse_drag_update(xrServer*){}
+bool server_corpse_dragging(CObject*){return false;}
 '''+loop+r'''
 void vehicle_server_update(xrServer*){}
 }
@@ -127,8 +129,14 @@ int main(){
  assert(barrel.shell.enabled&&fragment.shell.enabled&&dropped.shell.enabled&&corpse.shell.enabled);
  assert(barrel.shell.elements[0].mass==80&&barrel.shell.elements[0].last_impulse==15);
  assert(std::fabs(barrel.shell.elements[0].state.linear_vel.z-0.1875f)<1e-6f);
- assert(fragment.shell.elements[0].last_impulse==4&&dropped.shell.elements[0].last_impulse==12); // items are kicked at 1.5 m/s
- assert(std::fabs(corpse.shell.elements[0].state.linear_vel.z-0.28f)<1e-6f&&corpse.shell.elements[1].impulses==0);
+ assert(fragment.shell.elements[0].last_impulse==4&&dropped.shell.elements[0].last_impulse==6);
+ assert(std::fabs(corpse.shell.elements[0].state.linear_vel.z-0.65f)<1e-6f&&corpse.shell.elements[1].impulses==1);
+ assert(std::fabs(corpse.shell.elements[1].state.linear_vel.z-0.65f)<1e-6f);
+ assert(corpse.shell.elements[0].state.linear_vel.y==0&&corpse.shell.elements[1].state.linear_vel.y==0);
+ // This exceeds a 50-ms Coulomb friction impulse for a resting 0.8-mu
+ // ragdoll; the old single-limb impulse was below that threshold.
+ const float momentum=corpse.shell.elements[0].last_impulse+corpse.shell.elements[1].last_impulse;
+ assert(momentum>corpse.shell.getMass()*9.81f*.8f*.05f);
  assert(!untouched.shell.enabled&&netcoop::s_physics_sent.count(10)==0&&server.sends==4);
  for(unsigned i=0;i<64;++i)tick(server);
  assert(fragment.shell.elements[0].state.linear_vel.z<=0.5f&&barrel.shell.elements[0].state.linear_vel.z<=0.5f);

@@ -15,6 +15,13 @@ static xr_map<u16, CorpseDrag> s_corpse_drags;
 static CActor* s_drag_client_actor = nullptr;
 static bool s_drag_client_active = false;
 
+bool server_corpse_dragging(CObject* object)
+{
+    for (const auto& entry : s_corpse_drags)
+        if (entry.second.body == object) return true;
+    return false;
+}
+
 void corpse_drag_client_state(bool active)
 {
     CActor* actor = g_pGameLevel ? smart_cast<CActor*>(Level().CurrentControlEntity()) : nullptr;

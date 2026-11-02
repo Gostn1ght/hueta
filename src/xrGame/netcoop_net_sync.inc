@@ -107,7 +107,7 @@ void server_physics_update(xrServer* server)
 		// movement contact to props/fragments, including sleeping ones.
 		for (const FootContact& foot : feet)
 		{
-			if (vehicle) break; // players walking into a car do not push it
+			if (vehicle || (creature && server_corpse_dragging(object))) break;
 			for (u16 i = 0; i < count; ++i)
 			{
 				SPHNetState body; holder->PHGetSyncItem(i)->get_State(body);
@@ -115,17 +115,23 @@ void server_physics_update(xrServer* server)
 				if (gap.y < -0.2f || gap.y > 0.8f) continue;
 				gap.y = 0.f;
 				if (gap.square_magnitude() > 0.36f || gap.dotproduct(foot.direction) < -0.05f) continue;
-				// Items are kicked aside as in single player (owner 2026-10-13: a
-				// weapon on the floor felt too heavy to move); bodies and props stay heavy.
-				const float target = creature ? 0.28f : item_or_corpse ? 1.5f : 0.5f;
+				// Small item drops must not shoot away under the player's feet.
+				// A corpse needs a whole-body nudge: pushing one light limb at
+				// 0.28 m/s could not overcome the ground friction of the full body.
+				const float target = creature ? 0.65f : item_or_corpse ? 0.75f : 0.5f;
 				const float gain = _max(0.f, target - body.linear_vel.dotproduct(foot.direction));
 				if (gain > 0.f)
 				{
+					if (creature && holder->PPhysicsShell()->getMass() > 200.f) break;
 					holder->PPhysicsShell()->Enable();
-					// Push the contacted limb instead of distributing the impulse over
-					// every bone. The joints and ground friction retain the body's weight.
-					CPhysicsElement* element = holder->PPhysicsShell()->get_ElementByStoreOrder(i);
-					element->applyImpulse(foot.direction, _min(element->getMass(), 30.f) * _min(gain, target));
+					for (u16 j = 0; j < (creature ? count : 1); ++j)
+					{
+						const u16 part = creature ? j : i;
+						SPHNetState state; holder->PHGetSyncItem(part)->get_State(state);
+						const float change = _max(0.f, _min(target, target - state.linear_vel.dotproduct(foot.direction)));
+						CPhysicsElement* element = holder->PPhysicsShell()->get_ElementByStoreOrder(part);
+						element->applyImpulse(foot.direction, _min(element->getMass(), 30.f) * change);
+					}
 				}
 				break;
 			}

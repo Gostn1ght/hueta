@@ -85,8 +85,10 @@ int main(){
  actor.seated=true;use("corpse_drag 10 1");assert(actor.physics.move.starts==0);actor.seated=false;
  actor.physics.move.exists=false;use("corpse_drag 10 1");assert(actor.physics.move.starts==0);actor.physics.move.exists=true;
  use("corpse_drag 10 1");assert(actor.physics.move.starts==1&&states.back()=="1"&&s_corpse_drags.size()==1);
+ assert(server_corpse_dragging(&body));
  server_corpse_drag_update(&server);assert(s_corpse_drags.size()==1);
  use("corpse_drag 65535 65535");assert(s_corpse_drags.empty()&&actor.physics.move.releases==1&&states.back()=="0");
+ assert(!server_corpse_dragging(&body));
  use("corpse_drag 10 1");client.flags.bConnected=false;server_corpse_drag_update(&server);
  assert(s_corpse_drags.empty()&&actor.physics.move.releases==2);client.flags.bConnected=true;
  use("corpse_drag 10 1");actor.alive=false;server_corpse_drag_update(&server);assert(s_corpse_drags.empty());actor.alive=true;

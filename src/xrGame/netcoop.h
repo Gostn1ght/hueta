@@ -164,6 +164,7 @@ bool corpse_drag_use(CActor* actor, CObject* target, u16 bone, bool shift);
 void corpse_drag_client_state(bool active);
 bool server_corpse_drag_command(xrServer* server, xrClientData* client, LPCSTR text);
 void server_corpse_drag_update(xrServer* server);
+bool server_corpse_dragging(CObject* object);
 bool script_pure_client();
 
 // ---- server ------------------------------------------------------------

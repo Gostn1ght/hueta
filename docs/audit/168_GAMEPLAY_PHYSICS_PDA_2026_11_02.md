@@ -174,3 +174,19 @@ candidates, per-inventory isolation and clock wrap; no live physics acceptance.
 First corpse-drag CI 41437420636 stopped in its test harness on MSVC warnings:
 CRT sscanf deprecation and int-to-u16 map fixture keys. Updated the harness to
 match project CRT settings and use explicit u16 keys; not a claimed runtime fix.
+
+Corpse foot-contact candidate: a tiny impulse on one light limb (0.28 m/s)
+was below the Coulomb ground-friction budget for a whole ragdoll. Walking contact
+now gives a bounded horizontal mass-scaled nudge across the ragdoll's parts;
+very heavy bodies (>200 kg) are excluded. Active captured bodies are not also
+kicked. Loose-item contact speed is reduced from 1.5 to 0.75 m/s. Fixture checks
+whole-body momentum, zero upward impulse and per-part velocity bounds. This
+still requires in-game contact/solver acceptance; not described as completed
+vehicle or general collision work.
+
+ZIL-131 source measured offline: actual DCP model is veh_zil_u_02 (not _01).
+Body/bench geometry uses game z = Blender y; the first inspection selected the
+cab area and was corrected. Cargo horizontal bench surfaces are at ~1.42-1.44 m,
+body floor ~1.12 m, sides x +/-1.20, rear ~-3.75. Current dcp_zil131 has only
+two cabin seats. Cargo seats, suitable low-bench pose, moving-platform support
+and fall damage remain open; geometry measurement alone is not an implementation.
