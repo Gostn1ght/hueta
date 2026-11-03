@@ -41,7 +41,7 @@ jobs:
           python-version: '3.13'
       - name: Check actual Lua menu and trade code
         run: |
-          python -m pip install lupa==2.8 cryptography==46.0.2
+          python -m pip install lupa==2.8 cryptography==46.0.2 numpy==2.4.5
           python scripts/check-netcoop-menu.py
           python scripts/check-netcoop-menu-assets.py
           python scripts/check-netcoop-admin-models.py

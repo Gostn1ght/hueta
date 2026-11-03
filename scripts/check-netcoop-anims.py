@@ -11,6 +11,7 @@ detector poses for every hand combination; the engine picks them by device."""
 from pathlib import Path
 import importlib.util
 import re
+import math,json
 
 root = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("merge", root / "tools/merge-player-anims.py")
@@ -68,7 +69,12 @@ assert {d['name'] for d in prone['defs']}==expected | {'lz_vehicle_passenger','l
 assert all(not d['flags']&2 for d in prone['defs']), 'prone movement must loop'
 import hashlib,json
 qa=json.loads((root.parent/'docs/audit/167_PRONE_POSE_QA.json').read_text())
-assert qa['omf_sha256']==hashlib.sha256(prone['data']).hexdigest()
+passenger=json.loads((root.parent/'docs/audit/180_PASSENGER_MOTION_QA.json').read_text())
+assert qa['omf_sha256']==passenger['previous_omf_sha256']
+assert passenger['omf_sha256']==hashlib.sha256(prone['data']).hexdigest()
+for name,blob in prone['blobs'].values():
+    if name!='lz_vehicle_passenger':
+        assert hashlib.sha256(blob).hexdigest()==passenger['unchanged_motions'][name], name
 assert 0.2<qa['sampled_head_height'][0]<=qa['sampled_head_height'][1]<0.5
 for grip in ('empty','knife','pistol','rifle'):
     samples=[s for s in qa['samples'] if s['clip']==f'lz_prone_{grip}_fwd']
@@ -78,3 +84,26 @@ for grip in ('empty','knife','pistol','rifle'):
         assert max(p[1] for p in foot)-min(p[1] for p in foot)>.12
         assert all(.02<p[2]<.3 for p in foot)
 print("netcoop anims: OK; 20 isolated prone cycles, low body, moving feet, exact QA asset checksum")
+
+# Independently decode exported keys, not authoring-scene metadata. Verify
+# that the passenger remains upright, faces the seat and keeps both feet
+# below the pelvis throughout breathing, without a twisted asymmetric hip.
+reader_spec=importlib.util.spec_from_file_location('poses',root/'read-omf-poses.py')
+poses=importlib.util.module_from_spec(reader_spec);reader_spec.loader.exec_module(poses)
+skeleton=json.loads((root.parent/'assets/animations/mesh2motion/game-skeleton-47.json').read_text())
+assert len(skeleton['parents'])==47
+motion=poses.Motions(actors/'modded_stalker_animations/netcoop_player_prone.omf',parents=skeleton['parents'])
+for phase in (0,.125,.25,.375,.5,.625,.75,.875,.99):
+    bones=motion.pose('lz_vehicle_passenger',phase,matrices=True)
+    hip=bones['bip01_pelvis'][:3,3];head=bones['bip01_head'][:3,3]
+    assert all(math.isfinite(float(v)) for mat in bones.values() for row in mat for v in row)
+    assert max(abs(float(v)) for v in hip)<.0005
+    assert .55<head[1]<.8 and abs(head[0])<.04
+    assert bones['bip01_head'][2,2]>.93, 'head must face along the seat, not sideways'
+    feet=[bones[f'bip01_{side}_foot'][:3,3] for side in ('l','r')]
+    assert abs(feet[0][1]-feet[1][1])<.03
+    assert abs(feet[0][2]-feet[1][2])<.03
+    assert -.65<feet[0][1]<-.25 and -.65<feet[1][1]<-.25
+    assert feet[0][0]<-.1 and feet[1][0]>.1
+    assert .2<feet[0][2]<.65 and .2<feet[1][2]<.65
+print('PASS decoded passenger keys: upright facing seat, hip at anchor, symmetric low feet; other 24 motions unchanged')

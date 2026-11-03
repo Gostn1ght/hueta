@@ -93,3 +93,23 @@ assert(acks==1 and player_state_ready and pending_player_state==nil)
 assert(zzz_player_injuries.health.head==11 and db.storage[7].pstor['health.head']==11)
 ''')
 print('PASS actual binder/state ordering: initialization before ACK; early snapshot survives first-update overwrite')
+
+# An optional HUD/PDA reset failure must not abort control/binder setup.
+fresh.execute(r'''
+local logs=0
+function printf(text,...) if text:find('[diag][actor-reset]',1,true) then logs=logs+1 end end
+local resets=0
+netcoop_pda={reset=function() error('stale PDA widget') end}
+zzz_player_injuries.netcoop_reset_actor=function() error('stale BHS widget') end
+ui_hud_dotmarks={netcoop_reset_actor=function() resets=resets+1 end}
+on_actor_spawned(actor)
+assert(input_resets==2 and resets==1 and logs==2,'optional resets are isolated; essential input restoration runs')
+use_player_state('@7|-')
+assert(bind_stalker.actor_binder.update({object=actor})==123)
+assert(acks==2 and zzz_player_injuries.health.head==11,'restore and input must survive an optional HUD failure')
+''')
+# Execute the actual disabled-DotMarks reset path (dependency failure => cfg=nil).
+dotmarks=(root/'scripts/netcoop-overlay/client/ui_hud_dotmarks.script').read_text(encoding='utf-8')
+reset=dotmarks[dotmarks.index('function netcoop_reset_actor()'):]
+LuaRuntime().execute('cfg=nil\n'+reset+'\nnetcoop_reset_actor()')
+print('PASS actor bootstrap: stale optional PDA/BHS widgets cannot abort input/binder/state restore; disabled DotMarks is safe')

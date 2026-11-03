@@ -28,6 +28,13 @@
       "path": "LICENSE-CC0.MD",
       "sha256": "52fec1c484df708c16b4c27b2bf0d7f0d3994105c57adc4b9e6f95bcfd9de65f",
       "bytes": 294
+    },
+    {
+      "path": "static/assets/human/animations/sitting-idle.glb",
+      "sha256": "1e4af0d5d565e6e44f6df5afb84eda027652c389fbc7e20dfd3fee7bdea5ffda",
+      "bytes": 59576,
+      "blender_input": "sitting-idle-plain.glb",
+      "blender_input_sha256": "c782c78ac28c8681f3e82df70b194e74ff046366575fd62ce44d4d2743d7991d"
     }
   ],
   "processing": "Lossless EXT_meshopt_compression decoding using official meshoptimizer decoder; no resampling or retargeting of source clips.",

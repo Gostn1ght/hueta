@@ -6594,6 +6594,9 @@ end
 function netcoop_reset_actor()
     maingameui, hmm, popin_active = nil, nil, nil
     scanning, anim_playing = false, false
+    -- Startup deliberately leaves cfg nil on a missing dependency/config.
+    -- Do not turn that optional-addon failure into an aborted actor spawn.
+    if not cfg then return end
     cfg.netcoop_restart = true
     cfg.held_key, cfg.held_mod, cfg.holding = nil, nil, nil
     cfg.use_release_time, cfg.last_tap, cfg.block_loot_window = nil, nil, nil

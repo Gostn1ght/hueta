@@ -15,7 +15,7 @@ def string(data,p):
     return data[p:end].decode('cp1251'),end+1
 
 class Motions:
-    def __init__(self, omf, actor):
+    def __init__(self, omf, actor=None, parents=None):
         d=dict(chunks(Path(omf).read_bytes()))
         meta=d[15];version,parts=struct.unpack_from('<HH',meta);p=4;names={}
         for _ in range(parts):
@@ -23,11 +23,13 @@ class Motions:
             for _ in range(n):
                 name,p=string(meta,p);bid=struct.unpack_from('<I',meta,p)[0];p+=4;names[bid]=name
         self.bones=[names[i] for i in range(len(names))]
-        bone_data=dict(chunks(Path(actor).read_bytes()))[13]
-        count=struct.unpack_from('<I',bone_data)[0];p=4;self.parents={}
-        for _ in range(count):
-            name,p=string(bone_data,p);parent,p=string(bone_data,p);p+=60
-            self.parents[name]=parent
+        self.parents=dict(parents or {})
+        if parents is None:
+            bone_data=dict(chunks(Path(actor).read_bytes()))[13]
+            count=struct.unpack_from('<I',bone_data)[0];p=4
+            for _ in range(count):
+                name,p=string(bone_data,p);parent,p=string(bone_data,p);p+=60
+                self.parents[name]=parent
         assert set(self.bones)<=set(self.parents)
         self.motions={}
         for i,b in chunks(d[14]):

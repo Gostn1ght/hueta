@@ -104,7 +104,6 @@ end
 
 -- Engine hook (Level_network_spawn.cpp) after the local Actor is assigned.
 function on_actor_spawned(obj)
-	if netcoop_pda and netcoop_pda.reset then netcoop_pda.reset() end
 	controlled_actor = obj
 	player_state_ready = false
 	player_state_spawn_ready = false
@@ -112,17 +111,26 @@ function on_actor_spawned(obj)
 	controlled_actor_id = obj:id()
 	destroyed_actor_id = nil
 	db.actor = obj
+	-- Recover control and bind the new body before touching optional UI.
+	-- A stale HUD widget must not abort respawn with input still disabled.
+	if level and level.enable_input then level.enable_input() end
+	install_actor_lifecycle()
+	use_own_actor_id(obj)
+	if netcoop_pda and netcoop_pda.reset then
+		local ok, err = pcall(netcoop_pda.reset)
+		if not ok then printf("! [diag][actor-reset] actor=%s module=pda error=%s", obj:id(), tostring(err)) end
+	end
 	-- These modules retain UI userdata and scan deadlines across a level
 	-- connection. Rebind them to this actor before its first update.
 	for _, name in ipairs({"zzz_player_injuries", "ui_hud_dotmarks"}) do
 		local m = _G[name]
-		if m and m.netcoop_reset_actor then m.netcoop_reset_actor() end
+		if m and m.netcoop_reset_actor then
+			local ok, err = pcall(m.netcoop_reset_actor)
+			if not ok then printf("! [diag][actor-reset] actor=%s module=%s error=%s", obj:id(), name, tostring(err)) end
+		end
 	end
 	-- Scripted item use can disable level input until its completion callback.
 	-- That callback belongs to the dead body and may never run after respawn.
-	if level and level.enable_input then level.enable_input() end
-	install_actor_lifecycle()
-	use_own_actor_id(obj)
 	quiet_busy_hands()
 	CreateTimeEvent("netcoop_client", "equip_pda", 5, equip_pda)
 	if pending_player_state then use_player_state(pending_player_state) end

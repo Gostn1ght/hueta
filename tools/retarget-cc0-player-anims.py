@@ -15,6 +15,8 @@ p.add_argument('--donors',type=Path,default=root/'assets/animations/mesh2motion'
 p.add_argument('--template',type=Path,required=True)
 p.add_argument('--addons',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
+p.add_argument('--clip',action='append',help='source.glb=motion_name; repeat for a custom review set')
+p.add_argument('--seat-origin',action='store_true',help='Place the pelvis at the seat anchor, without changing its orientation')
 args=p.parse_args(sys.argv[sys.argv.index('--')+1:])
 base=args.donors;out=args.output;out.mkdir(parents=True,exist_ok=True)
 provenance=json.loads((base/'provenance.json').read_text(encoding='utf-8'))
@@ -54,7 +56,9 @@ for side in ('l','r'):
 samples=[];snapshots=[];actions=[]
 clay=bpy.data.materials.new('Review actual game actor');clay.diffuse_color=(.38,.48,.39,1)
 for obj in target_meshes:obj.data.materials.clear();obj.data.materials.append(clay)
-for row,(file,name) in enumerate([('crawl-plain.glb','review_cc0_crawl'),('pistol-prone-plain.glb','review_cc0_pistol_prone'),('driving-plain.glb','review_cc0_driving')]):
+clips=[tuple(value.split('=',1)) for value in args.clip] if args.clip else [('crawl-plain.glb','review_cc0_crawl'),('pistol-prone-plain.glb','review_cc0_pistol_prone'),('driving-plain.glb','review_cc0_driving')]
+assert all(len(pair)==2 for pair in clips)
+for row,(file,name) in enumerate(clips):
  before=set(bpy.data.objects)
  bpy.ops.import_scene.gltf(filepath=str(base/file))
  imported=set(bpy.data.objects)-before;donor=next(o for o in imported if o.type=='ARMATURE')
@@ -83,7 +87,7 @@ for row,(file,name) in enumerate([('crawl-plain.glb','review_cc0_crawl'),('pisto
    if dst in mapping:
     src=mapping[dst];source_pose=align@donor.matrix_world@donor.pose.bones[src].matrix
     pose=(source_pose.to_quaternion()@corrections[dst]).to_matrix().to_4x4()
-    if dst=='bip01_pelvis':pose.translation=source_pose.translation*scale
+    if dst=='bip01_pelvis':pose.translation=Vector((0,0,0)) if args.seat_origin else source_pose.translation*scale
     else:pose.translation=(world[parent.name]@rest[parent.name].inverted()@rest[dst]).translation
    else:pose=world[parent.name]@rest[parent.name].inverted()@rest[dst] if parent else rest[dst].copy()
    world[dst]=pose

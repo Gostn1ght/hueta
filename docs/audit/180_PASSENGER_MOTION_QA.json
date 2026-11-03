@@ -1,0 +1,43 @@
+{
+  "previous_omf_sha256": "2ae3419285461fb39cad902679b6dfd4ba24df613f060b8f9df54502de4f09ec",
+  "omf_sha256": "42a15066e95cb8170b083da088c8f94da604e63505a971cb205a2a06c8495a9e",
+  "source": "Mesh2Motion sitting-idle, CC0-1.0",
+  "source_commit": "b6dc8faa022fecf69956c79682a2ecaca9fcb81d",
+  "roundtrip_max_error_metres": 4.655642467952318e-05,
+  "unchanged_motions": {
+    "lz_prone_empty_idle": "5572b6da7ab4c38421f2f364899c835297ac53f29c80d66eff482b556f017526",
+    "lz_prone_empty_fwd": "dedf59a62d68e24e6b28ec4ae03995921028eaaa0caebf7be0811f3bb2b1e668",
+    "lz_prone_empty_back": "5300125d400dd9f07a703a74090bf4cae00bf7a67989c164826477906088f344",
+    "lz_prone_empty_left": "4e9d37318aff9ef1d0fa05ba2971714d27c1406d7d7335fb6fc2b6089eabd6b8",
+    "lz_prone_empty_right": "944150d4955cde49ccb02dd9dc2d15b23fca6d8f83d03ee80b4e36b6071eeae2",
+    "lz_prone_knife_idle": "ecbf19b8993032b94368ea23876dbcab8accfdc984c1e5799f485c020b771c88",
+    "lz_prone_knife_fwd": "094c63df96bd577f0b335aed256d2a24793f105ced181dd9d40a59aed30a07c6",
+    "lz_prone_knife_back": "c51bea0e7a2984b48fd03e7e70a04dafb5030dc3b82ed355819c191cd9a3423f",
+    "lz_prone_knife_left": "38fe3cb65040ae52efd13590c048eb04253caf4b89394e3c868d0f3179763958",
+    "lz_prone_knife_right": "78737f9d68724d80dfc7961fd241fbf78acf70f65ce0fbea58bb85596daa2819",
+    "lz_prone_pistol_idle": "d5a400a9fd30c60c3f70c03e21de5219d52a80bd4e39eb6acea3f7a8c1419e45",
+    "lz_prone_pistol_fwd": "9dc4874b9b14f175575eeef500dfe569d72b5430b48cac02756e83bd59ba7899",
+    "lz_prone_pistol_back": "edcfca7cdf394300f5764f2c4923e40639130e05864505b0572bf9b9e4f8f478",
+    "lz_prone_pistol_left": "90d8e11e3b7abc2de08787b375a6d03a7345e15221434745b634a5ddb9046984",
+    "lz_prone_pistol_right": "7429d794e6794a9b1ef1190e1c96a5c7e5d813ab399dd84c16ad74b97d2878f5",
+    "lz_prone_rifle_idle": "62fcb01ac49c2841938b7b50be70f35e776ee2f80b940cdc27db53923e371d71",
+    "lz_prone_rifle_fwd": "a9b263e5db8db9bd1cc01ace819af3be270ce08c9392c3a3bbffa337e6c7ef85",
+    "lz_prone_rifle_back": "2158c5b37279e600ffd36cd1f221b37500249d911808f6923abd12fac901bacd",
+    "lz_prone_rifle_left": "46d9bd9487c12adb77b68669a4fb5282ee2087f08e40c18597adcf9225895f08",
+    "lz_prone_rifle_right": "59cfd1a4b2d93257e2e729a8d4f6e516b22c32457eff4ff4648bb759fb078c0e",
+    "lz_vehicle_enter_driver": "32265a8bea8d8768d1a162f56dfc095679767be7f41d9be6f89aefc2d9063240",
+    "lz_vehicle_exit_driver": "4733b2021ee90ab7da22a67c7a3be53601cb7b022208063963dc624351781571",
+    "lz_vehicle_enter_passenger": "7a52b7b16c38df2a2cb302b0b317ce65a750357ccdeacdc5ffbad2fabbcd5186",
+    "lz_vehicle_exit_passenger": "c5d042c0bd72c0e52ee02a6e3be7198a44b186ebb14e984413c239d63ab02ea2"
+  },
+  "reviewed_models": [
+    "dcp_bmw5",
+    "dcp_paz",
+    "dcp_paz3206",
+    "dcp_zil131",
+    "dcp_ural",
+    "dcp_kamaz_army"
+  ],
+  "game_tested": false,
+  "released": false
+}
