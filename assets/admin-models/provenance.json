@@ -1,0 +1,614 @@
+{
+  "sources": [
+    {
+      "name": "areke",
+      "source": "C:\\Users\\Mahito\\Downloads\\anime-style-elf-rigged.zip",
+      "sha256": "c1cd2f71cbb64cd6fc090350aeba6fed8c7b3d35473d5d6e815b7069c0959bbe"
+    },
+    {
+      "name": "mahito",
+      "source": "C:\\Users\\Mahito\\Downloads\\adam-smasher.zip",
+      "sha256": "22fa3b50f14b787d047406703cc6fdf2c561325dc5220e23a1434fa2865de221"
+    }
+  ],
+  "models": [
+    {
+      "name": "areke",
+      "model": "meshes/actors/lostzone_admin/areke.ogf",
+      "sha256": "c0d77f8ad3ad11053328a77c615dcf8011a31cecf616c1e98d0215f08efffa83",
+      "uniform_scale": 0.9828113301302038,
+      "core_proportions_preserved": true,
+      "mapping": {
+        "Bip001": "bip01",
+        "Bip001 Pelvis": "bip01_pelvis",
+        "Bip001 Spine": "bip01_spine",
+        "Bip001 Spine1": "bip01_spine1",
+        "Bip001 Neck": "bip01_neck",
+        "Bip001 Head": "bip01_head",
+        "Bip001 L Thigh": "bip01_l_thigh",
+        "Bip001 L Calf": "bip01_l_calf",
+        "Bip001 L Foot": "bip01_l_foot",
+        "Bip001 L Toe0": "bip01_l_toe0",
+        "Bip001 L Clavicle": "bip01_l_clavicle",
+        "Bip001 L UpperArm": "bip01_l_upperarm",
+        "Bip001 L Forearm": "bip01_l_forearm",
+        "Bip001 L Hand": "bip01_l_hand",
+        "Bip001 L Finger0": "bip01_l_finger0",
+        "Bip001 L Finger01": "bip01_l_finger01",
+        "Bip001 L Finger1": "bip01_l_finger1",
+        "Bip001 L Finger11": "bip01_l_finger11",
+        "Bip001 L Finger2": "bip01_l_finger2",
+        "Bip001 L Finger21": "bip01_l_finger21",
+        "Bip001 R Thigh": "bip01_r_thigh",
+        "Bip001 R Calf": "bip01_r_calf",
+        "Bip001 R Foot": "bip01_r_foot",
+        "Bip001 R Toe0": "bip01_r_toe0",
+        "Bip001 R Clavicle": "bip01_r_clavicle",
+        "Bip001 R UpperArm": "bip01_r_upperarm",
+        "Bip001 R Forearm": "bip01_r_forearm",
+        "Bip001 R Hand": "bip01_r_hand",
+        "Bip001 R Finger0": "bip01_r_finger0",
+        "Bip001 R Finger01": "bip01_r_finger01",
+        "Bip001 R Finger1": "bip01_r_finger1",
+        "Bip001 R Finger11": "bip01_r_finger11",
+        "Bip001 R Finger2": "bip01_r_finger2",
+        "Bip001 R Finger21": "bip01_r_finger21"
+      },
+      "meshes": [
+        {
+          "mesh": "0000_charbody",
+          "vertices": 3450,
+          "triangles": 5007
+        },
+        {
+          "mesh": "0001_charbody",
+          "vertices": 2155,
+          "triangles": 2211
+        },
+        {
+          "mesh": "0002_charbody_acc",
+          "vertices": 24,
+          "triangles": 22
+        },
+        {
+          "mesh": "0003_charbody_part1",
+          "vertices": 71,
+          "triangles": 74
+        },
+        {
+          "mesh": "0004_charbody",
+          "vertices": 2223,
+          "triangles": 1965
+        },
+        {
+          "mesh": "0005_charbody_acc",
+          "vertices": 132,
+          "triangles": 142
+        },
+        {
+          "mesh": "0006_charhair_1",
+          "vertices": 448,
+          "triangles": 650
+        },
+        {
+          "mesh": "0007_charhair_2",
+          "vertices": 1270,
+          "triangles": 1740
+        },
+        {
+          "mesh": "0008_charface",
+          "vertices": 822,
+          "triangles": 1420
+        },
+        {
+          "mesh": "0010_charface",
+          "vertices": 622,
+          "triangles": 803
+        },
+        {
+          "mesh": "0011_charface_eyeBrow",
+          "vertices": 268,
+          "triangles": 350
+        },
+        {
+          "mesh": "charhair_cos28",
+          "vertices": 1810,
+          "triangles": 2192
+        }
+      ],
+      "excluded": [
+        "Icosphere",
+        "0009_charface_none",
+        "0012_charface_none"
+      ],
+      "textures": [
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_costume_eleonor_28_hair.png",
+          "texture": "actors/lostzone_admin/areke_tex_costume_eleonor_28_hair.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_eleonor_eye.png",
+          "texture": "actors/lostzone_admin/areke_tex_eleonor_eye.dds",
+          "alpha": true
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_eleonor_face.png",
+          "texture": "actors/lostzone_admin/areke_tex_eleonor_face.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_eleonor_hair_01.png",
+          "texture": "actors/lostzone_admin/areke_tex_eleonor_hair_01.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_costume_eleonor_28_02.png",
+          "texture": "actors/lostzone_admin/areke_tex_costume_eleonor_28_02.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_costume_eleonor_28_02.png",
+          "texture": "actors/lostzone_admin/areke_tex_costume_eleonor_28_02.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\areke\\textures\\embedded\\tex_costume_eleonor_28_02.png",
+          "texture": "actors/lostzone_admin/areke_tex_costume_eleonor_28_02.dds",
+          "alpha": false
+        }
+      ]
+    },
+    {
+      "name": "mahito",
+      "model": "meshes/actors/lostzone_admin/mahito.ogf",
+      "sha256": "ab12469b8ce1ebe6c10d65141ffae37cdc7b8e2e6213e49e5cb9dbfd44e6e013",
+      "uniform_scale": 1.0860625233692358,
+      "core_proportions_preserved": true,
+      "mapping": {
+        "root_hips": "bip01_pelvis",
+        "pelvis": "bip01_pelvis",
+        "spine_lower_01": "bip01_spine",
+        "spine_middle": "bip01_spine1",
+        "spine_shoulders": "bip01_spine2",
+        "head_neck_lower": "bip01_neck",
+        "head_neck_upper": "bip01_head",
+        "arm_left_shoulder_01": "bip01_l_clavicle",
+        "arm_left_shoulder_02": "bip01_l_upperarm",
+        "arm_left_elbow": "bip01_l_forearm",
+        "arm_left_wrist": "bip01_l_hand",
+        "leg_left_thigh": "bip01_l_thigh",
+        "leg_left_knee": "bip01_l_calf",
+        "leg_left_ankle": "bip01_l_foot",
+        "leg_left_toes": "bip01_l_toe0",
+        "arm_left_finger_1a": "bip01_l_finger0",
+        "arm_left_finger_1b": "bip01_l_finger01",
+        "arm_left_finger_1c": "bip01_l_finger02",
+        "arm_left_finger_2a": "bip01_l_finger1",
+        "arm_left_finger_2b": "bip01_l_finger11",
+        "arm_left_finger_2c": "bip01_l_finger12",
+        "arm_left_finger_3a": "bip01_l_finger2",
+        "arm_left_finger_3b": "bip01_l_finger21",
+        "arm_left_finger_3c": "bip01_l_finger22",
+        "arm_right_shoulder_01": "bip01_r_clavicle",
+        "arm_right_shoulder_02": "bip01_r_upperarm",
+        "arm_right_elbow": "bip01_r_forearm",
+        "arm_right_wrist": "bip01_r_hand",
+        "leg_right_thigh": "bip01_r_thigh",
+        "leg_right_knee": "bip01_r_calf",
+        "leg_right_ankle": "bip01_r_foot",
+        "leg_right_toes": "bip01_r_toe0",
+        "arm_right_finger_1a": "bip01_r_finger0",
+        "arm_right_finger_1b": "bip01_r_finger01",
+        "arm_right_finger_1c": "bip01_r_finger02",
+        "arm_right_finger_2a": "bip01_r_finger1",
+        "arm_right_finger_2b": "bip01_r_finger11",
+        "arm_right_finger_2c": "bip01_r_finger12",
+        "arm_right_finger_3a": "bip01_r_finger2",
+        "arm_right_finger_3b": "bip01_r_finger21",
+        "arm_right_finger_3c": "bip01_r_finger22"
+      },
+      "meshes": [
+        {
+          "mesh": "_4__Backpack_0",
+          "vertices": 5000,
+          "triangles": 6368
+        },
+        {
+          "mesh": "_4_Body_0",
+          "vertices": 15733,
+          "triangles": 25017
+        },
+        {
+          "mesh": "_4_Stuff_0",
+          "vertices": 5993,
+          "triangles": 9084
+        },
+        {
+          "mesh": "_4_Head_0",
+          "vertices": 3785,
+          "triangles": 6100
+        }
+      ],
+      "excluded": [],
+      "textures": [
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\mahito\\textures\\T_GateMouseUniversal_Backpack_D.tga.png",
+          "texture": "actors/lostzone_admin/mahito_t_gatemouseuniversal_backpack_d.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\mahito\\textures\\T_GateMouse_Body_D.tga.png",
+          "texture": "actors/lostzone_admin/mahito_t_gatemouse_body_d.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\mahito\\textures\\T_GateMouse_Head_D.tga.png",
+          "texture": "actors/lostzone_admin/mahito_t_gatemouse_head_d.dds",
+          "alpha": false
+        },
+        {
+          "source": "J:\\LostZone_Work\\_work\\admin_models_20261103\\mahito\\textures\\T_GateMouse_FaceAcc_D.tga.png",
+          "texture": "actors/lostzone_admin/mahito_t_gatemouse_faceacc_d.dds",
+          "alpha": false
+        }
+      ]
+    }
+  ],
+  "textures": {
+    "actors/lostzone_admin/areke_tex_costume_eleonor_28_hair.dds": {
+      "source_sha256": "f006a333fccd53708307f39e97a857bfad33aaa9fad78cc66e3d6604beb3f0cf",
+      "sha256": "961a47b25da82547c25b99cfebda69650e886b0c2e6437d6fc95e2df9aa09644",
+      "size": [
+        1024,
+        1024
+      ],
+      "mips": 11,
+      "format": "DXT1",
+      "bytes": 699192
+    },
+    "actors/lostzone_admin/areke_tex_eleonor_eye.dds": {
+      "source_sha256": "f87c1f3b8f31e8f9b920d0221bbba75bc1b89fe30e394b75909b12d7a5d4f71f",
+      "sha256": "a08eff44f3bdd3d329287bf519770001201c7aaac6b3328ebb50264da1371b03",
+      "size": [
+        256,
+        256
+      ],
+      "mips": 9,
+      "format": "DXT5",
+      "bytes": 87536
+    },
+    "actors/lostzone_admin/areke_tex_eleonor_face.dds": {
+      "source_sha256": "1e3ce8cc281d60ae183c7c1fec4fecf51bedd2ba3ee79086f1be2f752d773cc9",
+      "sha256": "13c48fd91da515f40f89eb5833520ab0e643ac3ec2b3b18c3d2e464da4ca2fb0",
+      "size": [
+        512,
+        512
+      ],
+      "mips": 10,
+      "format": "DXT1",
+      "bytes": 174904
+    },
+    "actors/lostzone_admin/areke_tex_eleonor_hair_01.dds": {
+      "source_sha256": "1a5452e27f1ab54018554e80b25df222b3a7573224259d1112904d5d896711cc",
+      "sha256": "ad47c95b9edd4b2493d2694f5e931677a65e89be84936658feb3e751a9198910",
+      "size": [
+        1024,
+        1024
+      ],
+      "mips": 11,
+      "format": "DXT1",
+      "bytes": 699192
+    },
+    "actors/lostzone_admin/areke_tex_costume_eleonor_28_02.dds": {
+      "source_sha256": "75888ab436db4fc75f1908700f005bf55d7a684aa02721faaa7c67685514db33",
+      "sha256": "1b728a17ed6899e01e9d63506be13e80f383a561e79c303bb4e0c88f96630674",
+      "size": [
+        1024,
+        1024
+      ],
+      "mips": 11,
+      "format": "DXT1",
+      "bytes": 699192
+    },
+    "actors/lostzone_admin/mahito_t_gatemouseuniversal_backpack_d.dds": {
+      "source_sha256": "9ae28cd7d9907999e70269d2d83ba0d9c48763637d54de39632b332101a436b1",
+      "sha256": "5da67a591b5988d55038fa904365221357ea8e7c2dc0467a14c454e0cdef377b",
+      "size": [
+        2048,
+        2048
+      ],
+      "mips": 12,
+      "format": "DXT1",
+      "bytes": 2796344
+    },
+    "actors/lostzone_admin/mahito_t_gatemouse_body_d.dds": {
+      "source_sha256": "4979af79bea578ac8852289800e3e97f1dc53496b6449d5856f9e02f28fa21bd",
+      "sha256": "506ce1e8d49a4ab7e3b6588369a9e2ccf1a75029d1a0b533a1a25c0d0438a516",
+      "size": [
+        2048,
+        2048
+      ],
+      "mips": 12,
+      "format": "DXT1",
+      "bytes": 2796344
+    },
+    "actors/lostzone_admin/mahito_t_gatemouse_head_d.dds": {
+      "source_sha256": "386fa5913502f82cd5dfd9f665ff38dce491dead802a632eb1ce075c3572f056",
+      "sha256": "be6880b4839a765062f7bcd816f1e834b0d777e006852fff251274817f150d32",
+      "size": [
+        2048,
+        2048
+      ],
+      "mips": 12,
+      "format": "DXT1",
+      "bytes": 2796344
+    },
+    "actors/lostzone_admin/mahito_t_gatemouse_faceacc_d.dds": {
+      "source_sha256": "bce5913d188c40beb8eb632c0bfc540a1ab88c46b8551a70022fe752352a9335",
+      "sha256": "8b2583b7633bb266bbc42e8266406fa22421fc7fa810db305f07f54bb97eb1d7",
+      "size": [
+        2048,
+        2048
+      ],
+      "mips": 12,
+      "format": "DXT1",
+      "bytes": 2796344
+    }
+  },
+  "bind": [
+    {
+      "file": "stalker_neutral_1.ogf",
+      "bones": 47,
+      "position_error": 0.0,
+      "rotation_error": 0.0
+    },
+    {
+      "file": "mahito.ogf",
+      "bones": 47,
+      "position_error": 7.927123647805592e-06,
+      "rotation_error": 0.0
+    },
+    {
+      "file": "areke.ogf",
+      "bones": 47,
+      "position_error": 7.927123647805592e-06,
+      "rotation_error": 0.0
+    }
+  ],
+  "pose_review": [
+    {
+      "name": "mahito",
+      "samples": [
+        {
+          "clip": "rest",
+          "phase": 0,
+          "lo": [
+            -0.8867204189300537,
+            -0.3906736969947815,
+            -0.04296429082751274
+          ],
+          "hi": [
+            0.8862249851226807,
+            0.21827156841754913,
+            1.79999840259552
+          ]
+        },
+        {
+          "clip": "norm_walk_fwd_0",
+          "phase": 0,
+          "lo": [
+            -0.26821279525756836,
+            -0.19490328431129456,
+            -0.05390799045562744
+          ],
+          "hi": [
+            0.4061298668384552,
+            0.835025429725647,
+            1.6823245286941528
+          ]
+        },
+        {
+          "clip": "norm_walk_fwd_0",
+          "phase": 0.5,
+          "lo": [
+            -0.226053386926651,
+            -0.23031342029571533,
+            -0.022143905982375145
+          ],
+          "hi": [
+            0.44748905301094055,
+            0.7857959270477295,
+            1.682576060295105
+          ]
+        },
+        {
+          "clip": "steering_idle_0_0",
+          "phase": 0.2,
+          "lo": [
+            -0.3927142918109894,
+            -0.32723063230514526,
+            -0.21875232458114624
+          ],
+          "hi": [
+            0.39110684394836426,
+            0.9387755393981934,
+            0.7849211692810059
+          ]
+        },
+        {
+          "clip": "review_cc0_crawl",
+          "phase": 0.25,
+          "lo": [
+            -0.5065323710441589,
+            -0.9515644311904907,
+            -0.02981400489807129
+          ],
+          "hi": [
+            0.5863339304924011,
+            1.2942440509796143,
+            0.4734131097793579
+          ]
+        }
+      ],
+      "images": [
+        {
+          "name": "mahito_t_gatemouse_body_d.dds",
+          "size": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "name": "mahito_t_gatemouse_faceacc_d.dds",
+          "size": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "name": "mahito_t_gatemouse_head_d.dds",
+          "size": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "name": "mahito_t_gatemouseuniversal_backpack_d.dds",
+          "size": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "name": "Render Result",
+          "size": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "areke",
+      "samples": [
+        {
+          "clip": "rest",
+          "phase": 0,
+          "lo": [
+            -0.8920392394065857,
+            -0.4240071773529053,
+            -0.013989455997943878
+          ],
+          "hi": [
+            0.891502320766449,
+            0.24658861756324768,
+            1.8000001907348633
+          ]
+        },
+        {
+          "clip": "norm_walk_fwd_0",
+          "phase": 0,
+          "lo": [
+            -0.3772815465927124,
+            -0.4048479199409485,
+            -0.014518827199935913
+          ],
+          "hi": [
+            0.3595561385154724,
+            0.8288230299949646,
+            1.7051546573638916
+          ]
+        },
+        {
+          "clip": "norm_walk_fwd_0",
+          "phase": 0.5,
+          "lo": [
+            -0.3380667567253113,
+            -0.4624066948890686,
+            -0.017008449882268906
+          ],
+          "hi": [
+            0.4012218117713928,
+            0.7796856760978699,
+            1.7069487571716309
+          ]
+        },
+        {
+          "clip": "steering_idle_0_0",
+          "phase": 0.2,
+          "lo": [
+            -0.37594839930534363,
+            -0.6108325123786926,
+            -0.22593387961387634
+          ],
+          "hi": [
+            0.3306127190589905,
+            0.8545475006103516,
+            0.7847713232040405
+          ]
+        },
+        {
+          "clip": "review_cc0_crawl",
+          "phase": 0.25,
+          "lo": [
+            -0.4411168694496155,
+            -0.8689717650413513,
+            -0.5487082004547119
+          ],
+          "hi": [
+            0.5289580225944519,
+            1.2648860216140747,
+            0.4437134265899658
+          ]
+        }
+      ],
+      "images": [
+        {
+          "name": "areke_tex_costume_eleonor_28_02.dds",
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "areke_tex_costume_eleonor_28_hair.dds",
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "areke_tex_eleonor_eye.dds",
+          "size": [
+            256,
+            256
+          ]
+        },
+        {
+          "name": "areke_tex_eleonor_face.dds",
+          "size": [
+            512,
+            512
+          ]
+        },
+        {
+          "name": "areke_tex_eleonor_hair_01.dds",
+          "size": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "name": "Render Result",
+          "size": [
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "installed": false,
+  "published": false
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+  <string id="st_lz_admin_mahito"><text>Mahito</text></string>
+  <string id="st_lz_admin_mahito_descr"><text>Шуточный админский костюм Mahito. Модель Адама Смэшера. Усиленная защита, восстановление здоровья и сил, +1000 кг переносимого веса. В инвентаре показан обычный экзоскелет.</text></string>
+  <string id="st_lz_admin_areke"><text>Areke</text></string>
+  <string id="st_lz_admin_areke_descr"><text>Шуточный админский костюм Areke. Модель эльфа. Усиленная защита, восстановление здоровья и сил, +1000 кг переносимого веса. В инвентаре показан обычный экзоскелет.</text></string>
+</string_table>

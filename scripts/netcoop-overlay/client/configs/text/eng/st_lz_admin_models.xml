@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+  <string id="st_lz_admin_mahito"><text>Mahito</text></string>
+  <string id="st_lz_admin_mahito_descr"><text>Mahito joke administrator outfit. Adam Smasher model. Extreme protection, health and stamina recovery, +1000 kg carry capacity. Uses an existing exoskeleton inventory icon and world item.</text></string>
+  <string id="st_lz_admin_areke"><text>Areke</text></string>
+  <string id="st_lz_admin_areke_descr"><text>Areke joke administrator outfit. Elf model. Extreme protection, health and stamina recovery, +1000 kg carry capacity. Uses an existing exoskeleton inventory icon and world item.</text></string>
+</string_table>

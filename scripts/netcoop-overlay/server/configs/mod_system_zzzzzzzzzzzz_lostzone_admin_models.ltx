@@ -1,0 +1,66 @@
+; User-requested joke outfits. Issued through the existing administrator spawner.
+; No trader/loot/loadout tables reference these sections. Inventory world model
+; and icon intentionally inherit an existing exoskeleton, not the actor mesh.
+[lz_admin_bone_protection]
+default = 1.0, 1000.0, 0
+hit_fraction_npc = 0.001
+
+[lz_admin_outfit_immunities]
+burn_immunity = 0
+strike_immunity = 0
+shock_immunity = 0
+wound_immunity = 0
+radiation_immunity = 0
+telepatic_immunity = 0
+chemical_burn_immunity = 0
+explosion_immunity = 0
+fire_wound_immunity = 0
+
+[lz_admin_mahito]:exo_outfit
+$spawn = "outfit/lz_admin_mahito"
+actor_visual = actors\lostzone_admin\mahito.ogf
+npc_visual = actors\lostzone_admin\mahito.ogf
+inv_name = st_lz_admin_mahito
+inv_name_short = st_lz_admin_mahito
+description = st_lz_admin_mahito_descr
+visual = dynamics\outfit\exo_outfit
+inv_grid_x = 14
+inv_grid_y = 15
+inv_weight = 1
+cost = 0
+can_trade = false
+sprint_allowed = true
+power_loss = 0.001
+control_inertion_factor = 1
+additional_inventory_weight = 1000
+additional_inventory_weight2 = 1000
+artefact_count = 5
+hit_fraction_actor = 0.001
+bones_koeff_protection = lz_admin_bone_protection
+immunities_sect = lz_admin_outfit_immunities
+use_condition = false
+upgrades =
+installed_upgrades =
+burn_protection = 1000
+shock_protection = 1000
+radiation_protection = 1000
+chemical_burn_protection = 1000
+telepatic_protection = 1000
+strike_protection = 1000
+explosion_protection = 1000
+wound_protection = 1000
+health_restore_speed = 0.1
+power_restore_speed = 0.1
+radiation_restore_speed = 0.1
+bleeding_restore_speed = 0.1
+
+[lz_admin_areke]:lz_admin_mahito
+$spawn = "outfit/lz_admin_areke"
+actor_visual = actors\lostzone_admin\areke.ogf
+npc_visual = actors\lostzone_admin\areke.ogf
+inv_name = st_lz_admin_areke
+inv_name_short = st_lz_admin_areke
+description = st_lz_admin_areke_descr
+visual = dynamics\outfit\merc_exo_outfit
+inv_grid_x = 16
+inv_grid_y = 17
