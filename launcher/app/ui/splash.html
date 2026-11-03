@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Запуск</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="splash panel" data-drag style="border-radius:0;background:rgba(14,14,15,.55)">
+    <img class="logo-big" src="assets/logo.png" alt="" />
+    <h1 id="title">NETANOMALY</h1>
+    <div class="gold-line"></div>
+    <div class="grow"></div>
+    <div class="row"><span class="t" id="text">Запуск…</span><span class="v" id="ver"></span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+  <script src="common.js"></script>
+  <script>
+    listen("splash", (e) => {
+      $("#text").textContent = e.payload.text;
+      $("#bar").style.width = Math.round(e.payload.pct * 100) + "%";
+    });
+    (async () => {
+      try {
+        const info = await invoke("info");
+        $("#title").textContent = info.title;
+        $("#ver").textContent = "лаунчер " + info.launcher_version;
+        await invoke("boot");
+      } catch (e) {
+        $("#text").textContent = String(e);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      await new Promise((r) => setTimeout(r, 350));
+      if (T) invoke("show_main"); else location.href = "index.html";
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+{
+  "source": "Owner launcher 1.2.5, imported 2026-11-03 without keys, dist, target or generated files",
+  "files": [
+    {
+      "path": "app/brand.json",
+      "sha256": "3739a8767e2a302b6e29de3adaf3ea701a58a0e2f14e3a12f5c19c5a468c0e08"
+    },
+    {
+      "path": "app/build.rs",
+      "sha256": "bdd5c8ac357a7d9883073c58216839c7a3ed37a1f844c668186bc9ee6b659400"
+    },
+    {
+      "path": "app/Cargo.toml",
+      "sha256": "a77b7a773dba07b80e6f2e2b064fe957e59f5bcd4720227269b63c47fc3b9458"
+    },
+    {
+      "path": "app/tauri.conf.json",
+      "sha256": "8bb81e0fca526a646cde51c2492233a1bbf600ea98746fcc584a07e35981a4bf"
+    },
+    {
+      "path": "app/capabilities/default.json",
+      "sha256": "84fd16b67fc07ceb1cce4f361f9aa137668a831828fb4150ae418c298c2e856e"
+    },
+    {
+      "path": "app/icons/icon.ico",
+      "sha256": "86e1abc34a84a00b9132ab70fd4e86d8eea5e252d35973ef49056853f3186b7d"
+    },
+    {
+      "path": "app/icons/icon.png",
+      "sha256": "fbd7ffd2f120bbadb2bca7f64033a42560da32efd80f98618ae750463bc95ea0"
+    },
+    {
+      "path": "app/src/brand.rs",
+      "sha256": "7c23c3897b9ea6f7eccea98fca16d5558a9d4add2834474492f43c374b3fd4b8"
+    },
+    {
+      "path": "app/src/launcher.rs",
+      "sha256": "e664a9efca6e206aff5294140e248df3c0564d8e49aed3d243ea95443ac81aa5"
+    },
+    {
+      "path": "app/src/main.rs",
+      "sha256": "31135f996462d26f835bb1326aa0d961b719775fffaae3ba3659ecba334e5712"
+    },
+    {
+      "path": "app/src/setup.rs",
+      "sha256": "c8e6de402c9adcf2ec6acfe5f1bb249c21130281b07506ae719119cc82891422"
+    },
+    {
+      "path": "app/src/sys.rs",
+      "sha256": "8ac1c71c1dfa2e19870e27ac0da00aa364b389f1c8786d1e83b194a0c027b942"
+    },
+    {
+      "path": "app/ui/common.js",
+      "sha256": "d1e478aaf705712e4a312341826c0cdcdbf73e6b5edb1418dccfb964afe170ab"
+    },
+    {
+      "path": "app/ui/index.html",
+      "sha256": "4e9c161ba394c53e4fa3f1e16cb4d5deb19e4f4da675ff0b91749f83f9d9f8c9"
+    },
+    {
+      "path": "app/ui/main.js",
+      "sha256": "f8c72082af468c35598df943dc85073a5d5cc13d00e719f008bf2725a6f74c80"
+    },
+    {
+      "path": "app/ui/setup.html",
+      "sha256": "d3ef5af80eae14e47f1678c576ae1b39287fb1dbb0889d7414354b8b4c8d47b1"
+    },
+    {
+      "path": "app/ui/splash.html",
+      "sha256": "c41584077d79fdf25381ec810132f10862f37b3b9865c808ca01db57780784ee"
+    },
+    {
+      "path": "app/ui/style.css",
+      "sha256": "93a4f47befd8229daa5cb781f4f8c3a035b19135871bfde2739c662a653339b5"
+    },
+    {
+      "path": "app/ui/websetup.html",
+      "sha256": "739bb09a521bde86da045c6606d4f449aab0ff302fb53ca0df692f48cf1f3469"
+    },
+    {
+      "path": "app/ui/assets/bg.jpg",
+      "sha256": "b46587b8c7d48510d1f59c80aa2f0adc44192728a0a997229c31acb02ad3d4a1"
+    },
+    {
+      "path": "app/ui/assets/logo.png",
+      "sha256": "fbd7ffd2f120bbadb2bca7f64033a42560da32efd80f98618ae750463bc95ea0"
+    },
+    {
+      "path": "crates/gamesync/Cargo.toml",
+      "sha256": "9bb1cfc9828a4003f0f62bc1a73342e6b1db2ad50dbe7b75896fba1c08dac9fb"
+    },
+    {
+      "path": "crates/packer/Cargo.toml",
+      "sha256": "57bdf104ffe54b3a4eb4e6889c7a73874ebc6391331af2911397263f394afe1c"
+    },
+    {
+      "path": "crates/server/Cargo.toml",
+      "sha256": "9171563919a17b1e51aaaf4c5f962f943612ed9f0d0a3948c8ac35b4eaee61c8"
+    },
+    {
+      "path": "crates/setup/build.rs",
+      "sha256": "83b5ed581d818f4c01487a4fc16fd34b58098bea15955ccc192b148ef0368938"
+    },
+    {
+      "path": "crates/setup/Cargo.toml",
+      "sha256": "0357ff96d1fbdc79c153c5c01e6b1b8a53c1160a0ab9bd420feca0e6758c937f"
+    },
+    {
+      "path": "crates/setup/tauri.conf.json",
+      "sha256": "2501e1553d5032b67652958cbdc67fcef90a429b90479e93c40d8cb49cd65e79"
+    },
+    {
+      "path": "crates/setup/capabilities/default.json",
+      "sha256": "84fd16b67fc07ceb1cce4f361f9aa137668a831828fb4150ae418c298c2e856e"
+    },
+    {
+      "path": "crates/setup/src/main.rs",
+      "sha256": "6da25611f5dc8f77b5d7ca52c39e70dd7a36e9eec94823048e04a2f484bbc334"
+    },
+    {
+      "path": "crates/server/src/main.rs",
+      "sha256": "9943c724be4806229c110fd09000ad6152d85df9a828e98f41958f4e52c38296"
+    },
+    {
+      "path": "crates/server/src/panel.html",
+      "sha256": "be5e5a5cf384c3b8c0d5d935e65b3a0090d33855f8e9e1c5348587ec6332a50c"
+    },
+    {
+      "path": "crates/packer/examples/bench.rs",
+      "sha256": "6c825d7d25a047238b6c906073741fdad1d997585cf08534b53b0dd501cc811d"
+    },
+    {
+      "path": "crates/packer/src/lib.rs",
+      "sha256": "e10d8a13e26900df7329d081ec930cbab0f018dde911ec0c7f486f06f0b35c49"
+    },
+    {
+      "path": "crates/packer/src/main.rs",
+      "sha256": "1920e316309c6f24de5202b7c2883ca509817e5cb8921d72289703a15f67a2fd"
+    },
+    {
+      "path": "crates/packer/src/news_example.json",
+      "sha256": "9fec81eb0e613f3df058b45c5640d10b7df5316161a2bd9cfb44b6f879826578"
+    },
+    {
+      "path": "crates/gamesync/src/engine.rs",
+      "sha256": "434371664545350146eddc55f05293bdbeadf9362d740052b5202851c5492a29"
+    },
+    {
+      "path": "crates/gamesync/src/lib.rs",
+      "sha256": "b1dc52da9583362309dd11a1f3d63366bf14cb2a2560abd13a62e104e6dca640"
+    },
+    {
+      "path": "crates/gamesync/src/local.rs",
+      "sha256": "73ebf3059e541680cbb26ae2d2cc1d72c11512b6427e2f098fe273085c60df59"
+    },
+    {
+      "path": "crates/gamesync/src/manifest.rs",
+      "sha256": "8926ecf6d63def2d91b7b3ba1a66931d62e09ef25798c66d5ae483bf89ad9121"
+    },
+    {
+      "path": "crates/gamesync/src/p2p.rs",
+      "sha256": "5d524009c88f5f8faa83d5c9cee6be8d57e5da6fe63b956fafc1719067cf2598"
+    },
+    {
+      "path": "crates/gamesync/src/policy.rs",
+      "sha256": "a4b11186be80e04e3cd43a30fe8565e11ee5c02b5e42bc8e72cc759629ffe196"
+    },
+    {
+      "path": "crates/gamesync/src/sign.rs",
+      "sha256": "d6d09fab66b92be0a2d9b61d6c60874402cd901c45273b4dea5008c455e606da"
+    },
+    {
+      "path": "crates/gamesync/src/source.rs",
+      "sha256": "c70e0261bfbc7a1e1e57c2abf0571fd74adc6a124189a924717e96acff355910"
+    },
+    {
+      "path": "crates/gamesync/src/util.rs",
+      "sha256": "b6db0c547e5d94db948eb10d1c5487f2462444274fd3b56862b0cee2cf5b6883"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "adb9765505a4d0140b51fce534060730ba79efcc2ed02133f789ae7fbc812334"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "886e84f514ddef851db97f7583542a1e0670bc02deafbe4c3d28345f0f8b4e0c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "cecadcd2ed4b68c74d51d0d7821ace1c526094cbc2037d8bdb8cc9b39360512b"
+    },
+    {
+      "path": "build.ps1",
+      "sha256": "3ebc419752d3bf0d9a17ac4693305be217f35f76257bf5ee9759be5222be448e"
+    }
+  ]
+}

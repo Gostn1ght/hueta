@@ -1,0 +1,66 @@
+{
+  "product": "Lost Zone",
+  "title": "LOST ZONE",
+  "publisher": "Lost Zone Team",
+  "exe_name": "LostZoneLauncher.exe",
+  "default_install_dir": "C:\\Games\\Lost Zone",
+  "base_urls": [
+    "p2p://846f267bb56d69b8a2e85cfee11de5b938eb86538a607039571a536e14f85acd"
+  ],
+  "public_key": "b42863820ff895765fbc399a958e6adca8e1cd87b3472c46c15f9352da742e23",
+  "news_url": "news.json",
+  "links": {
+    "bug": "https://discord.gg/",
+    "discord": "https://discord.gg/",
+    "youtube": "https://youtube.com/"
+  },
+  "renderers": [
+    {
+      "name": "DirectX 11",
+      "hint": "Lost Zone, DX11",
+      "exe": "bin/LostZoneClientDX11.exe",
+      "args": "-netcoop -noprefetch -fsltx fsgame.ltx"
+    },
+    {
+      "name": "DirectX 8 / R1",
+      "hint": "Статическое освещение; меньше нагрузка на видеокарту",
+      "exe": "bin/LostZoneClientDX8.exe",
+      "args": "-netcoop -noprefetch -fsltx fsgame.ltx"
+    }
+  ],
+  "game_working_dir": "",
+  "connect_args": "",
+  "connections": 16,
+  "max_retries": 6,
+  "keep": [
+    "appdata/**",
+    "gamedata/**",
+    "fsgame.ltx",
+    "UPDATING.lock",
+    "*.log"
+  ],
+  "clean_on_update": [
+    "appdata/player/shaders_cache"
+  ],
+  "minimize_on_start": true,
+  "auto_update": true,
+  "p2p_seed_default": true,
+  "p2p_hide_ip": false,
+  "setup_text": "Установщик поставит лаунчер, а лаунчер скачает Lost Zone (~51 ГБ). Загрузку можно прервать — она продолжится с того же места.",
+  "user_files": [
+    "client/configs/axr_options.ltx"
+  ],
+  "launch_template": {
+    "from": "fsgame.template",
+    "to": "fsgame.ltx"
+  },
+  "launch_mkdirs": [
+    "appdata/player"
+  ],
+  "launch_block_file": "UPDATING.lock",
+  "p2p_relays": [
+    "https://use1-1.relay.n0.iroh.link/",
+    "https://usw1-1.relay.n0.iroh.link/",
+    "https://aps1-1.relay.n0.iroh.link/"
+  ]
+}

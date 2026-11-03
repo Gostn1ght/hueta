@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Сервер раздачи</title>
+<style>
+  /* Чёрная минималистичная тема: поверхности почти чёрные, один тёплый акцент. */
+  :root {
+    --bg: #0a0a0b; --panel: #111113; --panel2: #18181b; --border: rgba(255,255,255,.06); --border2: rgba(255,255,255,.11);
+    --text: #e8e6e1; --muted: #8c8c91; --dim: #5a5a5f; --accent: #d9a441; --hi: #e9b858; --lo: #c4923a; --green: #4cc38a; --red: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, textarea, select { font: inherit; }
+  ::selection { background: rgba(217,164,65,.3); }
+  .top { display: flex; align-items: center; gap: 14px; padding: 16px max(32px, calc((100vw - 1180px) / 2 + 32px)); background: var(--bg); position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--border); }
+  .top .name { font-family: Bahnschrift, "Segoe UI"; font-weight: 700; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .top .sub { color: var(--dim); font-size: 13px; }
+  .top .sp { flex: 1; }
+  #net { font-size: 13px; color: var(--muted); }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 7px; vertical-align: 1px; }
+  .dot.off { background: var(--red); }
+  nav { display: flex; gap: 6px; padding: 14px 32px; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
+  nav button { background: none; border: 1px solid transparent; color: var(--muted); padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: color .15s, background .15s; }
+  nav button:hover { color: var(--text); }
+  nav button.on { color: var(--text); background: var(--panel2); border-color: var(--border2); }
+  main { padding: 6px 32px 64px; max-width: 1180px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+  .card h3 { margin: 0 0 14px; font-size: 11px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+  .stat .v { font-family: Bahnschrift, "Segoe UI"; font-size: 26px; font-weight: 600; margin: 2px 0; }
+  .stat .l { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; }
+  .stat .muted { font-size: 12.5px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  label { display: block; font-size: 11px; letter-spacing: 1.1px; color: var(--dim); text-transform: uppercase; margin: 14px 0 6px; }
+  input, textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); padding: 9px 12px; outline: none; transition: border-color .15s; }
+  input:focus, textarea:focus, select:focus { border-color: rgba(217,164,65,.6); }
+  input::placeholder, textarea::placeholder { color: var(--dim); }
+  textarea { min-height: 110px; resize: vertical; }
+  .btn { height: 38px; padding: 0 16px; background: var(--panel2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s; }
+  .btn:hover { background: #202024; border-color: rgba(255,255,255,.16); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .gold { background: var(--accent); color: #17110a; border-color: var(--accent); }
+  .gold:hover { background: var(--hi); border-color: var(--hi); }
+  .danger { color: #ff9b92; }
+  .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12.5px; word-break: break-all; user-select: all; color: #cfcbc2; }
+  .copy { display: flex; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 6px 6px 12px; margin-top: 6px; }
+  .copy .mono { flex: 1; }
+  .copy .btn { height: 32px; font-size: 13px; }
+  .bar { height: 4px; border-radius: 2px; background: #222226; overflow: hidden; margin: 12px 0 6px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; }
+  tbody tr:hover td { background: rgba(255,255,255,.02); }
+  .news { display: grid; grid-template-columns: 120px 1fr auto; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .news:last-child { border-bottom: 0; }
+  .news img { width: 120px; height: 70px; object-fit: cover; border-radius: 6px; background: var(--panel2); }
+  .news .t { font-weight: 600; } .news .d { color: var(--dim); font-size: 12px; }
+  .center { max-width: 360px; margin: 16vh auto; }
+  #auth h3 { font-size: 13px; color: var(--text); letter-spacing: 2px; }
+  .hint { color: var(--dim); font-size: 12.5px; margin-top: 8px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .top, nav, main { padding-left: 16px; padding-right: 16px; } .two { grid-template-columns: 1fr; } .news { grid-template-columns: 1fr; } .news img { width: 100%; height: 140px; } }
+  .toast { position: fixed; right: 24px; bottom: 24px; background: var(--panel2); border: 1px solid var(--border2); padding: 10px 16px; border-radius: 10px; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: none; }
+  ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: #26262a; border-radius: 5px; border: 2px solid var(--bg); } ::-webkit-scrollbar-track { background: var(--bg); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="auth" class="center card hidden">
+  <h3 id="auth-title">Вход в панель</h3>
+  <div id="auth-hint" class="hint"></div>
+  <label>Пароль</label>
+  <input id="pw" type="password" autocomplete="current-password" maxlength="256" />
+  <div id="pw2-wrap" class="hidden"><label>Ещё раз</label><input id="pw2" type="password" autocomplete="new-password" /></div>
+  <div style="margin-top:14px"><button class="btn gold" id="auth-go" style="width:100%">Войти</button></div>
+  <div id="auth-err" class="hint bad"></div>
+</div>
+
+<div id="ui" class="hidden">
+  <div class="top">
+    <span class="name" id="product">Сервер</span>
+    <span class="sub">сервер раздачи</span>
+    <span class="sp"></span>
+    <span id="net"><span class="dot off"></span>…</span>
+  </div>
+  <nav>
+    <button data-tab="overview" class="on">Обзор</button>
+    <button data-tab="publish">Публикация версии</button>
+    <button data-tab="news">Новости</button>
+    <button data-tab="peers">Игроки</button>
+    <button data-tab="settings">Настройки</button>
+  </nav>
+  <main>
+    <section id="tab-overview">
+      <div class="grid">
+        <div class="card stat"><div class="l">Версия игры</div><div class="v" id="s-ver">—</div><div class="muted" id="s-pub"></div></div>
+        <div class="card stat"><div class="l">Размер игры</div><div class="v" id="s-size">—</div><div class="muted" id="s-files"></div></div>
+        <div class="card stat"><div class="l">Раздают игроки</div><div class="v" id="s-peers">0</div><div class="muted">сейчас онлайн с последней версией</div></div>
+        <div class="card stat"><div class="l">Отдано сервером</div><div class="v" id="s-sent">0</div><div class="muted" id="s-speed"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Подключение лаунчера</h3>
+        <div class="muted">Это адрес сервера — публичный ключ, а не IP. Белый IP, Radmin и проброс портов не нужны: связь идёт напрямую через NAT, а если не пробивается — через relay-сервер.</div>
+        <label>Адрес (в brand.json → base_urls)</label>
+        <div class="copy"><span class="mono" id="addr"></span><button class="btn" data-copy="addr">Копировать</button></div>
+        <label>Ключ проверки релизов (brand.json → public_key)</label>
+        <div class="copy"><span class="mono" id="pk"></span><button class="btn" data-copy="pk">Копировать</button></div>
+        <div class="hint">После смены этих значений лаунчер нужно пересобрать (build.ps1).</div>
+      </div>
+    </section>
+
+    <section id="tab-publish" class="hidden">
+      <div class="two">
+        <div class="card">
+          <h3>Новая версия</h3>
+          <label>Папка игры на этом ПК</label>
+          <input id="p-input" placeholder="D:\Games\NetAnomaly" spellcheck="false" />
+          <label>Версия</label>
+          <input id="p-ver" placeholder="1.0.0" />
+          <label>Не включать (шаблоны через запятую)</label>
+          <input id="p-excl" placeholder="_client_/**, *.log" spellcheck="false" />
+          <label>Сжатие</label>
+          <select id="p-level">
+            <option value="19">Максимальное (19) — медленнее упаковка, меньше качать</option>
+            <option value="12">Среднее (12)</option>
+            <option value="3">Быстрое (3)</option>
+          </select>
+          <div style="margin-top:16px" class="row">
+            <button class="btn gold" id="p-go">Опубликовать</button>
+            <label class="row" style="margin:0;text-transform:none;letter-spacing:0;color:var(--muted)"><input type="checkbox" id="p-rescan" style="width:auto"> перечитать все файлы</label>
+          </div>
+          <div class="hint">Повторная публикация из той же папки быстрая: неизменённые файлы не перечитываются, игроки скачают только изменения.</div>
+        </div>
+        <div class="card">
+          <h3>Ход публикации</h3>
+          <div id="j-text" class="muted">Публикаций в этом запуске не было.</div>
+          <div class="bar"><i id="j-bar"></i></div>
+          <div id="j-sub" class="hint"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Лаунчер</h3>
+        <div class="muted" id="l-cur">—</div>
+        <div class="two">
+          <div><label>Файл лаунчера (exe)</label><input id="l-exe" placeholder="C:\...\launcher\dist\NetAnomalyLauncher.exe" spellcheck="false" /></div>
+          <div><label>Версия (пусто — из exe)</label><input id="l-ver" placeholder="берётся из exe" /></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn gold" id="l-go">Опубликовать лаунчер</button></div>
+        <div class="hint">Установщик ставит именно этот exe, а лаунчеры игроков обновятся на него при следующем запуске. Игру перепаковывать не нужно.</div>
+      </div>
+    </section>
+
+    <section id="tab-news" class="hidden">
+      <div class="two">
+        <div class="card">
+          <h3 id="n-head">Новая новость</h3>
+          <input type="hidden" id="n-id" />
+          <label>Заголовок</label><input id="n-title" />
+          <label>Дата (пусто — сегодня)</label><input id="n-date" placeholder="01.10.2026" />
+          <label>Текст</label><textarea id="n-text"></textarea>
+          <label>Ссылка (необязательно)</label><input id="n-link" placeholder="https://" spellcheck="false" />
+          <label>Картинка (до 3 МБ)</label><input id="n-img" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+          <div style="margin-top:14px" class="row">
+            <button class="btn gold" id="n-save">Опубликовать</button>
+            <button class="btn hidden" id="n-cancel">Отмена</button>
+          </div>
+          <div class="hint">Новости появляются в лаунчере у игроков сразу при следующем открытии.</div>
+        </div>
+        <div class="card"><h3>Опубликовано</h3><div id="n-list" class="muted">…</div></div>
+      </div>
+    </section>
+
+    <section id="tab-peers" class="hidden">
+      <div class="card">
+        <h3>Игроки, которые раздают игру</h3>
+        <div class="hint" style="margin-bottom:10px">Лаунчеры с включённой раздачей и последней версией. Чем их больше, тем меньше нагрузка на ваш интернет.</div>
+        <table><thead><tr><th>Узел</th><th>Версия</th><th>Онлайн</th><th>Был на связи</th></tr></thead><tbody id="peers"></tbody></table>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="hidden">
+      <div class="two">
+        <div class="card">
+          <h3>Сервер</h3>
+          <label>Название игры</label><input id="c-product" />
+          <label>Одновременных раздач (запросов чанков)</label><input id="c-slots" type="number" min="1" max="64" />
+          <label>HTTP-зеркало, порт (0 — выключено; нужно только при белом IP)</label><input id="c-http" type="number" min="0" max="65535" />
+          <label class="row" style="text-transform:none;letter-spacing:0;color:var(--text);margin-top:16px"><input type="checkbox" id="c-hide" style="width:auto"> Скрывать IP сервера от игроков</label>
+          <div class="hint">Весь трафик идёт через relay-сервер: игроки не узнают ваш IP, но скорость ниже, чем при прямом соединении. Содержимое зашифровано в любом режиме.</div>
+          <div style="margin-top:14px"><button class="btn gold" id="c-save">Сохранить</button></div>
+          <div class="hint">Применится после перезапуска сервера.</div>
+          <div class="hint">Папка релиза: <span class="mono" id="c-dir"></span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+function bytes(n) { const u = ["Б","КБ","МБ","ГБ","ТБ"]; let i = 0; n = n || 0; while (n >= 1024 && i < 4) { n /= 1024; i++; } return (i ? n.toFixed(n >= 100 ? 0 : 1) : n).toString().replace(".", ",") + " " + u[i]; }
+function dur(s) { if (s < 60) return s + " с"; if (s < 3600) return Math.floor(s / 60) + " мин"; return Math.floor(s / 3600) + " ч " + Math.floor((s % 3600) / 60) + " мин"; }
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 3500); }
+async function api(path, body, method) {
+  const r = await fetch(path, { method: method || (body ? "POST" : "GET"), headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined, credentials: "same-origin" });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== "/api/login") { showAuth(false); throw new Error("нужен вход"); }
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+// ---------- вход ----------
+let setupMode = false;
+function showAuth(setup) {
+  setupMode = setup;
+  $("#ui").classList.add("hidden");
+  $("#auth").classList.remove("hidden");
+  $("#auth-title").textContent = setup ? "Первый запуск: задайте пароль" : "Вход в панель";
+  $("#auth-hint").textContent = setup ? "Пароль защищает панель управления сервером. Минимум 6 символов." : "";
+  $("#pw2-wrap").classList.toggle("hidden", !setup);
+  $("#auth-go").textContent = setup ? "Сохранить и войти" : "Войти";
+  $("#pw").focus();
+}
+$("#auth-go").onclick = async () => {
+  $("#auth-err").textContent = "";
+  try {
+    if (setupMode && $("#pw").value !== $("#pw2").value) throw new Error("пароли не совпадают");
+    await api(setupMode ? "/api/setup" : "/api/login", { password: $("#pw").value });
+    $("#pw").value = $("#pw2").value = "";
+    start();
+  } catch (e) { $("#auth-err").textContent = e.message; }
+};
+$("#pw").onkeydown = $("#pw2").onkeydown = (e) => { if (e.key === "Enter") $("#auth-go").click(); };
+
+// ---------- вкладки ----------
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll("main section").forEach((s) => s.classList.toggle("hidden", s.id !== "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "news") loadNews();
+  if (b.dataset.tab === "peers") loadPeers();
+});
+document.querySelectorAll("[data-copy]").forEach((b) => b.onclick = () => { navigator.clipboard.writeText($("#" + b.dataset.copy).textContent); toast("Скопировано"); });
+
+// ---------- статус ----------
+let filled = false;
+async function refresh() {
+  let s;
+  try { s = await api("/api/status"); } catch (e) { return; }
+  $("#product").textContent = s.product;
+  document.title = s.product + " — сервер";
+  $("#net").replaceChildren(el("span", "dot" + (s.online ? "" : " off")), document.createTextNode(s.online ? "P2P на связи" : "нет связи с relay"));
+  const r = s.release;
+  $("#s-ver").textContent = r ? r.version : "нет";
+  $("#s-pub").textContent = r ? "опубликована " + new Date(r.published * 1000).toLocaleString("ru-RU") : "опубликуйте первую версию";
+  $("#s-size").textContent = r ? bytes(r.game_size) : "—";
+  $("#s-files").textContent = r ? r.files + " файлов" : "";
+  $("#s-peers").textContent = s.peers_online;
+  $("#s-sent").textContent = bytes(s.sent);
+  $("#s-speed").textContent = (s.speed > 1 ? bytes(s.speed) + "/с · " : "") + "активных потоков: " + s.active + " · работает " + dur(s.uptime);
+  $("#addr").textContent = "p2p://" + s.node_id;
+  $("#pk").textContent = s.public_key;
+  $("#c-dir").textContent = s.publish_dir;
+  if (!filled) {
+    filled = true;
+    $("#c-product").value = s.product; $("#c-http").value = s.http_port; $("#c-slots").value = s.upload_slots; $("#c-hide").checked = s.hide_ip;
+    $("#p-input").value = s.last_input || ""; $("#p-excl").value = s.last_exclude || "";
+    $("#l-exe").value = s.last_launcher || "";
+  }
+  const L = r && r.launcher;
+  $("#l-cur").textContent = L ? `Сейчас опубликован лаунчер ${L.version} · ${bytes(L.size)}` : (r ? "Лаунчер ещё не опубликован — установщик не сможет ничего поставить." : "Сначала опубликуйте игру.");
+  $("#l-cur").className = L ? "muted" : "bad";
+  const j = s.job;
+  $("#p-go").disabled = j.running;
+  if (j.running) {
+    const p = j.progress || { done: 0, total: 0, new_bytes: 0, speed: 0, files: 0 };
+    const f = p.total ? p.done / p.total : 0;
+    $("#j-text").textContent = `Публикую версию ${j.version}: ${Math.floor(f * 100)}%`;
+    $("#j-bar").style.width = (f * 100).toFixed(1) + "%";
+    $("#j-sub").textContent = `${bytes(p.done)} из ${bytes(p.total)} · ${p.files} файлов · ${bytes(p.speed)}/с · новых данных ${bytes(p.new_bytes)}`;
+  } else if (j.error) {
+    $("#j-text").className = "bad"; $("#j-text").textContent = "Ошибка: " + j.error; $("#j-bar").style.width = "0%"; $("#j-sub").textContent = "";
+  } else if (j.report) {
+    const x = j.report;
+    $("#j-text").className = "ok"; $("#j-text").textContent = `Версия ${x.version} опубликована за ${Math.round(x.seconds)} с`;
+    $("#j-bar").style.width = "100%";
+    $("#j-sub").textContent = `${x.files} файлов, ${bytes(x.game_size)} · на сервере ${bytes(x.server_bytes)} · новых данных ${bytes(x.new_bytes)} — столько скачают игроки при обновлении`;
+  }
+}
+
+$("#p-go").onclick = async () => {
+  try {
+    await api("/api/publish", { input: $("#p-input").value, version: $("#p-ver").value, exclude: $("#p-excl").value, level: +$("#p-level").value, rescan: $("#p-rescan").checked });
+    $("#j-text").className = "muted"; $("#j-text").textContent = "Запуск…";
+    refresh();
+  } catch (e) { toast(e.message); }
+};
+
+$("#l-go").onclick = async () => {
+  try {
+    const l = await api("/api/launcher", { exe: $("#l-exe").value, version: $("#l-ver").value });
+    toast(`Лаунчер ${l.version} опубликован`);
+    refresh();
+  } catch (e) { toast(e.message); }
+};
+
+// ---------- новости ----------
+let newsCache = [];
+async function loadNews() {
+  try {
+    newsCache = await api("/api/news");
+    const box = $("#n-list"); box.replaceChildren();
+    if (!newsCache.length) box.append(el("div", "muted", "Новостей пока нет."));
+    for (const n of newsCache) {
+      const row = el("div", "news");
+      const img = el("img"); if (n.image) img.src = "/" + n.image; img.alt = ""; row.append(img);
+      const mid = el("div"); mid.append(el("div", "t", n.title), el("div", "d", n.date + (n.image ? " · с картинкой" : "")), el("div", "muted", n.text.slice(0, 160)));
+      row.append(mid);
+      const act = el("div", "row");
+      const e = el("button", "btn", "Изменить"); e.onclick = () => editNews(n);
+      const d = el("button", "btn danger", "Удалить"); d.onclick = async () => { if (confirm("Удалить новость «" + n.title + "»?")) { await api("/api/news/" + encodeURIComponent(n.id), null, "DELETE"); loadNews(); } };
+      act.append(e, d); row.append(act);
+      if (!n.image) img.style.visibility = "hidden";
+      box.append(row);
+    }
+  } catch (e) { toast(e.message); }
+}
+function editNews(n) {
+  $("#n-id").value = n ? n.id : ""; $("#n-title").value = n ? n.title : ""; $("#n-date").value = n ? n.date : "";
+  $("#n-text").value = n ? n.text : ""; $("#n-link").value = n ? n.link : ""; $("#n-img").value = "";
+  $("#n-head").textContent = n ? "Изменить новость" : "Новая новость";
+  $("#n-save").textContent = n ? "Сохранить" : "Опубликовать";
+  $("#n-cancel").classList.toggle("hidden", !n);
+}
+$("#n-cancel").onclick = () => editNews(null);
+$("#n-save").onclick = async () => {
+  const file = $("#n-img").files[0];
+  let image_data = "";
+  if (file) {
+    if (file.size > 3 * 1024 * 1024) return toast("Картинка больше 3 МБ");
+    image_data = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+  }
+  try {
+    await api("/api/news", { id: $("#n-id").value, title: $("#n-title").value, date: $("#n-date").value, text: $("#n-text").value, link: $("#n-link").value, image_data });
+    toast("Новость опубликована"); editNews(null); loadNews();
+  } catch (e) { toast(e.message); }
+};
+
+// ---------- игроки ----------
+async function loadPeers() {
+  try {
+    const list = await api("/api/peers");
+    const tb = $("#peers"); tb.replaceChildren();
+    if (!list.length) { const tr = el("tr"); const td = el("td", "muted", "Пока никто не раздаёт."); td.colSpan = 4; tr.append(td); tb.append(tr); }
+    for (const p of list) { const tr = el("tr"); tr.append(el("td", "mono", p.id), el("td", "", p.version), el("td", "", dur(p.online_for)), el("td", "", dur(p.seen) + " назад")); tb.append(tr); }
+  } catch (e) {}
+}
+
+// ---------- настройки ----------
+$("#c-save").onclick = async () => {
+  try { await api("/api/settings", { product: $("#c-product").value, http_port: +$("#c-http").value || 0, upload_slots: +$("#c-slots").value || 16, hide_ip: $("#c-hide").checked }); toast("Сохранено. Перезапустите сервер."); } catch (e) { toast(e.message); }
+};
+
+let timer = null;
+function start() {
+  $("#auth").classList.add("hidden");
+  $("#ui").classList.remove("hidden");
+  refresh();
+  clearInterval(timer);
+  timer = setInterval(() => { refresh(); if (!$("#tab-peers").classList.contains("hidden")) loadPeers(); }, 1500);
+}
+(async () => {
+  const s = await api("/api/state");
+  if (!s.logged_in) showAuth(false); else start();
+})();
+</script>
+</body>
+</html>

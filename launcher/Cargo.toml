@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = ["crates/gamesync", "crates/packer", "crates/server", "crates/setup", "app"]
+
+[workspace.package]
+edition = "2021"
+
+[profile.release]
+opt-level = 3
+lto = false
+strip = true
+panic = "unwind"
+
+# Установщик собирается отдельным профилем — оптимизация по размеру:
+#   cargo build --profile setup -p setup
+[profile.setup]
+inherits = "release"
+opt-level = "z"
+codegen-units = 1
+panic = "abort"

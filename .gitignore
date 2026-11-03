@@ -50,3 +50,9 @@ backend/runtime/
 # Generated from the GitHub Actions archive secret; never commit the key.
 src/xrCore/_lzpack_key.generated.h
 tools/lzpack/__pycache__/
+
+# Launcher sources are tracked; credentials and build output are never imported.
+launcher/target/
+launcher/dist/
+launcher/keys/
+launcher/app/gen/

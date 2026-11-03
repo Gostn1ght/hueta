@@ -1,0 +1,40 @@
+name: Lost Zone Launcher
+on:
+  workflow_dispatch:
+  push:
+    branches: [engine-restructure]
+    paths: ['launcher/**', '.github/workflows/lostzone-launcher.yml']
+permissions:
+  contents: read
+concurrency:
+  group: lostzone-launcher-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  launcher:
+    runs-on: windows-2022
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher
+      - name: Portable restart, add-on conflicts and distribution policy
+        run: cargo test --release --locked -p launcher -p gamesync
+      - name: Build portable launcher without an installer
+        run: cargo build --release --locked -p launcher
+      - name: Package reviewed output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ci-output | Out-Null
+          Copy-Item target/release/Launcher.exe ci-output/LostZoneLauncher.exe
+          $hash = (Get-FileHash ci-output/LostZoneLauncher.exe -Algorithm SHA256).Hash.ToLower()
+          @{commit='${{ github.sha }}'; version='1.3.0'; sha256=$hash} | ConvertTo-Json | Set-Content ci-output/build-reviewed.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LostZone-Launcher
+          path: launcher/ci-output
+          retention-days: 14

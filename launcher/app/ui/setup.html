@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Установка</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg"></div>
+
+  <div class="titlebar" data-drag data-tauri-drag-region>
+    <img class="logo" src="assets/logo.png" alt="" />
+    <span class="name" id="tb-name">NETANOMALY</span>
+    <span class="sub" id="tb-sub">установка</span>
+    <div class="spacer" data-tauri-drag-region></div>
+    <button class="tb-btn" id="b-min" title="Свернуть"></button>
+    <button class="tb-btn close" id="b-close" title="Закрыть"></button>
+  </div>
+
+  <div class="setup">
+    <div class="left" data-drag>
+      <div class="gold-line"></div>
+      <h1 id="title">NETANOMALY</h1>
+      <div class="subtitle" id="subtitle">Установка</div>
+      <div class="desc" id="desc"></div>
+    </div>
+
+    <div class="panel card">
+      <div class="lbl" id="dir-lbl">Папка установки</div>
+      <div class="dir">
+        <input class="input" id="dir" spellcheck="false" />
+        <button class="btn" id="b-browse">Обзор</button>
+      </div>
+      <div class="hint" id="hint"></div>
+      <hr />
+      <label class="check"><input type="checkbox" id="c-desktop" checked /><span class="box"></span>Ярлык на рабочем столе</label>
+      <label class="check"><input type="checkbox" id="c-start" checked /><span class="box"></span>Ярлык в меню «Пуск»</label>
+      <label class="check"><input type="checkbox" id="c-launch" checked /><span class="box"></span>Запустить лаунчер после установки</label>
+      <button class="btn btn-gold go" id="b-go">УСТАНОВИТЬ</button>
+      <div class="done-msg" id="msg"></div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    $("#b-min").innerHTML = ICONS.min;
+    $("#b-close").innerHTML = ICONS.close;
+    $("#b-min").onclick = () => appWindow.minimize();
+    $("#b-close").onclick = () => (T ? T.window.getCurrentWindow().close() : 0);
+
+    let si = null;
+    async function refreshDir() {
+      const path = $("#dir").value.trim();
+      const d = await invoke("dir_info", { path });
+      const hint = $("#hint");
+      hint.replaceChildren();
+      if (d.message) hint.append(el("div", "", d.message));
+      const parts = [];
+      if (si && si.game_size) parts.push("Игре нужно около " + bytes(si.game_size));
+      if (d.free_text) parts.push(d.free_text);
+      const line = el("div", "", parts.join(" · "));
+      if (si && si.game_size && d.free != null && d.free < si.game_size && !d.has_game) {
+        line.className = "bad";
+        line.textContent += " — места может не хватить";
+      }
+      hint.append(line);
+      const upd = d.has_game || (si && si.existing);
+      $("#subtitle").textContent = upd ? "Обновление лаунчера" : "Установка";
+      $("#tb-sub").textContent = upd ? "установка" : "установка";
+      $("#dir-lbl").textContent = upd ? "Установлено в папку" : "Папка установки";
+      $("#b-go").textContent = upd ? "ОБНОВИТЬ" : "УСТАНОВИТЬ";
+      $("#desc").textContent = upd
+        ? `${si.product} уже установлен. Установщик поставит свежую версию лаунчера — игра и ваши настройки останутся на месте.`
+        : si.text;
+    }
+
+    $("#dir").addEventListener("change", refreshDir);
+    $("#b-browse").onclick = async () => {
+      const p = await invoke("pick_dir", { current: $("#dir").value });
+      if (p) { $("#dir").value = p; refreshDir(); }
+    };
+    $("#b-go").onclick = async () => {
+      const b = $("#b-go");
+      b.disabled = true;
+      $("#msg").className = "done-msg";
+      $("#msg").textContent = "Установка…";
+      try {
+        await invoke("do_install", {
+          path: $("#dir").value.trim(),
+          desktop: $("#c-desktop").checked,
+          startMenu: $("#c-start").checked,
+          launch: $("#c-launch").checked,
+        });
+        $("#msg").textContent = $("#c-launch").checked ? "Готово, запускаю лаунчер…" : "Готово. Лаунчер установлен.";
+        b.textContent = "ГОТОВО";
+      } catch (e) {
+        $("#msg").className = "done-msg bad";
+        $("#msg").textContent = String(e);
+        b.disabled = false;
+      }
+    };
+
+    (async () => {
+      si = await invoke("setup_info");
+      $("#tb-name").textContent = si.title;
+      $("#title").textContent = si.title;
+      document.title = si.product + " — установка";
+      $("#dir").value = si.default_dir;
+      await refreshDir();
+    })();
+  </script>
+</body>
+</html>

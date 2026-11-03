@@ -16,7 +16,8 @@ p.add_argument('--only',default='')
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:])
 sys.path.insert(0,str(a.addons.resolve()));a.root=a.root.resolve();a.out=a.out.resolve()
 models=json.loads((a.root/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
-reports=[]
+report_path=a.out/'debris-reviewed-candidate.json'
+reports=json.loads(report_path.read_text()) if report_path.exists() and not a.only else []
 def xr(v):return (v.x,v.z,v.y)
 def classify(name,parents):
     current=name
@@ -31,6 +32,12 @@ def classify(name,parents):
 
 for relative in models:
     if a.only and a.only not in relative:continue
+    old=next((r for r in reports if r['source']==relative),None)
+    if old:
+        assert old['source_sha256']==hashlib.sha256((a.root/'scripts/netcoop-overlay/client/meshes'/relative).read_bytes()).hexdigest()
+        for part in old['parts']:
+            assert hashlib.sha256((a.out/'meshes'/part['path']).read_bytes()).hexdigest()==part['sha256']
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable('io_scene_xray',default_set=True,persistent=False)
     source=a.root/'scripts/netcoop-overlay/client/meshes'/relative
@@ -50,7 +57,9 @@ for relative in models:
             group=votes.most_common(1)[0][0]
             groups[group].append((mesh,face.index))
             source_tris+=1
-    assert 'body' in groups and 2<=len(groups)<=20,(relative,list(groups))
+    # Some tracked donor models have every face bound to one rigid body.
+    # Retain that real wreck instead of inventing another vehicle's wheels.
+    assert 'body' in groups and 1<=len(groups)<=20,(relative,list(groups))
     total_mass=sum(max(0.,b.xray.mass.value) for b in donor.data.bones if b.xray.shape.type!='0' and not b.xray.shape.flags_nophysics)
     total_mass=max(100.,total_mass)
     weights={name:0.04 if 'wheel' in name else 0.025 for name in groups if name!='body'}
@@ -106,7 +115,7 @@ for relative in models:
         for draw in draw_objects:bpy.data.objects.remove(draw,do_unlink=True)
         bpy.data.objects.remove(rig,do_unlink=True)
     assert sum(x['triangles'] for x in result)==source_tris
-    reports.append(dict(source=relative,source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),triangles=source_tris,parts=result))
+    reports.append(dict(source=relative,source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),triangles=source_tris,parts=result,rigid_only=len(groups)==1))
     print('WRECK',relative,len(result),'parts',source_tris,'triangles',flush=True)
     (a.out/'debris-reviewed-candidate.json').write_text(json.dumps(reports,indent=2)+'\n')
 a.out.mkdir(parents=True,exist_ok=True)

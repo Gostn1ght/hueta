@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Лаунчер</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg"></div>
+
+  <div class="titlebar" data-drag data-tauri-drag-region>
+    <img class="logo" src="assets/logo.png" alt="" />
+    <span class="name" id="tb-name">LOST ZONE</span>
+    <span class="sub" id="tb-ver">лаунчер</span>
+    <div class="spacer" data-tauri-drag-region></div>
+    <button class="tb-btn" id="b-bug" title="Сообщить об ошибке"></button>
+    <button class="tb-btn" id="b-discord" title="Discord"></button>
+    <button class="tb-btn" id="b-youtube" title="YouTube"></button>
+    <span class="tb-sep"></span>
+    <button class="tb-btn" id="b-min" title="Свернуть"></button>
+    <button class="tb-btn close" id="b-close" title="Закрыть"></button>
+  </div>
+
+  <div class="layout single">
+    <section class="right">
+      <h1 class="title" id="title">LOST ZONE</h1>
+      <div class="status" id="status"><span class="dot"></span><span id="status-text">…</span></div>
+
+      <div class="chips">
+        <div class="chip">Установлено <b id="v-installed">—</b></div>
+        <div class="chip">На сервере <b id="v-server">—</b></div>
+        <div class="chip seg hidden" id="seed-chip" title="Раздавать игру другим игрокам, как в торренте: им быстрее, серверу легче">Раздача <span id="seed"></span></div>
+      </div>
+
+      <div class="panel journal">
+        <span class="panel-title">Журнал</span>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="launch-options">
+        <label for="renderer">Графический режим</label>
+        <select id="renderer" aria-label="Графический режим"></select>
+        <button class="btn" id="b-addons">Аддоны</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="footer">
+    <div class="prog">
+      <div class="prog-top"><span class="prog-text" id="p-text">…</span><span class="prog-pct" id="p-pct"></span></div>
+      <div class="bar"><i id="p-bar"></i></div>
+      <div class="prog-sub" id="p-sub"></div>
+    </div>
+    <button class="btn" id="b-check">Проверить обновление</button>
+    <button class="btn" id="b-verify">Проверить файлы</button>
+    <button class="btn btn-gold btn-play" id="b-play">ИГРАТЬ</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <dialog id="addons-dialog">
+    <div class="addon-heading"><h2>Аддоны</h2><button class="btn" id="addons-close">Закрыть</button></div>
+    <p>По умолчанию — обычное 2D-меню без радио и музыки. Изменения применяются при следующем запуске игры.</p>
+    <div id="addons-list"></div>
+  </dialog>
+
+  <script src="common.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

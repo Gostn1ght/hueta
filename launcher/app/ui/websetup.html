@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Установка</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .srv { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-top: 18px; }
+    .srv .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+    .srv.ok .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .srv.bad { color: var(--red); }
+    .srv.bad .dot { background: var(--red); }
+    .srv.wait .dot { background: var(--accent); animation: pulse 1s infinite ease-in-out; }
+    .iprog { margin-top: 12px; }
+    .iprog .top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    .iprog .top span:last-child { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+
+  <div class="titlebar" data-drag data-tauri-drag-region>
+    <img class="logo" src="assets/logo.png" alt="" />
+    <span class="name" id="tb-name">NETANOMALY</span>
+    <span class="sub">установка</span>
+    <div class="spacer" data-tauri-drag-region></div>
+    <button class="tb-btn" id="b-min" title="Свернуть"></button>
+    <button class="tb-btn close" id="b-close" title="Закрыть"></button>
+  </div>
+
+  <div class="setup">
+    <div class="left" data-drag>
+      <div class="gold-line"></div>
+      <h1 id="title">NETANOMALY</h1>
+      <div class="subtitle" id="subtitle">Установка</div>
+      <div class="desc" id="desc"></div>
+      <div class="srv wait" id="srv"><span class="dot"></span><span id="srv-text">Связь с сервером…</span></div>
+    </div>
+
+    <div class="panel card">
+      <div class="lbl" id="dir-lbl">Папка установки</div>
+      <div class="dir">
+        <input class="input" id="dir" spellcheck="false" />
+        <button class="btn" id="b-browse">Обзор</button>
+      </div>
+      <div class="hint" id="hint"></div>
+      <hr />
+      <label class="check"><input type="checkbox" id="c-desktop" checked /><span class="box"></span>Ярлык на рабочем столе</label>
+      <label class="check"><input type="checkbox" id="c-start" checked /><span class="box"></span>Ярлык в меню «Пуск»</label>
+      <label class="check"><input type="checkbox" id="c-launch" checked /><span class="box"></span>Запустить лаунчер после установки</label>
+      <button class="btn btn-gold go" id="b-go">УСТАНОВИТЬ</button>
+      <div class="iprog hidden" id="iprog">
+        <div class="top"><span id="ip-text">Загрузка лаунчера</span><span id="ip-pct"></span></div>
+        <div class="bar"><i id="ip-bar"></i></div>
+        <div class="hint" id="ip-sub" style="min-height:0"></div>
+      </div>
+      <div class="done-msg" id="msg"></div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    $("#b-min").innerHTML = ICONS.min;
+    $("#b-close").innerHTML = ICONS.close;
+    $("#b-min").onclick = () => appWindow.minimize();
+    $("#b-close").onclick = () => invoke("quit");
+
+    let si = null, srv = null, installing = false;
+
+    function setSrv(cls, text) {
+      $("#srv").className = "srv " + cls;
+      $("#srv-text").textContent = text;
+    }
+
+    async function refreshDir() {
+      const d = await invoke("dir_info", { path: $("#dir").value.trim() });
+      const hint = $("#hint");
+      hint.replaceChildren();
+      if (d.message) hint.append(el("div", "", d.message));
+      const parts = [];
+      if (srv && srv.game_size) parts.push("Игре нужно около " + bytes(srv.game_size));
+      if (d.free_text) parts.push(d.free_text);
+      const line = el("div", "", parts.join(" · "));
+      if (srv && srv.game_size && d.free != null && d.free < srv.game_size && !d.has_game) {
+        line.className = "bad";
+        line.textContent += " — места может не хватить";
+      }
+      hint.append(line);
+      const upd = d.has_game || si.existing;
+      $("#subtitle").textContent = upd ? "Обновление лаунчера" : "Установка";
+      $("#dir-lbl").textContent = upd ? "Установлено в папку" : "Папка установки";
+      $("#b-go").textContent = upd ? "ОБНОВИТЬ" : "УСТАНОВИТЬ";
+      $("#desc").textContent = upd
+        ? `${si.product} уже установлен. Установщик скачает свежую версию лаунчера — игра и ваши настройки останутся на месте.`
+        : si.text;
+    }
+
+    async function connect() {
+      setSrv("wait", "Связь с сервером…");
+      try {
+        srv = await invoke("connect");
+        if (srv.launcher_version) {
+          setSrv("ok", `Сервер на связи · лаунчер ${srv.launcher_version}, ${bytes(srv.launcher_size)} · игра ${srv.game_version}`);
+        } else {
+          setSrv("bad", "На сервере ещё не опубликован лаунчер");
+        }
+        refreshDir();
+      } catch (e) {
+        setSrv("bad", String(e) + " — повторю через 10 с");
+        setTimeout(connect, 10000);
+      }
+    }
+
+    listen("setup-progress", (e) => {
+      const p = e.payload;
+      $("#ip-text").textContent = p.text;
+      const f = p.total ? p.done / p.total : 0;
+      $("#ip-pct").textContent = p.total ? Math.floor(f * 100) + "%" : "";
+      $("#ip-bar").style.width = (f * 100).toFixed(1) + "%";
+      $("#ip-sub").textContent = p.total ? `${bytes(p.done)} из ${bytes(p.total)}` : "";
+    });
+
+    $("#dir").addEventListener("change", refreshDir);
+    $("#b-browse").onclick = async () => {
+      const p = await invoke("pick_dir", { current: $("#dir").value });
+      if (p) { $("#dir").value = p; refreshDir(); }
+    };
+    $("#b-go").onclick = async () => {
+      if (installing) return;
+      installing = true;
+      const b = $("#b-go");
+      b.classList.add("hidden");
+      $("#iprog").classList.remove("hidden");
+      $("#msg").className = "done-msg";
+      $("#msg").textContent = "";
+      try {
+        await invoke("do_install", {
+          path: $("#dir").value.trim(),
+          desktop: $("#c-desktop").checked,
+          startMenu: $("#c-start").checked,
+          launch: $("#c-launch").checked,
+        });
+        $("#ip-text").textContent = "Готово";
+        $("#ip-pct").textContent = "100%";
+        $("#ip-bar").style.width = "100%";
+        $("#msg").textContent = $("#c-launch").checked ? "Запускаю лаунчер — он скачает игру." : "Лаунчер установлен. Запустите его с рабочего стола.";
+      } catch (e) {
+        $("#msg").className = "done-msg bad";
+        $("#msg").textContent = String(e);
+        $("#iprog").classList.add("hidden");
+        b.classList.remove("hidden");
+        installing = false;
+      }
+    };
+
+    (async () => {
+      si = await invoke("setup_info");
+      $("#tb-name").textContent = si.title;
+      $("#title").textContent = si.title;
+      document.title = si.product + " — установка";
+      $("#dir").value = si.default_dir;
+      await refreshDir();
+      connect();
+    })();
+  </script>
+</body>
+</html>
