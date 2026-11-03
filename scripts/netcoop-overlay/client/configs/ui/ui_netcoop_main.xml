@@ -2,7 +2,7 @@
 <w>
   <background x="0" y="0" width="1024" height="768">
     <auto_static x="0" y="0" width="1024" height="768" stretch="1">
-      <texture x="0" y="0" width="1672" height="941">ui\lost_zone_background</texture>
+      <texture x="0" y="0" width="1920" height="1080">ui\lz_addon_classic</texture>
     </auto_static>
     <auto_static x="64" y="80" width="290" height="56">
       <text r="221" g="204" b="177" font="graffiti32" align="l" vert_align="c" complex_mode="1">LOST ZONE</text>

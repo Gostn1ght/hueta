@@ -3,11 +3,11 @@
 use serde::Serialize;
 use std::path::Path;
 
-pub const MIN_PATCH: u32 = 62;
+pub const MIN_PATCH: u32 = 63;
 const THEMES: &[(&str, &str, &str, bool)] = &[
-    ("room", "Комната — 3D", "Интерактивные предметы, персонаж и радио в прежней комнате.", true),
-    ("campfire", "Костёр — 2D", "Укрытие, снаряжение и костёр. Без радио и фоновой музыки.", true),
-    ("night", "Ночной лес — 2D", "Лунный лес, меню слева. Без радио и фоновой музыки.", true),
+    ("room", "Комната — 3D", "Интерактивные предметы, персонаж и радио. Требуется DirectX 11.", true),
+    ("campfire", "Костёр — 2D", "Готовое анимированное меню Anomaly: костёр в ангаре. Без радио и фоновой музыки.", true),
+    ("night", "Ночное убежище — 2D", "Готовое анимированное меню Anomaly: убежище при свече, меню слева. Без фоновой музыки.", true),
 ];
 
 #[derive(Serialize)]
@@ -34,15 +34,20 @@ pub fn patch(dir: &Path) -> u32 {
         .and_then(|v| v.get("patch")?.as_str()?.parse().ok()).unwrap_or(0)
 }
 
-pub fn list(dir: &Path) -> Vec<Addon> {
+pub fn supports_room(executable: &str) -> bool {
+    executable.replace('\\', "/").rsplit('/').next().unwrap_or("").eq_ignore_ascii_case("LostZoneClientDX11.exe")
+}
+
+pub fn list(dir: &Path, room_supported: bool) -> Vec<Addon> {
     let current = selected(dir);
     let compatible = patch(dir) >= MIN_PATCH;
     THEMES.iter().map(|&(id, name, description, ready)| Addon {
-        id, name, description, installed: current == id, available: compatible && ready,
+        id, name, description, installed: current == id, available: compatible && ready && (id != "room" || room_supported),
         conflicts: THEMES.iter().filter(|t| t.0 != id).map(|t| t.0).collect(),
         conflict_names: THEMES.iter().filter(|t| t.0 != id).map(|t| t.1).collect(),
         requires: if !ready { "В разработке".into() }
             else if !compatible { format!("Нужно обновление игры: данные {MIN_PATCH:06} или новее") }
+            else if id == "room" && !room_supported { "Несовместимо с DX8 / R1. Выберите DirectX 11. В DX8 игра откроет обычное 2D-меню.".into() }
             else { "После перезапуска игры. Удаление возвращает обычное 2D-меню без музыки.".into() },
     }).collect()
 }
@@ -60,7 +65,8 @@ fn resolve(current: &str, id: &str, install: bool, replace_conflicts: bool, game
     Ok(id.into())
 }
 
-pub fn change(dir: &Path, id: &str, install: bool, replace_conflicts: bool) -> Result<(), String> {
+pub fn change(dir: &Path, id: &str, install: bool, replace_conflicts: bool, room_supported: bool) -> Result<(), String> {
+    if install && id == "room" && !room_supported { return Err("3D-комната требует DirectX 11. Сначала переключите рендер.".into()); }
     let next = resolve(&selected(dir), id, install, replace_conflicts, patch(dir))?;
     let path = dir.join("appdata/player/netcoop_menu_theme.txt");
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
@@ -84,11 +90,15 @@ mod tests {
     use super::*;
     #[test]
     fn conflicts_require_explicit_replacement_and_uninstall_restores_default() {
-        assert!(resolve("night", "room", true, false, 62).is_err());
-        assert_eq!(resolve("night", "room", true, true, 62).unwrap(), "room");
+        assert!(resolve("night", "room", true, false, MIN_PATCH).is_err());
+        assert_eq!(resolve("night", "room", true, true, MIN_PATCH).unwrap(), "room");
         assert_eq!(resolve("room", "room", false, false, 0).unwrap(), "classic");
         assert!(resolve("classic", "room", true, false, 61).is_err());
-        assert_eq!(resolve("classic", "night", true, false, 62).unwrap(), "night");
-        assert!(resolve("classic", "../../anything", true, true, 62).is_err());
+        assert_eq!(resolve("classic", "night", true, false, MIN_PATCH).unwrap(), "night");
+        assert!(resolve("classic", "../../anything", true, true, MIN_PATCH).is_err());
+        assert!(supports_room("bin/LostZoneClientDX11.exe"));
+        assert!(supports_room("bin\\LostZoneClientDX11.exe"));
+        assert!(!supports_room("bin/LostZoneClientDX8.exe"));
+        assert!(change(Path::new("unused"), "room", true, true, false).is_err());
     }
 }

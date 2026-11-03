@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='windows-1251'?>
 <w>
   <background x="0" y="0" width="1024" height="768" stretch="1">
-    <texture x="0" y="0" width="1672" height="941">ui\lost_zone_background</texture>
+    <texture x="0" y="0" width="1920" height="1080">ui\lz_addon_classic</texture>
     <auto_static x="252" y="95" width="520" height="608" stretch="1">
       <texture r="16" g="18" b="19" a="244">ui\netcoop_menu_solid</texture>
     </auto_static>

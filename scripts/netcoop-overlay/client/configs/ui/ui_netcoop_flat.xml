@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="windows-1251"?>
 <w>
-<background x="0" y="0" width="1024" height="768" stretch="1"><texture x="0" y="0" width="1672" height="941">ui\lz_menu_classic</texture>
+<background x="0" y="0" width="1024" height="768" stretch="1"><texture x="0" y="0" width="1920" height="1080">ui\lz_addon_classic</texture>
 <auto_static x="0" y="0" width="1024" height="768" stretch="1"><texture r="0" g="0" b="0" a="55">ui\netcoop_menu_solid</texture></auto_static>
 </background><title x="280" y="115" width="464" height="70"><text font="graffiti32" r="225" g="222" b="210" align="c" vert_align="c">LOST ZONE</text></title>
-<account x="358" y="306" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></account>
-<server x="358" y="349" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></server>
-<address x="358" y="392" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></address>
-<options x="358" y="435" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></options>
-<quit x="358" y="478" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></quit>
+<notice x="72" y="655" width="880" height="60"><text font="letterica16" r="230" g="195" b="135" align="c" vert_align="c" complex_mode="1" /></notice>
+<account x="358" y="306" width="308" height="34"><text font="graffiti19" r="240" g="240" b="240" align="c" vert_align="c" /><text_color><e r="240" g="240" b="240" a="255"/><h r="255" g="214" b="151" a="255"/><t r="219" g="174" b="105" a="255"/><d r="120" g="120" b="120" a="255"/></text_color></account>
+<server x="358" y="349" width="308" height="34"><text font="graffiti19" r="240" g="240" b="240" align="c" vert_align="c" /><text_color><e r="240" g="240" b="240" a="255"/><h r="255" g="214" b="151" a="255"/><t r="219" g="174" b="105" a="255"/><d r="120" g="120" b="120" a="255"/></text_color></server>
+<address x="358" y="392" width="308" height="34"><text font="graffiti19" r="240" g="240" b="240" align="c" vert_align="c" /><text_color><e r="240" g="240" b="240" a="255"/><h r="255" g="214" b="151" a="255"/><t r="219" g="174" b="105" a="255"/><d r="120" g="120" b="120" a="255"/></text_color></address>
+<options x="358" y="435" width="308" height="34"><text font="graffiti19" r="240" g="240" b="240" align="c" vert_align="c" /><text_color><e r="240" g="240" b="240" a="255"/><h r="255" g="214" b="151" a="255"/><t r="219" g="174" b="105" a="255"/><d r="120" g="120" b="120" a="255"/></text_color></options>
+<quit x="358" y="478" width="308" height="34"><text font="graffiti19" r="240" g="240" b="240" align="c" vert_align="c" /><text_color><e r="240" g="240" b="240" a="255"/><h r="255" g="214" b="151" a="255"/><t r="219" g="174" b="105" a="255"/><d r="120" g="120" b="120" a="255"/></text_color></quit>
 </w>

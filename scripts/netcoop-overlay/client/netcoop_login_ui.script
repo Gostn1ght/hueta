@@ -168,16 +168,18 @@ function netcoop_login_wnd:__init(owner) super()
     local flat = CScriptXmlInit(); flat:ParseFile("ui_netcoop_flat.xml")
     self.flat_background = flat:InitStatic("background", self)
     self.flat_background:InitTexture(netcoop_menu_theme.background())
-    self.flat_background:SetTextureRect(Frect():set(0, 0, 1672, 941))
+    self.flat_background:SetTextureRect(Frect():set(0, 0, 1920, 1080))
     self.flat_title = flat:InitStatic("title", self)
+    self.flat_notice = flat:InitStatic("notice", self)
+    self.flat_notice:TextControl():SetText(netcoop_menu_theme.notice())
     if netcoop_menu_theme.current() == "night" then self.flat_title:SetWndPos(vector2():set(8, 155)); self.flat_title:SetWndSize(vector2():set(380, 70)) end
     self.flat_buttons = {}
     for _, entry in ipairs({
-        {"account", "Аккаунт и персонаж", function() self:ShowCharacterView() end},
-        {"server", "Войти в Зону", function() self:SelectCharacter(1) end},
-        {"address", "Сервер", function() self:ShowServer() end},
-        {"options", "Настройки", function() self:ShowSettings() end},
-        {"quit", "Выйти из игры", function() self:AskQuit() end},
+        {"account", tr("flat_account"), function() self:ShowCharacterView() end},
+        {"server", tr("enter_zone"), function() self:SelectCharacter(1) end},
+        {"address", tr("server"), function() self:ShowServer() end},
+        {"options", tr("settings"), function() self:ShowSettings() end},
+        {"quit", tr("flat_quit"), function() self:AskQuit() end},
     }) do
         local b = flat:Init3tButton(entry[1], self)
         b:TextControl():SetText(entry[2]); self:Register(b, "flat_" .. entry[1])
@@ -190,7 +192,7 @@ function netcoop_login_wnd:__init(owner) super()
 	self.account_background = xml:InitStatic("background", self)
     if not self.room_theme then
         self.account_background:InitTexture(netcoop_menu_theme.background())
-        self.account_background:SetTextureRect(Frect():set(0, 0, 1672, 941))
+        self.account_background:SetTextureRect(Frect():set(0, 0, 1920, 1080))
     end
 
 	local function cap(path, text)
@@ -319,6 +321,7 @@ end
 function netcoop_login_wnd:PositionRoomControls()
     local overview = self.mode == "characters" and not self.room_view
     if self.flat_title then self.flat_title:Show(not self.room_theme and overview) end
+    if self.flat_notice then self.flat_notice:Show(not self.room_theme and overview and netcoop_menu_theme.notice() ~= "") end
     if self.flat_background then self.flat_background:Show(not self.room_theme and self.mode ~= "account") end
     for _, b in ipairs(self.flat_buttons or {}) do b:Show(not self.room_theme and overview); b:Enable(not self:Busy()) end
     local shown = self.room_theme and self.mode == "characters" and (not self.room_view or self.room_view == "door")
@@ -656,7 +659,7 @@ function netcoop_login_wnd:ShowCharacters()
         connect:TextControl():SetText(tr("enter_zone")); self:Register(connect, "server_connect")
         self:Bind("server_connect", function() self:SelectCharacter(self.slot) end)
         local check = xml:Init3tButton("server_check", self.server_panel)
-        check:TextControl():SetText("�������� ���������� � ������")
+        check:TextControl():SetText(tr("check_connection"))
         self:Register(check, "server_check"); self:Bind("server_check", self.CheckServer)
         self.room_back = xml:Init3tButton("room_back", self)
         self.room_back:TextControl():SetText(tr("back")); self:Register(self.room_back, "room_back")
@@ -690,7 +693,7 @@ function netcoop_login_wnd:ShowCharacters()
     self.slot = self.slot or 1; self.character_panel:Show(true); self:ChangeSlot(0)
     self.details_panel:Show(false)
     self:SetMsg(auth_message or "")
-    self.account_caption:TextControl():SetText(self.pending_login .. (self:CharacterLimit() == 10 and "  /  �������������" or "  /  �������"))
+    self.account_caption:TextControl():SetText(self.pending_login .. "  /  " .. tr("flat_account"))
     for i = 1, 10 do self.slot_buttons[i]:Show(false) end
     for i = 1, self:CharacterLimit() do
         self.slot_buttons[i]:TextControl():SetText(string.format("%d   %s", i, self.names[i] and self.names[i] ~= "" and self.names[i] or tr("empty_slot")))
@@ -708,7 +711,7 @@ function netcoop_login_wnd:ChangeSlot(delta)
     self.enter:TextControl():SetText(tr(name and name ~= "" and "enter_zone" or "create_character"))
     local description, history = "", ""
     if cloud_enabled() then description = netcoop_draft(self.slot, "description"); history = netcoop_draft(self.slot, "history") end
-    self.character_description:TextControl():SetText((description ~= "" and description .. "\n\n" or "") .. (history ~= "" and history or "������ ���� ��������. ���������� � �������� ����������� �� ��������� �������."))
+    self.character_description:TextControl():SetText((description ~= "" and description .. "\n\n" or "") .. (history ~= "" and history or tr("character_history_empty")))
     for i = 1, 10 do self.slot_buttons[i]:Enable(i ~= self.slot) end
     self.storage_revision=nil
     if self.room_theme and self.room_view == "character" then self.view_index=2; netcoop_preview_focus(2)

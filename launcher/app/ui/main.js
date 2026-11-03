@@ -182,7 +182,10 @@ $("#b-play").onclick = async () => {
 };
 
 $("#renderer").onchange = async (e) => {
-  try { await invoke("set_renderer", { index: Number(e.target.value) }); }
+  try {
+    await invoke("set_renderer", { index: Number(e.target.value) });
+    if ($("#addons-dialog").open) await renderAddons(await invoke("list_addons"));
+  }
   catch (error) { toast(error); render(await invoke("info")); }
 };
 async function renderAddons(rows) {

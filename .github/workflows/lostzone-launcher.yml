@@ -32,7 +32,7 @@ jobs:
           New-Item -ItemType Directory -Force ci-output | Out-Null
           Copy-Item target/release/Launcher.exe ci-output/LostZoneLauncher.exe
           $hash = (Get-FileHash ci-output/LostZoneLauncher.exe -Algorithm SHA256).Hash.ToLower()
-          @{commit='${{ github.sha }}'; version='1.3.0'; sha256=$hash} | ConvertTo-Json | Set-Content ci-output/build-reviewed.json
+          @{commit='${{ github.sha }}'; version='1.3.1'; sha256=$hash} | ConvertTo-Json | Set-Content ci-output/build-reviewed.json
       - uses: actions/upload-artifact@v4
         with:
           name: LostZone-Launcher

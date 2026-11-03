@@ -11,7 +11,7 @@ cache = Path(temporary.name)
 (cache/'logs').mkdir()
 lua=LuaRuntime(unpack_returned_tuples=True)
 lua.globals().test_path=cache.as_posix()+'/'
-lua.execute(r'''
+menu_stubs = r'''
 state,role,account,present=0,0,'',false
 commands,characters,previews,callbacks,controls={},{},{},{},{}
 local Widget={}
@@ -60,6 +60,8 @@ function CScriptXmlInit() return {ParseFile=function() end,InitStatic=function(s
  InitEditBox=function(s,id) return widget(id) end,Init3tButton=function(s,id) return widget(id) end,
  InitScrollView=function(s,id) return widget(id) end} end
 function getFS() return {update_path=function(s,alias,name) return test_path..name end} end
+renderer='renderer_r4'
+function get_console_cmd(kind,name) assert(kind==0 and name=='renderer'); return renderer end
 function netcoop_account() return account end
 function netcoop_account_state() return state end
 function netcoop_role() return role end
@@ -111,7 +113,8 @@ ui_options={UIOptions=function()
  return setmetatable({background=widget()}, {__index=Widget})
 end}
 CUIMMShniaga={epi_main=0,epi_new_game=1}
-''')
+'''
+lua.execute(menu_stubs)
 radio_root = root/'scripts/netcoop-overlay/client'
 theme_source = (radio_root/'netcoop_menu_theme.script').read_text()
 def load_theme():
@@ -126,7 +129,10 @@ lua.execute("netcoop_menu_stations={}; netcoop_menu_radio={}")
 lua.execute("local f=assert(loadstring(...)); setfenv(f,netcoop_menu_stations); f()", (radio_root/'netcoop_menu_stations.script').read_text())
 lua.execute("setmetatable(netcoop_menu_radio,{__index=_G}); local f=assert(loadstring(...)); setfenv(f,netcoop_menu_radio); f()", (radio_root/'netcoop_menu_radio.script').read_text())
 menu_source = Path(sys.argv[1]) if len(sys.argv) > 1 else root/'scripts/netcoop-overlay/client/netcoop_login_ui.script'
-lua.execute(menu_source.read_text(encoding='cp1251'))
+# Lua strings reach the game's byte-oriented CP1251 fonts unchanged. Keep
+# localized text in the string table; UTF8 literals were rendered as mojibake.
+assert menu_source.read_bytes().isascii(), 'Menu Lua must use string-table IDs, not encoded display literals'
+lua.execute(menu_source.read_text(encoding='ascii'))
 lua.execute("assert(rawget(netcoop_login_wnd, 'Show') == nil, 'native Show must stay inherited')")
 lua.execute(r'''
 local menu={HideDialog=function(s) s.hidden=true end,Show=function() end,ShowDialog=function() end}
@@ -626,11 +632,50 @@ for theme in ['campfire', 'night']:
     lua.globals().expected_theme=theme
     lua.execute(r"""
     assert(netcoop_menu_theme.current()==expected_theme and not netcoop_menu_theme.room())
-    assert(netcoop_menu_theme.background()=='ui\\lz_menu_'..expected_theme)
+    assert(netcoop_menu_theme.background()=='ui\\lz_addon_'..expected_theme)
     local flat=netcoop_login_wnd({HideDialog=function() end,Show=function() end})
     flat:ShowRoom();assert(not room_model and not flat:Busy())
     if expected_theme=='night' then assert(flat.flat_buttons[1].position.x==44) end
     netcoop_menu_radio.update();for _,sound in ipairs(music_sounds) do assert(not sound.active) end
     """)
 print('Optional campfire/night menus: isolated selection, no 3D, no radio, left night layout PASS')
+# R1 has no native room renderer: retain the add-on selection, but show a
+# usable flat menu and an explicit notice instead of invisible 3D controls.
+(cache/'netcoop_menu_theme.txt').write_text('room\n')
+load_theme()
+lua.execute(r"""
+renderer='renderer_r1';present=false;room_model=false
+local fallback=netcoop_login_wnd({HideDialog=function()end,Show=function()end})
+fallback:ShowRoom()
+assert(not fallback.room_theme and not fallback:Busy() and not room_model)
+assert(fallback.flat_buttons[1].shown and not controls.previous.shown)
+assert(fallback.flat_notice.shown and fallback.flat_notice.text=='st_netcoop_room_requires_dx11')
+netcoop_menu_radio.update();for _,s in ipairs(music_sounds)do assert(not s.active)end
+renderer='renderer_r4'
+local room=netcoop_login_wnd({HideDialog=function()end,Show=function()end})
+room:ShowRoom();finish_camera();room:PositionRoomControls()
+assert(room.room_theme and room_model and not room.flat_background.shown and not room.flat_notice.shown)
+assert(controls.previous.shown and not room.flat_buttons[1].shown)
+""")
+print('Actual DX8 room fallback and DX11 room path PASS')
+
+# The real game uses byte strings and CP1251 fonts. Unlike the Unicode UI
+# fixture above this checks the exact bytes sent by actual menu construction.
+import xml.etree.ElementTree as ET
+raw=LuaRuntime(unpack_returned_tuples=True,encoding=None)
+raw.globals()[b'test_path']=lua.globals().test_path.encode('ascii')
+raw.execute(menu_stubs.encode('ascii'))
+raw.execute(b"netcoop_menu_theme={};setmetatable(netcoop_menu_theme,{__index=_G});local f=assert(loadstring(...));setfenv(f,netcoop_menu_theme);f()", theme_source.encode('ascii'))
+raw.execute(menu_source.read_bytes())
+strings=ET.fromstring((radio_root/'configs/text/rus/st_netcoop.xml').read_bytes())
+label_ids={'st_netcoop_'+k for k in ['flat_account','enter_zone','server','settings','flat_quit','room_requires_dx11']}
+translations={e.attrib['id'].encode('ascii'):e.findtext('text').encode('cp1251') for e in strings if e.attrib['id'] in label_ids}
+raw.globals()[b'game'][b'translate_string']=lambda key:translations.get(key,key)
+window=raw.eval(b'netcoop_login_wnd') (raw.table())
+for i,key in enumerate(['flat_account','enter_zone','server','settings','flat_quit'],1):
+    label=window[b'flat_buttons'][i][b'text']
+    assert label==translations[('st_netcoop_'+key).encode('ascii')]
+    assert label.decode('cp1251').encode('cp1251')==label
+print('Actual flat labels reach CP1251 fonts byte-for-byte; no UTF8 literals or replacement characters PASS')
+
 temporary.cleanup()

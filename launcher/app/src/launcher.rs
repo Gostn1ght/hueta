@@ -581,16 +581,22 @@ pub fn set_renderer(st: S<'_>, index: usize) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn list_addons(st: S<'_>) -> Vec<crate::addons::Addon> { crate::addons::list(&st.dir) }
+pub fn list_addons(st: S<'_>) -> Vec<crate::addons::Addon> {
+    let index = st.settings.lock().renderer;
+    let supported = st.brand.renderers.get(index).or(st.brand.renderers.first()).is_some_and(|r| crate::addons::supports_room(&r.exe));
+    crate::addons::list(&st.dir, supported)
+}
 
 #[tauri::command]
 pub fn set_addon(st: S<'_>, id: String, install: bool, replace_conflicts: bool) -> Result<Vec<crate::addons::Addon>, String> {
     if st.busy.compare_exchange(false, true, AcqRel, Relaxed).is_err() { return Err("Дождитесь окончания обновления".into()); }
-    let result = crate::addons::change(&st.dir, &id, install, replace_conflicts);
+    let index = st.settings.lock().renderer;
+    let supported = st.brand.renderers.get(index).or(st.brand.renderers.first()).is_some_and(|r| crate::addons::supports_room(&r.exe));
+    let result = crate::addons::change(&st.dir, &id, install, replace_conflicts, supported);
     st.busy.store(false, Release);
     result?;
     st.log.line(&format!("Аддон {id}: {}; новое меню откроется при следующем запуске игры", if install { "установлен" } else { "удалён" }));
-    Ok(crate::addons::list(&st.dir))
+    Ok(crate::addons::list(&st.dir, supported))
 }
 
 #[tauri::command]

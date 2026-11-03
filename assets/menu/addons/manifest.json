@@ -1,31 +1,54 @@
 {
+  "addon": "Animated main menus",
+  "author": "karatel_196rus",
+  "credits": [
+    "xomut"
+  ],
+  "source_url": "https://www.moddb.com/mods/stalker-anomaly/addons/animated-main-menus",
+  "license_on_source_page": "Public Domain",
+  "archive": "Animated_main_menu.2.zip",
+  "archive_md5": "c4b45a3afd54d45bb95e5b93a0df5a00",
+  "archive_sha256": "08624ce13d9dbc44a273807f968d5540e2bde58910ddefe6b9a8e1b7b12927f3",
   "images": [
     {
       "id": "classic",
-      "source": "assets/menu/addons/classic.png",
-      "texture": "ui/lz_menu_classic.dds",
-      "width": 1672,
-      "height": 941,
-      "sha256": "3e3c4dca9e4ece1a4fc960757c4071b2c124d9f44854a3d1fa261a23cf2ac26f",
-      "method": "built-in image_gen; native-size DDS conversion without resampling"
+      "source": "Cordon/gamedata/textures/ui/ui_background_new.ogm",
+      "texture": "ui/lz_addon_classic.ogm",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 72564591,
+      "sha256": "3a6213684c945e25ae27f3710017cda7e7df10da3cd5e98b6ec174dd768c0f84",
+      "method": "Original Theora video packets preserved byte-for-byte; Ogg remux removes audio and metadata streams; no re-encoding or resizing",
+      "original_ogm_sha256": "92fb92be40237c18b5e3eae1398b110e511264289f350bf90af2cebaab13301d",
+      "encoded_video_sha256": "aab35308e7ef5c486970711907fbddf6aa8a352ddafaf2cf170422e5fe817537",
+      "video_packets": 1785
     },
     {
       "id": "campfire",
-      "source": "assets/menu/addons/campfire.png",
-      "texture": "ui/lz_menu_campfire.dds",
-      "width": 1672,
-      "height": 941,
-      "sha256": "67772ebcfe49421073ffc7e8b2013efcde005bb41ea85cad1e649ae10dae031f",
-      "method": "built-in image_gen; native-size DDS conversion without resampling"
+      "source": "Garbage/gamedata/textures/ui/ui_background_new.ogm",
+      "texture": "ui/lz_addon_campfire.ogm",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 23485521,
+      "sha256": "991bb5d362af1be4c79d9e7f6af11a84cfcd089517512fe8fd9804304e064525",
+      "method": "Original Theora video packets preserved byte-for-byte; Ogg remux removes audio and metadata streams; no re-encoding or resizing",
+      "original_ogm_sha256": "7d3c501164a5b8e1e5a0e8fe4b80d640eef7326551dad08391597ca34dd68e18",
+      "encoded_video_sha256": "c8fb66097c69204301c4840ab3112b62d4834927da967a1c780f363f831ba53b",
+      "video_packets": 1763
     },
     {
       "id": "night",
-      "source": "assets/menu/addons/night.png",
-      "texture": "ui/lz_menu_night.dds",
-      "width": 1672,
-      "height": 941,
-      "sha256": "9117cbae7dd321d6f3f6a90a2e52aeb4ec08649af547601b61f8cb4f843af6f1",
-      "method": "built-in image_gen; native-size DDS conversion without resampling"
+      "source": "Swamp_night/gamedata/textures/ui/ui_background_new.ogm",
+      "texture": "ui/lz_addon_night.ogm",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 7392608,
+      "sha256": "79a7d4c5671962da4593b62b30d18603453b90581c7820b88c28405913f74049",
+      "method": "Original Theora video packets preserved byte-for-byte; Ogg remux removes audio and metadata streams; no re-encoding or resizing",
+      "original_ogm_sha256": "83cfa32035704c4ef45a08bf73a1956c0bb2c4fcc43b81c41dd9685110ea92e0",
+      "encoded_video_sha256": "ef15a007186c878b3f42590da1b014599e0b7edb4a2ae883701aca7cfc2a4a33",
+      "video_packets": 1539
     }
-  ]
+  ],
+  "adaptation": "Original animated backgrounds and menu typography/layout adapted to Lost Zone account/character/world actions. No single-player menu scripts or music imported."
 }

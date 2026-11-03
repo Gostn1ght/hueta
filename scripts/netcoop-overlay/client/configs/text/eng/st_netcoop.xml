@@ -1574,4 +1574,9 @@
 <string id="st_pdanet_usb_read_archive"><text>Read conversation archive</text></string>
 <string id="st_pdanet_rec_loading"><text>Recording is loading. Send it again after the download finishes.</text></string>
 <string id="st_pdanet_hack_password"><text>Reset password with decryption USB</text></string>
+  <string id="st_netcoop_flat_account"><text>Account and character</text></string>
+  <string id="st_netcoop_flat_quit"><text>Quit game</text></string>
+  <string id="st_netcoop_check_connection"><text>Check world connection</text></string>
+  <string id="st_netcoop_character_history_empty"><text>Your journey in the Zone begins. Description and story belong to this character.</text></string>
+  <string id="st_netcoop_room_requires_dx11"><text>The 3D room requires DX11. The standard menu is shown instead.</text></string>
 </string_table>

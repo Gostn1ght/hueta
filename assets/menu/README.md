@@ -1,4 +1,6 @@
-# Lost Zone 2D menu assets
+# Historical Lost Zone menu artwork
+
+The generated background below is historical and is no longer used by the current candidate. Active menu backgrounds now come from the original Anomaly add-on documented in `addons/README.md` and `addons/manifest.json`. The player portrait is separate from the background replacement.
 
 Generated with the built-in image_gen tool. The exact prompts are saved in prompts.json.
 

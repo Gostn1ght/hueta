@@ -13,8 +13,16 @@ function current()
     printf("[Lost Zone][menu] theme=%s", selected)
     return selected
 end
-function room() return current() == "room" end
+function room()
+    if current() ~= "room" then return false end
+    -- Only R4 implements PrepareUIModel/DrawUIModel. R1 inherits the no-op
+    -- renderer methods; exposing room controls there leaves a black screen.
+    return get_console_cmd(0, "renderer") == "renderer_r4"
+end
+function notice()
+    return current() == "room" and not room() and game.translate_string("st_netcoop_room_requires_dx11") or ""
+end
 function background()
     local name = current()
-    return "ui\\lz_menu_" .. (name == "room" and "classic" or name)
+    return "ui\\lz_addon_" .. (name == "room" and "classic" or name)
 end
