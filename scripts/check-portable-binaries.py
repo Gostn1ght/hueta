@@ -5,6 +5,9 @@ import struct
 
 SYSTEM=set('msvfw32 avifil32 winmm kernel32 user32 gdi32 dinput8 cfgmgr32 d3dcompiler_47 d3d11 dxgi bcrypt version winhttp crypt32 dnsapi imm32 advapi32 shell32 ole32 oleaut32 ws2_32 iphlpapi ktmw32 msvcrt ucrtbase ntdll rpcrt4 combase shlwapi setupapi psapi comdlg32 comctl32 uxtheme d3d9 dwmapi wininet wldap32 xinput1_4'.split())
 REQUIRED=('GameNetworkingSockets.dll','libprotobuf.dll','libcrypto-3-x64.dll','discord_game_sdk.dll','icuuc65.dll','icudt65.dll','tbb.dll','soft_oal.dll','D3DX9_43.dll','d3dx11_43.dll','D3DCompiler_43.dll','msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll')
+# The native master uses Windows' signed System32 DbgHelp for crash stacks.
+# It is supplied by the OS, like kernel32, rather than an app-local runtime.
+SYSTEM.add('dbghelp')
 
 def imports(path):
     data=path.read_bytes()

@@ -609,8 +609,8 @@
       ]
     }
   ],
-  "installed": false,
-  "published": false,
+  "installed": true,
+  "published": true,
   "game_pose_review": [
     {
       "name": "mahito",
@@ -843,5 +843,7 @@
         }
       ]
     }
-  ]
+  ],
+  "release": "2026.11.03.3",
+  "patch": "000063"
 }
