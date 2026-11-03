@@ -15,13 +15,18 @@ source=r'''
 #include <map>
 #include <cstdio>
 using u32=unsigned;
-struct CObject{virtual ~CObject()=default;};struct CCar:CObject{};
+using u16=unsigned short;
+struct CObject{bool removed=false;virtual ~CObject()=default;bool getDestroy(){return removed;}};struct CCar:CObject{};
 template<class T>T smart_cast(CObject* p){return dynamic_cast<T>(p);}
 namespace netcoop{bool client=false;bool pure_client(){return client;}}
+struct Objects{std::map<u16,CObject*>items;CObject*net_Find(u16 id){auto i=items.find(id);return i==items.end()?nullptr:i->second;}};
+struct World{Objects objects;Objects&LevelObjects(){return objects;}}world;
+World&inl_ph_world(){return world;}
+struct CPHSimpleCharacter{struct{u16 m_obj_id=65535;}m_collision_damage_info;CObject*CollisionObject()const;};
 struct Graph{bool valid_vertex_id(u32 id){return id<10;}};
 struct AI{Graph graph;Graph&level_graph(){return graph;}}instance;
 AI&ai(){return instance;}
-'''+method('src/xrGame/Actor.cpp','static bool actor_collision_damage_local(')+method('src/xrGame/level_script.cpp','bool valid_vertex(')+r'''
+'''+method('src/xrGame/Actor.cpp','static bool actor_collision_damage_local(')+method('src/xrPhysics/PHSimpleCharacter.cpp','CObject* CPHSimpleCharacter::CollisionObject() const')+method('src/xrGame/level_script.cpp','bool valid_vertex(')+r'''
 int main(){
  assert(netcoop::destroy_authorized(false,false,true));
  assert(netcoop::destroy_authorized(false,true,false)); // authoritative cleanup of migrated ownership
@@ -44,6 +49,15 @@ int main(){
  CCar car;CObject ground;
  assert(actor_collision_damage_local(&car));netcoop::client=true;
  assert(!actor_collision_damage_local(&car));assert(actor_collision_damage_local(&ground));assert(actor_collision_damage_local(nullptr));
+ // Damage credit can be the driver, the player itself, or absent. The
+ // actual contacting wheel/car still belongs to the server's run-over path.
+ CObject driver;assert(!actor_collision_damage_local(&driver,&car));assert(!actor_collision_damage_local(nullptr,&car));
+ CPHSimpleCharacter character;assert(!character.CollisionObject());
+ world.objects.items[5]=&car;character.m_collision_damage_info.m_obj_id=5;
+ assert(character.CollisionObject()==&car&&!actor_collision_damage_local(&driver,character.CollisionObject()));
+ car.removed=true;assert(!character.CollisionObject());car.removed=false;
+ world.objects.items.clear();assert(!character.CollisionObject());
+ netcoop::client=false;assert(actor_collision_damage_local(&driver,&car));
  assert(valid_vertex(0)&&valid_vertex(9)&&!valid_vertex(10)&&!valid_vertex(~0u));
  puts("PASS actual destroy progress/authorization/graph, replica-car damage exclusion, respawn vertex API");
 }

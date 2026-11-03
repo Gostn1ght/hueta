@@ -932,9 +932,9 @@ void CActor::SwitchOutBorder(bool new_border_state)
 	m_bOutBorder = new_border_state;
 }
 
-static bool actor_collision_damage_local(CObject* initiator)
+static bool actor_collision_damage_local(CObject* initiator, CObject* contact = nullptr)
 {
-    return !netcoop::pure_client() || !smart_cast<CCar*>(initiator);
+    return !netcoop::pure_client() || (!smart_cast<CCar*>(initiator) && !smart_cast<CCar*>(contact));
 }
 
 void CActor::g_Physics(Fvector& _accel, float jump, float dt)
@@ -1014,7 +1014,7 @@ void CActor::g_Physics(Fvector& _accel, float jump, float dt)
             // even when a car is parked. Moving vehicles hit players once on
             // the authority (vehicle_run_over), never from replica impulses.
             if (Level().CurrentControlEntity() == this &&
-                actor_collision_damage_local(initiator))
+                actor_collision_damage_local(initiator, di->CollisionObject()))
 			{
 				SHit HDS = SHit(mctrl->gcontact_HealthLost,
 				                //.								0.0f,

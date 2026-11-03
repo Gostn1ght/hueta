@@ -11,6 +11,8 @@ public:
 	virtual const Fvector& HitPos() const =0;
 	virtual u16 DamageInitiatorID() const =0;
 	virtual CObject* DamageInitiator() const =0;
+	// The contacting body is not necessarily its damage credit (a driver's ID).
+	virtual CObject* CollisionObject() const =0;
 	virtual ALife::EHitType HitType() const =0;
 	virtual ICollisionHitCallback* HitCallback() const =0;
 	virtual void Reinit() =0;

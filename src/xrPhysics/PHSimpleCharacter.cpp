@@ -1847,6 +1847,13 @@ u16 CPHSimpleCharacter::DamageInitiatorID() const
 	return ret;
 }
 
+CObject* CPHSimpleCharacter::CollisionObject() const
+{
+	if (m_collision_damage_info.m_obj_id == u16(-1)) return nullptr;
+	CObject* object = inl_ph_world().LevelObjects().net_Find(m_collision_damage_info.m_obj_id);
+	return object && !object->getDestroy() ? object : nullptr;
+}
+
 CObject* CPHSimpleCharacter::DamageInitiator() const
 {
 	VERIFY(m_phys_ref_object);
