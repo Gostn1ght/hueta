@@ -23,7 +23,8 @@ for name in ['mahito','areke']:
  stock=reader.Motions(root/'scripts/netcoop-overlay/client/meshes/actors/stalker_animation.omf',path)
  prone=reader.Motions(a.prone,path) if a.prone else None
  snapshots=[];samples=[]
- poses=[(None,'rest',0),(stock,'norm_walk_fwd_0',0),(stock,'norm_walk_fwd_0',.5),(stock,'steering_idle_0_0',.2)]
+ seated=reader.Motions(root/'scripts/netcoop-overlay/client/meshes/actors/modded_stalker_animations/netcoop_player_prone.omf',path)
+ poses=[(None,'rest',0),(stock,'norm_walk_fwd_0',0),(stock,'norm_walk_fwd_0',.5),(stock,'steering_idle_0_0',.2),(seated,'lz_vehicle_passenger',.2)]
  if prone:poses.append((prone,'review_cc0_crawl',.25))
  for col,(motions,clip,phase) in enumerate(poses):
   world={n:c@Matrix(m.tolist())@c for n,m in motions.pose(clip,phase,matrices=True).items()} if motions else {b.name:b.matrix_local.copy() for b in rig.data.bones}
