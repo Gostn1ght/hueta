@@ -1,0 +1,36 @@
+{
+  "repository": "https://api.github.com/repos/Mesh2Motion/mesh2motion-app",
+  "commit": "b6dc8faa022fecf69956c79682a2ecaca9fcb81d",
+  "license": "CC0-1.0",
+  "files": [
+    {
+      "path": "static/assets/human/animations/crawl.glb",
+      "sha256": "2fba691a0cc424ee7e3b2bd96261aa37555157f1cc8fbd53e1e5876b4cd17bc2",
+      "bytes": 63856,
+      "blender_input": "crawl-plain.glb",
+      "blender_input_sha256": "028bdb7f646bd8c9c3ead7a82b9212bc66aacb363e099f75939f7b6db3f66e4b"
+    },
+    {
+      "path": "static/assets/human/animations/driving.glb",
+      "sha256": "1f95a7317d3f17e5394148cb12a4c829957adaff3889bc5bab72b140d7b182a2",
+      "bytes": 58416,
+      "blender_input": "driving-plain.glb",
+      "blender_input_sha256": "cbbbda0292428fbe8d61f7aa47eb1c2b93db4a444d17407cb4f6b881bd477066"
+    },
+    {
+      "path": "static/assets/human/animations/pistol-prone.glb",
+      "sha256": "23b05d989f9d7f35d55ba05060d39ac476bcac73b5cf2541fd71c85dda84a752",
+      "bytes": 58556,
+      "blender_input": "pistol-prone-plain.glb",
+      "blender_input_sha256": "082f09a9e84c68701d96efe0dc91b6be81c6aa705092f607741f43a5b5525655"
+    },
+    {
+      "path": "LICENSE-CC0.MD",
+      "sha256": "52fec1c484df708c16b4c27b2bf0d7f0d3994105c57adc4b9e6f95bcfd9de65f",
+      "bytes": 294
+    }
+  ],
+  "processing": "Lossless EXT_meshopt_compression decoding using official meshoptimizer decoder; no resampling or retargeting of source clips.",
+  "decoder_commit": "f0a684f11ead064e176775c9b796f82a55910e92",
+  "license_url": "https://github.com/Mesh2Motion/mesh2motion-app/blob/b6dc8faa022fecf69956c79682a2ecaca9fcb81d/LICENSE-CC0.MD"
+}
