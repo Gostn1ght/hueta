@@ -55,7 +55,7 @@ hud:Set("64.0|72.0|86.0|2400|3|1")
 assert(hud.speed.text=="064  <st_lz_car_kmh>" and hud.details.text:find("2400",1,true))
 assert(hud.condition.text:find("72%",1,true) and hud.condition.color[2]==205 and added==1)
 hud:Set("0|9|24|0|0|0");assert(hud.condition.color[2]==220 and added==1)
-assert(hud.details.text:find("<st_lz_car_off>",1,true) and hud.details.text:find(" R",1,true))
+assert(hud.engine.text:find("<st_lz_car_off>",1,true) and hud.details.text:find(" R",1,true))
 hud:Set("");assert(removed==1 and not hud.shown)
 ''')
 

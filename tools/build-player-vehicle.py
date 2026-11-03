@@ -51,7 +51,7 @@ def locals_for(source,name,fraction,hip_zero=False):
   a=Matrix(m.tolist());a.translation-=__import__('mathutils').Vector(shift.tolist());poses[n]=c@a@c
  return {b.name:poses[b.parent.name].inverted()@poses[b.name] if b.parent else poses[b.name] for b in order}
 targets={'driver':locals_for(driver,'steering_idle_0_0',.2,True),
-         'passenger':locals_for(chair,'animpoint_sit_high_idle_1',.2,True)}
+         'passenger':locals_for(chair,'animpoint_sit_normal_idle_1',.2,True)}
 def smooth(x):return x*x*(3-2*x)
 def emit(name,poses_at,frames,once):
  action=bpy.data.actions.new(name);action.use_fake_user=True;action.xray.fps=30;action.xray.speed=1

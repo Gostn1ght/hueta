@@ -2,6 +2,7 @@
 <w><dashboard x="780" y="570" width="222" height="132" stretch="1">
 <texture>ui_inGame2_demo_player_info_window</texture>
 <speed x="14" y="10" width="198" height="30"><text font="graffiti22" r="223" g="215" b="190"/></speed>
-<details x="14" y="48" width="198" height="46" complex_mode="1"><text font="letterica16" r="185" g="184" b="170"/></details>
+<details x="14" y="48" width="198" height="22"><text font="letterica16" r="185" g="184" b="170"/></details>
+<engine x="14" y="74" width="198" height="22"><text font="letterica16" r="185" g="184" b="170"/></engine>
 <condition x="14" y="100" width="198" height="22"><text font="letterica16" r="205" g="199" b="179"/></condition>
 </dashboard></w>
