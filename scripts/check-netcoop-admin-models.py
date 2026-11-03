@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import math
+import re
 import struct
 import xml.etree.ElementTree as ET
 
@@ -87,6 +88,8 @@ config = mirrored('configs/mod_system_zzzzzzzzzzzz_lostzone_admin_models.ltx').d
 assert '[lz_admin_mahito]:exo_outfit' in config and '[lz_admin_areke]:lz_admin_mahito' in config
 assert 'can_trade = false' in config and 'additional_inventory_weight = 1000' in config
 assert 'visual = dynamics\\outfit\\exo_outfit' in config and 'visual = dynamics\\outfit\\merc_exo_outfit' in config
+radiation = re.search(r'^radiation_restore_speed\s*=\s*([-+.\d]+)', config, re.M)
+assert radiation and float(radiation[1]) < 0, 'Outfits must remove radiation, not irradiate their wearer'
 for language in ['rus', 'eng']:
     strings = ET.fromstring(mirrored('configs/text/'+language+'/st_lz_admin_models.xml'))
     values = {row.attrib['id']: row.findtext('text') for row in strings}

@@ -74,7 +74,7 @@
     ]
   },
   "physics/vehicles/paz/veh_paz_u_01.ogf": {
-    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Rear bench has four positions inside armrests instead of five, whose outer anchors were outside the cushion.",
     "seats": [
       {
         "bone": "seat_left",
@@ -250,7 +250,7 @@
       {
         "bone": "seat_left",
         "offset": [
-          -0.1641,
+          0.1359,
           -0.1395,
           -5.8458
         ],
@@ -259,7 +259,7 @@
       {
         "bone": "seat_left",
         "offset": [
-          0.3159,
+          0.5759,
           -0.1395,
           -5.8458
         ],
@@ -268,7 +268,7 @@
       {
         "bone": "seat_left",
         "offset": [
-          0.7959,
+          1.0159,
           -0.1395,
           -5.8458
         ],
@@ -277,16 +277,7 @@
       {
         "bone": "seat_left",
         "offset": [
-          1.2759,
-          -0.1395,
-          -5.8458
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
-          1.7559,
+          1.4559,
           -0.1395,
           -5.8458
         ],
@@ -295,7 +286,7 @@
     ]
   },
   "physics/vehicles/paz/veh_paz_u_02.ogf": {
-    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed rear-left empty-floor seat and rear-right door-step seat; retained actual side benches.",
     "seats": [
       {
         "bone": "seat_left",
@@ -372,15 +363,6 @@
       {
         "bone": "seat_left",
         "offset": [
-          -0.1961,
-          -0.1556,
-          -4.8892
-        ],
-        "yaw": 90
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
           1.8439,
           -0.1556,
           -3.6892
@@ -395,34 +377,16 @@
           -4.2892
         ],
         "yaw": -90
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
-          1.8439,
-          -0.1556,
-          -4.8892
-        ],
-        "yaw": -90
       }
     ]
   },
   "physics/vehicles/zil/veh_zil_u_02.ogf": {
-    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
     "seats": [
       {
         "bone": "seat_left",
         "offset": [
           -0.0004,
-          -0.0029,
-          0.0045
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
-          0.5096,
           -0.0029,
           0.0045
         ],
@@ -530,7 +494,7 @@
     ]
   },
   "physics/vehicles/uaz/veh_uaz_van_u_01.ogf": {
-    "evidence": "Offline donor mesh cutaway and bind-space seat/surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Three-seat rear cabin bench faces rearwards; pelvis moved from front cushion edge onto cushion and yaw set to 180.",
     "seats": [
       {
         "bone": "seat_left",
@@ -555,27 +519,27 @@
         "offset": [
           -0.0258,
           -0.0534,
-          -0.9291
+          -0.6091
         ],
-        "yaw": 0
+        "yaw": 180
       },
       {
         "bone": "seat_left",
         "offset": [
           0.5242,
           -0.0534,
-          -0.9291
+          -0.6091
         ],
-        "yaw": 0
+        "yaw": 180
       },
       {
         "bone": "seat_left",
         "offset": [
           1.0742,
           -0.0534,
-          -0.9291
+          -0.6091
         ],
-        "yaw": 0
+        "yaw": 180
       }
     ]
   },
@@ -1184,21 +1148,12 @@
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_01.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
     "seats": [
       {
         "bone": "seat_left",
         "offset": [
           0,
-          0,
-          0
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_right",
-        "offset": [
-          -0.46,
           0,
           0
         ],
@@ -1216,7 +1171,7 @@
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_04.ogf": {
-    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
+    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81–1.83 m; army Kamaz at 1.97–1.99 m; audit 169",
     "seats": [
       {
         "bone": "seat_left",
@@ -1374,7 +1329,7 @@
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_03.ogf": {
-    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
+    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81–1.83 m; army Kamaz at 1.97–1.99 m; audit 169",
     "seats": [
       {
         "bone": "seat_left",
@@ -1532,21 +1487,12 @@
     ]
   },
   "physics/vehicles/kamaz/veh_kamaz_u_02.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
     "seats": [
       {
         "bone": "seat_left",
         "offset": [
           0,
-          0,
-          0
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_right",
-        "offset": [
-          -0.46,
           0,
           0
         ],
@@ -1764,7 +1710,7 @@
     ]
   },
   "physics/vehicles/luaz/veh_luaz_u_01.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed generic rear -0.85 m seats: donor has bare cargo floor/wheel arches, no rear cushions.",
     "seats": [
       {
         "bone": "seat_left",
@@ -1781,31 +1727,13 @@
           0,
           0,
           0
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
-          0.0,
-          0.0,
-          -0.85
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_right",
-        "offset": [
-          0.0,
-          0.0,
-          -0.85
         ],
         "yaw": 0
       }
     ]
   },
   "physics/vehicles/luaz/veh_luaz_u_02.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed generic rear -0.85 m seats: donor has bare cargo floor/wheel arches, no rear cushions.",
     "seats": [
       {
         "bone": "seat_left",
@@ -1822,24 +1750,6 @@
           0,
           0,
           0
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_left",
-        "offset": [
-          0.0,
-          0.0,
-          -0.85
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_right",
-        "offset": [
-          0.0,
-          0.0,
-          -0.85
         ],
         "yaw": 0
       }
@@ -2433,7 +2343,7 @@
     ]
   },
   "physics/vehicles/uaz/veh_uaz_u_05_gun.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Moved two generic rear seats to actual individual rear cushions, clear of turret and wheel-arch walkway.",
     "seats": [
       {
         "bone": "seat_left",
@@ -2456,18 +2366,18 @@
       {
         "bone": "seat_left",
         "offset": [
+          -0.07,
           0.0,
-          0.0,
-          -0.85
+          -1.48
         ],
         "yaw": 0
       },
       {
         "bone": "seat_right",
         "offset": [
+          0.08,
           0.0,
-          0.0,
-          -0.85
+          -1.48
         ],
         "yaw": 0
       }
@@ -2497,7 +2407,7 @@
     ]
   },
   "physics/vehicles/ural/veh_ural_u_01.ogf": {
-    "evidence": "Enlarged donor truck cutaway and horizontal bench surfaces: Ural at 1.81\u20131.83 m; army Kamaz at 1.97\u20131.99 m; audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Spread two passenger anchors across actual double bench; removed excessive overlap with driver.",
     "seats": [
       {
         "bone": "seat_left",
@@ -2511,7 +2421,7 @@
       {
         "bone": "seat_right",
         "offset": [
-          -0.46,
+          -0.31,
           0,
           0
         ],
@@ -2520,7 +2430,7 @@
       {
         "bone": "seat_right",
         "offset": [
-          0.1,
+          0.2,
           0,
           0
         ],
@@ -2637,7 +2547,7 @@
     ]
   },
   "physics/vehicles/zaz/veh_zaz_u_01.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Rear pelvis moved forward from behind the backrest onto actual rear bench; height follows rear cushion.",
     "seats": [
       {
         "bone": "seat_left",
@@ -2661,8 +2571,8 @@
         "bone": "seat_left",
         "offset": [
           0.0,
-          0.0,
-          -0.85
+          0.1,
+          -0.57
         ],
         "yaw": 0
       },
@@ -2670,8 +2580,8 @@
         "bone": "seat_right",
         "offset": [
           0.0,
-          0.0,
-          -0.85
+          0.1,
+          -0.57
         ],
         "yaw": 0
       }
@@ -2760,7 +2670,7 @@
     ]
   },
   "physics/vehicles/zaz/veh_zaz_u_02.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Rear pelvis moved forward from behind the backrest onto actual rear bench; height follows rear cushion.",
     "seats": [
       {
         "bone": "seat_left",
@@ -2784,8 +2694,8 @@
         "bone": "seat_left",
         "offset": [
           0.0,
-          0.0,
-          -0.85
+          0.1,
+          -0.57
         ],
         "yaw": 0
       },
@@ -2793,29 +2703,20 @@
         "bone": "seat_right",
         "offset": [
           0.0,
-          0.0,
-          -0.85
+          0.1,
+          -0.57
         ],
         "yaw": 0
       }
     ]
   },
   "physics/vehicles/zil/veh_zil_u_01.ogf": {
-    "evidence": "All-fleet offline donor mesh cutaway, seat bones and horizontal surface measurements, audit 169",
+    "evidence": "Actual donor cutaways and posed 47-bone actor, audit 182 (2026-11-03); Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
     "seats": [
       {
         "bone": "seat_left",
         "offset": [
           0,
-          0,
-          0
-        ],
-        "yaw": 0
-      },
-      {
-        "bone": "seat_right",
-        "offset": [
-          -0.46,
           0,
           0
         ],

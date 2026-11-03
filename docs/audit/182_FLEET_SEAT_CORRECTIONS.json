@@ -1,0 +1,1954 @@
+{
+  "base_audit": "169_FLEET_SEATS_AND_DECKS.json",
+  "status": "candidate_not_published",
+  "base_seats": 287,
+  "current_seats": 276,
+  "rows": [
+    {
+      "section": "dcp_zil",
+      "visual": "physics/vehicles/zil/veh_zil_u_01.ogf",
+      "reason": "Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            -0.46,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_zil131",
+      "visual": "physics/vehicles/zil/veh_zil_u_02.ogf",
+      "reason": "Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0004,
+            -0.0029,
+            0.0045
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.5096,
+            -0.0029,
+            0.0045
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0296,
+            -0.0029,
+            0.0045
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -1.4955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -2.0955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -2.6955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -3.2955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -3.8955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -1.4955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -2.0955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -2.6955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -3.2955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -3.8955
+          ],
+          "yaw": -90
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0004,
+            -0.0029,
+            0.0045
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0296,
+            -0.0029,
+            0.0045
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -1.4955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -2.0955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -2.6955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -3.2955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.5204,
+            0.1571,
+            -3.8955
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -1.4955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -2.0955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -2.6955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -3.2955
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4396,
+            0.1571,
+            -3.8955
+          ],
+          "yaw": -90
+        }
+      ]
+    },
+    {
+      "section": "dcp_kamaz",
+      "visual": "physics/vehicles/kamaz/veh_kamaz_u_01.ogf",
+      "reason": "Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            -0.46,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_kamaz_fura",
+      "visual": "physics/vehicles/kamaz/veh_kamaz_u_02.ogf",
+      "reason": "Removed invented middle cab seat: donor has two separate cushions and no centre seat.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            -0.46,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_luaz",
+      "visual": "physics/vehicles/luaz/veh_luaz_u_01.ogf",
+      "reason": "Removed generic rear -0.85 m seats: donor has bare cargo floor/wheel arches, no rear cushions.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_luaz_2",
+      "visual": "physics/vehicles/luaz/veh_luaz_u_02.ogf",
+      "reason": "Removed generic rear -0.85 m seats: donor has bare cargo floor/wheel arches, no rear cushions.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_paz",
+      "visual": "physics/vehicles/paz/veh_paz_u_01.ogf",
+      "reason": "Rear bench has four positions inside armrests instead of five, whose outer anchors were outside the cushion.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0041,
+            0.0005,
+            0.0042
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.0595,
+            -0.2758
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7559,
+            -0.0595,
+            -0.2758
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1641,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.3159,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.7959,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.2759,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7559,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0041,
+            0.0005,
+            0.0042
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.0595,
+            -0.2758
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7559,
+            -0.0595,
+            -0.2758
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -1.9958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -2.7458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -3.4958
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1841,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.2459,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.3459,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.7759,
+            -0.1695,
+            -4.2458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.1359,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.5759,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0159,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.4559,
+            -0.1395,
+            -5.8458
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_paz3206",
+      "visual": "physics/vehicles/paz/veh_paz_u_02.ogf",
+      "reason": "Removed rear-left empty-floor seat and rear-right door-step seat; retained actual side benches.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0039,
+            0.0044,
+            0.0008
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6439,
+            0.0044,
+            0.0008
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0161,
+            -0.0856,
+            -2.2892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0161,
+            -0.0856,
+            -2.8892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6639,
+            -0.0856,
+            -2.2892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6639,
+            -0.0856,
+            -2.8892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1961,
+            -0.1556,
+            -3.6892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1961,
+            -0.1556,
+            -4.2892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1961,
+            -0.1556,
+            -4.8892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.8439,
+            -0.1556,
+            -3.6892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.8439,
+            -0.1556,
+            -4.2892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.8439,
+            -0.1556,
+            -4.8892
+          ],
+          "yaw": -90
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0039,
+            0.0044,
+            0.0008
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6439,
+            0.0044,
+            0.0008
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0161,
+            -0.0856,
+            -2.2892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0161,
+            -0.0856,
+            -2.8892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6639,
+            -0.0856,
+            -2.2892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.6639,
+            -0.0856,
+            -2.8892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1961,
+            -0.1556,
+            -3.6892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.1961,
+            -0.1556,
+            -4.2892
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.8439,
+            -0.1556,
+            -3.6892
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.8439,
+            -0.1556,
+            -4.2892
+          ],
+          "yaw": -90
+        }
+      ]
+    },
+    {
+      "section": "dcp_uaz_van",
+      "visual": "physics/vehicles/uaz/veh_uaz_van_u_01.ogf",
+      "reason": "Three-seat rear cabin bench faces rearwards; pelvis moved from front cushion edge onto cushion and yaw set to 180.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0042,
+            -0.0034,
+            0.0009
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0442,
+            -0.0034,
+            0.0009
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0258,
+            -0.0534,
+            -0.9291
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.5242,
+            -0.0534,
+            -0.9291
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0742,
+            -0.0534,
+            -0.9291
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0042,
+            -0.0034,
+            0.0009
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0442,
+            -0.0034,
+            0.0009
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.0258,
+            -0.0534,
+            -0.6091
+          ],
+          "yaw": 180
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.5242,
+            -0.0534,
+            -0.6091
+          ],
+          "yaw": 180
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.0742,
+            -0.0534,
+            -0.6091
+          ],
+          "yaw": 180
+        }
+      ]
+    },
+    {
+      "section": "dcp_uaz_army_gun",
+      "visual": "physics/vehicles/uaz/veh_uaz_u_05_gun.ogf",
+      "reason": "Moved two generic rear seats to actual individual rear cushions, clear of turret and wheel-arch walkway.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.07,
+            0.0,
+            -1.48
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.08,
+            0.0,
+            -1.48
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_zaz",
+      "visual": "physics/vehicles/zaz/veh_zaz_u_01.ogf",
+      "reason": "Rear pelvis moved forward from behind the backrest onto actual rear bench; height follows rear cushion.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.1,
+            -0.57
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.1,
+            -0.57
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_zaz_2",
+      "visual": "physics/vehicles/zaz/veh_zaz_u_02.ogf",
+      "reason": "Rear pelvis moved forward from behind the backrest onto actual rear bench; height follows rear cushion.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.0,
+            -0.85
+          ],
+          "yaw": 0
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            0.0,
+            0.1,
+            -0.57
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.0,
+            0.1,
+            -0.57
+          ],
+          "yaw": 0
+        }
+      ]
+    },
+    {
+      "section": "dcp_ural",
+      "visual": "physics/vehicles/ural/veh_ural_u_01.ogf",
+      "reason": "Spread two passenger anchors across actual double bench; removed excessive overlap with driver.",
+      "before": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            -0.46,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.1,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -1.3339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -2.0339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -2.7339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -3.4339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -4.1339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -4.8339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -1.3339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -2.0339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -2.7339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -3.4339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -4.1339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -4.8339
+          ],
+          "yaw": -90
+        }
+      ],
+      "after": [
+        {
+          "bone": "seat_left",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            -0.31,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_right",
+          "offset": [
+            0.2,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -1.3339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -2.0339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -2.7339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -3.4339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -4.1339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            -0.473,
+            -0.0061,
+            -4.8339
+          ],
+          "yaw": 90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -1.3339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -2.0339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -2.7339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -3.4339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -4.1339
+          ],
+          "yaw": -90
+        },
+        {
+          "bone": "seat_left",
+          "offset": [
+            1.477,
+            -0.0061,
+            -4.8339
+          ],
+          "yaw": -90
+        }
+      ]
+    }
+  ],
+  "contact_review": {
+    "report_sha256": "9bbbb6f622be94a0b6adc6c265d019b734cb264d000db5eb94c213a5d0e4189b",
+    "models": 50,
+    "passengers": 226,
+    "flagged_before": 40,
+    "flagged_after": 20,
+    "remaining": [
+      {
+        "section": "dcp_brdm",
+        "seat": 2,
+        "gap": 0.40881049633026123
+      },
+      {
+        "section": "dcp_brdm",
+        "seat": 3,
+        "gap": 0.24701833724975586
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 3,
+        "gap": 0.3072524070739746
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 4,
+        "gap": 0.30759966373443604
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 5,
+        "gap": 0.3075966238975525
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 7,
+        "gap": 0.3072943687438965
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 8,
+        "gap": 0.30759966373443604
+      },
+      {
+        "section": "dcp_btr",
+        "seat": 9,
+        "gap": 0.30759668350219727
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 2,
+        "gap": null
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 3,
+        "gap": 0.2327578067779541
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 4,
+        "gap": 0.2327578067779541
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 5,
+        "gap": 0.2867557406425476
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 6,
+        "gap": null
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 7,
+        "gap": 0.2327578067779541
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 8,
+        "gap": 0.2327566146850586
+      },
+      {
+        "section": "dcp_btr82",
+        "seat": 9,
+        "gap": 0.286757230758667
+      },
+      {
+        "section": "dcp_kamaz_army",
+        "seat": 6,
+        "gap": 0.5401655435562134
+      },
+      {
+        "section": "dcp_kamaz_army",
+        "seat": 13,
+        "gap": 0.5401655435562134
+      },
+      {
+        "section": "dcp_kamaz_army_tent",
+        "seat": 6,
+        "gap": 0.5401655435562134
+      },
+      {
+        "section": "dcp_kamaz_army_tent",
+        "seat": 13,
+        "gap": 0.5401655435562134
+      }
+    ],
+    "limitation": "Hip rays only: foot-floor and full-body fitting remain open. No claim that all seats/animations are finished."
+  },
+  "preview_sha256": {
+    "dcp_kamaz-front-actors.png": "cfe3dc9c94afc15bfbb00996714a691f9caada06a6e1170300aeb03e5d594206",
+    "dcp_kamaz-front-mesh.png": "f520b3cf4896e8a33356be13ae60212841529ea41592337448e16b27ccf12ea1",
+    "dcp_kamaz-top-actors.png": "6bbb259bff9d271da66a361ca55b36adb69a3d856a23d5ec07939a2b4474fe16",
+    "dcp_kamaz-top-mesh.png": "f2dbd7a3cf8f4a6fc68c15cdd33a1a9c2faa30707a42b4d6f8f775a4d8dd4a89",
+    "dcp_kamaz_fura-front-actors.png": "f53896f1b83849208d5352d90b8d414038acef319d65e6d883ccd636f3dd51dc",
+    "dcp_kamaz_fura-front-mesh.png": "e1d8e4baf87d6d3659586add59f211fdce70fdddf1fccb6f073b2df100526a10",
+    "dcp_kamaz_fura-top-actors.png": "927e9d91af8d26737d119162eb8907c5606f58dc443658c51e1cb8aff51179bf",
+    "dcp_kamaz_fura-top-mesh.png": "6349da4ba4a2f80744a821b2fae769cecf5663341a5f44b34f4f916c2e68709b",
+    "dcp_luaz-front-actors.png": "3993e47045024f9f4171c47ea5949860cddedc2cacc0f0fa66ab9fddc73cfce4",
+    "dcp_luaz-front-mesh.png": "29f34581b9e62eac37deca2f011e3b73af8613950806793af65fdb6592567f17",
+    "dcp_luaz-top-actors.png": "ad947bc1a101870cedda360e37878ebc7dc892c3c31c1f5412a8a94fec31fc6c",
+    "dcp_luaz-top-mesh.png": "59705118d9d86b5e992f12c78146001df857ac5904970f9b8ca96dd855e17449",
+    "dcp_luaz_2-front-actors.png": "4a10f5620a60a9f69dbc4692810dd2130c39bab6e55c7f0b3b95b7be36f6c7d0",
+    "dcp_luaz_2-front-mesh.png": "9716eed54b3f5a0443cd54df753bf111c9ed2b765efea0178973bbdf0f87910d",
+    "dcp_luaz_2-top-actors.png": "d6aac78017feb07c2d061b21a6d76c406f16cbf19e65f998b4006ed3c4dc7ef9",
+    "dcp_luaz_2-top-mesh.png": "e4020bea36a51ba29f7312d7d96b139d22a73edb939f8058c00111fb60dca079",
+    "dcp_paz-front-actors.png": "dd9021e7c7f241f4cabc5b9d04cbf8895b4a07754afd63f5532bc7e47674e09d",
+    "dcp_paz-front-mesh.png": "6390522993b4e091f450fac1efc8af2ebfe891ff84e520bb4107bc4c70080168",
+    "dcp_paz-top-actors.png": "8a408dfb0f4f3d50e1d6618d7c59c93b01bd55d76879c32cad34ad06ce687ad7",
+    "dcp_paz-top-mesh.png": "b48f8279e303f8e2adab35d66438aa20288a5a5a98c41fb05404c38ba38af34a",
+    "dcp_paz3206-front-actors.png": "1dc379b10382275040edd08dbc24eeb0a2e93e2900618c2533d994d96d3b39e5",
+    "dcp_paz3206-front-mesh.png": "1bd8954425bdda1e3c75f44a95073a5a756c0eb2093fb3c9b87d5ce64ef563bb",
+    "dcp_paz3206-top-actors.png": "3b72a9e0b39f3a6358a1f8595d6415e38ce759c6019054edd5af6d3da13d6390",
+    "dcp_paz3206-top-mesh.png": "142825794954c408d724c15fe0762529122ff880d66d49b02eaafb63ffffef3e",
+    "dcp_uaz_army_gun-front-actors.png": "a4ea5f33235d1595b60d04710afee56a2ec1a7653a690fcfb25e336dab52c6b8",
+    "dcp_uaz_army_gun-front-mesh.png": "35dcca8b21dda38fd07fa223633fc93059fbd7f11bfe1b9792a26dce5fb47724",
+    "dcp_uaz_army_gun-top-actors.png": "d0c4dd8d1e3d5580e2943fb6adeaf14e770cbdc970fe84ae066bd8557da7dee7",
+    "dcp_uaz_army_gun-top-mesh.png": "4446450f45056f445300f1006547051e166e543371d5832fc12fbf1243d3b69d",
+    "dcp_uaz_van-front-actors.png": "3fef96f423333525b5e294fc99e1bd5565ec86b4dfd87cd71bd19591bec6bc8b",
+    "dcp_uaz_van-front-mesh.png": "3c803c86eb7d5c7d8b659ffe060040d22773f4ea1a62ea439e892a4972ae0c18",
+    "dcp_uaz_van-top-actors.png": "9fcbe5a52956431c8bcaf54aa67addc51acf0bd512dd06f2665356b149a12e4c",
+    "dcp_uaz_van-top-mesh.png": "ffe776bb6a2d817345e7646f8a6352a9bfe60bf6e744d09912ed529213d110e4",
+    "dcp_ural-front-actors.png": "19ed8516ccd0afaa63e646c1239325fc59de953c40c8a1de2329f366de4c8ba1",
+    "dcp_ural-front-mesh.png": "6e03a86f3d76d1603d80654d5553ec55080ec1861d16258a4c09cbe3d50dec62",
+    "dcp_ural-top-actors.png": "85512256f8ebb742591bd6093d7ccca3b1171bc4c9204c384692ee8fee58a93e",
+    "dcp_ural-top-mesh.png": "2ccee251c14869ec20196d8bd56da9f44e5130c0abc61ff181c58a31e18957bb",
+    "dcp_zaz-front-actors.png": "66c9b16c7452be0c904f7f81668d71f939005bdad4af273b5e2adb56645f8fd1",
+    "dcp_zaz-front-mesh.png": "78a0971ab16443daea3931f0cb54d707b3773db6ad4e5cbb9ebadd73b0316195",
+    "dcp_zaz-top-actors.png": "e133d0d84fa91788162598b8575311f66f9ab9ab7c06ecb1d62ea3b8906d0f60",
+    "dcp_zaz-top-mesh.png": "10e7f4143284e85876fd0e698396e6f6b8b463edeb896f7b10bb9281b7045a36",
+    "dcp_zaz_2-front-actors.png": "bdd39c5c2a8ed032fd353dd3b3d2b4e388f7a57fe1a0ba7c7ff0ca478aad9493",
+    "dcp_zaz_2-front-mesh.png": "38d443f2a504f5bcbc971c53d68e35cea1ec85d496f55c35f227286bf421e4ef",
+    "dcp_zaz_2-top-actors.png": "8de8e5bd395b68a927f8c07e4489e8c968c55ca90c3e91861f57788750e2eb26",
+    "dcp_zaz_2-top-mesh.png": "e40c672d5ead0dd2cd8d52b6c786ad7cd89f64dcfb9e9ffe7e59bf53bb0c049f",
+    "dcp_zil-front-actors.png": "e74a64f6dcbddb130e886c5f460b6a687045f22599b6a205a5982d98b726a8c6",
+    "dcp_zil-front-mesh.png": "f85cab2c85d8905d0ed4f9e7d40c3ac3bcc899c83ea3a7bc4eb5e331861c2d9d",
+    "dcp_zil-top-actors.png": "79edbac6383f892c3ed82fef68f6e5f023a221a9c17fd7e1520f0b86dd55116c",
+    "dcp_zil-top-mesh.png": "c41f199da8a149cf558da8789e6a8284b7a2e4f4e487049c4db27948ae65e9a8",
+    "dcp_zil131-front-actors.png": "da6868bcac176c1e52a6ec97fdda4aee0a5efbc759065d1b0cfecc353f149287",
+    "dcp_zil131-front-mesh.png": "0b1934aa9ffcda5b51eddb11cd8c61e590790ba3f4e0dc3e0acf8e9d8e19db01",
+    "dcp_zil131-top-actors.png": "fdf3f4422565eeeb16c08ff62bc0414c90670bb3cd1b90b40fbb5b6c58894fd5",
+    "dcp_zil131-top-mesh.png": "45afb0a88b0b03caec68625d24c356a65470d1ba6ff5e7360ffa6a156de042fe"
+  }
+}

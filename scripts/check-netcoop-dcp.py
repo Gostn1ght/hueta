@@ -116,6 +116,11 @@ assert (CLIENT / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes() == (SERV
 layouts=json.loads((ROOT/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
 audit=json.loads((ROOT/'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text(encoding='utf-8'))
 rows={r['section']:r for r in audit['rows']}
+corrections=json.loads((ROOT/'docs/audit/182_FLEET_SEAT_CORRECTIONS.json').read_text(encoding='utf-8'))
+corrected={r['section']:r for r in corrections['rows']}
+assert len(corrected)==len(corrections['rows'])
+assert set(corrected)<=set(rows)
+assert corrections['base_seats']==sum(r['seats'] for r in rows.values())
 assert len(cars)==len(layouts)==len(rows)==audit['models']==50
 assert set(rows)==set(cars)
 assert set(layouts)=={k['visual'].replace('\\','/') for k in cars.values()}
@@ -134,7 +139,13 @@ for name, keys in cars.items():
     assert actual==expected and 1<=len(actual)<=64, (name,'layout/config mismatch')
     row=rows[name]
     assert row['model_sha256']==hashlib.sha256(data).hexdigest()
-    assert row['seats']==len(actual)
+    if name in corrected:
+        review=corrected[name]
+        assert review['visual']==keys['visual'].replace('\\','/')
+        assert len(review['before'])==row['seats'] and review['after']==layout['seats']
+        assert review['before'][0]==review['after'][0], (name, 'driver anchor changed without driver review')
+    else:
+        assert row['seats']==len(actual)
     positions=[]
     for seat in layout['seats']:
         assert len(seat['offset'])==3 and all(math.isfinite(v) for v in (*seat['offset'],seat['yaw']))
@@ -185,5 +196,7 @@ for need in ('if (spot) light_render->set_cone(', 'ini->line_exist(section, "spo
              'ini->line_exist(section, "glow_texture")', 'READ_IF_EXISTS(ini, r_s32, section, "type"',
              '"headlights","stoplights","reverselights","indoorlights"'):
     assert need in lights, need
-assert sum(len(v['seats']) for v in layouts.values())==287
+assert sum(len(v['seats']) for v in layouts.values())==corrections['current_seats']
+assert corrections['current_seats']==corrections['base_seats']+sum(
+    len(r['after'])-len(r['before']) for r in corrected.values())
 print("PASS DCP: %d complete models, physical shapes/masses, wheel and door joints, profile bone references, client/server configs and seat names; %d old cars cut" % (len(cars), len(old)))
