@@ -48,7 +48,7 @@ constexpr float EPS=.0001f;
 int main(){
  using namespace netcoop_vehicle_dynamics;
  CCar car;CCar::Wheel wheel;wheel.car=&car;car.m_breaking_wheels={{&wheel},{&wheel}};
- car.m_breaking_wheels[0].HandBreak();assert(wheel.last_speed==0&&wheel.last_torque>=1800);
+ car.m_breaking_wheels[0].HandBreak();assert(wheel.last_speed==0&&std::abs(wheel.last_torque-1800)<.01f);
  car.shell.mass=10000;wheel.radius=.6f;car.m_breaking_wheels[0].HandBreak();
  assert(std::abs(wheel.last_torque-29430)<.02f);
  netcoop::active=false;car.m_breaking_wheels[0].HandBreak();assert(std::abs(wheel.last_torque-1800)<.01f);
