@@ -6,8 +6,13 @@
 	<barter>
 		<background x="0" y="0" width="1024" height="768"/>
 		<left_panel x="0" y="0" width="375" height="768" stretch="1"><texture>ui_inGame2_left_side_16</texture></left_panel>
-		<equipment_panel x="375" y="0" width="273" height="768" stretch="1"><texture>ui_inGame2_inventory_back</texture></equipment_panel>
+		<equipment_panel x="375" y="0" width="273" height="768" stretch="1"><texture>ui_inGame2_left_side_16</texture></equipment_panel>
 		<right_panel x="648" y="0" width="376" height="768" stretch="1"><texture>ui_inGame2_left_side_16</texture></right_panel>
+		<give_frame x="12" y="106" width="350" height="160" stretch="1"><texture>ui_loot_window</texture></give_frame>
+		<get_frame x="660" y="106" width="350" height="160" stretch="1"><texture>ui_loot_window</texture></get_frame>
+		<bag_frame x="12" y="354" width="350" height="350" stretch="1"><texture>ui_loot_window</texture></bag_frame>
+		<their_bag_frame x="660" y="354" width="350" height="350" stretch="1"><texture>ui_loot_window</texture></their_bag_frame>
+		<equipment_frame x="382" y="106" width="258" height="414" stretch="1"><texture>ui_loot_window</texture></equipment_frame>
 		<caption x="387" y="12" width="249" height="40" complex_mode="1"><text font="letterica18" align="c" r="220" g="220" b="210"></text></caption>
 		<my_name x="20" y="24" width="250" height="28" complex_mode="1"><text font="letterica18" align="l" r="220" g="220" b="210"></text></my_name>
 		<partner_name x="668" y="24" width="250" height="28" complex_mode="1"><text font="letterica18" align="l" r="220" g="220" b="210"></text></partner_name>
@@ -15,11 +20,11 @@
 		<partner_icon x="934" y="15" width="75" height="66" stretch="1"/>
 		<title_give x="20" y="86" width="335" height="22" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></title_give>
 		<title_get x="668" y="86" width="335" height="22" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></title_get>
-		<cont_give x="20" y="110" width="335" height="155" stretch="1"/>
-		<cont_get x="668" y="110" width="335" height="155" stretch="1"/>
-		<cont_bag x="20" y="360" width="335" height="335" stretch="1"/>
-		<cont_their_bag x="668" y="360" width="335" height="335" stretch="1"/>
-		<cont_equipment x="388" y="86" width="246" height="430" stretch="1"/>
+		<cont_give x="20" y="114" width="335" height="144" stretch="1"/>
+		<cont_get x="668" y="114" width="335" height="144" stretch="1"/>
+		<cont_bag x="20" y="366" width="335" height="326" stretch="1"/>
+		<cont_their_bag x="668" y="366" width="335" height="326" stretch="1"/>
+		<cont_equipment x="390" y="114" width="242" height="394" stretch="1"/>
 		<money_label x="20" y="272" width="215" height="24" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></money_label>
 		<money_edit x="240" y="272" width="115" height="24" numonly="1"><texture>ui_inGame2_edit_box_1</texture><text font="letterica16" align="r" r="235" g="230" b="220"/></money_edit>
 		<their_money x="668" y="272" width="335" height="24" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></their_money>
@@ -27,7 +32,9 @@
 		<status_theirs x="668" y="300" width="335" height="42" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></status_theirs>
 		<title_bag x="20" y="338" width="335" height="22" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></title_bag>
 		<title_their_bag x="668" y="338" width="335" height="22" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></title_their_bag>
-		<equipment_status x="388" y="548" width="246" height="125" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"></text></equipment_status>
+		<equipment_health x="388" y="548" width="246" height="36" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"/></equipment_health>
+<equipment_power x="388" y="590" width="246" height="36" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"/></equipment_power>
+<equipment_wallet x="388" y="632" width="246" height="36" complex_mode="1"><text font="letterica16" align="l" r="220" g="220" b="210"/></equipment_wallet>
 		<btn_ready x="403" y="690" width="216" height="28"><text font="letterica16" y="2">st_netcoop_barter_ready</text><texture>ui_button_ordinary</texture></btn_ready>
 		<btn_cancel x="403" y="726" width="216" height="28"><text font="letterica16" y="2">st_netcoop_barter_cancel</text><texture>ui_button_ordinary</texture></btn_cancel>
 	</barter>

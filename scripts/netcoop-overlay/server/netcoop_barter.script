@@ -109,18 +109,14 @@ local function close(s, reason)
 	printf("[Lost Zone][barter] %s - %s closed: %s", tostring(s.a), tostring(s.b), reason)
 end
 
--- Items a player may offer: in his own backpack, not quest items, not worn.
+-- Offering equipped/belt items is allowed. Ownership and quest protection
+-- are checked again at execution; the native transfer removes the old slot.
 offerable = function(owner, item)
 	if not (owner and item) then return false end
 	local parent = item:parent()
 	if not (parent and parent:id() == owner:id()) then return false end
 	local section = item:section()
 	if ini_sys:r_bool_ex(section, "quest_item", false) then return false end
-	if owner.is_on_belt and owner:is_on_belt(item) then return false end
-	for slot = 1, 16 do
-		local worn = owner:item_in_slot(slot)
-		if worn and worn:id() == item:id() then return false end
-	end
 	return true
 end
 
@@ -202,6 +198,15 @@ function command(id, args)
 			if amount ~= s.money[id] then s.money[id] = amount; changed(s) end
 		elseif verb == "ready" and number then
 			if number ~= s.version then return push_state(s) end
+			local cash = string.match(rest, "^%d+%s+(%d+)%s*$")
+			if cash then
+				local amount = math.max(0, math.min(tonumber(cash), me:money()))
+				if amount ~= s.money[id] then
+					s.money[id] = amount
+					s.version = s.version + 1
+					s.ready[s.a], s.ready[s.b] = false, false
+				end
+			end
 			s.ready[id] = true
 			if s.ready[s.a] and s.ready[s.b] then return execute(s) end
 			push_state(s)

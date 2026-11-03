@@ -168,7 +168,7 @@ function UIBarter:__init(partner, name) super()
 	xml:ParseFile("ui_netcoop_barter.xml")
 	self.xml = xml
 	self.dialog = xml:InitStatic("barter:background", self)
-	for _, panel in ipairs({"left_panel", "equipment_panel", "right_panel"}) do xml:InitStatic("barter:" .. panel, self.dialog) end
+	for _, panel in ipairs({"left_panel", "equipment_panel", "right_panel", "give_frame", "get_frame", "bag_frame", "their_bag_frame", "equipment_frame"}) do xml:InitStatic("barter:" .. panel, self.dialog) end
 	self.caption = xml:InitTextWnd("barter:caption", self.dialog)
 	self.caption:SetText(string.format(tr("st_netcoop_barter_with"), name))
 	xml:InitTextWnd("barter:my_name", self.dialog):SetText(db.actor and db.actor:character_name() or "")
@@ -186,11 +186,10 @@ function UIBarter:__init(partner, name) super()
 	self.get = utils_ui.UICellContainer("get", self, nil, "barter:cont_get", self.dialog)
 	self.their_bag = utils_ui.UICellContainer("their_bag", self, nil, "barter:cont_their_bag", self.dialog)
 	self.equipment = utils_ui.UICellContainer("equipment", self, nil, "barter:cont_equipment", self.dialog)
-	self.equipment.disable_drag = true
-	local worn = {}
-	if db.actor then for slot = 1, 16 do local item = db.actor:item_in_slot(slot); if item then worn[#worn+1] = item end end end
-	self.equipment:Reinit(worn)
-	self.equipment_status = xml:InitTextWnd("barter:equipment_status", self.dialog)
+	self.equipment_status = {}
+	for _, key in ipairs({"health", "power", "wallet"}) do
+		self.equipment_status[key] = xml:InitTextWnd("barter:equipment_" .. key, self.dialog)
+	end
 	-- the partner's side shows sections: his items are his to move
 	for _, cc in ipairs({ self.get, self.their_bag }) do
 		cc.showcase = 1
@@ -213,7 +212,19 @@ function UIBarter:__init(partner, name) super()
 	self:Apply("0", "0", "0", "0", "0", "", "", "")
 end
 
--- My backpack: everything not worn, not on the belt and not offered.
+-- Equipped items remain visible and offerable in the centre. Belt items
+-- belong to the available inventory; offering does not unequip anything.
+function UIBarter:Equipment()
+	local out, seen = {}, {}
+	if db.actor then for slot = 1, 16 do
+		local item = db.actor:item_in_slot(slot)
+		if item and not seen[item:id()] and not self.mine[item:id()] then
+			seen[item:id()] = true; out[#out + 1] = item
+		end
+	end end
+	return out
+end
+
 function UIBarter:Backpack()
 	local list = {}
 	if not db.actor then return list end
@@ -222,8 +233,10 @@ function UIBarter:Backpack()
 		local item = db.actor:item_in_slot(slot)
 		if item then worn[item:id()] = true end
 	end
-	db.actor:iterate_ruck(function(_, item)
-		if item and not worn[item:id()] and not self.mine[item:id()] and not db.actor:is_on_belt(item) then
+	local seen = {}
+	(db.actor.iterate_inventory or db.actor.iterate_ruck)(db.actor, function(_, item)
+		if item and not seen[item:id()] and not worn[item:id()] and not self.mine[item:id()] then
+			seen[item:id()] = true
 			list[#list + 1] = item
 		end
 	end, db.actor)
@@ -259,7 +272,13 @@ function UIBarter:Apply(version, my_money, their_money, my_ready, their_ready, m
 	self.give:Reinit(give)
 	self.get:Reinit(sections(theirs))
 	self.their_bag:Reinit(sections(their_bag))
-	if not self.money_editing then self.money:SetText(tostring(tonumber(my_money) or 0)) end
+	self.equipment:Reinit(self:Equipment())
+	local amount = tonumber(my_money) or 0
+	-- An update from the partner must not erase a number being typed.
+	if self.server_money == nil or self.money:GetText() == self.money_pending or self.money:GetText() == tostring(self.server_money) then
+		self.money:SetText(tostring(amount))
+	end
+	self.server_money, self.money_pending = amount, false
 	self.their_money:SetText(string.format(tr("st_netcoop_barter_their_money"), tonumber(their_money) or 0))
 	self.ready_mine = my_ready == "1"
 	self.status_mine:SetText(tr(self.ready_mine and "st_netcoop_barter_you_ready" or "st_netcoop_barter_you_wait"))
@@ -268,10 +287,10 @@ end
 
 -- My item into my offer, or back into the backpack.
 function UIBarter:Move(cont, idx)
-	local cc = (cont == "bag" and self.bag) or (cont == "give" and self.give) or nil
+	local cc = (cont == "bag" and self.bag) or (cont == "give" and self.give) or (cont == "equipment" and self.equipment) or nil
 	local ci = cc and cc.cell[idx]
 	if not (ci and ci.ID) then return end
-	netcoop_command(string.format("barter %s %d", cont == "bag" and "add" or "remove", ci.ID))
+	netcoop_command(string.format("barter %s %d", cont == "give" and "remove" or "add", ci.ID))
 end
 
 function UIBarter:On_CC_Mouse1(cont, idx) self:Move(cont, idx) end
@@ -279,18 +298,22 @@ UIBarter.On_CC_Mouse1_DB = UIBarter.On_CC_Mouse1
 
 -- Drag and drop: from the backpack onto the offer, or back.
 function UIBarter:On_CC_DragDrop(cont, idx)
-	local target = (cont == "bag" and self.give) or (cont == "give" and self.bag) or nil
+	local target = ((cont == "bag" or cont == "equipment") and self.give) or (cont == "give" and self.bag) or nil
 	if target and target.prof and target.prof:IsCursorOverWindow() then self:Move(cont, idx) end
 end
 
 function UIBarter:OnMoney()
 	local amount = math.max(0, math.floor(tonumber(self.money:GetText()) or 0))
+	self.money_pending = self.money:GetText()
 	netcoop_command("barter money " .. amount)
 end
 
 function UIBarter:OnReady()
-	self:OnMoney()
-	netcoop_command("barter ready " .. self.version)
+	local amount = math.max(0, math.floor(tonumber(self.money:GetText()) or 0))
+	self.money_pending = self.money:GetText()
+	-- One version-checked command: changing cash cannot invalidate our own
+	-- ready message between two separate commands.
+	netcoop_command(string.format("barter ready %d %d", self.version, amount))
 end
 
 function UIBarter:OnCancel()
@@ -312,12 +335,22 @@ function UIBarter:Update()
 	if not found then self.item_info:Update() end
 	if db.actor and time_global() >= (self.next_status or 0) then
 		self.next_status = time_global() + 1000
-		self.equipment_status:SetText(string.format("%s: %d%%\n%s: %d%%\n%s: %d RU", tr("ui_inv_health"), math.floor(db.actor.health*100), tr("ui_inv_power"), math.floor(db.actor.power*100), tr("st_netcoop_barter_money"), db.actor:money()))
+		self.equipment_status.health:SetText(string.format("%s: %d%%", tr("ui_inv_health"), math.floor(db.actor.health*100)))
+		self.equipment_status.power:SetText(string.format("%s: %d%%", tr("ui_inv_power"), math.floor(db.actor.power*100)))
+		self.equipment_status.wallet:SetText(string.format("%s: %d RU", tr("st_netcoop_barter_money"), db.actor:money()))
 	end
 end
 
 function UIBarter:OnKeyboard(dik, action)
 	local res = CUIScriptWnd.OnKeyboard(self, dik, action)
+	if res == false then
+		-- UICellContainer polls hover in Update but receives mouse presses,
+		-- releases and drag completion only through this owner forwarding.
+		local held = self.item_in_hold
+		for _, cc in ipairs({self.bag, self.give, self.get, self.their_bag, self.equipment}) do
+			if cc:IsShown() and (not held or cc.ID == held) then cc:OnKeyboard(dik, action) end
+		end
+	end
 	if res == false and action == ui_events.WINDOW_KEY_PRESSED and dik == DIK_keys.DIK_ESCAPE then
 		self:OnCancel()
 		return true

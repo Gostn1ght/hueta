@@ -170,7 +170,7 @@ assert client.current_request() is None             # accepted on the other side
 assert shown_prompt() is None                      # no prompt while the window is open
 client.receive("state|3|150|200|1|0|53,medkit,0.80|77,ammo_9x18,1.00;78,bread,0.50|60,vodka,1.00;61,ghost,1.00")
 bag = [g.reinit.bag[i + 1]._id for i in range(len(g.reinit.bag))]
-assert bag == [52], bag                            # not worn (50), not on belt (51), not offered (53)
+assert bag == [51, 52], bag                            # not worn (50), not on belt (51), not offered (53)
 assert [g.reinit.give[i + 1]._id for i in range(len(g.reinit.give))] == [53]
 assert [g.reinit.get[i + 1] for i in range(len(g.reinit.get))] == ["ammo_9x18", "bread"]
 assert [g.reinit.their_bag[i + 1] for i in range(len(g.reinit.their_bag))] == ["vodka"]  # unknown sections skipped
@@ -191,13 +191,60 @@ win.give.prof.over = False; win.bag.prof.over = True
 win.On_CC_DragDrop(win, "give", 1); assert cmds() == ["barter remove 53"]
 win.On_CC_DragDrop(win, "their_bag", 1); assert cmds() == []
 win.money.text = "250"
-win.OnReady(win); assert cmds() == ["barter money 250", "barter ready 3"]
+win.OnReady(win); assert cmds() == ["barter ready 3 250"]
 win.money.text = "-5"
 win.OnMoney(win); assert cmds() == ["barter money 0"]
+# Exercise the real base UICellContainer event methods, not direct callback calls.
+lua.execute((Path(__file__).parent / "tests/fixtures/barter_container_input.lua").read_text(encoding="utf-8"))
+lua.execute(r'''
+K_M1, K_M2, K_SHFT, E_PRESS, E_RELEASE = 100, 101, 102, 3, 4
+function get_time() return now end
+function wire(cc, owner, id, item)
+  setmetatable(cc, {__index = UICellContainer})
+  cc.ID, cc.owner, cc.disable_callback = id, owner, {}
+  cc.hover, cc.db = {idx = 1}, {tg = -1000}
+  cc.hold = {ico = {Show = function() end}}
+  cc.cell[1] = {ID = item, IsShown = function() return true end}
+  cc.scroll = {GetCurrentScrollPos = function() return 0 end}
+  cc.IsShown = function() return true end
+  cc.On_Select = function() end
+  cc.Print = function() end
+end
+''')
+for name, item in (("bag", 52), ("give", 53), ("equipment", 50), ("get", 77), ("their_bag", 60)):
+    g.wire(win[name], win, name, item)
+    win[name].hover.idx = False
+win.bag.hover.idx = 1
+win.OnKeyboard(win, g.K_M1, g.E_PRESS)
+win.OnKeyboard(win, g.K_M1, g.E_RELEASE)
+assert cmds() == ["barter add 52"], "owner must forward real mouse input"
+win.bag.hover.idx = False
+win.equipment.hover.idx = 1
+g.now += 500
+win.OnKeyboard(win, g.K_M1, g.E_PRESS)
+win.OnKeyboard(win, g.K_M1, g.E_RELEASE)
+assert cmds() == ["barter add 50"], "equipped items are offerable"
+win.equipment.hover.idx = False
+win.bag.hover.idx = 1
+g.now += 500
+win.OnKeyboard(win, g.K_M1, g.E_PRESS)
+win.bag.hover.idx = False
+win.give.hover.idx = 1
+win.give.prof.over = True
+win.OnKeyboard(win, g.K_M1, g.E_RELEASE)
+assert cmds() == ["barter add 52"], "drop must not click an item in the target as well"
+# Remote state refresh preserves an unfinished money edit and refreshes equipment.
+win.money.text = "123"
+client.receive("state|4|150|210|0|0|50,wpn_ak74,1.00||")
+assert win.money.text == "123" and len(g.reinit.equipment) == 0
+win.OnReady(win)
+assert cmds() == ["barter ready 4 123"]
+client.receive("state|5|123|210|1|0|50,wpn_ak74,1.00||")
+assert win.money.text == "123"
 client.receive("done")
 assert client.current_window() is None and g.news_log[len(g.news_log)] == "st_netcoop_barter_done"
 client.receive("open|10|Bravo"); client.receive("closed|far")
 assert client.current_window() is None and g.news_log[len(g.news_log)] == "st_netcoop_barter_closed_far"
 client.receive("open|10|Bravo"); win = client.current_window()
 win.OnCancel(win); assert cmds() == ["barter cancel"] and client.current_window() is None
-print("PASS barter client: prompt only for players in reach and without their name, request with accept/decline lapsing in 60 s, drag and drop, partner's backpack, window from the server's state")
+print("PASS barter client: prompt only for players in reach and without their name, request with accept/decline lapsing in 60 s, actual container mouse/drag input, equipped offers, money edit preservation, atomic cash-ready, partner inventory")

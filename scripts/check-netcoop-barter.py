@@ -2,7 +2,7 @@
 invitation only within reach and only to a player, acceptance only by the
 invited one and only while fresh (60 s; a lapsed request tells both sides),
 each side sees the other's backpack as in a trader's window, offers only of own backpack items (no quest,
-belt or worn items) and own money, any change clears both "ready" marks, the
+foreign items) and own money, any change clears both "ready" marks, the
 deal needs both marks on the same version, everything is checked again and
 moves at once or nothing does, parting/leaving ends it."""
 from pathlib import Path
@@ -91,18 +91,18 @@ g.now = 70000
 cmd(1, "invite 2")
 out = cmd(2, "accept 1")
 assert out[:2] == ["1>open|2|Bravo", "2>open|1|Alpha"], out
-BAG_A, BAG_B = "100,wpn_ak74,0.75;101,medkit,0.75", "105,bread,0.75;106,ammo_9x18,0.75"
+BAG_A, BAG_B = "100,wpn_ak74,0.75;101,medkit,0.75;103,helm,0.75;104,art,0.75", "105,bread,0.75;106,ammo_9x18,0.75"
 assert out[2] == "1>state|1|0|0|0|0|||" + BAG_B and out[3] == "2>state|1|0|0|0|0|||" + BAG_A, out
 # A busy player cannot be invited by someone else.
 C._pos = g.pos(1)
 assert cmd(3, "invite 2") == ["3>declined|Bravo"]
 # Offers: own backpack items only.
 s = barter.session_of(1)
-for bad in (105, 102, 103, 104, 999):       # theirs, quest, worn, belt, missing
+for bad in (105, 102, 999):       # theirs, quest, worn, belt, missing
     assert cmd(1, "add %d" % bad) == [], bad
 out = cmd(1, "add 100")
 assert out[0] == "1>state|2|0|0|0|0|100,wpn_ak74,0.75||" + BAG_B, out
-assert out[1] == "2>state|2|0|0|0|0||100,wpn_ak74,0.75|101,medkit,0.75", out  # an offered item leaves the backpack list
+assert out[1] == "2>state|2|0|0|0|0||100,wpn_ak74,0.75|101,medkit,0.75;103,helm,0.75;104,art,0.75", out  # an offered item leaves the backpack list
 cmd(2, "add 106")
 cmd(1, "money 300")
 cmd(2, "money 9999")                         # clamped to Bravo's 500
@@ -143,6 +143,27 @@ assert msgs() == ["1>closed|left", "2>closed|left"]
 g.players = "1 2 3"
 cmd(1, "invite 2"); cmd(2, "accept 1"); msgs()
 assert cmd(2, "cancel") == ["1>closed|cancel", "2>closed|cancel"]
+# Money entered with Ready is one version-checked change. It clears the
+# partner's old consent but keeps the sender ready for the resulting version.
+cmd(1, "invite 2"); cmd(2, "accept 1")
+s = barter.session_of(1)
+cmd(2, "ready 1")
+cmd(1, "ready 1 250")
+assert s.version == 2 and s["money"][1] == 250
+assert s["ready"][1] is True and s["ready"][2] is False
+cmd(2, "ready 1 0")
+assert s["ready"][2] is False and s["money"][1] == 250
+cmd(1, "add 103")  # worn, still owned; no unequip before confirming
+assert s["items"][1][103] and g.objects[103]._parent == 1
+cmd(1, "add 104")  # belt
+assert s["items"][1][104]
+cmd(1, "ready %d 999999" % s.version)
+assert s["money"][1] == A._money
+version = s.version
+cmd(2, "ready %d 0" % version)
+assert barter.session_of(1) is None
+assert g.objects[103]._parent == 2 and g.objects[104]._parent == 2
+assert A._money == 0 and B._money == 1500
 # Declining tells the inviter; a stale invitation disappears.
 cmd(1, "invite 2"); msgs()
 assert cmd(2, "decline 1") == ["1>declined|Bravo"]
