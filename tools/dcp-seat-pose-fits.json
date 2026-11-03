@@ -1,0 +1,22 @@
+{
+  "physics/vehicles/bmw/veh_bmw_u_01.ogf": {
+    "section": "dcp_bmw7",
+    "pose": "lz_vehicle_passenger_compact",
+    "evidence": "Actual donor hip/ankle contact and posed actor review, audit 183"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_05.ogf": {
+    "section": "dcp_moskvich_2715",
+    "pose": "lz_vehicle_passenger_floor",
+    "evidence": "Actual donor hip/ankle contact and posed actor review, audit 183"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_06.ogf": {
+    "section": "dcp_moskvich_2715tun",
+    "pose": "lz_vehicle_passenger_floor",
+    "evidence": "Actual donor hip/ankle contact and posed actor review, audit 183"
+  },
+  "physics/vehicles/uaz/veh_uaz_u_05_gun.ogf": {
+    "section": "dcp_uaz_army_gun",
+    "pose": "lz_vehicle_passenger_low",
+    "evidence": "Actual donor hip/ankle contact and posed actor review, audit 183"
+  }
+}

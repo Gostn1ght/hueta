@@ -107,3 +107,32 @@ for phase in (0,.125,.25,.375,.5,.625,.75,.875,.99):
     assert feet[0][0]<-.1 and feet[1][0]>.1
     assert .2<feet[0][2]<.65 and .2<feet[1][2]<.65
 print('PASS decoded passenger keys: upright facing seat, hip at anchor, symmetric low feet; other 24 motions unchanged')
+
+# Low cabins cannot use an ankle half a metre below the seat. Validate the
+# actual additional keys, including every skeleton segment (no stretched legs).
+fit_qa=json.loads((root.parent/'docs/audit/183_PASSENGER_FITS.json').read_text())
+fit_path=actors/'modded_stalker_animations/netcoop_vehicle_passengers.omf'
+assert hashlib.sha256(fit_path.read_bytes()).hexdigest()==fit_qa['candidate_sha256']
+fit_data=merge.parse(str(fit_path))
+assert {d['name'] for d in fit_data['defs']}==set(fit_qa['ankle_drops'])
+assert all(not d['flags']&2 for d in fit_data['defs'])
+fitted=poses.Motions(fit_path,parents=skeleton['parents'])
+for name,drop in fit_qa['ankle_drops'].items():
+    for phase in (0,.125,.25,.375,.5,.625,.75,.875,.99):
+        bones=fitted.pose(name,phase,matrices=True)
+        original=motion.pose('lz_vehicle_passenger',phase,matrices=True)
+        points={bone:matrix[:3,3] for bone,matrix in bones.items()}
+        assert all(math.isfinite(float(v)) for matrix in bones.values() for row in matrix for v in row)
+        assert max(abs(float(v)) for v in points['bip01_pelvis'])<.0005
+        for bone,parent in skeleton['parents'].items():
+            if not parent:continue
+            length=float(sum((points[bone]-points[parent])**2))**.5
+            prior=float(sum((original[bone][:3,3]-original[parent][:3,3])**2))**.5
+            assert abs(length-prior)<.001,(name,bone,'limb stretched',length,prior)
+        for side,sign in [('l',-1),('r',1)]:
+            foot=points[f'bip01_{side}_foot'];hand=points[f'bip01_{side}_hand']
+            assert abs(float(foot[0])-sign*.12)<.001
+            assert abs(float(foot[1])+drop)<.001 and abs(float(foot[2])-fit_qa['foot_forward'][name])<.001
+            assert abs(float(hand[0]))<.17 and float(hand[1])>.14
+        assert bones['bip01_head'][2,2]>.93
+print('PASS fitted passenger keys: three low-seat heights, compact feet/hands, all 47 bone lengths preserved')

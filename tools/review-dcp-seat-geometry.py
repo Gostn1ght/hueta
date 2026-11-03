@@ -24,6 +24,8 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--target', action='append', required=True)
     parser.add_argument('--layouts', type=Path)
+    parser.add_argument('--passenger-omf', type=Path,
+                        help='Optional separate candidate; source game data are left untouched')
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
     root = Path(__file__).resolve().parents[1]
     overlay = root / 'scripts/netcoop-overlay/client'
@@ -38,7 +40,10 @@ def main():
     spec = importlib.util.spec_from_file_location('poses', root / 'scripts/read-omf-poses.py')
     reader = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(reader)
-    passenger = reader.Motions(overlay / 'meshes/actors/modded_stalker_animations/netcoop_player_prone.omf', args.actor)
+    active = reader.Motions(overlay / 'meshes/actors/modded_stalker_animations/netcoop_player_prone.omf', args.actor)
+    extra = overlay / 'meshes/actors/modded_stalker_animations/netcoop_vehicle_passengers.omf'
+    passenger_path = args.passenger_omf or (extra if extra.is_file() else None)
+    passenger = reader.Motions(passenger_path, args.actor) if passenger_path else active
     driver = reader.Motions(overlay / 'meshes/actors/stalker_animation.omf', args.actor)
     convert = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
     body_material = bpy.data.materials.new('Actor')
@@ -48,8 +53,10 @@ def main():
     marker_material = bpy.data.materials.new('Seat origin')
     marker_material.diffuse_color = (1, .15, .04, 1)
     bodies = {}
-    for role, source, motion in [('driver', driver, 'steering_idle_0_0'),
-                                  ('passenger', passenger, 'lz_vehicle_passenger')]:
+    sources = {'lz_vehicle_passenger': active}
+    sources.update({name: passenger for name in passenger.motions if name.startswith('lz_vehicle_passenger')})
+    clips = [('driver', driver, 'steering_idle_0_0')] + [(name, source, name) for name, source in sources.items()]
+    for role, source, motion in clips:
         world = {n: convert @ Matrix(m.tolist()) @ convert
                  for n, m in source.pose(motion, .2, matrices=True).items()}
         for bone in sorted(rig.pose.bones, key=lambda b: len(b.parent_recursive)):
@@ -72,12 +79,15 @@ def main():
     rows = {r['section']: r for r in json.loads(
         (root / 'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text(encoding='utf-8'))['rows']}
     models = {}
+    model_poses = {}
     current = None
     for line in (overlay / 'configs/mod_system_lz_dcp_vehicles.ltx').read_text(encoding='cp1251').splitlines():
         if line.startswith('['):
             current = line.split(']')[0][1:]
         elif line.startswith('visual ='):
             models[current] = line.split('=', 1)[1].strip().replace('\\', '/')
+        elif line.startswith('netcoop_passenger_pose ='):
+            model_poses[current] = line.split('=', 1)[1].strip()
     scene = bpy.context.scene
     scene.render.engine = 'BLENDER_WORKBENCH'
     scene.display.shading.light = 'STUDIO'
@@ -123,7 +133,8 @@ def main():
         spawned = []
         actors = []
         for index, seat in zip(indexes, seats):
-            for data, base in bodies['driver' if index == 0 else 'passenger']:
+            motion = layouts[visual]['seats'][index].get('pose', model_poses.get(section, 'lz_vehicle_passenger'))
+            for data, base in bodies['driver' if index == 0 else motion]:
                 obj = bpy.data.objects.new('Actor seat ' + str(index), data)
                 scene.collection.objects.link(obj)
                 obj.matrix_world = seat @ base

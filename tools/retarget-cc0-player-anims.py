@@ -17,7 +17,21 @@ p.add_argument('--addons',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 p.add_argument('--clip',action='append',help='source.glb=motion_name; repeat for a custom review set')
 p.add_argument('--seat-origin',action='store_true',help='Place the pelvis at the seat anchor, without changing its orientation')
+p.add_argument('--seat-fit',action='append',default=[],help='Review only: motion_name:ankle_drop_metres; fit feet and hands to a seated pose, preserving limb lengths')
+p.add_argument('--seat-foot-forward',action='append',default=[],help='motion_name:metres; shorter footwell for compact cabins (default 0.4)')
 args=p.parse_args(sys.argv[sys.argv.index('--')+1:])
+seat_fits={}
+for value in args.seat_fit:
+ name,drop=value.split(':');drop=float(drop)
+ assert args.seat_origin and .12<=drop<=.65, 'Seat fitting requires a pelvis origin and a supported chair height'
+ assert name not in seat_fits
+ seat_fits[name]=drop
+seat_forward={}
+for value in args.seat_foot_forward:
+ name,forward=value.split(':');forward=float(forward)
+ assert name in seat_fits and .2<=forward<=.6
+ assert name not in seat_forward
+ seat_forward[name]=forward
 base=args.donors;out=args.output;out.mkdir(parents=True,exist_ok=True)
 provenance=json.loads((base/'provenance.json').read_text(encoding='utf-8'))
 for row in provenance['files']:
@@ -53,6 +67,40 @@ align=Matrix.Rotation(math.pi,4,'Z')
 successor={'bip01_pelvis':'bip01_spine','bip01_spine':'bip01_spine1','bip01_spine1':'bip01_spine2','bip01_spine2':'bip01_neck','bip01_neck':'bip01_head'}
 for side in ('l','r'):
  for a,b in [('clavicle','upperarm'),('upperarm','forearm'),('forearm','hand'),('thigh','calf'),('calf','foot'),('foot','toe0')]:successor['bip01_'+side+'_'+a]='bip01_'+side+'_'+b
+
+def seat_limb(world, first, middle, last, endpoint, pole):
+ """Two-bone fit in model space; rotate complete subtrees, never scale bones."""
+ origin=world[first].translation.copy();joint=world[middle].translation.copy();end=world[last].translation.copy()
+ upper=(joint-origin).length;lower=(end-joint).length;delta=endpoint-origin;distance=delta.length
+ assert abs(upper-lower)+.0001<distance<upper+lower-.0001, (first,'unreachable seat fit',distance,upper,lower)
+ axis=delta/distance;along=(upper*upper-lower*lower+distance*distance)/(2*distance)
+ bend=pole-axis*pole.dot(axis);assert bend.length>.0001;bend.normalize()
+ elbow=origin+axis*along+bend*math.sqrt(max(0,upper*upper-along*along))
+ original_end_rotation=world[last].to_quaternion()
+ def rotate_branch(bone,desired):
+  child=middle if bone==first else last;start=world[bone].translation.copy()
+  rotation=(world[child].translation-start).rotation_difference(desired-start).to_matrix().to_4x4()
+  transform=Matrix.Translation(start)@rotation@Matrix.Translation(-start)
+  for descendant in order:
+   if descendant.name==bone or any(parent.name==bone for parent in descendant.parent_recursive):world[descendant.name]=transform@world[descendant.name]
+ rotate_branch(first,elbow);rotate_branch(middle,endpoint)
+ # Keep the donor's foot/hand orientation; propagate its correction to toes/fingers.
+ final=original_end_rotation.to_matrix().to_4x4();final.translation=world[last].translation
+ transform=final@world[last].inverted()
+ for descendant in order:
+  if descendant.name==last or any(parent.name==last for parent in descendant.parent_recursive):world[descendant.name]=transform@world[descendant.name]
+ assert (world[last].translation-endpoint).length<.0001
+
+def fit_seat(world, drop, forward):
+ for side,sign in [('l',-1),('r',1)]:
+  prefix='bip01_'+side+'_'
+  seat_limb(world,prefix+'thigh',prefix+'calf',prefix+'foot',
+            Vector((sign*.12,forward,-drop)),Vector((0,1,0)))
+  thigh=world[prefix+'thigh'].translation;knee=world[prefix+'calf'].translation
+  support=thigh.lerp(knee,.4)
+  hand=Vector((sign*.16,support.y,max(.15,support.z+.09)))
+  seat_limb(world,prefix+'upperarm',prefix+'forearm',prefix+'hand',hand,
+            Vector((sign*.08, -1, -.1)))
 samples=[];snapshots=[];actions=[]
 clay=bpy.data.materials.new('Review actual game actor');clay.diffuse_color=(.38,.48,.39,1)
 for obj in target_meshes:obj.data.materials.clear();obj.data.materials.append(clay)
@@ -91,6 +139,9 @@ for row,(file,name) in enumerate(clips):
     else:pose.translation=(world[parent.name]@rest[parent.name].inverted()@rest[dst]).translation
    else:pose=world[parent.name]@rest[parent.name].inverted()@rest[dst] if parent else rest[dst].copy()
    world[dst]=pose
+  if name in seat_fits:fit_seat(world,seat_fits[name],seat_forward.get(name,.4))
+  for bone in order:
+   parent=bone.parent;pose=world[bone.name]
    kwargs={} if parent is None else dict(parent_matrix=world[parent.name],parent_matrix_local=parent.bone.matrix_local)
    bone.matrix_basis=bone.bone.convert_local_to_pose(pose,bone.bone.matrix_local,invert=True,**kwargs)
    bone.keyframe_insert('location',frame=frame);bone.keyframe_insert('rotation_quaternion',frame=frame);bone.keyframe_insert('scale',frame=frame)
@@ -100,7 +151,7 @@ for row,(file,name) in enumerate(clips):
  item=target.xray.motions_collection.add();item.name=name
  for col,fraction in enumerate([0,.25,.5,.75]):
   bpy.context.scene.frame_set(round((frames-1)*fraction));bpy.context.view_layer.update()
-  samples.append(dict(clip=name,fraction=fraction,frame=round((frames-1)*fraction),frames=frames,points={n:list(target.pose.bones[n].matrix.translation) for n in ['bip01_head','bip01_pelvis','bip01_l_hand','bip01_r_hand','bip01_l_foot','bip01_r_foot']}))
+  samples.append(dict(clip=name,fraction=fraction,frame=round((frames-1)*fraction),frames=frames,seat_ankle_drop=seat_fits.get(name),seat_foot_forward=seat_forward.get(name,.4) if name in seat_fits else None,points={n:list(target.pose.bones[n].matrix.translation) for n in ['bip01_head','bip01_pelvis','bip01_l_hand','bip01_r_hand','bip01_l_foot','bip01_r_foot']}))
   for obj in target_meshes:
    mesh=bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
    snap=bpy.data.objects.new(f'{name}_{fraction}',mesh);bpy.context.collection.objects.link(snap)
@@ -130,10 +181,11 @@ target.hide_render=True
 for obj in snapshots:obj.hide_render=False
 scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE_NEXT';scene.render.resolution_x=1800;scene.render.resolution_y=1200;scene.render.resolution_percentage=100
 scene.world=bpy.data.worlds.new('Review World');scene.world.color=(.12,.12,.12)
-bpy.ops.mesh.primitive_plane_add(size=60,location=(4.2,3.5,-.06));floor=bpy.context.object
+floor_z=-.75 if args.seat_origin else -.06
+bpy.ops.mesh.primitive_plane_add(size=60,location=(4.2,3.5,floor_z));floor=bpy.context.object
 material=bpy.data.materials.new('Floor');material.diffuse_color=(.16,.18,.20,1);floor.data.materials.append(material)
 for loc,power in [((3,-5,10),2200),((-5,4,8),1800),((9,10,10),2200)]:
  bpy.ops.object.light_add(type='AREA',location=loc);lamp=bpy.context.object;lamp.data.energy=power;lamp.data.size=8;lamp.rotation_euler=(Vector((4.2,3.5,0))-lamp.location).to_track_quat('-Z','Y').to_euler()
-bpy.ops.object.camera_add(location=(12,-12,12));camera=bpy.context.object;camera.rotation_euler=(Vector((4.2,3.5,.2))-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=15;scene.camera=camera
+bpy.ops.object.camera_add(location=(12,18,12));camera=bpy.context.object;camera.rotation_euler=(Vector((4.2,(len(clips)-1)*1.75,.2))-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=max(15,len(clips)*4.2);scene.camera=camera
 scene.render.filepath=str(out/'actual-game-actor-review.png');bpy.ops.render.render(write_still=True)
 print('PRIVATE_REVIEW_READY',out,flush=True)

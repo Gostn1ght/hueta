@@ -1,0 +1,253 @@
+{
+  "max_error_metres": 5.60644065885846e-05,
+  "samples": 12,
+  "clips": [
+    "lz_vehicle_passenger_floor",
+    "lz_vehicle_passenger_compact",
+    "lz_vehicle_passenger_low"
+  ],
+  "source_commit": "b6dc8faa022fecf69956c79682a2ecaca9fcb81d",
+  "template_sha256": "39cfce837ffb11987f703ae50f91df664e3c7760c034b07ee49a9cf0312ef142",
+  "candidate_sha256": "a6b249d3871ee6551bcdf4a89fdea049c629ac7fd4445b1bd7d7e3b156c68d10",
+  "status": "candidate_not_published",
+  "models": {
+    "dcp_bmw7": "compact",
+    "dcp_moskvich_2715": "floor",
+    "dcp_moskvich_2715tun": "floor",
+    "dcp_uaz_army_gun": "low"
+  },
+  "ankle_drops": {
+    "lz_vehicle_passenger_floor": 0.15,
+    "lz_vehicle_passenger_compact": 0.2,
+    "lz_vehicle_passenger_low": 0.3
+  },
+  "source": "Mesh2Motion sitting-idle CC0, limb fit without scaling bones; no driver/door/prone replacement",
+  "output": "scripts/netcoop-overlay/client/meshes/actors/modded_stalker_animations/netcoop_vehicle_passengers.omf",
+  "foot_forward": {
+    "lz_vehicle_passenger_floor": 0.25,
+    "lz_vehicle_passenger_compact": 0.3,
+    "lz_vehicle_passenger_low": 0.4
+  },
+  "contact_review": {
+    "method": "Visual ray at ankle XY starting 0.15 m below hip, to exclude cushion/dash above the foot; diagnostic only, not a collider or sole proof",
+    "rows": [
+      {
+        "section": "dcp_bmw7",
+        "seat": 1,
+        "hip_game": [
+          0.3849790096282959,
+          0.5049574375152588,
+          0.09830986708402634
+        ],
+        "support_gap_m": 0.11815530061721802,
+        "support_normal_z": 0.9987654089927673,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.08542688190937042
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.08655665814876556
+          }
+        ]
+      },
+      {
+        "section": "dcp_bmw7",
+        "seat": 2,
+        "hip_game": [
+          -0.3849790096282959,
+          0.5049574375152588,
+          -0.751690149307251
+        ],
+        "support_gap_m": -0.008954644203186035,
+        "support_normal_z": 0.9983261823654175,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.087679922580719
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.08721281588077545
+          }
+        ]
+      },
+      {
+        "section": "dcp_bmw7",
+        "seat": 3,
+        "hip_game": [
+          0.3849790096282959,
+          0.5049574375152588,
+          -0.751690149307251
+        ],
+        "support_gap_m": -0.00895458459854126,
+        "support_normal_z": 0.9983261823654175,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.08717750012874603
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.087715283036232
+          }
+        ]
+      },
+      {
+        "section": "dcp_bmw7",
+        "seat": 4,
+        "hip_game": [
+          2.0980838598916307e-05,
+          0.5049574375152588,
+          -0.751690149307251
+        ],
+        "support_gap_m": -0.01425015926361084,
+        "support_normal_z": 0.9999997615814209,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.08602973818778992
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.08606588840484619
+          }
+        ]
+      },
+      {
+        "section": "dcp_moskvich_2715",
+        "seat": 1,
+        "hip_game": [
+          0.36612004041671753,
+          0.5722724795341492,
+          0.1167079359292984
+        ],
+        "support_gap_m": 0.00829237699508667,
+        "support_normal_z": 0.9987824559211731,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.09882745146751404
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.09772685170173645
+          }
+        ]
+      },
+      {
+        "section": "dcp_moskvich_2715tun",
+        "seat": 1,
+        "hip_game": [
+          0.36607998609542847,
+          0.5722724795341492,
+          0.1167079508304596
+        ],
+        "support_gap_m": 0.0629376769065857,
+        "support_normal_z": 0.9898307919502258,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.064654141664505
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.06464546918869019
+          }
+        ]
+      },
+      {
+        "section": "dcp_uaz_army_gun",
+        "seat": 1,
+        "hip_game": [
+          0.4198766052722931,
+          1.0711662769317627,
+          -0.02354305423796177
+        ],
+        "support_gap_m": 0.09592127799987793,
+        "support_normal_z": 0.9923632740974426,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.10123997926712036
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.10126721858978271
+          }
+        ]
+      },
+      {
+        "section": "dcp_uaz_army_gun",
+        "seat": 2,
+        "hip_game": [
+          -0.4992867708206177,
+          1.071166753768921,
+          -1.5035440921783447
+        ],
+        "support_gap_m": 0.011852741241455078,
+        "support_normal_z": 1.0,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.08390933275222778
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.08391213417053223
+          }
+        ]
+      },
+      {
+        "section": "dcp_uaz_army_gun",
+        "seat": 3,
+        "hip_game": [
+          0.49987661838531494,
+          1.0711662769317627,
+          -1.5035430192947388
+        ],
+        "support_gap_m": 0.011852264404296875,
+        "support_normal_z": 1.0,
+        "feet": [
+          {
+            "side": "l",
+            "floor_gap_m": 0.08390885591506958
+          },
+          {
+            "side": "r",
+            "floor_gap_m": 0.08391165733337402
+          }
+        ]
+      }
+    ],
+    "ankle_floor_range_m": [
+      0.06464546918869019,
+      0.10126721858978271
+    ],
+    "source_report_sha256": "70d83594b58e8ac7a11a6a9980dbd6dc5031469b0c2a271236d131d70128f82f",
+    "rejected_model_candidates": [
+      "dcp_bmw5",
+      "dcp_uaz_van"
+    ],
+    "reason": "Front and rear footwells need different fits; global pose not enabled."
+  },
+  "preview_sha256": {
+    "dcp_bmw7-front-actors.png": "b6bf387c77c0fe514585b4ebd8258ce89a6e432929303a3ff393afc80b3ffb51",
+    "dcp_bmw7-front-mesh.png": "9b33c503f465b6bbcd9daca16bfa4604072873b4eccabc5b41c5dc8a64a97fa0",
+    "dcp_bmw7-top-actors.png": "fb9a63cd185f1de986448ab8670132fce072041ea72a8bf04e61276dcf339009",
+    "dcp_bmw7-top-mesh.png": "e11f3bd63cb2d14ca48cd58237c4c771fe3fbf9154b9a873751ff4c75445e524",
+    "dcp_moskvich_2715-front-actors.png": "4ca6e82d559e6374d610221651df57cd64768a83bcf52af247fbec5f38cba86d",
+    "dcp_moskvich_2715-front-mesh.png": "ba6592409b4b62ce24bb4619f2c452726662043f46baf0fba10982a86bc5a646",
+    "dcp_moskvich_2715-top-actors.png": "0562c9ef8e965d75f78fa7eadc5bad375d3238a783e599a47114849bf8dcf5e4",
+    "dcp_moskvich_2715-top-mesh.png": "eebf00ea834311b3520725f9d448ce097d48aed225853944705ffc3835e3910d",
+    "dcp_moskvich_2715tun-front-actors.png": "eaa372b426b6f21c9bd534e926facc26675fe0a985a336e5696893526ee136f3",
+    "dcp_moskvich_2715tun-front-mesh.png": "99b5817c4b3a14a83aa35910a9a3b99500e0e07322e5d3557c34c776a68dd817",
+    "dcp_moskvich_2715tun-top-actors.png": "3748cf51d82128ab592555baf62a885bbd04543e8d09f65084c58e0ed0eac8ce",
+    "dcp_moskvich_2715tun-top-mesh.png": "2185e54b8fcbf4020d2d2691524c71b469d5dfde1d93f63112c4bdc22f381455",
+    "dcp_uaz_army_gun-front-actors.png": "9c9bac86afd292ea853159ba448a0e4d56ed7ba531cb58b1386e56a5e103ba3a",
+    "dcp_uaz_army_gun-front-mesh.png": "8ac2e05b4579fc4a75e6801abf4988fda3448262ea2112ea122df90e201dec22",
+    "dcp_uaz_army_gun-top-actors.png": "83cb8c1a053a864b322d89fd60f962c8251ac8d1278a9820ccfcd1c3c24dffea",
+    "dcp_uaz_army_gun-top-mesh.png": "679bd78205dcdd8f9d4a5bd9c2357d328c0705595d449cdfa6f4b5dfbc46d29f"
+  }
+}

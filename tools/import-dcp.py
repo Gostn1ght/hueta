@@ -181,6 +181,7 @@ def main(dcp, overlay, gamma):
              "; Seats from the models' seat bones (netcoop_vehicles.inc), the driver first.", ""]
     names_needed, kept = set(), []
     panel_profiles={}
+    pose_fits=json.loads(Path(__file__).with_name('dcp-seat-pose-fits.json').read_text(encoding='utf-8'))
     for name, keys in sorted(vehicles.items()):
         if not name.startswith("vehicle_") or SKIP.search(name) or "visual" not in keys:
             continue
@@ -204,7 +205,8 @@ def main(dcp, overlay, gamma):
             lines += ["inv_name = " + keys["inv_name"], "inv_name_short = " + keys["inv_name"]]
             names_needed.add(keys["inv_name"])
         lines.append("netcoop_seats = " + ", ".join(seats))
-        lines += ["netcoop_passenger_pose = lz_vehicle_passenger", "netcoop_passenger_drop = 0"]
+        pose=pose_fits.get((visual+'.ogf').replace('\\','/'),{}).get('pose','lz_vehicle_passenger')
+        lines += ["netcoop_passenger_pose = "+pose, "netcoop_passenger_drop = 0"]
         if keys.get("has_trunk", "true").lower() == "false":
             lines.append("netcoop_trunk = false")
         lines.append("")

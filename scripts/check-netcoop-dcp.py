@@ -114,6 +114,8 @@ for side in (CLIENT, SERVER):
                     assert value in particle_names, (side.name, path.name, section, key, 'missing particle', value)
 assert (CLIENT / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes() == (SERVER / "configs/mod_system_lz_dcp_vehicles.ltx").read_bytes()
 layouts=json.loads((ROOT/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
+pose_fits=json.loads((ROOT/'tools/dcp-seat-pose-fits.json').read_text(encoding='utf-8'))
+assert set(pose_fits)<=set(layouts)
 audit=json.loads((ROOT/'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text(encoding='utf-8'))
 rows={r['section']:r for r in audit['rows']}
 corrections=json.loads((ROOT/'docs/audit/182_FLEET_SEAT_CORRECTIONS.json').read_text(encoding='utf-8'))
@@ -153,7 +155,9 @@ for name, keys in cars.items():
         pos=[a+b for a,b in zip(row['seat_bones_game'][seat['bone']],seat['offset'])]
         assert all(sum((a-b)**2 for a,b in zip(pos,other))>.2**2 for other in positions), (name,'overlapping seats')
         positions.append(pos)
-    assert keys['netcoop_passenger_pose']=='lz_vehicle_passenger' and float(keys['netcoop_passenger_drop'])==0
+    fit=pose_fits.get(keys['visual'].replace('\\','/'),{})
+    assert keys['netcoop_passenger_pose']==fit.get('pose','lz_vehicle_passenger') and float(keys['netcoop_passenger_drop'])==0
+    if fit:assert fit['section']==name
     bones = model_physics(data)
     profile = dcp_import.sections(profile_text(CLIENT / 'configs' / include.group(1).replace('\\', '/')))
     definition = profile['car_definition']
