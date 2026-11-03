@@ -335,6 +335,7 @@ jobs:
           python scripts/check-native-destroy-progress.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-owner-regressions.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-corpse-animation.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-corpse-drag.py
