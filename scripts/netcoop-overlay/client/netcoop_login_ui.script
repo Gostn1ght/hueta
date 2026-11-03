@@ -159,11 +159,28 @@ class "netcoop_login_wnd" (CUIScriptWnd)
 
 function netcoop_login_wnd:__init(owner) super()
 	self.owner = owner
+    self.room_theme = netcoop_menu_theme.room()
 	self:SetAutoDelete(false)
 	self:SetWndRect(Frect():set(0, 0, 1024, 768))
 
 	local xml = CScriptXmlInit()
 	xml:ParseFile("ui_netcoop_login.xml")
+    local flat = CScriptXmlInit(); flat:ParseFile("ui_netcoop_flat.xml")
+    self.flat_background = flat:InitStatic("background", self)
+    self.flat_buttons = {}
+    for _, entry in ipairs({
+        {"account", "Аккаунт и персонаж", function() self:ShowCharacterView() end},
+        {"server", "Войти в Зону", function() self:SelectCharacter(1) end},
+        {"address", "Сервер", function() self:ShowServer() end},
+        {"options", "Настройки", function() self:ShowSettings() end},
+        {"quit", "Выйти из игры", function() self:AskQuit() end},
+    }) do
+        local b = flat:Init3tButton(entry[1], self)
+        b:TextControl():SetText(entry[2]); self:Register(b, "flat_" .. entry[1])
+        self:Bind("flat_" .. entry[1], entry[3]); self.flat_buttons[#self.flat_buttons+1] = b
+        b:Show(false)
+    end
+    self.flat_background:Show(not self.room_theme)
 	self.account_background = xml:InitStatic("background", self)
 
 	local function cap(path, text)
@@ -246,7 +263,7 @@ end
 
 function netcoop_login_wnd:CloseRoomView()
     self.room_view, self.room_pending = nil, nil
-    if self.view_index ~= -1 then self.view_index = -1; netcoop_preview_focus(-1) end
+    if self.view_index ~= -1 then self.view_index = -1; if self.room_theme then netcoop_preview_focus(-1) end end
     self.settings_pending, self.settings_open = nil, nil
     if self.server_panel then self.server_panel:Show(false) end
     if self.details_panel then self.details_panel:Show(false) end
@@ -260,14 +277,14 @@ function netcoop_login_wnd:OpenRoomView(kind, object)
     self.view_index = object
     self.hovered = -1
     if netcoop_preview_hover then netcoop_preview_hover(-1) end
-    netcoop_preview_focus(object)
+    if self.room_theme then netcoop_preview_focus(object) end
     self.room_back:Show(kind ~= "door")
 end
 -- One action at a time: no clicks while a request runs, a view opens or the
 -- room camera moves.
 function netcoop_login_wnd:Busy()
     if self.route_wait or auth_return == "pending" or self.settings_pending or self.room_pending then return true end
-    return self.mode == "characters" and netcoop_preview_ready ~= nil and not netcoop_preview_ready()
+    return self.room_theme and self.mode == "characters" and netcoop_preview_ready ~= nil and not netcoop_preview_ready()
 end
 -- Every click is logged, ignored while busy (unless always) and guarded.
 function netcoop_login_wnd:Bind(id, handler, always)
@@ -290,7 +307,10 @@ function netcoop_login_wnd:AskQuit()
     self.quit_box:ShowDialog(true)
 end
 function netcoop_login_wnd:PositionRoomControls()
-    local shown = self.mode == "characters" and (not self.room_view or self.room_view == "door")
+    local overview = self.mode == "characters" and not self.room_view
+    if self.flat_background then self.flat_background:Show(not self.room_theme and self.mode ~= "account") end
+    for _, b in ipairs(self.flat_buttons or {}) do b:Show(not self.room_theme and overview); b:Enable(not self:Busy()) end
+    local shown = self.room_theme and self.mode == "characters" and (not self.room_view or self.room_view == "door")
     for _, arrow in ipairs(self.room_arrows or {}) do arrow:Show(shown); arrow:Enable(not self:Busy()) end
 end
 -- Both edge arrows turn between the room overview and the door behind us.
@@ -319,6 +339,7 @@ end
 -- Hovered object: the one under the cursor, or the one chosen with the arrows
 -- until the mouse moves. Nothing is hovered while busy or in a close-up view.
 function netcoop_login_wnd:UpdateHover()
+    if not self.room_theme then return end
     local object = -1
     local active = self.mode == "characters" and not self:Busy() and self:IsShown()
     local only = self.room_view and VIEW_OBJECT[self.room_view]
@@ -465,7 +486,7 @@ function netcoop_login_wnd:Update()
 end
 function netcoop_login_wnd:UpdateMenu()
     self:PollRoute()
-    if self.room_pending and (not netcoop_preview_ready or netcoop_preview_ready()) then
+    if self.room_pending and (not self.room_theme or not netcoop_preview_ready or netcoop_preview_ready()) then
         local kind = self.room_pending; self.room_pending = nil
         if kind == "server" then
             self.server_edit:SetText(self.pending_ip .. ":" .. self.pending_port)
@@ -480,7 +501,7 @@ function netcoop_login_wnd:UpdateMenu()
             if not self.opt_dlg then self.opt_dlg = ui_options.UIOptions(); self.opt_dlg.owner = self end
             self.settings_open=true
             self:HideDialog(); self:Show(false)
-            self.opt_dlg.background:Show(false)
+            self.opt_dlg.background:Show(not self.room_theme)
             Register_UI("UIOptions")
             self.opt_dlg:ShowDialog(true)
         end)
@@ -496,7 +517,7 @@ function netcoop_login_wnd:UpdateMenu()
     if level.present() then netcoop_menu_radio.stop()
     else netcoop_menu_radio.update() end
     if self.radio_panel and self.radio_panel:IsShown() then self:RefreshRadio() end
-    if self.mode=="characters" then self:PositionRoomControls() end
+    self:PositionRoomControls()
     self:UpdateHover()
     if auth_return and auth_return ~= "pending" then frontend_update(self.owner) end
     self:PollVerification()
@@ -679,8 +700,9 @@ function netcoop_login_wnd:ChangeSlot(delta)
     self.character_description:TextControl():SetText((description ~= "" and description .. "\n\n" or "") .. (history ~= "" and history or "пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ."))
     for i = 1, 10 do self.slot_buttons[i]:Enable(i ~= self.slot) end
     self.storage_revision=nil
-    if self.room_view == "character" then self.view_index=2; netcoop_preview_focus(2)
-    elseif self.view_index ~= -1 then self.view_index=-1; netcoop_preview_focus(-1) end
+    if self.room_theme and self.room_view == "character" then self.view_index=2; netcoop_preview_focus(2)
+    elseif self.room_theme and self.view_index ~= -1 then self.view_index=-1; netcoop_preview_focus(-1) end
+    if not self.room_theme then netcoop_preview_clear(); self:PositionRoomControls(); return end
     local model=preview.visual and preview.visual~="" and preview.visual or BASE_MODEL
     if not netcoop_preview_model(model,-2) then netcoop_preview_model(BASE_MODEL,-2) end
     local weapon=""
@@ -692,6 +714,7 @@ function netcoop_login_wnd:ChangeSlot(delta)
     self:PositionRoomControls()
 end
 function netcoop_login_wnd:SetPose(pose)
+    if not self.room_theme then return end
     local preview=self.previews[self.slot] or {}; netcoop_preview_model(preview.visual or BASE_MODEL,-2)
 end
 -- Keep the native Show method inherited. Lua virtual overrides have no
@@ -1066,7 +1089,7 @@ function netcoop_login_wnd:OnKeyboard(dik, keyboard_action)
 		return true
 	end
 	if keyboard_action == ui_events.WINDOW_KEY_PRESSED then
-		local room = self.mode == "characters" and not self.room_view
+		local room = self.room_theme and self.mode == "characters" and not self.room_view
 		if self.mode == "account" and cloud_enabled() then
 			if dik == DIK_keys.DIK_TAB then self:FocusNextField(); return true end
 			if dik == DIK_keys.MOUSE_1 then self:TrackFieldClick() end
@@ -1078,7 +1101,7 @@ function netcoop_login_wnd:OnKeyboard(dik, keyboard_action)
 		if room and dik == DIK_keys.DIK_TAB then
 			self.show_all = true
 			return true
-		elseif self.mode == "characters" and (not self.room_view or self.room_view == "door") and
+		elseif self.room_theme and self.mode == "characters" and (not self.room_view or self.room_view == "door") and
             (dik == DIK_keys.DIK_LEFT or dik == DIK_keys.DIK_RIGHT) then
             guard("camera turn", self.TurnRoom)(self)
             return true
@@ -1102,7 +1125,8 @@ function netcoop_login_wnd:OnKeyboard(dik, keyboard_action)
 			printf("[Lost Zone][menu] key Enter")
 			guard("key Enter", function()
 				if self.mode == "characters" then
-					if self.server_panel:IsShown() then self:SelectCharacter(self.slot)
+					if not self.room_theme and not self.room_view then self:ShowCharacterView()
+                    elseif self.server_panel:IsShown() then self:SelectCharacter(self.slot)
                     elseif self.room_view == "door" then self:AskQuit()
 					elseif not self.room_view and (self.hovered or -1) >= 0 then self:ActivateObject(self.hovered) end
 				elseif self.mode == "profile" then self:ContinueProfile()
@@ -1326,7 +1350,7 @@ end
 function netcoop_login_wnd:ShowSettings()
     self:OpenRoomView("settings", 3)
 end
-function netcoop_login_wnd:ShowRadio() self:OpenRoomView("radio", 1) end
+function netcoop_login_wnd:ShowRadio() if self.room_theme then self:OpenRoomView("radio", 1) end end
 function netcoop_login_wnd:RefreshRadio()
     local station, track, volume, enabled = netcoop_menu_radio.info()
     self.radio_station:TextControl():SetText(tr(station))

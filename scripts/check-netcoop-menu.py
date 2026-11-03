@@ -113,6 +113,15 @@ end}
 CUIMMShniaga={epi_main=0,epi_new_game=1}
 ''')
 radio_root = root/'scripts/netcoop-overlay/client'
+theme_source = (radio_root/'netcoop_menu_theme.script').read_text()
+def load_theme():
+    lua.execute("netcoop_menu_theme={}; setmetatable(netcoop_menu_theme,{__index=_G}); local f=assert(loadstring(...)); setfenv(f,netcoop_menu_theme); f()", theme_source)
+load_theme()
+lua.execute("assert(netcoop_menu_theme.current()=='classic' and not netcoop_menu_theme.room())")
+(cache/'netcoop_menu_theme.txt').write_text('unknown\n')
+load_theme();lua.execute("assert(netcoop_menu_theme.current()=='classic')")
+(cache/'netcoop_menu_theme.txt').write_text('room\n')
+load_theme();lua.execute("assert(netcoop_menu_theme.room())")
 lua.execute("netcoop_menu_stations={}; netcoop_menu_radio={}")
 lua.execute("local f=assert(loadstring(...)); setfenv(f,netcoop_menu_stations); f()", (radio_root/'netcoop_menu_stations.script').read_text())
 lua.execute("setmetatable(netcoop_menu_radio,{__index=_G}); local f=assert(loadstring(...)); setfenv(f,netcoop_menu_radio); f()", (radio_root/'netcoop_menu_radio.script').read_text())
@@ -468,7 +477,7 @@ assert(#commands==2 and not music_sounds[#music_sounds].active)
 """)
 print('Room interactions: camera arrows, quit confirmation, PDA entry, character dialog, toolbox settings, radio controls and audio lifecycle PASS')
 
-temporary.cleanup()
+
 
 # The base menu must not load another Lua class during its native constructor.
 # Loading the account module here can disrupt luabind construction.
@@ -590,3 +599,26 @@ assert(hidden and joined[1]==1 and joined[2]==nickname and joined[3]=="stalker" 
 assert(drafts[1].name==nickname and drafts[1].loadout==joined[5])
 ''')
 print('Actual starter completion: selected items/stacks, fixed loner economy, Russian name, rejected points/faction and failed cloud save hold entry PASS')
+
+# New default uses the SAME authenticated character and route methods without
+# constructing a room, waiting for a room camera, or playing radio audio.
+(cache/'netcoop_menu_theme.txt').unlink()
+load_theme()
+lua.execute(r"""
+present=false; room_model=false; camera_done=false
+local count=#previews
+local flat=netcoop_login_wnd({HideDialog=function() end,Show=function() end})
+flat:ShowRoom()
+assert(flat.mode=='characters' and not flat.room_theme and not flat:Busy())
+assert(#previews==count and not room_model and flat.flat_background.shown)
+assert(flat.flat_buttons[1].shown and flat.flat_buttons[2].shown and not controls.previous.shown)
+flat:ShowServer(); flat:UpdateMenu()
+assert(controls.server_panel.shown and not room_model)
+flat:CloseRoomView();flat:PositionRoomControls()
+flat:ShowCharacterView(); assert(flat.mode=='account')
+flat:PositionRoomControls();assert(not flat.flat_buttons[1].shown)
+netcoop_menu_radio.update()
+for _,sound in ipairs(music_sounds) do assert(not sound.active) end
+""")
+print('Default 2D: existing account/character entry, server controls, no model, no camera wait and no music PASS')
+temporary.cleanup()

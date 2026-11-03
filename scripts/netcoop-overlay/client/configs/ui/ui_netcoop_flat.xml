@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<w>
+<background x="0" y="0" width="1024" height="768" stretch="1"><texture x="0" y="0" width="1920" height="1080">ui\ui_background_new</texture>
+<auto_static x="0" y="0" width="1024" height="768" stretch="1"><texture r="0" g="0" b="0" a="55">ui\netcoop_menu_solid</texture></auto_static>
+<auto_static x="280" y="115" width="464" height="70"><text font="graffiti32" r="225" g="222" b="210" align="c" vert_align="c">LOST ZONE</text></auto_static></background>
+<account x="358" y="306" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></account>
+<server x="358" y="349" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></server>
+<address x="358" y="392" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></address>
+<options x="358" y="435" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></options>
+<quit x="358" y="478" width="308" height="32"><texture>ui_button_ordinary</texture><text font="letterica16" r="225" g="222" b="210" align="c" vert_align="c" /></quit>
+</w>

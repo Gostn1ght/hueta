@@ -27,7 +27,7 @@ function stop()
     if sound then sound:stop(); sound = nil end
 end
 local function room_visible()
-    return not level.present() and netcoop_preview_visible ~= nil and netcoop_preview_visible()
+    return netcoop_menu_theme.room() and not level.present() and netcoop_preview_visible ~= nil and netcoop_preview_visible()
 end
 local function play()
     stop()

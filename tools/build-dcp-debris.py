@@ -3,7 +3,7 @@
 All source faces, UVs and materials survive exactly once. No other vehicle's
 parts are borrowed. Candidate outputs stay outside the overlay until reviewed.
 """
-import argparse, collections, hashlib, json, re, sys
+import argparse, collections, hashlib, json, re, struct, sys
 from pathlib import Path
 import addon_utils, bpy, bmesh
 from mathutils import Vector
@@ -18,6 +18,22 @@ sys.path.insert(0,str(a.addons.resolve()));a.root=a.root.resolve();a.out=a.out.r
 models=json.loads((a.root/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
 report_path=a.out/'debris-reviewed-candidate.json'
 reports=json.loads(report_path.read_text()) if report_path.exists() and not a.only else []
+userdata='[impulse_transition_from_source_bone]\nref_bone = root\nimp_transition_factor = 0.1\nlv_transition_factor = 1\nav_transition_factor = 1\n'
+
+def normalize_userdata(path):
+    # The exporter can pick a split mesh as the property owner for large bodies.
+    # Explicitly persist the reviewed fragment userdata, independently of which
+    # Blender object it selected. Use the source root for rigid-body velocity;
+    # a decorative door bone need not have a physics element of its own.
+    data=path.read_bytes();offset=0;chunks=[]
+    while offset<len(data):
+        tag,size=struct.unpack_from('<II',data,offset);offset+=8
+        assert offset+size<=len(data)
+        if tag!=17:chunks.append(struct.pack('<II',tag,size)+data[offset:offset+size])
+        offset+=size
+    payload=userdata.encode()+b'\0'
+    chunks.append(struct.pack('<II',17,len(payload))+payload)
+    path.write_bytes(b''.join(chunks))
 def xr(v):return (v.x,v.z,v.y)
 def classify(name,parents):
     current=name
@@ -36,7 +52,11 @@ for relative in models:
     if old:
         assert old['source_sha256']==hashlib.sha256((a.root/'scripts/netcoop-overlay/client/meshes'/relative).read_bytes()).hexdigest()
         for part in old['parts']:
-            assert hashlib.sha256((a.out/'meshes'/part['path']).read_bytes()).hexdigest()==part['sha256']
+            path=a.out/'meshes'/part['path']
+            assert hashlib.sha256(path.read_bytes()).hexdigest()==part['sha256']
+            normalize_userdata(path)
+            part['sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
+        report_path.write_text(json.dumps(reports,indent=2)+'\n')
         continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable('io_scene_xray',default_set=True,persistent=False)
@@ -106,11 +126,12 @@ for relative in models:
                 bm.to_mesh(chunk.data);bm.free();draw_objects.append(chunk)
             bpy.data.objects.remove(obj,do_unlink=True)
         rig.xray.isroot=True
-        ref=name if name in parents else 'root'
-        rig.xray.userdata='[impulse_transition_from_source_bone]\nref_bone = '+ref+'\nimp_transition_factor = 0.1\nlv_transition_factor = 1\nav_transition_factor = 1\n[collide]\nnot_collide_parts = 1\n'
+        assert 'root' in parents
+        rig.xray.userdata=userdata
         dest=a.out/'meshes/physics/vehicles/lz_debris'/source.stem/(name+'.ogf');dest.parent.mkdir(parents=True,exist_ok=True)
         for draw in draw_objects:draw.select_set(True)
         assert bpy.ops.xray_export.ogf_file(filepath=str(dest),fmt_version='cscop',export_motions=False,use_export_paths=False,texture_name_from_image_path=False)=={'FINISHED'}
+        normalize_userdata(dest)
         result.append(dict(name=name,path=dest.relative_to(a.out/'meshes').as_posix(),triangles=len(triangles),mass=bone.xray.mass.value,lo=list(lo),hi=list(hi),sha256=hashlib.sha256(dest.read_bytes()).hexdigest()))
         for draw in draw_objects:bpy.data.objects.remove(draw,do_unlink=True)
         bpy.data.objects.remove(rig,do_unlink=True)

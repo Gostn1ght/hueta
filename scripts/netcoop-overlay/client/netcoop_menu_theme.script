@@ -1,0 +1,16 @@
+-- Shared with the launcher's built-in add-on selector. Unknown, missing or
+-- incomplete selections always return the silent 2D default. Read once per run.
+local selected
+function current()
+    if selected then return selected end
+    selected = "classic"
+    local file = io.open(getFS():update_path("$app_data_root$", "netcoop_menu_theme.txt"), "r")
+    if file then
+        local value = (file:read(64) or ""):match("^%s*(%S+)%s*$")
+        file:close()
+        if value == "room" then selected = value end
+    end
+    printf("[Lost Zone][menu] theme=%s", selected)
+    return selected
+end
+function room() return current() == "room" end
