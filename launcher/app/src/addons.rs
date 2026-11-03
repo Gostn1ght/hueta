@@ -6,8 +6,8 @@ use std::path::Path;
 pub const MIN_PATCH: u32 = 62;
 const THEMES: &[(&str, &str, &str, bool)] = &[
     ("room", "Комната — 3D", "Интерактивные предметы, персонаж и радио в прежней комнате.", true),
-    ("campfire", "Костёр — 2D", "Стена, снаряжение и костёр. Художественные ресурсы ещё готовятся.", false),
-    ("night", "Ночной лес — 2D", "Тёмный лес и меню слева. Художественные ресурсы ещё готовятся.", false),
+    ("campfire", "Костёр — 2D", "Укрытие, снаряжение и костёр. Без радио и фоновой музыки.", true),
+    ("night", "Ночной лес — 2D", "Лунный лес, меню слева. Без радио и фоновой музыки.", true),
 ];
 
 #[derive(Serialize)]
@@ -88,7 +88,7 @@ mod tests {
         assert_eq!(resolve("night", "room", true, true, 62).unwrap(), "room");
         assert_eq!(resolve("room", "room", false, false, 0).unwrap(), "classic");
         assert!(resolve("classic", "room", true, false, 61).is_err());
-        assert!(resolve("classic", "night", true, false, 62).is_err());
+        assert_eq!(resolve("classic", "night", true, false, 62).unwrap(), "night");
         assert!(resolve("classic", "../../anything", true, true, 62).is_err());
     }
 }

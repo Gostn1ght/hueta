@@ -167,21 +167,31 @@ function netcoop_login_wnd:__init(owner) super()
 	xml:ParseFile("ui_netcoop_login.xml")
     local flat = CScriptXmlInit(); flat:ParseFile("ui_netcoop_flat.xml")
     self.flat_background = flat:InitStatic("background", self)
+    self.flat_background:InitTexture(netcoop_menu_theme.background())
+    self.flat_background:SetTextureRect(Frect():set(0, 0, 1672, 941))
+    self.flat_title = flat:InitStatic("title", self)
+    if netcoop_menu_theme.current() == "night" then self.flat_title:SetWndPos(vector2():set(8, 155)); self.flat_title:SetWndSize(vector2():set(380, 70)) end
     self.flat_buttons = {}
     for _, entry in ipairs({
-        {"account", "Аккаунт и персонаж", function() self:ShowCharacterView() end},
-        {"server", "Войти в Зону", function() self:SelectCharacter(1) end},
-        {"address", "Сервер", function() self:ShowServer() end},
-        {"options", "Настройки", function() self:ShowSettings() end},
-        {"quit", "Выйти из игры", function() self:AskQuit() end},
+        {"account", "РђРєРєР°СѓРЅС‚ Рё РїРµСЂСЃРѕРЅР°Р¶", function() self:ShowCharacterView() end},
+        {"server", "Р’РѕР№С‚Рё РІ Р—РѕРЅСѓ", function() self:SelectCharacter(1) end},
+        {"address", "РЎРµСЂРІРµСЂ", function() self:ShowServer() end},
+        {"options", "РќР°СЃС‚СЂРѕР№РєРё", function() self:ShowSettings() end},
+        {"quit", "Р’С‹Р№С‚Рё РёР· РёРіСЂС‹", function() self:AskQuit() end},
     }) do
         local b = flat:Init3tButton(entry[1], self)
         b:TextControl():SetText(entry[2]); self:Register(b, "flat_" .. entry[1])
         self:Bind("flat_" .. entry[1], entry[3]); self.flat_buttons[#self.flat_buttons+1] = b
+        if netcoop_menu_theme.current() == "night" then b:SetWndPos(vector2():set(44, 306 + (#self.flat_buttons-1)*43)) end
         b:Show(false)
     end
     self.flat_background:Show(not self.room_theme)
+    self.flat_title:Show(not self.room_theme)
 	self.account_background = xml:InitStatic("background", self)
+    if not self.room_theme then
+        self.account_background:InitTexture(netcoop_menu_theme.background())
+        self.account_background:SetTextureRect(Frect():set(0, 0, 1672, 941))
+    end
 
 	local function cap(path, text)
 		local st = xml:InitStatic(path, self)
@@ -308,6 +318,7 @@ function netcoop_login_wnd:AskQuit()
 end
 function netcoop_login_wnd:PositionRoomControls()
     local overview = self.mode == "characters" and not self.room_view
+    if self.flat_title then self.flat_title:Show(not self.room_theme and overview) end
     if self.flat_background then self.flat_background:Show(not self.room_theme and self.mode ~= "account") end
     for _, b in ipairs(self.flat_buttons or {}) do b:Show(not self.room_theme and overview); b:Enable(not self:Busy()) end
     local shown = self.room_theme and self.mode == "characters" and (not self.room_view or self.room_view == "door")

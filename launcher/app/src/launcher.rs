@@ -154,6 +154,15 @@ pub async fn boot(app: AppHandle, st: S<'_>) -> Result<(), String> {
         Err(_) => *st.offline.lock() = Some("сервер не ответил за 12 с".into()),
     }
 
+    if maybe_update_launcher(&app, &st).await { return Ok(()); }
+    refresh_seed(&st).await;
+    splash(&app, "Готово", 1.0);
+    Ok(())
+}
+
+// Startup, manual checking and periodic checking use the same signed updater.
+async fn maybe_update_launcher(app: &AppHandle, st: &St) -> bool {
+    let exe = match std::env::current_exe() { Ok(p) => p, Err(_) => return false };
     let lr = st.release.lock().as_ref().and_then(|r| r.launcher.clone());
     // The verified signed release is used for portable and installed launchers.
     // Master copies retain their explicit no-update policy. Compare bytes rather
@@ -171,15 +180,13 @@ pub async fn boot(app: AppHandle, st: S<'_>) -> Result<(), String> {
                 Ok(()) => {
                     st.log.line(&format!("Лаунчер обновлён до {}", l.version));
                     app.exit(0);
-                    return Ok(());
+                    return true;
                 }
                 Err(e) => st.log.line(&format!("Не удалось обновить лаунчер: {e:#}")),
             }
         }
     }
-    refresh_seed(&st).await;
-    splash(&app, "Готово", 1.0);
-    Ok(())
+    false
 }
 
 /// Включить/выключить раздачу игры другим игрокам по настройке и состоянию установки.
@@ -221,6 +228,10 @@ pub async fn refresh_seed(st: &Arc<St>) {
 }
 
 async fn self_update(app: &AppHandle, st: &St, l: &gamesync::manifest::LauncherRelease) -> anyhow::Result<()> {
+    if st.busy.compare_exchange(false, true, AcqRel, Relaxed).is_err() { anyhow::bail!("Дождитесь окончания обновления"); }
+    struct Reset<'a>(&'a AtomicBool);
+    impl Drop for Reset<'_> { fn drop(&mut self) { self.0.store(false, Release); } }
+    let _busy = Reset(&st.busy);
     let b = st
         .sources
         .download_chunked(&l.path, l.size, &|done, total| {
@@ -231,9 +242,22 @@ async fn self_update(app: &AppHandle, st: &St, l: &gamesync::manifest::LauncherR
         anyhow::bail!("хеш нового лаунчера не совпал");
     }
     let exe = std::env::current_exe()?;
+    // Two launcher instances must not rename the same running image concurrently.
+    use std::os::windows::fs::OpenOptionsExt;
+    let locks = exe.parent().ok_or_else(|| anyhow::anyhow!("нет папки лаунчера"))?.join(".launcher");
+    std::fs::create_dir_all(&locks)?;
+    let _lock = std::fs::OpenOptions::new().write(true).create(true).truncate(false).share_mode(0)
+        .open(locks.join("self-update.lock"))?;
+    let args = restart_arguments(std::env::args_os().skip(1), &st.dir);
+    replace_launcher(&exe, &b, |path| std::process::Command::new(path).args(args).current_dir(&st.dir).spawn().map(|_| ()))
+}
+
+fn replace_launcher(exe: &std::path::Path, bytes: &[u8], start: impl FnOnce(&std::path::Path) -> std::io::Result<()>) -> anyhow::Result<()> {
     let new = exe.with_extension("exe.new");
     let old = exe.with_extension("exe.old");
-    std::fs::write(&new, &b)?;
+    use std::io::Write;
+    let mut file = std::fs::File::create(&new)?;
+    file.write_all(bytes)?; file.sync_all()?; drop(file);
     let _ = std::fs::remove_file(&old);
     std::fs::rename(&exe, &old)?;
     if let Err(e) = std::fs::rename(&new, &exe) {
@@ -242,8 +266,7 @@ async fn self_update(app: &AppHandle, st: &St, l: &gamesync::manifest::LauncherR
     }
     // Preserve the explicit game directory after updating a portable launcher
     // that lives elsewhere. A failed restart rolls the executable back as well.
-    let args = restart_arguments(std::env::args_os().skip(1), &st.dir);
-    if let Err(e) = std::process::Command::new(&exe).args(args).current_dir(&st.dir).spawn() {
+    if let Err(e) = start(exe) {
         let _ = std::fs::remove_file(&exe);
         std::fs::rename(&old, &exe)?;
         return Err(e.into());
@@ -263,7 +286,7 @@ fn restart_arguments(args: impl IntoIterator<Item = std::ffi::OsString>, dir: &s
 
 #[cfg(test)]
 mod restart_tests {
-    use super::restart_arguments;
+    use super::{restart_arguments, replace_launcher};
     use std::{ffi::OsString, path::Path};
     #[test]
     fn portable_restart_keeps_unicode_directory_and_flags() {
@@ -271,6 +294,20 @@ mod restart_tests {
         assert_eq!(args, ["--quiet", "--dir", "J:/Игры/Lost Zone", "--launcher"].map(OsString::from));
         let explicit = ["--dir", "J:/Other game", "--launcher"].map(OsString::from);
         assert_eq!(restart_arguments(explicit.clone(), Path::new("J:/Ignored")), explicit);
+    }
+    #[test]
+    fn failed_restart_restores_old_bytes_and_success_keeps_backup() {
+        let dir = std::env::temp_dir().join(format!("lz-update-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir(&dir).unwrap();
+        let exe=dir.join("Лаунчер.exe"); std::fs::write(&exe,b"old").unwrap();
+        assert!(replace_launcher(&exe,b"new",|_| Err(std::io::Error::other("fixture restart failure"))).is_err());
+        assert_eq!(std::fs::read(&exe).unwrap(),b"old");
+        replace_launcher(&exe,b"new",|p| { assert_eq!(std::fs::read(p)?,b"new");Ok(()) }).unwrap();
+        assert_eq!(std::fs::read(&exe).unwrap(),b"new");
+        assert_eq!(std::fs::read(exe.with_extension("exe.old")).unwrap(),b"old");
+        std::fs::remove_file(&exe).unwrap();std::fs::remove_file(exe.with_extension("exe.old")).unwrap();
+        std::fs::remove_dir(dir).unwrap();
     }
 }
 
@@ -366,8 +403,9 @@ fn build_info(st: &St) -> Info {
 }
 
 #[tauri::command]
-pub async fn check_update(st: S<'_>) -> Result<Info, String> {
+pub async fn check_update(app: AppHandle, st: S<'_>) -> Result<Info, String> {
     let st = st.inner().clone();
+    if st.busy.load(Acquire) { return Err("Дождитесь окончания обновления".into()); }
     match gamesync::fetch_release(&st.sources, &st.brand.public_key).await {
         Ok(r) => {
             *st.release.lock() = Some(r);
@@ -378,6 +416,7 @@ pub async fn check_update(st: S<'_>) -> Result<Info, String> {
             return Err(format!("Сервер недоступен: {e:#}"));
         }
     }
+    if maybe_update_launcher(&app, &st).await { return Ok(build_info(&st)); }
     let dir = st.dir.clone();
     let uf = st.brand.user_files.clone();
     *st.quick.lock() = tokio::task::spawn_blocking(move || gamesync::quick_check(&dir, &uf)).await.ok().flatten();

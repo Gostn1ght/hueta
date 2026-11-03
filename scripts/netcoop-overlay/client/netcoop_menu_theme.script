@@ -8,9 +8,13 @@ function current()
     if file then
         local value = (file:read(64) or ""):match("^%s*(%S+)%s*$")
         file:close()
-        if value == "room" then selected = value end
+        if value == "room" or value == "campfire" or value == "night" then selected = value end
     end
     printf("[Lost Zone][menu] theme=%s", selected)
     return selected
 end
 function room() return current() == "room" end
+function background()
+    local name = current()
+    return "ui\\lz_menu_" .. (name == "room" and "classic" or name)
+end

@@ -225,6 +225,13 @@ async function onBooted() {
   else if (info.status === "not_installed" && info.server) log([`Доступна версия ${info.server}. Нажмите «Установить».`]);
 }
 listen("booted", onBooted);
+// Recheck the signed launcher release while the window stays open. This does
+// not install game files or interrupt the game; its ordinary update remains a
+// separate action. Offline checks stay quiet and retry at the next interval.
+setInterval(async () => {
+  if (!started || syncing || !info || info.status === "master" || document.hidden) return;
+  try { render(await invoke("check_update")); } catch (_) { /* retry later */ }
+}, 10 * 60 * 1000);
 (async () => {
   render(await invoke("info"));
   if (!T) onBooted();

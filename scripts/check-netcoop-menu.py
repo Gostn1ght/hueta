@@ -621,4 +621,16 @@ netcoop_menu_radio.update()
 for _,sound in ipairs(music_sounds) do assert(not sound.active) end
 """)
 print('Default 2D: existing account/character entry, server controls, no model, no camera wait and no music PASS')
+for theme in ['campfire', 'night']:
+    (cache/'netcoop_menu_theme.txt').write_text(theme+'\n');load_theme()
+    lua.globals().expected_theme=theme
+    lua.execute(r"""
+    assert(netcoop_menu_theme.current()==expected_theme and not netcoop_menu_theme.room())
+    assert(netcoop_menu_theme.background()=='ui\\lz_menu_'..expected_theme)
+    local flat=netcoop_login_wnd({HideDialog=function() end,Show=function() end})
+    flat:ShowRoom();assert(not room_model and not flat:Busy())
+    if expected_theme=='night' then assert(flat.flat_buttons[1].position.x==44) end
+    netcoop_menu_radio.update();for _,sound in ipairs(music_sounds) do assert(not sound.active) end
+    """)
+print('Optional campfire/night menus: isolated selection, no 3D, no radio, left night layout PASS')
 temporary.cleanup()

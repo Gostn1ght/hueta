@@ -1,0 +1,31 @@
+{
+  "images": [
+    {
+      "id": "classic",
+      "source": "assets/menu/addons/classic.png",
+      "texture": "ui/lz_menu_classic.dds",
+      "width": 1672,
+      "height": 941,
+      "sha256": "3e3c4dca9e4ece1a4fc960757c4071b2c124d9f44854a3d1fa261a23cf2ac26f",
+      "method": "built-in image_gen; native-size DDS conversion without resampling"
+    },
+    {
+      "id": "campfire",
+      "source": "assets/menu/addons/campfire.png",
+      "texture": "ui/lz_menu_campfire.dds",
+      "width": 1672,
+      "height": 941,
+      "sha256": "67772ebcfe49421073ffc7e8b2013efcde005bb41ea85cad1e649ae10dae031f",
+      "method": "built-in image_gen; native-size DDS conversion without resampling"
+    },
+    {
+      "id": "night",
+      "source": "assets/menu/addons/night.png",
+      "texture": "ui/lz_menu_night.dds",
+      "width": 1672,
+      "height": 941,
+      "sha256": "9117cbae7dd321d6f3f6a90a2e52aeb4ec08649af547601b61f8cb4f843af6f1",
+      "method": "built-in image_gen; native-size DDS conversion without resampling"
+    }
+  ]
+}
