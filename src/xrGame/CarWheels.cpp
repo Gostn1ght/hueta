@@ -8,6 +8,8 @@
 #include "hit.h"
 #include "PHDestroyable.h"
 #include "car.h"
+#include "netcoop.h"
+#include "netcoop_vehicle_dynamics.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "../xrEngine/bone.h"
 #include "../xrphysics/ExtendedGeom.h"
@@ -467,7 +469,11 @@ void CCar::SWheelBreak::Break(float k)
 
 void CCar::SWheelBreak::HandBreak()
 {
-	pwheel->ApplyDriveAxisVelTorque(0.f, 100000.f * hand_break_torque);
+	CCar* car = pwheel->car;
+	const float torque = netcoop_vehicle_dynamics::parking_torque(netcoop::enabled(),
+		100000.f * hand_break_torque, car->PPhysicsShell()->getMass(),
+		car->EffectiveGravity(), pwheel->radius, unsigned(car->m_breaking_wheels.size()));
+	pwheel->ApplyDriveAxisVelTorque(0.f, torque);
 }
 
 void CCar::SWheelBreak::Neutral()

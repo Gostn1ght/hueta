@@ -608,6 +608,7 @@ public:
 		netcoop_key_yaw_right = 128,
 	};
 	u8 m_netcoop_keys = 0; // server: the driver's held keys
+	float m_netcoop_low_rpm_seconds = 0.f;
 	bool m_netcoop_lights = false;
 	u8 m_netcoop_aux_lights = 0;
 	u8 netcoop_aux_lights();

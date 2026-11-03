@@ -2,6 +2,7 @@
 #include "ai_space.h"
 #include "script_engine.h"
 #include "car.h"
+#include "netcoop_vehicle_dynamics.h"
 #include "CustomZone.h"
 //#if 0
 
@@ -1337,7 +1338,8 @@ void CCar::StartEngine()
 	m_car_sound->Start();
 	b_engine_on = true;
 	m_current_rpm = 0.f;
-	b_starting = true;
+	m_netcoop_low_rpm_seconds = 0.f;
+	Starter(); // ignition gets its own start grace, not a previous pedal's clock
 }
 
 void CCar::StopEngine()
@@ -2133,7 +2135,13 @@ void CCar::PhDataUpdate(float step)
 	//if(fwp)
 	{
 		UpdatePower();
-		if (b_engine_on && !b_starting && m_current_rpm < m_min_rpm && !m_speed_governed)Stall();
+		if (netcoop_vehicle_dynamics::stall_due(netcoop::enabled(), b_engine_on, b_starting,
+			m_speed_governed, b_clutch, e_state_drive == neutral, m_current_rpm, m_min_rpm,
+			step, m_netcoop_low_rpm_seconds))
+		{
+			if (netcoop::enabled()) Msg("[diag][vehicle] id=%u stalled after sustained low rpm=%.1f idle=%.1f seconds=%.2f", ID(), m_current_rpm, m_min_rpm, m_netcoop_low_rpm_seconds);
+			Stall();
+		}
 	}
 
 	if (bkp)
@@ -2141,7 +2149,10 @@ void CCar::PhDataUpdate(float step)
 		UpdateBack();
 	}
 
-	if (brp)
+	// UpdatePower above rewrites drive-axis torque on EVERY step. A single
+	// HandBreak call on exit was overwritten immediately on shared drive/brake
+	// wheels, so an unoccupied truck rolled away even with its engine off.
+	if (brp || (netcoop::enabled() && !m_netcoop_heli.pilot))
 		HandBreak();
 	//////////////////////////////////////////////////////////
 	for (int k = 0; k < (int)m_doors_update.size(); ++k)
