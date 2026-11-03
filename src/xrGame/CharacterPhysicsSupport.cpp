@@ -608,8 +608,34 @@ void dbg_draw_geoms(xr_vector<CODEGeom*>& m_weapon_geoms)
 #endif
 
 
+// A ragdoll drives physical bones, but decorative bones (ears, jaw, fingers)
+// still sample the old live motion if animation tracks keep advancing.
+// Block only track advancement: shell interpolation and bone callbacks remain
+// active. The static callback holds no entity pointer across model lifetimes.
+struct NetcoopCorpseTracks : IUpdateTracksCallback
+{
+	bool operator()(float, IKinematicsAnimated&) override { return true; }
+};
+static NetcoopCorpseTracks s_netcoop_corpse_tracks;
+
+static void netcoop_update_corpse_tracks(CEntityAlive& entity, bool has_shell)
+{
+	IRenderVisual* visual = entity.Visual();
+	IKinematicsAnimated* model = visual ? visual->dcast_PKinematicsAnimated() : nullptr;
+	if (!model) return;
+	const bool freeze = netcoop::enabled() && !entity.g_Alive() && has_shell;
+	if (freeze && model->GetUpdateTracksCalback() != &s_netcoop_corpse_tracks)
+	{
+		model->SetUpdateTracksCalback(&s_netcoop_corpse_tracks);
+		Msg("[diag][corpse] id=%u live animation tracks stopped; physics shell remains active", entity.ID());
+	}
+	else if (!freeze && model->GetUpdateTracksCalback() == &s_netcoop_corpse_tracks)
+		model->SetUpdateTracksCalback(nullptr);
+}
+
 void CCharacterPhysicsSupport::in_UpdateCL()
 {
+	netcoop_update_corpse_tracks(m_EntityAlife, m_pPhysicsShell != nullptr);
 	if (netcoop::pure_client() && m_EntityAlife.Remote() && m_EntityAlife.g_Alive() &&
 		m_PhysicMovementControl->CharacterExist())
 	{
@@ -1225,6 +1251,7 @@ void CCharacterPhysicsSupport::CreateShell(CObject* who, Fvector& dp, Fvector& v
 	m_pPhysicsShell->SetDeadBody();
 	m_pPhysicsShell->SetIgnoreSmall();
 	AddActiveWeaponCollision();
+	netcoop_update_corpse_tracks(m_EntityAlife, true);
 }
 
 void CCharacterPhysicsSupport::EndActivateFreeShell(CObject* who, const Fvector& inital_entity_position,
