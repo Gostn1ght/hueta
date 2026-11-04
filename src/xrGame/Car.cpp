@@ -2726,7 +2726,8 @@ void CCar::netcoop_shift(bool up)
 		(m_netcoop_shift_at && Device.dwTimeGlobal - m_netcoop_shift_at < 200)) return;
 	const size_t current = CurrentTransmission();
 	if (current >= m_gear_ratious.size()) return;
-	const size_t next = up ? _min(current + 1, m_gear_ratious.size() - 1) : (current ? current - 1 : 0);
+	const size_t last = m_gear_ratious.size() - 1;
+	const size_t next = up ? (current < last ? current + 1 : current) : (current ? current - 1 : 0);
 	if (next == current) return;
 	// Reverse is selected deliberately at a standstill, never by releasing S.
 	if (current == 0 || next == 0)
