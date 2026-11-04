@@ -30,7 +30,7 @@ struct MotionID{int id=-1;bool valid()const{return id>=0;}void invalidate(){id=-
 struct CBlend{float speed=1;};struct CMotionDef{float Speed(){return 1;}};
 struct Item{virtual ~Item()=default;};using PIItem=Item*;
 struct CWeapon:Item{unsigned slot=2;unsigned animation_slot(){return slot;}};
-struct CWeaponPistol:CWeapon{};struct CWeaponKnife:CWeapon{};struct CWeaponBinoculars:CWeapon{};
+struct CWeaponPistol:CWeapon{};struct CWeaponKnife:CWeapon{};struct CWeaponBinoculars:CWeapon{};struct CWeaponRPG7:CWeapon{};
 template<class T,class U>T smart_cast(U* value){return dynamic_cast<T>(value);}
 struct Inventory{PIItem active=nullptr;PIItem ActiveItem(){return active;}};
 struct Movement{Fvector velocity{.5f,0,0};const Fvector& GetVelocity(){return velocity;}};
@@ -62,20 +62,27 @@ struct CActor{
 '''+code+r'''
 int main(){
  IKinematicsAnimated model;CActor actor;actor.test_model=&model;unsigned id=0;
- for(LPCSTR grip:{"empty","knife","pistol","rifle"})for(LPCSTR direction:{"idle","fwd","back","left","right"})
+ for(LPCSTR grip:{"empty","knife","pistol","rifle","launcher"})for(LPCSTR direction:{"idle","fwd","back","left","right"})
   model.motions[std::string("lz_prone_")+grip+"_"+direction]={int(id++)};
  constexpr u32 prone=mcCrouch|mcAccel;
  assert(!actor.netcoop_prone_animation(mcCrouch));
  assert(actor.netcoop_prone_animation(prone|mcFwd) && model.last=="lz_prone_empty_fwd" && model.plays==3);
  auto before=model.plays;assert(actor.netcoop_prone_animation(prone|mcFwd) && model.plays==before);
- CWeapon rifle,generic_pistol;CWeaponPistol pistol;CWeaponKnife knife;CWeaponBinoculars binoculars;generic_pistol.slot=1;
- for(auto pair:{std::make_pair(PIItem(&rifle),"rifle"),std::make_pair(PIItem(&generic_pistol),"pistol"),std::make_pair(PIItem(&pistol),"pistol"),std::make_pair(PIItem(&knife),"knife"),std::make_pair(PIItem(&binoculars),"empty")}) {
+ CWeapon rifle,generic_pistol;CWeaponPistol pistol;CWeaponKnife knife;CWeaponBinoculars binoculars;CWeaponRPG7 launcher;generic_pistol.slot=1;
+ for(auto pair:{std::make_pair(PIItem(&rifle),"rifle"),std::make_pair(PIItem(&generic_pistol),"pistol"),std::make_pair(PIItem(&pistol),"pistol"),std::make_pair(PIItem(&knife),"knife"),std::make_pair(PIItem(&binoculars),"empty"),std::make_pair(PIItem(&launcher),"launcher")}) {
   actor.inv.active=pair.first;assert(actor.netcoop_prone_animation(prone|mcBack));
   assert(model.last==std::string("lz_prone_")+pair.second+"_back");
  }
  for(auto pair:{std::make_pair(mcLStrafe,"left"),std::make_pair(mcRStrafe,"right"),std::make_pair(0u,"idle")}) {
+  actor.inv.active=&binoculars;
   assert(actor.netcoop_prone_animation(prone|pair.first));assert(model.last==std::string("lz_prone_empty_")+pair.second);
  }
+ actor.inv.active=&launcher;
+ for(auto pair:{std::make_pair(mcLStrafe,"left"),std::make_pair(mcRStrafe,"right"),std::make_pair(mcFwd,"fwd"),std::make_pair(0u,"idle")}) {
+  assert(actor.netcoop_prone_animation(prone|pair.first));assert(model.last==std::string("lz_prone_launcher_")+pair.second);
+ }
+ model.motions.erase("lz_prone_launcher_idle");
+ assert(actor.netcoop_prone_animation(prone) && model.last=="lz_prone_rifle_idle");
  actor.m_bAnimTorsoPlayed=true;actor.m_current_torso={77};before=model.plays;
  assert(actor.netcoop_prone_animation(prone) && model.plays==before+2 && actor.m_current_torso.id==77);
  actor.m_bAnimTorsoPlayed=false;before=model.plays;assert(actor.netcoop_prone_animation(prone) && model.plays==before+3);
@@ -88,7 +95,7 @@ int main(){
  model.fail=true;assert(!actor.netcoop_prone_animation(prone));model.fail=false;
  assert(actor.netcoop_prone_animation(prone));actor.netcoop_prone_animation(0);
  model.motions.clear();assert(!actor.netcoop_prone_animation(prone));
- std::puts("PASS actual prone: low stance only, four grips/five directions, live blend speed, no restart, item-use overlay, exit reset, server/death/seat/RP exclusions, missing clip and failed blend fallback");
+ std::puts("PASS actual prone: low stance only, five grips/five directions, RPG-specific grip and legacy-pack fallback, live blend speed, no restart, item-use overlay, exit reset, server/death/seat/RP exclusions, missing clip and failed blend fallback");
 }
 '''
 with TemporaryDirectory(prefix='prone-native-') as temporary:

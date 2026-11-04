@@ -25,6 +25,7 @@
 #include "WeaponKnife.h"
 #include "WeaponPistol.h"
 #include "WeaponBinoculars.h"
+#include "WeaponRPG7.h"
 #include "Pda.h"
 #include "CustomDevice.h"
 #include "Flashlight.h"
@@ -737,10 +738,17 @@ bool CActor::netcoop_prone_animation(u32 movement)
 	PIItem active=inventory().ActiveItem();
 	CWeapon* weapon=smart_cast<CWeapon*>(active);
 	LPCSTR grip=smart_cast<CWeaponKnife*>(active) ? "knife":weapon && !smart_cast<CWeaponBinoculars*>(active) ?
-		(smart_cast<CWeaponPistol*>(active) || weapon->animation_slot()==1 ? "pistol":"rifle"):"empty";
+		(smart_cast<CWeaponRPG7*>(active) ? "launcher":
+		 smart_cast<CWeaponPistol*>(active) || weapon->animation_slot()==1 ? "pistol":"rifle"):"empty";
 	LPCSTR direction=(movement & mcFwd) ? "fwd":(movement & mcBack) ? "back":(movement & mcLStrafe) ? "left":(movement & mcRStrafe) ? "right":"idle";
 	string128 name;xr_sprintf(name,"lz_prone_%s_%s",grip,direction);
-	const MotionID motion=model->ID_Cycle_Safe(name);
+	MotionID motion=model->ID_Cycle_Safe(name);
+	// Older actor packs only contain the original four grips. Keep their
+	// existing rifle fallback until a complete launcher set is installed.
+	if(!motion.valid() && smart_cast<CWeaponRPG7*>(active)) {
+		xr_sprintf(name,"lz_prone_rifle_%s",direction);
+		motion=model->ID_Cycle_Safe(name);
+	}
 	if(!motion.valid()) {netcoop_tp_note("prone","this model lacks the prone motion set; crouch fallback");return false;}
 	const bool torso_free=!m_bAnimTorsoPlayed;
 	if(motion!=m_netcoop_prone_motion || torso_free!=m_netcoop_prone_torso_free || m_current_legs!=motion) {
