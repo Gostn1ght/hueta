@@ -27,8 +27,16 @@ p.add_argument('--samples', type=int, default=4)
 p.add_argument('--weapon-position', help='Review-only attachment override X,Y,Z; not an installed configuration')
 p.add_argument('--weapon-transform', type=Path, help='Private review.json attachment matrix; not an installed engine transform')
 p.add_argument('--close-up', action='store_true', help='Also render the actual right hand and trigger at a readable scale')
+p.add_argument('--only-close-up', action='store_true', help='Skip the three full-body cameras')
+p.add_argument('--close-up-view', choices=('both','outer','inner'), default='both')
+p.add_argument('--render-frames', help='Comma-separated sample indices to render; audit still includes every sample')
+p.add_argument('--preview-width', type=int, default=1000)
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert 1 <= a.samples <= 300
+assert not a.only_close_up or a.close_up
+assert 320<=a.preview_width<=2000
+render_frames={int(value) for value in a.render_frames.split(',')} if a.render_frames else set(range(a.samples))
+assert render_frames<=set(range(a.samples))
 a.out.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(a.addons))
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -144,6 +152,7 @@ def weapon_body_intersections(trigger_point=None):
         regions['trigger_index_pad'] = ('bip01_r_finger1','bip01_r_finger11','bip01_r_finger12')
     for region, group_name in regions.items():
         vertices, triangles = [], []
+        triangle_bones=[]
         for obj in body:
             evaluated = obj.evaluated_get(depsgraph)
             mesh = evaluated.to_mesh()
@@ -155,8 +164,15 @@ def weapon_body_intersections(trigger_point=None):
                 if any(assignment.group in groups and assignment.weight >= .35 for assignment in vertex.groups)}
             base = len(vertices)
             vertices.extend(evaluated.matrix_world @ vertex.co for vertex in mesh.vertices)
-            triangles.extend(tuple(base + i for i in tri.vertices) for tri in mesh.loop_triangles
-                             if any(i in influenced for i in tri.vertices))
+            for tri in mesh.loop_triangles:
+                if not any(i in influenced for i in tri.vertices):continue
+                triangles.append(tuple(base+i for i in tri.vertices))
+                weights={}
+                for i in tri.vertices:
+                    for assignment in obj.data.vertices[i].groups:
+                        name=obj.vertex_groups[assignment.group].name
+                        weights[name]=weights.get(name,0)+assignment.weight
+                triangle_bones.append(max(weights,key=weights.get))
             evaluated.to_mesh_clear()
         tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True) if triangles else None
         result[region] = dict(triangles=len(triangles), intersecting_pairs=len(weapon_tree.overlap(tree)) if tree else 0)
@@ -168,6 +184,10 @@ def weapon_body_intersections(trigger_point=None):
                 result[region]['trigger_surface_to_index_metres']=min(tree.find_nearest(trigger_vertices[i])[3] for i in contact_vertices)
                 result[region]['trigger_triangle_intersections']=len(trigger_tree.overlap(tree))
                 result[region]['trigger_triangles']=len(trigger_triangles)
+                by_bone={}
+                for _,index in trigger_tree.overlap(tree):
+                    name=triangle_bones[index];by_bone[name]=by_bone.get(name,0)+1
+                result[region]['trigger_intersections_by_dominant_bone']=by_bone
     return result
 
 scene = bpy.context.scene
@@ -176,8 +196,8 @@ scene.display.shading.light = 'STUDIO'
 scene.display.shading.color_type = 'MATERIAL'
 scene.display.shading.show_shadows = True
 scene.display.shading.show_cavity = True
-scene.render.resolution_x = 1000
-scene.render.resolution_y = 650
+scene.render.resolution_x = a.preview_width
+scene.render.resolution_y = round(a.preview_width*.65)
 scene.render.resolution_percentage = 100
 scene.world = bpy.data.worlds.new('World')
 scene.world.color = (.22, .22, .22)
@@ -223,16 +243,18 @@ for sample_index in range(a.samples):
                            review_only_attachment_matrix=bool(a.weapon_transform),
                            body_surface_intersections=weapon_body_intersections(trigger_point)))
     center = Vector((0, .1, .23))
-    for name, location in ([] if a.no_render else [('top', (0, .1, 5)), ('side', (4, .1, .8)), ('front', (2, 3, 1.4))]):
+    render_sample=not a.no_render and sample_index in render_frames
+    for name, location in ([] if not render_sample or a.only_close_up else [('top', (0, .1, 5)), ('side', (4, .1, .8)), ('front', (2, 3, 1.4))]):
         camera.data.ortho_scale = 3.6 if name == 'top' else 2.8
         camera.location = location
         camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
         scene.render.filepath = str(a.out / f'{name}-{int(phase*100):02}.png')
         bpy.ops.render.render(write_still=True)
-    if a.close_up and not a.no_render:
+    if a.close_up and render_sample:
         center = world['bip01_r_hand'].translation.lerp(world['bip01_r_finger1'].translation,.6)
         camera.data.ortho_scale = .40
         for name, delta in [('trigger-outer',Vector((1,.3,.2))),('trigger-inner',Vector((-1,.3,.2)))]:
+            if a.close_up_view!='both' and name!='trigger-'+a.close_up_view:continue
             camera.location = center+delta
             camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
             scene.render.filepath = str(a.out/f'{name}-{int(phase*100):02}.png')

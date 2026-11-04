@@ -11,6 +11,7 @@ import json
 import math
 from pathlib import Path
 import re
+import random
 import sys
 
 import addon_utils
@@ -25,9 +26,15 @@ p.add_argument('--rpg-trigger-fit', action='store_true', help='Private right-han
 p.add_argument('--hud-grip-motion', default='rpg7_iwp_shoot_aim', help='RPG hand clip used for the private grip reference')
 p.add_argument('--hud-grip-frame', type=float, default=2/13, help='Normalized sample in the RPG hand clip')
 p.add_argument('--fit-index-contact', action='store_true', help='Fit the index pad to the actual trigger without changing the palm')
+p.add_argument('--trigger-clearance-mm', type=float, default=.8, help='Private contact fitting clearance in front of the trigger')
+p.add_argument('--avoid-index-penetration', action='store_true', help='Include actual whole-index/weapon triangle intersections in the fit')
+p.add_argument('--grip-lateral-mm', type=float, default=0, help='Private right-palm lateral adjustment for the body glove thickness')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert 0 <= a.hud_grip_frame <= 1
 assert not a.fit_index_contact or a.rpg_trigger_fit, '--fit-index-contact requires --rpg-trigger-fit'
+assert not a.avoid_index_penetration or a.fit_index_contact
+assert 0 <= a.trigger_clearance_mm <= 15
+assert abs(a.grip_lateral_mm)<=10
 a.out.mkdir(parents=True, exist_ok=True)
 root = Path(__file__).resolve().parents[1]
 
@@ -196,6 +203,8 @@ if a.rpg_trigger_fit:
     hand_correction=hud_rest['r_hand'].to_quaternion().inverted()@palm_rotation@rest['bip01_r_hand'].to_quaternion()
     desired_hand=(source_hand.to_quaternion()@hand_correction).to_matrix().to_4x4()
     desired_hand.translation=source_hand.translation
+    desired_hand.translation+= (c@old_gun).to_3x3()@Vector((a.grip_lateral_mm/1000,0,0))
+    grip_source['right_palm_lateral_mm']=a.grip_lateral_mm
     desired={name:matrix.copy() for name,matrix in world.items()}
     desired['bip01_r_hand']=desired_hand
     hud_blender={name:c@matrix@s for name,matrix in hud_game.items()}
@@ -252,22 +261,28 @@ if a.rpg_trigger_fit:
         bpy.ops.xray_import.ogf(directory=str(world_weapon.parent),files=[{'name':world_weapon.name}],import_motions=False)
         imported=set(bpy.data.objects)-before
         trigger_trees=[]
+        weapon_vertices,weapon_triangles=[],[]
         for obj in imported:
             if obj.type!='MESH':continue
             vertices=[c@obj.matrix_world@v.co for v in obj.data.vertices]
             # Only the curved trigger's connected geometry occupies this box.
             indices={i for i,point in enumerate(vertices) if abs(point.x)<.005 and .085<point.y<.12 and .165<point.z<.19}
             obj.data.calc_loop_triangles()
+            base=len(weapon_vertices)
+            weapon_vertices.extend(c@old_gun@point for point in vertices)
+            weapon_triangles.extend(tuple(base+i for i in tri.vertices) for tri in obj.data.loop_triangles)
             triangles=[tuple(tri.vertices) for tri in obj.data.loop_triangles if all(i in indices for i in tri.vertices)]
             if triangles:trigger_trees.append(BVHTree.FromPolygons(vertices,triangles,all_triangles=True))
         assert len(trigger_trees)==1,'Re-identify the actual RPG trigger geometry'
         surface,normal,_,_=trigger_trees[0].find_nearest(trigger_local+Vector((0,0,.014)))
         # Touch the forward-facing surface; pressing is toward the grip,
-        # not sideways through the trigger. Leave 0.8 mm skin clearance.
-        target_local=surface+Vector((0,0,.0008))
+        # not sideways through the trigger. Check the whole skin separately;
+        # contact at a single pad vertex does not exclude penetration nearby.
+        target_local=surface+Vector((0,0,a.trigger_clearance_mm/1000))
         target=c@old_gun@target_local
         grip_source['index_contact_target_game']=list(target_local)
         for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
+        weapon_tree=BVHTree.FromPolygons(weapon_vertices,weapon_triangles,all_triangles=True)
         def skin(weights, matrices):
             return sum(((matrices[name]@point)*weight for name,point,weight in weights),Vector((0,0,0)))
         samples=[]
@@ -283,6 +298,31 @@ if a.rpg_trigger_fit:
                          for g in vertex.groups if obj.vertex_groups[g.group].name in rest]
                 samples.append(weights)
         assert samples
+        index_vertices,index_triangles=[],[]
+        for obj in bpy.data.objects:
+            if obj.type!='MESH':continue
+            groups={group.index for group in obj.vertex_groups if group.name in chain}
+            influenced={v.index for v in obj.data.vertices if any(g.group in groups and g.weight>=.35 for g in v.groups)}
+            if not influenced:continue
+            obj.data.calc_loop_triangles()
+            triangles=[]
+            for tri in obj.data.loop_triangles:
+                if not any(i in influenced for i in tri.vertices):continue
+                weights={}
+                for i in tri.vertices:
+                    for g in obj.data.vertices[i].groups:
+                        name=obj.vertex_groups[g.group].name;weights[name]=weights.get(name,0)+g.weight
+                # The palm/grip seam shares small index weights. Its fixed
+                # hand contact must not drive the finger into a different pose.
+                if max(weights,key=weights.get) in chain:triangles.append(tuple(tri.vertices))
+            used={i for tri in triangles for i in tri};lookup={}
+            for i in sorted(used):
+                vertex=obj.data.vertices[i]
+                point=rig.matrix_world.inverted()@obj.matrix_world@vertex.co
+                weights=[(obj.vertex_groups[g.group].name,rest[obj.vertex_groups[g.group].name].inverted()@point,g.weight)
+                         for g in vertex.groups if obj.vertex_groups[g.group].name in rest]
+                lookup[i]=len(index_vertices);index_vertices.append(weights)
+            index_triangles.extend(tuple(lookup[i] for i in tri) for tri in triangles)
         pad=min(samples,key=lambda weights:(skin(weights,world)-target).length_squared)
         relative={name:world[rig.data.bones[name].parent.name].inverted()@world[name] for name in chain}
         proximal=world[chain[1]].translation-world[chain[0]].translation
@@ -300,27 +340,58 @@ if a.rpg_trigger_fit:
                 result[name]=result[parent]@relative[name]@rotation
             return result
         def score(angles):
-            return (skin(pad,fitted(angles))-target).length_squared+(.0005**2)*sum(v*v for v in angles)
-        angles=[0.0]*4
+            matrices=fitted(angles)
+            distance=(skin(pad,matrices)-target).length_squared
+            collisions=0
+            if a.avoid_index_penetration:
+                points=[skin(weights,matrices) for weights in index_vertices]
+                tree=BVHTree.FromPolygons(points,index_triangles,all_triangles=True)
+                collisions=len(weapon_tree.overlap(tree))
+            return distance+(.0005**2)*sum(v*v for v in angles)+collisions*.000004
         bounds=[math.radians(v) for v in (55,65,70,30)]
-        for step_degrees in (12,6,3,1,.3,.1):
-            step=math.radians(step_degrees)
-            for iteration in range(100):
-                best,changed=score(angles),False
-                for j in range(4):
-                    for sign in (-1,1):
-                        trial=angles.copy();trial[j]=max(-bounds[j],min(bounds[j],trial[j]+step*sign))
-                        value=score(trial)
-                        if value<best:
-                            angles,best,changed=trial,value,True
-                if not changed:break
+        seeds=[[0.0]*4]
+        if a.avoid_index_penetration:
+            rng=random.Random(61104)
+            seeds.extend([[rng.uniform(-bound,bound) for bound in bounds] for _ in range(160)])
+            seeds=sorted(seeds,key=score)[:6]
+        solutions=[]
+        for seed in seeds:
+            angles=seed.copy()
+            for step_degrees in (12,6,3,1,.3,.1):
+                step=math.radians(step_degrees)
+                for iteration in range(100):
+                    best,changed=score(angles),False
+                    for j in range(4):
+                        for sign in (-1,1):
+                            trial=angles.copy();trial[j]=max(-bounds[j],min(bounds[j],trial[j]+step*sign))
+                            value=score(trial)
+                            if value<best:
+                                angles,best,changed=trial,value,True
+                    if not changed:break
+            solutions.append(angles)
+        angles=min(solutions,key=score)
         solved=fitted(angles)
         for name in chain:world[name]=solved[name]
         contact_error=(skin(pad,world)-target).length
         print('INDEX_FIT',contact_error,[math.degrees(v) for v in angles],
               list(old_gun.inverted()@c@skin(pad,world)))
-        assert contact_error<.003, ('Index pad cannot reach trigger',contact_error)
+        assert contact_error<(.02 if a.avoid_index_penetration else .003), ('Index pad cannot reach trigger',contact_error)
+        overlaps=weapon_tree.overlap(BVHTree.FromPolygons(
+            [skin(weights,world) for weights in index_vertices],index_triangles,all_triangles=True))
+        collision_pairs=len(overlaps)
+        assert not a.avoid_index_penetration or collision_pairs==0, ('Refit the index surface',collision_pairs)
+        collision_bones={}
+        for _,triangle in overlaps:
+            weights={}
+            for index in index_triangles[triangle]:
+                for name,_,weight in index_vertices[index]:weights[name]=weights.get(name,0)+weight
+            dominant=max(weights,key=weights.get)
+            collision_bones[dominant]=collision_bones.get(dominant,0)+1
         grip_source['index_contact_fit']=dict(pad_error_metres=contact_error,
+            requested_clearance_mm=a.trigger_clearance_mm,
+            index_dominant_triangles_weapon_intersections=collision_pairs,
+            intersections_by_dominant_bone=collision_bones,
+            collision_aware_fit=a.avoid_index_penetration,
             local_angle_adjustments_degrees=[math.degrees(v) for v in angles],
             palm_unchanged=world['bip01_r_hand']==desired['bip01_r_hand'])
     for name in ('bip01_l_upperarm','bip01_l_forearm','bip01_l_hand','bip01_head','bip01_pelvis'):

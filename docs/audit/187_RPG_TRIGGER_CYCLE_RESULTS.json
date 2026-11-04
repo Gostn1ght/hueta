@@ -1,0 +1,249 @@
+{
+  "status": "private_candidate_not_installed",
+  "owner_accepted": false,
+  "redistribution_cleared": false,
+  "candidate_sha256": "c8c76b2de33ab6f83df2b23d5682c6c7d84f584424bb7945590380daa06adc03",
+  "frames": 21,
+  "fps": 30,
+  "moving_bones": [
+    "bip01_r_finger11",
+    "bip01_r_finger12"
+  ],
+  "unchanged_bones": 45,
+  "maximum_index_weapon_intersections": 0,
+  "maximum_trigger_surface_intersections": 0,
+  "maximum_weapon_position_error_metres": 8.360602147916887e-05,
+  "maximum_weapon_rotation_coefficient": 9.631738066673279e-05,
+  "maximum_fixed_bone_drift": 0.0,
+  "loop_closure_coefficient": 0.0,
+  "release_joint_degrees": [
+    -6,
+    -4
+  ],
+  "trigger_gap_metres": {
+    "min": 0.000275603961199522,
+    "max": 0.0033414431381970644
+  },
+  "remaining_body_intersections": {
+    "r_upperarm": 393,
+    "r_forearm": 0,
+    "l_upperarm": 0,
+    "l_forearm": 0,
+    "head": 0,
+    "spine1": 7
+  },
+  "native_selector_commit": "5a053236b130723a53cea0dbaf48488558279d6d",
+  "native_run_url": "https://github.com/Gostn1ght/hueta/actions/runs/41865175699",
+  "exported_frame_checks": [
+    {
+      "frame": 0,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 1,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 2,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 3,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 4,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0030606244690716267,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.985321373997442e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 5,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0022327331826090813,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 6,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0012212350266054273,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 7,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0005161119042895734,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 8,
+      "intersections": 0,
+      "trigger_gap_metres": 0.000275603961199522,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.949608322247219e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 9,
+      "intersections": 0,
+      "trigger_gap_metres": 0.000275603961199522,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.949608322247219e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 10,
+      "intersections": 0,
+      "trigger_gap_metres": 0.000275603961199522,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.949608322247219e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 11,
+      "intersections": 0,
+      "trigger_gap_metres": 0.000275603961199522,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.949608322247219e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 12,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0004030510026495904,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 13,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0007416367880068719,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 14,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0013608651934191585,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 15,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0020912939216941595,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 16,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0027491345535963774,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 17,
+      "intersections": 0,
+      "trigger_gap_metres": 0.003216209588572383,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 18,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 19,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    },
+    {
+      "frame": 20,
+      "intersections": 0,
+      "trigger_gap_metres": 0.0033414431381970644,
+      "unchanged_bone_drift_coefficient": 0.0,
+      "weapon_position_error_metres": 8.360602147916887e-05,
+      "weapon_rotation_coefficient": 9.631738066673279e-05,
+      "roundtrip_position_metres": 9.915490189387621e-05,
+      "roundtrip_rotation_coefficient": 0.00015500187873840332
+    }
+  ]
+}
