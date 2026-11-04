@@ -50,6 +50,21 @@ static const float r_head_factor = 0.2f;
 CBlend* PlayMotionByParts(IKinematicsAnimated* sa, MotionID motion_ID, BOOL bMixIn, PlayCallback Callback,
                           LPVOID CallbackParam);
 
+// The prone clip anchors the hips/legs. Only its upper chest and head follow
+// the view, around their own pivots; upright spine corrections bend the whole
+// flat body. Keep the two weights at a total of one.
+static void netcoop_prone_look(CBoneInstance* bone, float yaw, float pitch, float weight)
+{
+	if (!_valid(yaw) || !_valid(pitch)) return;
+	clamp(yaw, -deg2rad(45.f), deg2rad(45.f));
+	clamp(pitch, -deg2rad(30.f), deg2rad(30.f));
+	Fmatrix spin;
+	spin.setXYZ(-pitch * weight, yaw * weight, 0.f);
+	const Fvector pivot = bone->mTransform.c;
+	bone->mTransform.mulA_43(spin);
+	bone->mTransform.c = pivot;
+}
+
 void CActor::Spin0Callback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
@@ -86,7 +101,12 @@ void CActor::ShoulderCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
-	if(A->netcoop_authored_pose()) return;
+	if(A->netcoop_authored_pose()) {
+		if (!A->netcoop_seated() && A->g_Alive() && !A->m_bAnimTorsoPlayed)
+			netcoop_prone_look(B, angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta),
+				angle_normalize_signed(A->r_torso.pitch), .85f);
+		return;
+	}
 	Fmatrix spin;
 	float bone_yaw = angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta) * y_shoulder_factor;
 	float bone_pitch = angle_normalize_signed(A->r_torso.pitch) * p_shoulder_factor;
@@ -103,7 +123,12 @@ void CActor::HeadCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
-	if(A->netcoop_authored_pose()) return;
+	if(A->netcoop_authored_pose()) {
+		if (!A->netcoop_seated() && A->g_Alive() && !A->m_bAnimTorsoPlayed)
+			netcoop_prone_look(B, angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta),
+				angle_normalize_signed(A->r_torso.pitch), .15f);
+		return;
+	}
 	Fmatrix spin;
 	float bone_yaw;
 
