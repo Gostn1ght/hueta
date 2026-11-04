@@ -66,7 +66,7 @@ function UIVehiclePrompt:__init() super()
 	self.text = CUITextWnd()
 	self.text:SetAutoDelete(true)
 	self.text:SetWndRect(Frect():set(162, 420, 862, 476))
-	self.text:SetComplexMode(true)
+	self.text:SetTextComplexMode(true)
 	self.text:SetFont(GetFontLetterica18Russian())
 	self.text:SetTextAlignment(2)
 	self.text:SetTextColor(GetARGB(255, 235, 230, 220))
@@ -163,7 +163,7 @@ function prompt_text(state, now)
 				key("kDETECTOR", "O"), tr("st_netcoop_heli_engine"), key("kNIGHT_VISION", "N"), tr("st_lz_heli_gear"), key("kUSE", "F"), tr("st_netcoop_car_exit"))
 		end
 		if state == "seated" then return string.format("[%s]  %s", key("kUSE", "F"), tr("st_netcoop_car_exit")) end
-		return string.format("[%s/%s] %s   [%s/%s] %s\n[%s] %s   [%s] %s   [%s] %s   [%s] %s",
+		return string.format("[%s/%s] %s   [%s/%s] %s\\n[%s] %s   [%s] %s   [%s] %s   [%s] %s",
 			key("kFWD","W"),key("kBACK","S"),tr("st_lz_car_pedals"),
 			key("kACCEL","SHIFT"),key("kCROUCH","CTRL"),tr("st_lz_car_shift"),
 			key("kUSE", "F"), tr("st_netcoop_car_exit"),

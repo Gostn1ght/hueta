@@ -25,7 +25,7 @@ assert(prompt_text("trunk", 0) == "[F]  <st_netcoop_car_trunk>")
 assert(prompt_text("taken", 0) == "<st_netcoop_seat_taken>", "a taken seat says so, no key")
 assert(prompt_text("", 0) == nil)
 local hint = prompt_text("seated_driver", 1000)
-assert(hint:find("[UP/DOWN]",1,true) and hint:find("[RSHIFT/RCTRL]",1,true),hint)
+assert(hint:find("[UP/DOWN]",1,true) and hint:find("[RSHIFT/RCTRL]",1,true) and hint:find("\\n",1,true),hint)
 assert(hint:find("%[SPACE%] <st_netcoop_car_handbrake>") and hint:find("%[L%] <st_netcoop_car_lights>"), hint)
 assert(prompt_text("seated_driver", 8999) ~= nil and prompt_text("seated_driver", 9001) == nil, "controls for 8 s")
 assert(prompt_text("", 9100) == nil)
@@ -42,7 +42,7 @@ assert(prompt_text("seated_pilot", 34999) ~= nil and prompt_text("seated_pilot",
 lua.execute(r'''
 frames,added,removed=0,0,0
 function super()end
-function Frect()return {set=function(self,...)return self end}end
+function Frect()return {set=function(self,...)self.coords={...};return self end}end
 function GetARGB(a,r,g,b)return {a,r,g,b}end
 function get_hud()return {AddDialogToRender=function()added=added+1 end,RemoveDialogToRender=function()removed=removed+1 end}end
 function CScriptXmlInit()return {
@@ -63,7 +63,22 @@ hud:Set("0|100|100|850|1|1");assert(hud.parking.text:find("<st_lz_car_off>",1,tr
 hud:Set("0|100|100|850|1|97");assert(hud.parking.text=="" and hud.controls.text=="" and hud.details.text:find("<st_lz_heli_gear_down>",1,true))
 hud:Set("0|100|100|850|1|65");assert(hud.details.text:find("<st_lz_heli_gear_up>",1,true))
 hud:Set("");assert(removed==1 and not hud.shown)
+-- Construct the real prompt using the actual exported TextWnd API. The
+-- two control rows must fit below the viewport and left of the dashboard.
+function GetFontLetterica18Russian()return {}end
+function CUITextWnd()return {
+ SetAutoDelete=function()end,SetWndRect=function(self,r)self.rect=r.coords end,
+ SetTextComplexMode=function(self,v)self.complex=v end,SetFont=function()end,
+ SetTextAlignment=function()end,SetTextColor=function()end,SetText=function(self,v)self.text=v end,
+}end
+local prompt=setmetatable({SetWndRect=function()end,AttachChild=function()end},{__index=UIVehiclePrompt})
+prompt:__init();assert(prompt.text.complex)
+prompt:Set("pedals\\ngears",690)
+assert(prompt.text.rect[1]==60 and prompt.text.rect[2]==690 and prompt.text.rect[3]==760 and prompt.text.rect[4]==746)
+assert(prompt.shown);prompt:Set(nil);assert(not prompt.shown)
 ''')
+bindings=(root/'src/xrGame/ui/UIStatic_script.cpp').read_text(encoding='utf-8')
+assert '.def("SetTextComplexMode", &CUITextWnd::SetTextComplexMode)' in bindings
 
 srv = LuaRuntime(unpack_returned_tuples=True)
 srv.execute(r'''
