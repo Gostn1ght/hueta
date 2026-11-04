@@ -62,9 +62,9 @@ int main(){
  // r_torso is {yaw,pitch,roll} in the engine, not a position vector.
  auto shoulder=bone(a),head=bone(a),hip=bone(a),spine=bone(a);
  CActor::ShoulderCallback(&shoulder);CActor::HeadCallback(&head);
- assert(shoulder.mTransform.writes==1&&head.mTransform.writes==1);
- assert(near(shoulder.mTransform.yaw,deg2rad(12)*.85f));
- assert(near(shoulder.mTransform.pitch,-deg2rad(20)*.85f));
+ assert(shoulder.mTransform.writes==1&&head.mTransform.writes==0);
+ assert(near(shoulder.mTransform.yaw,deg2rad(12)));
+ assert(near(shoulder.mTransform.pitch,-deg2rad(20)));
  assert(near(head.mTransform.yaw+shoulder.mTransform.yaw,deg2rad(12)));
  assert(near(head.mTransform.pitch+shoulder.mTransform.pitch,-deg2rad(20)));
  pivot(shoulder);pivot(head);
@@ -73,8 +73,8 @@ int main(){
  for(float sign:{-1.f,1.f}){
   a.r_torso.yaw=sign*deg2rad(150);a.r_torso.pitch=sign*deg2rad(80);
   auto b=bone(a);CActor::ShoulderCallback(&b);pivot(b);
-  assert(near(b.mTransform.yaw,sign*deg2rad(45)*.85f));
-  assert(near(b.mTransform.pitch,-sign*deg2rad(30)*.85f));
+  assert(near(b.mTransform.yaw,sign*deg2rad(45)));
+  assert(near(b.mTransform.pitch,-sign*deg2rad(30)));
  }
  for(int gate=0;gate<3;++gate){
   a.seated=gate==0;a.alive=gate!=1;a.m_bAnimTorsoPlayed=gate==2;

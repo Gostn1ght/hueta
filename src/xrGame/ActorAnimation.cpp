@@ -51,8 +51,9 @@ CBlend* PlayMotionByParts(IKinematicsAnimated* sa, MotionID motion_ID, BOOL bMix
                           LPVOID CallbackParam);
 
 // The prone clip anchors the hips/legs. Only its upper chest and head follow
-// the view, around their own pivots; upright spine corrections bend the whole
-// flat body. Keep the two weights at a total of one.
+// the view, around the chest pivot; its children (hands and head) inherit the
+// full correction. Splitting it with a separate head turn leaves the weapon
+// pointing short of the view. Upright spine corrections bend the flat body.
 static void netcoop_prone_look(CBoneInstance* bone, float yaw, float pitch, float weight)
 {
 	if (!_valid(yaw) || !_valid(pitch)) return;
@@ -104,7 +105,7 @@ void CActor::ShoulderCallback(CBoneInstance* B)
 	if(A->netcoop_authored_pose()) {
 		if (!A->netcoop_seated() && A->g_Alive() && !A->m_bAnimTorsoPlayed)
 			netcoop_prone_look(B, angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta),
-				angle_normalize_signed(A->r_torso.pitch), .85f);
+				angle_normalize_signed(A->r_torso.pitch), 1.f);
 		return;
 	}
 	Fmatrix spin;
@@ -123,12 +124,7 @@ void CActor::HeadCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
-	if(A->netcoop_authored_pose()) {
-		if (!A->netcoop_seated() && A->g_Alive() && !A->m_bAnimTorsoPlayed)
-			netcoop_prone_look(B, angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta),
-				angle_normalize_signed(A->r_torso.pitch), .15f);
-		return;
-	}
+	if(A->netcoop_authored_pose()) return;
 	Fmatrix spin;
 	float bone_yaw;
 
