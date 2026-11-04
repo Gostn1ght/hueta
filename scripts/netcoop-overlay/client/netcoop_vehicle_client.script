@@ -14,6 +14,11 @@ local dashboard
 
 local function tr(id) return game.translate_string(id) end
 
+local function key(bind, default)
+	local ok, name = pcall(function() return dik_to_keyname(bind_to_dik(key_bindings[bind])) end)
+	return (ok and name and name ~= "") and string.upper(name) or default
+end
+
 -- A compact freeplay instrument panel, using the game's inventory palette.
 class "UIVehicleStatus" (CUIScriptWnd)
 function UIVehicleStatus:__init() super()
@@ -24,6 +29,8 @@ function UIVehicleStatus:__init() super()
 	self.details=xml:InitTextWnd("dashboard:details",panel)
 	self.engine=xml:InitTextWnd("dashboard:engine",panel)
 	self.condition=xml:InitTextWnd("dashboard:condition",panel)
+	self.parking=xml:InitTextWnd("dashboard:parking",panel)
+	self.controls=xml:InitTextWnd("dashboard:controls",panel)
 	self.shown=false
 end
 function UIVehicleStatus:Set(data)
@@ -36,27 +43,30 @@ function UIVehicleStatus:Set(data)
 	self.speed:SetText(string.format("%03d  %s",math.floor(speed+.5),tr("st_lz_car_kmh")))
 	self.details:SetText(string.format("%s %s   /   %s %d",tr("st_lz_car_gear"),gear==0 and "R" or tostring(gear),tr("st_lz_car_rpm"),rpm))
 	self.engine:SetText(string.format("%s: %s",tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
+	self.parking:SetText("");self.controls:SetText("")
 	if math.floor(flags/64)%2==1 then
 		local gear=tr(math.floor(flags/32)%2==1 and "st_lz_heli_gear_down" or "st_lz_heli_gear_up")
 		if flags>=128 then gear=tr("st_lz_heli_gear_moving") end
 		self.details:SetText(string.format("%s: %s   /   %s %d",tr("st_lz_heli_gear"),gear,tr("st_lz_car_rpm"),rpm))
+	end
+	if math.floor(flags/64)%2==0 then
+		self.parking:SetText(string.format("%s: %s [%s]",tr("st_lz_car_parking"),tr(math.floor(flags/32)%2==1 and "st_lz_car_on" or "st_lz_car_off"),key("kJUMP","SPACE")))
+		self.controls:SetText(string.format("%s/%s: %s",key("kACCEL","SHIFT"),key("kCROUCH","CTRL"),tr("st_lz_car_shift")))
 	end
 	self.condition:SetText(string.format("%s %d%%  /  %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
 	self.condition:SetTextColor((fuel<15 or health<30) and GetARGB(255,220,145,90) or GetARGB(255,205,199,179))
 	if not self.shown then get_hud():AddDialogToRender(self);self.shown=true end
 end
 
-local function key(bind, default)
-	local ok, name = pcall(function() return dik_to_keyname(bind_to_dik(key_bindings[bind])) end)
-	return (ok and name and name ~= "") and string.upper(name) or default
-end
+
 
 class "UIVehiclePrompt" (CUIScriptWnd)
 function UIVehiclePrompt:__init() super()
 	self:SetWndRect(Frect():set(0, 0, 1024, 768))
 	self.text = CUITextWnd()
 	self.text:SetAutoDelete(true)
-	self.text:SetWndRect(Frect():set(162, 420, 862, 446))
+	self.text:SetWndRect(Frect():set(162, 420, 862, 476))
+	self.text:SetComplexMode(true)
 	self.text:SetFont(GetFontLetterica18Russian())
 	self.text:SetTextAlignment(2)
 	self.text:SetTextColor(GetARGB(255, 235, 230, 220))
@@ -65,7 +75,7 @@ function UIVehiclePrompt:__init() super()
 end
 function UIVehiclePrompt:Set(text, y)
 	if text then
-		self.text:SetWndRect(Frect():set(162, y or 420, 862, (y or 420) + 26))
+		self.text:SetWndRect(Frect():set(60, y or 420, 760, (y or 420) + 56))
 		self.text:SetText(text)
 		if not self.shown then get_hud():AddDialogToRender(self); self.shown = true end
 	elseif self.shown then
@@ -153,7 +163,10 @@ function prompt_text(state, now)
 				key("kDETECTOR", "O"), tr("st_netcoop_heli_engine"), key("kNIGHT_VISION", "N"), tr("st_lz_heli_gear"), key("kUSE", "F"), tr("st_netcoop_car_exit"))
 		end
 		if state == "seated" then return string.format("[%s]  %s", key("kUSE", "F"), tr("st_netcoop_car_exit")) end
-		return string.format("[%s] %s   [%s] %s   [%s] %s   [%s] %s", key("kUSE", "F"), tr("st_netcoop_car_exit"),
+		return string.format("[%s/%s] %s   [%s/%s] %s\n[%s] %s   [%s] %s   [%s] %s   [%s] %s",
+			key("kFWD","W"),key("kBACK","S"),tr("st_lz_car_pedals"),
+			key("kACCEL","SHIFT"),key("kCROUCH","CTRL"),tr("st_lz_car_shift"),
+			key("kUSE", "F"), tr("st_netcoop_car_exit"),
 			key("kJUMP", "SPACE"), tr("st_netcoop_car_handbrake"), key("kTORCH", "L"), tr("st_netcoop_car_lights"),
 			key("kDETECTOR", "O"), tr("st_netcoop_car_engine"))
 	end
@@ -189,7 +202,7 @@ local function actor_on_update()
 		if not seated then seated_since = nil end
 		if text or prompt then
 			prompt = prompt or UIVehiclePrompt()
-			prompt:Set(text, seated and 700 or 420)
+			prompt:Set(text, seated and 690 or 420)
 		end
 	end)
 	if not ok then printf("! [Lost Zone] vehicle prompt: %s", tostring(err)); next_update = time_global() + 5000 end

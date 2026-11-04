@@ -934,7 +934,9 @@ void CActor::SwitchOutBorder(bool new_border_state)
 
 static bool actor_collision_damage_local(CObject* initiator, CObject* contact = nullptr)
 {
-    return !netcoop::pure_client() || (!smart_cast<CCar*>(initiator) && !smart_cast<CCar*>(contact));
+    // Every network car impact is emitted by vehicle_run_over from measured
+    // vehicle motion. Neither host nor replica penetration impulses are hits.
+    return !netcoop::enabled() || (!smart_cast<CCar*>(initiator) && !smart_cast<CCar*>(contact));
 }
 
 void CActor::g_Physics(Fvector& _accel, float jump, float dt)

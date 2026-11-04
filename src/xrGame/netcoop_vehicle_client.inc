@@ -281,6 +281,15 @@ void vehicle_key(CActor* actor, int cmd, bool pressed)
 {
 	if (!pure_client() || !actor->netcoop_seated())
 		return;
+	CCar* controlled_car = smart_cast<CCar*>(Level().Objects.net_Find(actor->m_netcoop_seat_car));
+	if (controlled_car && !controlled_car->netcoop_is_heli() &&
+		(cmd == kACCEL || cmd == kCROUCH || cmd == kJUMP))
+	{
+		if (pressed && actor->m_netcoop_seat_driver)
+			vehicle_send(vehicle_op_toggle, actor->m_netcoop_seat_car,
+				cmd == kACCEL ? 3 : cmd == kCROUCH ? 4 : 5);
+		return;
+	}
 	// The gunner's seat: RMB switches between the seat and the gun, LMB
 	// fires, from the gun view only.
 	if (vehicle_gun_seat(actor))

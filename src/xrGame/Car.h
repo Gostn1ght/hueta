@@ -608,6 +608,11 @@ public:
 		netcoop_key_yaw_right = 128,
 	};
 	u8 m_netcoop_keys = 0; // server: the driver's held keys
+	bool m_netcoop_parking = true;
+	u32 m_netcoop_shift_at = 0;
+	bool netcoop_manual_controls() const;
+	void netcoop_shift(bool up);
+	bool netcoop_parking_brake() const { return m_netcoop_parking || brp || !m_netcoop_heli.pilot; }
 	float m_netcoop_low_rpm_seconds = 0.f;
 	bool m_netcoop_lights = false;
 	u8 m_netcoop_aux_lights = 0;

@@ -18,7 +18,7 @@ using u32=unsigned;
 using u16=unsigned short;
 struct CObject{bool removed=false;virtual ~CObject()=default;bool getDestroy(){return removed;}};struct CCar:CObject{};
 template<class T>T smart_cast(CObject* p){return dynamic_cast<T>(p);}
-namespace netcoop{bool client=false;bool pure_client(){return client;}}
+namespace netcoop{bool client=false,active=false;bool enabled(){return active;}bool pure_client(){return client;}}
 struct Objects{std::map<u16,CObject*>items;CObject*net_Find(u16 id){auto i=items.find(id);return i==items.end()?nullptr:i->second;}};
 struct World{Objects objects;Objects&LevelObjects(){return objects;}}world;
 World&inl_ph_world(){return world;}
@@ -47,7 +47,8 @@ int main(){
  assert(netcoop::destroy_children(children,[&](unsigned id){++attempts;children.erase(std::find(children.begin(),children.end(),id));}));
  assert(attempts==2&&children.empty());
  CCar car;CObject ground;
- assert(actor_collision_damage_local(&car));netcoop::client=true;
+ assert(actor_collision_damage_local(&car));netcoop::active=true;
+ assert(!actor_collision_damage_local(&car));netcoop::client=true;
  assert(!actor_collision_damage_local(&car));assert(actor_collision_damage_local(&ground));assert(actor_collision_damage_local(nullptr));
  // Damage credit can be the driver, the player itself, or absent. The
  // actual contacting wheel/car still belongs to the server's run-over path.
@@ -57,9 +58,10 @@ int main(){
  assert(character.CollisionObject()==&car&&!actor_collision_damage_local(&driver,character.CollisionObject()));
  car.removed=true;assert(!character.CollisionObject());car.removed=false;
  world.objects.items.clear();assert(!character.CollisionObject());
- netcoop::client=false;assert(actor_collision_damage_local(&driver,&car));
+ netcoop::client=false;assert(!actor_collision_damage_local(&driver,&car));
+ netcoop::active=false;assert(actor_collision_damage_local(&driver,&car));
  assert(valid_vertex(0)&&valid_vertex(9)&&!valid_vertex(10)&&!valid_vertex(~0u));
- puts("PASS actual destroy progress/authorization/graph, replica-car damage exclusion, respawn vertex API");
+ puts("PASS actual destroy progress/authorization/graph, host/replica-car damage exclusion, respawn vertex API");
 }
 '''
 native=(root/'src/xrGame/xrServer_process_event_destroy.cpp').read_text(encoding='utf-8')

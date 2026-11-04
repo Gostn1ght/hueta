@@ -1400,7 +1400,7 @@ void CCar::UpdatePower()
 {
 	m_current_rpm = EngineDriveSpeed();
 	m_current_engine_power = EnginePower();
-	if (b_auto_switch_transmission && !b_transmission_switching)
+	if (b_auto_switch_transmission && !netcoop_manual_controls() && !b_transmission_switching)
 	{
 		VERIFY2(CurrentTransmission()<m_gear_ratious.size(), "wrong transmission");
 		if (m_current_rpm < m_gear_ratious[CurrentTransmission()][1]) TransmissionDown();
@@ -1534,6 +1534,12 @@ void CCar::PressLeft()
 
 void CCar::PressForward()
 {
+	if (netcoop_manual_controls())
+	{
+		fwp = true;
+		if (b_engine_on && !bkp && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
+		return;
+	}
 	if (bkp)
 	{
 		Unclutch();
@@ -1548,6 +1554,12 @@ void CCar::PressForward()
 
 void CCar::PressBack()
 {
+	if (netcoop_manual_controls())
+	{
+		bkp = true;
+		Unclutch(); NeutralDrive(); StartBreaking();
+		return;
+	}
 	if (fwp)
 	{
 		Unclutch();
@@ -1565,6 +1577,7 @@ void CCar::PressBack()
 
 void CCar::PressBreaks()
 {
+	if (netcoop_manual_controls()) { Unclutch(); NeutralDrive(); }
 	HandBreak();
 	brp = true;
 }
@@ -1605,6 +1618,12 @@ void CCar::ReleaseLeft()
 
 void CCar::ReleaseForward()
 {
+	if (netcoop_manual_controls())
+	{
+		fwp = false;
+		Unclutch(); NeutralDrive();
+		return;
+	}
 	if (bkp)
 	{
 		Clutch();
@@ -1623,6 +1642,13 @@ void CCar::ReleaseForward()
 
 void CCar::ReleaseBack()
 {
+	if (netcoop_manual_controls())
+	{
+		bkp = false;
+		StopBreaking();
+		if (fwp && b_engine_on && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
+		return;
+	}
 	if (b_breaks)
 	{
 		StopBreaking();
@@ -1645,6 +1671,13 @@ void CCar::ReleaseBack()
 
 void CCar::ReleaseBreaks()
 {
+	if (netcoop_manual_controls())
+	{
+		brp = false;
+		if (!m_netcoop_parking) ReleaseHandBreak();
+		if (fwp && b_engine_on && !bkp && !m_netcoop_parking) { Clutch(); Drive(); }
+		return;
+	}
 	ReleaseHandBreak();
 	brp = false;
 }
@@ -1761,7 +1794,7 @@ void CCar::UpdateBack()
 		Fvector v;
 		m_pPhysicsShell->get_LinearVel(v);
 		//if(DriveWheelsMeanAngleRate()<m_breaks_to_back_rate)
-		if (v.dotproduct(XFORM().k) < EPS)
+		if (!netcoop_manual_controls() && v.dotproduct(XFORM().k) < EPS)
 		{
 			StopBreaking();
 			DriveBack();
@@ -2152,7 +2185,7 @@ void CCar::PhDataUpdate(float step)
 	// UpdatePower above rewrites drive-axis torque on EVERY step. A single
 	// HandBreak call on exit was overwritten immediately on shared drive/brake
 	// wheels, so an unoccupied truck rolled away even with its engine off.
-	if (brp || (netcoop::enabled() && !m_netcoop_heli.pilot))
+	if (brp || (netcoop::enabled() && netcoop_parking_brake()))
 		HandBreak();
 	//////////////////////////////////////////////////////////
 	for (int k = 0; k < (int)m_doors_update.size(); ++k)
@@ -2596,7 +2629,7 @@ void CCar::netcoop_drive(u8 keys)
 	// Normalize before computing edges. A pedal held while the engine is off
 	// must generate a fresh press after manual ignition, never call Starter.
 	if (!m_netcoop_heli.on && !b_engine_on)
-		keys &= ~(netcoop_key_forward | netcoop_key_back);
+		keys &= ~netcoop_key_forward; // S remains a working brake with the engine off.
 	const u8 changed = keys ^ m_netcoop_keys;
 	if (!changed)
 		return;
@@ -2635,9 +2668,15 @@ void CCar::netcoop_engage(bool driver)
 		// What attach_Actor does for the single-player driver.
 		PPhysicsShell()->Enable();
 		processing_activate();
-		ReleaseHandBreak();
+		if (netcoop_manual_controls())
+		{
+			m_netcoop_parking = true;
+			Unclutch(); NeutralDrive(); HandBreak();
+		}
+		else ReleaseHandBreak();
 		return;
 	}
+	m_netcoop_parking = true;
 	netcoop_drive(0);
 	NeutralDrive();
 	Unclutch();
@@ -2660,6 +2699,47 @@ void CCar::netcoop_toggle(u8 what)
 		m_netcoop_lights = !m_netcoop_lights;
 	}
 	else if(what==2) netcoop_heli_toggle_gear();
+	else if (netcoop_manual_controls())
+	{
+		if (what == 3 || what == 4) netcoop_shift(what == 3);
+		else if (what == 5)
+		{
+			m_netcoop_parking = !m_netcoop_parking;
+			if (m_netcoop_parking) { Unclutch(); NeutralDrive(); HandBreak(); }
+			else
+			{
+				if (!brp) ReleaseHandBreak();
+				if (fwp && b_engine_on && !bkp && !brp) { Clutch(); Drive(); }
+			}
+		}
+	}
+}
+
+bool CCar::netcoop_manual_controls() const
+{
+	return netcoop::enabled() && !m_netcoop_heli.on;
+}
+
+void CCar::netcoop_shift(bool up)
+{
+	if (!netcoop_manual_controls() || m_gear_ratious.size() < 2 ||
+		(m_netcoop_shift_at && Device.dwTimeGlobal - m_netcoop_shift_at < 200)) return;
+	const size_t current = CurrentTransmission();
+	if (current >= m_gear_ratious.size()) return;
+	const size_t next = up ? _min(current + 1, m_gear_ratious.size() - 1) : (current ? current - 1 : 0);
+	if (next == current) return;
+	// Reverse is selected deliberately at a standstill, never by releasing S.
+	if (current == 0 || next == 0)
+	{
+		Fvector velocity;
+		if (!PPhysicsShell()) return;
+		PPhysicsShell()->get_LinearVel(velocity);
+		if (!_valid(velocity) || velocity.square_magnitude() > .25f) return;
+	}
+	Unclutch(); NeutralDrive();
+	Transmission(next);
+	m_netcoop_shift_at = Device.dwTimeGlobal;
+	if (fwp && b_engine_on && !bkp && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
 }
 
 u16 CCar::netcoop_door_bone(u16 hit)

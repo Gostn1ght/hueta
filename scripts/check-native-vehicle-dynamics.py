@@ -22,7 +22,7 @@ def method(file, name):
 
 physics = method('src/xrGame/Car.cpp', 'void CCar::PhDataUpdate(')
 assert physics.index('UpdatePower();') < physics.index('netcoop_vehicle_dynamics::stall_due(')
-assert physics.index('UpdatePower();') < physics.index('if (brp || (netcoop::enabled() && !m_netcoop_heli.pilot))')
+assert physics.index('UpdatePower();') < physics.index('if (brp || (netcoop::enabled() && netcoop_parking_brake()))')
 assert physics.index('if (netcoop::pure_client())') < physics.index('netcoop_vehicle_dynamics::stall_due(')
 source = r'''
 #include <cassert>

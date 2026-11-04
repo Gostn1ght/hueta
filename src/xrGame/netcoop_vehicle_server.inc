@@ -95,7 +95,8 @@ void server_on_vehicle(xrServer* server, xrClientData* CL, NET_Packet& P)
 	case vehicle_op_toggle:
 		{
 			const u8 what = P.r_u8();
-			if (v.seats.empty() || v.seats[0] != actor->ID() || what > 2)
+			if (v.seats.empty() || v.seats[0] != actor->ID() || what > 5 ||
+				(what >= 3 && car->netcoop_is_heli()))
 				return;
 			car->netcoop_toggle(what);
 			if(what==0) car->netcoop_drive(v.keys); // recompute held pedals after ignition/stall
@@ -143,7 +144,7 @@ static void vehicle_send_state(xrServer* server, CCar* car, const VehicleRuntime
 	P.w_u8(vehicle_op_state);
 	P.w_u16(car->ID());
 	P.w_u8(u8((car->netcoop_engine_on() ? 1 : 0) | (car->m_netcoop_lights ? 2 : 0) | (car->netcoop_aux_lights()<<2) |
-		(car->netcoop_is_heli() ? 64:0) | (car->netcoop_is_heli() && car->netcoop_heli_gear_down() ? 32:0) |
+		(car->netcoop_is_heli() ? 64:0) | ((car->netcoop_is_heli() ? car->netcoop_heli_gear_down() : car->netcoop_parking_brake()) ? 32:0) |
 		(car->netcoop_is_heli() && car->netcoop_heli_gear_position()>0.01f && car->netcoop_heli_gear_position()<0.99f ? 128:0)));
 	P.w_u8(v.keys);
 	P.w_float(car->netcoop_rpm());
@@ -630,7 +631,7 @@ void vehicle_server_update(xrServer* server)
 					}
 		}
 		vehicle_speed_limit(car);
-		if (occupied) vehicle_run_over(car, v, now);
+		vehicle_run_over(car, v, now); // A rolling empty car is authoritative too.
 		// A driver whose client stopped sending lets go of the pedals.
 		if (v.keys && now - v.keys_time > 2000)
 		{

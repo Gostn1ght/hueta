@@ -39,7 +39,7 @@ bool vehicle_unseat_server(CCar*,VehicleRuntime&v,u8 i,bool force){if(!exit_clea
 void Msg(const char*,...){}
 '''+method('src/xrGame/Car.cpp','void CCar::netcoop_drive(')+method('src/xrGame/netcoop_vehicles.inc','static bool vehicle_transition(')+r'''
 int main(){
- CCar car;car.netcoop_drive(1);car.netcoop_drive(2);assert(!car.started&&!car.pressed[0]&&!car.pressed[1]&&!car.m_netcoop_keys);
+ CCar car;car.netcoop_drive(1);car.netcoop_drive(2);assert(!car.started&&!car.pressed[0]&&car.pressed[1]==1&&car.m_netcoop_keys==2);car.netcoop_drive(0);assert(car.released[1]==1);
  car.netcoop_drive(4|16);assert(car.pressed[2]==1&&car.pressed[4]==1&&!car.started);
  car.netcoop_drive(0);assert(car.released[2]==1&&car.released[4]==1);
  car.netcoop_drive(1);car.StartEngine();car.netcoop_drive(1);assert(car.started==1&&car.pressed[0]==1);

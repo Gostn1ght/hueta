@@ -10,8 +10,8 @@ server = (root / "scripts/netcoop-overlay/server/netcoop_vehicles.script").read_
 lua = LuaRuntime(unpack_returned_tuples=True)
 lua.execute(r'''
 game = {translate_string = function(id) return "<" .. id .. ">" end}
-key_bindings = {kUSE = 1, kJUMP = 2, kTORCH = 3, kDETECTOR = 4}
-names = {"F", "SPACE", "L", "O"}
+key_bindings = {kUSE = 1, kJUMP = 2, kTORCH = 3, kDETECTOR = 4, kACCEL=5, kCROUCH=6, kFWD=7, kBACK=8}
+names = {"F", "SPACE", "L", "O", "RSHIFT", "RCTRL", "UP", "DOWN"}
 function bind_to_dik(b) return b end
 function dik_to_keyname(d) return string.lower(names[d]) end
 function class(name) _G[name] = {} return function() end end
@@ -25,13 +25,14 @@ assert(prompt_text("trunk", 0) == "[F]  <st_netcoop_car_trunk>")
 assert(prompt_text("taken", 0) == "<st_netcoop_seat_taken>", "a taken seat says so, no key")
 assert(prompt_text("", 0) == nil)
 local hint = prompt_text("seated_driver", 1000)
+assert(hint:find("[UP/DOWN]",1,true) and hint:find("[RSHIFT/RCTRL]",1,true),hint)
 assert(hint:find("%[SPACE%] <st_netcoop_car_handbrake>") and hint:find("%[L%] <st_netcoop_car_lights>"), hint)
 assert(prompt_text("seated_driver", 8999) ~= nil and prompt_text("seated_driver", 9001) == nil, "controls for 8 s")
 assert(prompt_text("", 9100) == nil)
 assert(prompt_text("seated", 10000) == "[F]  <st_netcoop_car_exit>", "a new seat shows the hint again")
 assert(prompt_text("", 19000) == nil)
 local pilot = prompt_text("seated_pilot", 20000)
-assert(pilot:find("%[SPACE/CTRL%] <st_netcoop_heli_collective>") and pilot:find("%[WASD%] <st_netcoop_heli_cyclic>")
+assert(pilot:find("%[SPACE/RCTRL%] <st_netcoop_heli_collective>") and pilot:find("%[UPADOWND%] <st_netcoop_heli_cyclic>")
 	and pilot:find("%[Q/E%] <st_netcoop_heli_pedals>") and pilot:find("%[F%] <st_netcoop_car_exit>"), pilot)
 assert(prompt_text("seated_pilot", 34999) ~= nil and prompt_text("seated_pilot", 35001) == nil, "pilot controls for 15 s")
 ''')
@@ -56,6 +57,11 @@ assert(hud.speed.text=="064  <st_lz_car_kmh>" and hud.details.text:find("2400",1
 assert(hud.condition.text:find("72%",1,true) and hud.condition.color[2]==205 and added==1)
 hud:Set("0|9|24|0|0|0");assert(hud.condition.color[2]==220 and added==1)
 assert(hud.engine.text:find("<st_lz_car_off>",1,true) and hud.details.text:find(" R",1,true))
+hud:Set("0|100|100|850|1|33")
+assert(hud.parking.text:find("<st_lz_car_on>",1,true) and hud.controls.text:find("RSHIFT/RCTRL",1,true))
+hud:Set("0|100|100|850|1|1");assert(hud.parking.text:find("<st_lz_car_off>",1,true))
+hud:Set("0|100|100|850|1|97");assert(hud.parking.text=="" and hud.controls.text=="" and hud.details.text:find("<st_lz_heli_gear_down>",1,true))
+hud:Set("0|100|100|850|1|65");assert(hud.details.text:find("<st_lz_heli_gear_up>",1,true))
 hud:Set("");assert(removed==1 and not hud.shown)
 ''')
 

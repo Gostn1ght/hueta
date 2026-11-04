@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+<string id="st_lz_car_parking"><text>Ручник</text></string>
+<string id="st_lz_car_shift"><text>передачи +/-</text></string>
+<string id="st_lz_car_pedals"><text>газ / тормоз (R: газ назад)</text></string>
+</string_table>
