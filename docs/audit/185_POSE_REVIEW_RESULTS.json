@@ -759,7 +759,8 @@
           }
         }
       }
-    ]
+    ],
+    "status": "rejected_by_owner_for_hand_pose_after_numeric_checks"
   },
   "zil_driver": {
     "candidate_sha256": "7e32e7012ab2e38af05375638376ef663e91e13cd8e88d16649fbb71863d47f8",

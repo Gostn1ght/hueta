@@ -106,6 +106,17 @@ if a.weapon_grip:
     for index, axis in enumerate((side, up, direction)):
         basis.col[index].xyz = axis
     canonical = {name: c @ basis.inverted() @ matrix @ s for name, matrix in raw.items()}
+    if a.weapon_grip == 'launcher':
+        # The stock torso pose's left hand sits behind the trigger, not on
+        # this RPG-7 mesh's front vertical grip (Z .109..214, Y 0..140 m).
+        # Place the left palm outside that grip and turn its curled fingers
+        # around it. This does not change the right-index weapon anchors.
+        local = {name: c @ matrix @ s for name, matrix in canonical.items()}
+        target_wrist = local['bip01_r_finger1'].translation + Vector((-.027, -.113, -.02)) + Vector((-.08, .035, .10))
+        transform = Matrix.Translation(target_wrist) @ Matrix.Rotation(math.radians(-30), 4, 'Z') @ Matrix.Translation(-local['bip01_l_hand'].translation)
+        for bone in order:
+            if bone.name == 'bip01_l_hand' or any(parent.name == 'bip01_l_hand' for parent in bone.parent_recursive):
+                canonical[bone.name] = c @ transform @ local[bone.name] @ s
 
 
 def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
@@ -120,9 +131,10 @@ def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
         assert abs(upper - lower) + .0001 < distance < upper + lower - .0001, (a.weapon_grip, label, 'unreachable', distance, upper + lower)
         axis = delta / distance
         along = (upper * upper - lower * lower + distance * distance) / (2 * distance)
-        # Preserve the captured elbow plane. RPG clearance is achieved at the
-        # shoulder anchor: forcing the elbow down puts the cuff into the tube.
-        pole = joint - origin
+        # Keep the RPG elbow behind its wrist, so the forearm approaches the
+        # grip forwards instead of forcing a near-right-angle wrist bend.
+        hand_direction = (desired[f'bip01_{label}_finger1'].translation - endpoint).normalized()
+        pole = endpoint - lower * hand_direction - origin if launcher else joint - origin
         bend = pole - axis * pole.dot(axis)
         assert bend.length > .0001
         bend.normalize()
@@ -141,11 +153,6 @@ def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
             swing = (desired[last].translation - desired[middle].translation).rotation_difference(endpoint - elbow)
             world[middle] = swing.to_matrix().to_4x4() @ desired[middle].to_quaternion().to_matrix().to_4x4()
             world[middle].translation = elbow
-            if label == 'r':
-                # Small axial adjustment verified against the actual RPG tube
-                # and skinned cuff. The hand/finger world poses stay fixed.
-                world[middle] = Matrix.Translation(elbow) @ Matrix.Rotation(math.radians(-15), 4,
-                    (endpoint - elbow).normalized()) @ Matrix.Translation(-elbow) @ world[middle]
         for bone in order:
             if bone.name == last or any(parent.name == last for parent in bone.parent_recursive):
                 world[bone.name] = desired[bone.name].copy()
@@ -155,7 +162,7 @@ def fit_weapon(world):
     """Keep the source body; place proven finger grips through unstretched arms."""
     anchor = world['bip01_r_finger1'].translation.copy()
     if a.weapon_grip == 'launcher':
-        anchor += Vector((.10, -.18, .09))
+        anchor += Vector((.10, 0, .09))
         shoulder = world['bip01_r_upperarm'].translation
         # RPG-7 tube centre is ~49 mm above the right finger anchor after its
         # real LTX offset. Raise it above the shoulder/upper-arm envelope;

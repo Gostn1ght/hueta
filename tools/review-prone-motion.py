@@ -24,6 +24,9 @@ p.add_argument('--weapon-ltx', type=Path)
 p.add_argument('--meshes', type=Path)
 p.add_argument('--no-render', action='store_true', help='Only audit weapon direction and skin intersections')
 p.add_argument('--samples', type=int, default=4)
+p.add_argument('--weapon-position', help='Review-only attachment override X,Y,Z; not an installed configuration')
+p.add_argument('--weapon-transform', type=Path, help='Private review.json attachment matrix; not an installed engine transform')
+p.add_argument('--close-up', action='store_true', help='Also render the actual right hand and trigger at a readable scale')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert 1 <= a.samples <= 300
 a.out.mkdir(parents=True, exist_ok=True)
@@ -79,11 +82,15 @@ if a.weapon_ltx:
     offset.col[0].xyz = Vector((ch*cb-sp*sh*sb, -cp*sb, sp*ch*sb+sh*cb))
     offset.col[1].xyz = Vector((sp*sh*cb+ch*sb, cp*cb, sh*sb-sp*ch*cb))
     offset.col[2].xyz = Vector((-cp*sh, sp, cp*ch))
-    offset.translation = Vector(tuple(float(v) for v in fields.get('position', '0,0,0').split(',')))
+    offset.translation = Vector(tuple(float(v) for v in (a.weapon_position or fields.get('position', '0,0,0')).split(',')))
+    if a.weapon_transform:
+        import json
+        assert not a.weapon_position
+        offset = Matrix(json.loads(a.weapon_transform.read_text())['attachment_review']['matrix_game'])
     one_hand = int(fields.get('hand_dependence', '2')) == 1
 
 
-def weapon_body_intersections():
+def weapon_body_intersections(trigger_point=None):
     """Triangle surface intersections, excluding intentional hand contacts.
 
     Use the actual deformed skin, not just joint distances. This is a review
@@ -104,6 +111,8 @@ def weapon_body_intersections():
     regions = {f'{side}_{part}': f'bip01_{side}_{part}' for side in ('r', 'l') for part in ('upperarm', 'forearm')}
     regions['head'] = 'bip01_head'
     regions.update({part: 'bip01_' + part for part in ('spine', 'spine1', 'spine2', 'pelvis')})
+    if trigger_point is not None:
+        regions['trigger_index_pad'] = ('bip01_r_finger1','bip01_r_finger11','bip01_r_finger12')
     for region, group_name in regions.items():
         vertices, triangles = [], []
         for obj in body:
@@ -111,16 +120,20 @@ def weapon_body_intersections():
             mesh = evaluated.to_mesh()
             assert len(mesh.vertices) == len(obj.data.vertices), 'Contact review requires topology-preserving skinning'
             mesh.calc_loop_triangles()
-            group = obj.vertex_groups.get(group_name)
-            influenced = set() if group is None else {vertex.index for vertex in obj.data.vertices
-                if any(assignment.group == group.index and assignment.weight >= .35 for assignment in vertex.groups)}
+            names = group_name if isinstance(group_name,tuple) else (group_name,)
+            groups = {group.index for name in names if (group:=obj.vertex_groups.get(name)) is not None}
+            influenced = {vertex.index for vertex in obj.data.vertices
+                if any(assignment.group in groups and assignment.weight >= .35 for assignment in vertex.groups)}
             base = len(vertices)
             vertices.extend(evaluated.matrix_world @ vertex.co for vertex in mesh.vertices)
             triangles.extend(tuple(base + i for i in tri.vertices) for tri in mesh.loop_triangles
                              if any(i in influenced for i in tri.vertices))
             evaluated.to_mesh_clear()
-        result[region] = dict(triangles=len(triangles), intersecting_pairs=len(
-            weapon_tree.overlap(BVHTree.FromPolygons(vertices, triangles, all_triangles=True))) if triangles else 0)
+        tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True) if triangles else None
+        result[region] = dict(triangles=len(triangles), intersecting_pairs=len(weapon_tree.overlap(tree)) if tree else 0)
+        if region == 'trigger_index_pad':
+            assert tree
+            result[region]['nearest_surface_to_trigger_metres'] = tree.find_nearest(trigger_point)[3]
     return result
 
 scene = bpy.context.scene
@@ -166,8 +179,13 @@ for sample_index in range(a.samples):
         for obj, original in weapon:
             obj.matrix_world = convert @ transform @ offset @ convert @ original
         bpy.context.view_layer.update()
+        trigger_point = None
+        if a.weapon_ltx.stem == 'w_rpg7':
+            trigger_point = convert @ transform @ offset @ Vector((.0003,.1047,.1157))
         report.append(dict(phase=phase, weapon_direction=list(direction), muzzle_forward_dot=float(direction.z),
-                           body_surface_intersections=weapon_body_intersections()))
+                           review_only_weapon_position=a.weapon_position,
+                           review_only_attachment_matrix=bool(a.weapon_transform),
+                           body_surface_intersections=weapon_body_intersections(trigger_point)))
     center = Vector((0, .1, .23))
     for name, location in ([] if a.no_render else [('top', (0, .1, 5)), ('side', (4, .1, .8)), ('front', (2, 3, 1.4))]):
         camera.data.ortho_scale = 3.6 if name == 'top' else 2.8
@@ -175,6 +193,14 @@ for sample_index in range(a.samples):
         camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
         scene.render.filepath = str(a.out / f'{name}-{int(phase*100):02}.png')
         bpy.ops.render.render(write_still=True)
+    if a.close_up and not a.no_render:
+        center = world['bip01_r_hand'].translation.lerp(world['bip01_r_finger1'].translation,.6)
+        camera.data.ortho_scale = .40
+        for name, delta in [('trigger-outer',Vector((1,.3,.2))),('trigger-inner',Vector((-1,.3,.2)))]:
+            camera.location = center+delta
+            camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
+            scene.render.filepath = str(a.out/f'{name}-{int(phase*100):02}.png')
+            bpy.ops.render.render(write_still=True)
 import json
 (a.out / 'weapon-directions.json').write_text(json.dumps(report, indent=2) + '\n')
 print('PRONE_REVIEW_READY', a.out)
