@@ -245,5 +245,12 @@
       "roundtrip_position_metres": 9.915490189387621e-05,
       "roundtrip_rotation_coefficient": 0.00015500187873840332
     }
-  ]
+  ],
+  "native_ci_conclusion": "success",
+  "resource_ci": {
+    "conclusion": "success",
+    "headSha": "ecf5b20dc3ae9e674c270c61c847c752ea10f963",
+    "status": "completed",
+    "url": "https://github.com/Gostn1ght/hueta/actions/runs/41869759984"
+  }
 }
