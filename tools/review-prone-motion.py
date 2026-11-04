@@ -103,6 +103,7 @@ def weapon_body_intersections():
     result = {}
     regions = {f'{side}_{part}': f'bip01_{side}_{part}' for side in ('r', 'l') for part in ('upperarm', 'forearm')}
     regions['head'] = 'bip01_head'
+    regions.update({part: 'bip01_' + part for part in ('spine', 'spine1', 'spine2', 'pelvis')})
     for region, group_name in regions.items():
         vertices, triangles = [], []
         for obj in body:
