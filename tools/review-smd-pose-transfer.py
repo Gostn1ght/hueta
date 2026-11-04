@@ -16,12 +16,18 @@ import sys
 import addon_utils
 import bpy
 from mathutils import Euler, Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 p = argparse.ArgumentParser(description=__doc__)
 for name in ('reference', 'pose', 'template', 'addons', 'out'):
     p.add_argument('--' + name, required=True, type=Path)
 p.add_argument('--rpg-trigger-fit', action='store_true', help='Private right-hand fit with a matching, recorded RPG attachment offset')
+p.add_argument('--hud-grip-motion', default='rpg7_iwp_shoot_aim', help='RPG hand clip used for the private grip reference')
+p.add_argument('--hud-grip-frame', type=float, default=2/13, help='Normalized sample in the RPG hand clip')
+p.add_argument('--fit-index-contact', action='store_true', help='Fit the index pad to the actual trigger without changing the palm')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
+assert 0 <= a.hud_grip_frame <= 1
+assert not a.fit_index_contact or a.rpg_trigger_fit, '--fit-index-contact requires --rpg-trigger-fit'
 a.out.mkdir(parents=True, exist_ok=True)
 root = Path(__file__).resolve().parents[1]
 
@@ -110,25 +116,6 @@ for target, source in mapping.items():
         q = (palm_frame(source_rest, source, mapping[index], mapping[thumb]) @
              palm_frame(rest, target, index, thumb).transposed()).to_quaternion()
     baseline_correction[target] = source_rest[source].to_quaternion().inverted() @ q @ rest[target].to_quaternion()
-    if a.rpg_trigger_fit and target.startswith('bip01_r_finger'):
-        # Matching only the phalanx direction leaves its flexion plane free
-        # to roll. Constrain it to the same palm normal on both skeletons.
-        def finger_frame(matrices, name, child, normal):
-            axis = (matrices[child].translation-matrices[name].translation).normalized()
-            side = (normal-axis*normal.dot(axis)).normalized()
-            return Matrix((axis,side,axis.cross(side))).transposed()
-        hand='bip01_r_hand'
-        target_normal=palm_frame(rest,hand,'bip01_r_finger1','bip01_r_finger0').col[2]
-        source_normal=palm_frame(source_rest,mapping[hand],mapping['bip01_r_finger1'],mapping['bip01_r_finger0']).col[2]
-        if target in successor:
-            child=successor[target]
-            target_frame=finger_frame(rest,target,child,target_normal)
-            source_frame=finger_frame(source_rest,source,mapping[child],source_normal)
-        else:
-            parent=rig.data.bones[target].parent.name
-            target_frame=finger_frame(rest,parent,target,target_normal)
-            source_frame=finger_frame(source_rest,mapping[parent],source,source_normal)
-        q=(source_frame@target_frame.transposed()).to_quaternion()
     correction[target] = source_rest[source].to_quaternion().inverted() @ q @ rest[target].to_quaternion()
 length_pairs = [('bip01_l_thigh', 'bip01_l_calf'), ('bip01_l_calf', 'bip01_l_foot')]
 scale = sum((rest[x].translation - rest[y].translation).length for x, y in length_pairs) / sum(
@@ -155,6 +142,7 @@ for bone in order:
     baseline_world[name] = baseline
 
 attachment_review = None
+grip_source = None
 if a.rpg_trigger_fit:
     c = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
     s = Matrix.Diagonal((1, 1, -1, 1))
@@ -174,15 +162,66 @@ if a.rpg_trigger_fit:
     old_gun.translation = right.translation+basis@old_offset
     # Fit the palm to the actual grip, then fit the index separately. The
     # original Source launcher and this mesh have different trigger locations.
-    wrist_game = (c@world['bip01_r_hand']@s).translation
-    target_wrist = old_gun@Vector((.02,.07,.035))
-    delta = basis.inverted()@(target_wrist-wrist_game)
-    shift_game = basis @ delta
-    shift = Vector((shift_game.x, shift_game.z, shift_game.y))
-    desired = {name: matrix.copy() for name, matrix in world.items()}
+    # Reuse this RPG's actual first-person finger motion. The general body
+    # animation has a different grip; the HUD clip is authored for the trigger.
+    meshes=a.template.parents[2]
+    hud_model=meshes/'anomaly_weapons/hands/wpn_hand_01.ogf'
+    hud_motion=meshes/'dynamics/weapons/wpn_rpg7/wpn_hand_rpg7_hud_animation.omf'
+    hud_weapon=meshes/'dynamics/weapons/wpn_rpg7/wpn_rpg7_hud.ogf'
+    hud_weapon_motion=meshes/'dynamics/weapons/wpn_rpg7/wpn_rpg7_hud_animation.omf'
+    world_weapon=meshes/'dynamics/weapons/wpn_rpg7/wpn_rpg7.ogf'
+    before=set(bpy.data.objects)
+    bpy.ops.xray_import.ogf(directory=str(hud_model.parent),files=[{'name':hud_model.name}],import_motions=False)
+    imported=set(bpy.data.objects)-before
+    hud_rig=next(obj for obj in imported if obj.type=='ARMATURE')
+    hud_rest={bone.name:bone.matrix_local.copy() for bone in hud_rig.data.bones}
+    for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
+    spec_grip=importlib.util.spec_from_file_location('grip_reader',root/'scripts/read-omf-poses.py')
+    grip_reader=importlib.util.module_from_spec(spec_grip);spec_grip.loader.exec_module(grip_reader)
+    hud_game={name:Matrix(value.tolist()) for name,value in grip_reader.Motions(hud_motion,hud_model).pose(
+        a.hud_grip_motion,a.hud_grip_frame,matrices=True).items()}
+    grip_source = dict(motion=a.hud_grip_motion, normalized_frame=a.hud_grip_frame,
+        files={str(path.relative_to(meshes)):hashlib.sha256(path.read_bytes()).hexdigest()
+               for path in (hud_model,hud_motion,hud_weapon,hud_weapon_motion,world_weapon)})
+    weapon_game=grip_reader.Motions(hud_weapon_motion,hud_weapon).pose('idle',.2,matrices=True)
+    hud_to_world=Matrix.Identity(4)
+    # The 28-vertex curved piece inside the guard is the trigger. The
+    # separate 100-vertex part behind the grip is the hammer, not the trigger.
+    trigger_local=Vector((.00042,.1022,.1771))
+    hud_to_world.translation=trigger_local-Vector(weapon_game['spusk'][:3,3])
+    grip_source['world_trigger_game']=list(trigger_local)
+    source_hand=c@old_gun@hud_to_world@hud_game['r_hand']@s
+    palm_rotation=(palm_frame(hud_rest,'r_hand','bip01_r_finger1','r_finger0')@
+        palm_frame(rest,'bip01_r_hand','bip01_r_finger1','bip01_r_finger0').transposed()).to_quaternion()
+    hand_correction=hud_rest['r_hand'].to_quaternion().inverted()@palm_rotation@rest['bip01_r_hand'].to_quaternion()
+    desired_hand=(source_hand.to_quaternion()@hand_correction).to_matrix().to_4x4()
+    desired_hand.translation=source_hand.translation
+    desired={name:matrix.copy() for name,matrix in world.items()}
+    desired['bip01_r_hand']=desired_hand
+    hud_blender={name:c@matrix@s for name,matrix in hud_game.items()}
+    remap={'bip01_r_hand':'r_hand',**{f'bip01_r_finger0{suffix}':f'r_finger0{suffix}' for suffix in ('','1','2')}}
     for bone in order:
-        if bone.name == 'bip01_r_hand' or any(parent.name == 'bip01_r_hand' for parent in bone.parent_recursive):
-            desired[bone.name] = Matrix.Translation(shift) @ world[bone.name]
+        if not any(parent.name=='bip01_r_hand' for parent in bone.parent_recursive):continue
+        name,parent=bone.name,bone.parent.name
+        src,src_parent=remap.get(name,name),remap.get(parent,parent)
+        def anatomical_frame(matrices,bone,other,normal):
+            axis=(matrices[other].translation-matrices[bone].translation).normalized()
+            side=(normal-axis*normal.dot(axis)).normalized()
+            return Matrix((axis,side,axis.cross(side))).transposed()
+        target_normal=palm_frame(rest,'bip01_r_hand','bip01_r_finger1','bip01_r_finger0').col[2]
+        source_normal=palm_frame(hud_rest,'r_hand','bip01_r_finger1','r_finger0').col[2]
+        if name in successor:
+            child=successor[name];src_child=remap.get(child,child)
+            target_frame=anatomical_frame(rest,name,child,target_normal)
+            source_frame=anatomical_frame(hud_rest,src,src_child,source_normal)
+        else:
+            target_frame=anatomical_frame(rest,parent,name,target_normal)
+            source_frame=anatomical_frame(hud_rest,src_parent,src,source_normal)
+        align_finger=(source_frame@target_frame.transposed()).to_quaternion()
+        correction_finger=hud_rest[src].to_quaternion().inverted()@align_finger@rest[name].to_quaternion()
+        source_world=c@old_gun@hud_to_world@hud_game[src]@s
+        desired[name]=(source_world.to_quaternion()@correction_finger).to_matrix().to_4x4()
+        desired[name].translation=(desired[parent]@rest[parent].inverted()@rest[name]).translation
     first, middle, last = 'bip01_r_upperarm', 'bip01_r_forearm', 'bip01_r_hand'
     origin, joint, end = [world[name].translation.copy() for name in (first, middle, last)]
     endpoint = desired[last].translation
@@ -205,35 +244,87 @@ if a.rpg_trigger_fit:
     for bone in order:
         if bone.name == last or any(parent.name == last for parent in bone.parent_recursive):
             world[bone.name] = desired[bone.name]
+    if a.fit_index_contact:
+        # Fit a real skinned pad vertex, not a joint centre. Only the index
+        # articulates; local rotations preserve the imported phalanx lengths.
+        chain=['bip01_r_finger1','bip01_r_finger11','bip01_r_finger12']
+        before=set(bpy.data.objects)
+        bpy.ops.xray_import.ogf(directory=str(world_weapon.parent),files=[{'name':world_weapon.name}],import_motions=False)
+        imported=set(bpy.data.objects)-before
+        trigger_trees=[]
+        for obj in imported:
+            if obj.type!='MESH':continue
+            vertices=[c@obj.matrix_world@v.co for v in obj.data.vertices]
+            # Only the curved trigger's connected geometry occupies this box.
+            indices={i for i,point in enumerate(vertices) if abs(point.x)<.005 and .085<point.y<.12 and .165<point.z<.19}
+            obj.data.calc_loop_triangles()
+            triangles=[tuple(tri.vertices) for tri in obj.data.loop_triangles if all(i in indices for i in tri.vertices)]
+            if triangles:trigger_trees.append(BVHTree.FromPolygons(vertices,triangles,all_triangles=True))
+        assert len(trigger_trees)==1,'Re-identify the actual RPG trigger geometry'
+        surface,normal,_,_=trigger_trees[0].find_nearest(trigger_local+Vector((0,0,.014)))
+        # Touch the forward-facing surface; pressing is toward the grip,
+        # not sideways through the trigger. Leave 0.8 mm skin clearance.
+        target_local=surface+Vector((0,0,.0008))
+        target=c@old_gun@target_local
+        grip_source['index_contact_target_game']=list(target_local)
+        for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
+        def skin(weights, matrices):
+            return sum(((matrices[name]@point)*weight for name,point,weight in weights),Vector((0,0,0)))
+        samples=[]
+        for obj in bpy.data.objects:
+            if obj.type!='MESH':continue
+            distal=obj.vertex_groups.get(chain[-1])
+            if distal is None:continue
+            for vertex in obj.data.vertices:
+                if sum(g.weight for g in vertex.groups if g.group==distal.index)<.7:continue
+                point=rig.matrix_world.inverted()@obj.matrix_world@vertex.co
+                weights=[(obj.vertex_groups[g.group].name,
+                          rest[obj.vertex_groups[g.group].name].inverted()@point,g.weight)
+                         for g in vertex.groups if obj.vertex_groups[g.group].name in rest]
+                samples.append(weights)
+        assert samples
+        pad=min(samples,key=lambda weights:(skin(weights,world)-target).length_squared)
+        relative={name:world[rig.data.bones[name].parent.name].inverted()@world[name] for name in chain}
+        proximal=world[chain[1]].translation-world[chain[0]].translation
+        intermediate=world[chain[2]].translation-world[chain[1]].translation
+        hinge=proximal.cross(intermediate).normalized()
+        assert hinge.length>.99
+        axes=[world[name].to_3x3().inverted()@hinge for name in chain]
+        spread=world[chain[0]].to_3x3().inverted()@proximal.cross(hinge).normalized()
+        def fitted(angles):
+            result={name:matrix.copy() for name,matrix in world.items()}
+            for i,name in enumerate(chain):
+                parent=rig.data.bones[name].parent.name
+                rotation=Matrix.Rotation(angles[i],4,axes[i])
+                if i==0:rotation=rotation@Matrix.Rotation(angles[3],4,spread)
+                result[name]=result[parent]@relative[name]@rotation
+            return result
+        def score(angles):
+            return (skin(pad,fitted(angles))-target).length_squared+(.0005**2)*sum(v*v for v in angles)
+        angles=[0.0]*4
+        bounds=[math.radians(v) for v in (55,65,70,30)]
+        for step_degrees in (12,6,3,1,.3,.1):
+            step=math.radians(step_degrees)
+            for iteration in range(100):
+                best,changed=score(angles),False
+                for j in range(4):
+                    for sign in (-1,1):
+                        trial=angles.copy();trial[j]=max(-bounds[j],min(bounds[j],trial[j]+step*sign))
+                        value=score(trial)
+                        if value<best:
+                            angles,best,changed=trial,value,True
+                if not changed:break
+        solved=fitted(angles)
+        for name in chain:world[name]=solved[name]
+        contact_error=(skin(pad,world)-target).length
+        print('INDEX_FIT',contact_error,[math.degrees(v) for v in angles],
+              list(old_gun.inverted()@c@skin(pad,world)))
+        assert contact_error<.003, ('Index pad cannot reach trigger',contact_error)
+        grip_source['index_contact_fit']=dict(pad_error_metres=contact_error,
+            local_angle_adjustments_degrees=[math.degrees(v) for v in angles],
+            palm_unchanged=world['bip01_r_hand']==desired['bip01_r_hand'])
     for name in ('bip01_l_upperarm','bip01_l_forearm','bip01_l_hand','bip01_head','bip01_pelvis'):
         assert world[name] == desired[name], 'Only the right arm may change'
-    # The two proximal phalanges form a hook round the trigger guard. The
-    # distal pad faces the measured trigger component (Z .099..133 m).
-    first,middle,last='bip01_r_finger1','bip01_r_finger11','bip01_r_finger12'
-    point_game=old_gun@Vector((-.012,.108,.117))
-    endpoint=Vector((point_game.x,point_game.z,point_game.y))
-    origin,joint,end=[world[name].translation.copy() for name in (first,middle,last)]
-    upper,lower=(joint-origin).length,(end-joint).length
-    axis=endpoint-origin;distance=axis.length
-    assert abs(upper-lower)+.0001 < distance < upper+lower-.0001
-    axis.normalize();along=(upper*upper-lower*lower+distance*distance)/(2*distance)
-    bend=joint-origin-axis*(joint-origin).dot(axis)
-    assert bend.length>.0001
-    joint_target=origin+axis*along+bend.normalized()*math.sqrt(max(0,upper*upper-along*along))
-    for name,child,point in [(first,middle,joint_target),(middle,last,endpoint)]:
-        pivot=world[name].translation.copy()
-        rotation=(world[child].translation-pivot).rotation_difference(point-pivot).to_matrix().to_4x4()
-        transform=Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)
-        for bone in order:
-            if bone.name==name or any(parent.name==name for parent in bone.parent_recursive):
-                world[bone.name]=transform@world[bone.name]
-    pad_game=old_gun@Vector((.0003,.1047,.1157))
-    pad=Vector((pad_game.x,pad_game.z,pad_game.y))
-    pivot=world[last].translation.copy()
-    rest_axis=(rest[last].translation-rest[middle].translation).normalized()
-    pad_axis=world[last].to_quaternion()@rest[last].to_quaternion().inverted()@rest_axis
-    rotation=pad_axis.rotation_difference(pad-pivot).to_matrix().to_4x4()
-    world[last]=Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)@world[last]
     new_right=c@world['bip01_r_finger1']@s
     new_next=c@world['bip01_r_finger11']@s
     new_direction=(new_next.translation-new_right.translation).normalized()
@@ -302,5 +393,6 @@ assert worst_position < .001 and worst_rotation < .002
 (a.out / 'review.json').write_text(json.dumps(dict(installed=False,reference_only=True,redistribution_cleared=False,
     source_sha256=hashlib.sha256(a.pose.read_bytes()).hexdigest(),reference_sha256=hashlib.sha256(a.reference.read_bytes()).hexdigest(),
     candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest(),roundtrip_position_metres=worst_position,
-    roundtrip_rotation_coefficient=worst_rotation,scale=scale,attachment_review=attachment_review),indent=2)+'\n')
+    roundtrip_rotation_coefficient=worst_rotation,scale=scale,attachment_review=attachment_review,
+    grip_source=grip_source),indent=2)+'\n')
 print('PRIVATE_WHOLE_POSE_REFERENCE_READY',a.out)

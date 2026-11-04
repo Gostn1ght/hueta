@@ -54,6 +54,7 @@ for obj in body:
     obj.data.materials.append(actor_material)
 weapon = []
 weapon_meshes = []
+trigger_components = []
 if a.weapon_ltx:
     assert a.meshes
     fields = {}
@@ -67,6 +68,25 @@ if a.weapon_ltx:
     bpy.ops.xray_import.ogf(directory=str(path.parent), files=[{'name': path.name}], import_motions=False)
     imported = set(bpy.data.objects) - before
     weapon_meshes = [obj for obj in imported if obj.type == 'MESH']
+    if a.weapon_ltx.stem == 'w_rpg7':
+        # Identify the actual curved trigger inside the guard. In this OGF
+        # the separate part at Z=.10-.13 is the hammer behind the grip.
+        for obj in weapon_meshes:
+            parents=list(range(len(obj.data.vertices)))
+            def find(index):
+                while parents[index]!=index:
+                    parents[index]=parents[parents[index]];index=parents[index]
+                return index
+            for edge in obj.data.edges:
+                first,second=edge.vertices;parents[find(first)]=find(second)
+            components={}
+            for vertex in obj.data.vertices:components.setdefault(find(vertex.index),set()).add(vertex.index)
+            for indices in components.values():
+                if len(indices)<20:continue
+                points=[convert@obj.matrix_world@obj.data.vertices[index].co for index in indices]
+                if all(abs(point.x)<.005 and .085<point.y<.12 and .165<point.z<.19 for point in points):
+                    trigger_components.append((obj,indices))
+        assert len(trigger_components)==1, 'RPG trigger geometry changed; re-identify it before reviewing contact'
     weapon = [(obj, obj.matrix_world.copy()) for obj in imported if obj.parent not in imported]
     material = bpy.data.materials.new('Weapon')
     material.diffuse_color = (.19, .21, .16, 1)
@@ -107,6 +127,15 @@ def weapon_body_intersections(trigger_point=None):
         triangles.extend(tuple(base + i for i in tri.vertices) for tri in mesh.loop_triangles)
         evaluated.to_mesh_clear()
     weapon_tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True)
+    trigger_vertices,trigger_triangles=[],[]
+    for obj,indices in trigger_components:
+        evaluated=obj.evaluated_get(depsgraph);mesh=evaluated.to_mesh();mesh.calc_loop_triangles()
+        base=len(trigger_vertices)
+        trigger_vertices.extend(evaluated.matrix_world@vertex.co for vertex in mesh.vertices)
+        trigger_triangles.extend(tuple(base+i for i in tri.vertices) for tri in mesh.loop_triangles
+                                 if all(i in indices for i in tri.vertices))
+        evaluated.to_mesh_clear()
+    trigger_tree=BVHTree.FromPolygons(trigger_vertices,trigger_triangles,all_triangles=True) if trigger_triangles else None
     result = {}
     regions = {f'{side}_{part}': f'bip01_{side}_{part}' for side in ('r', 'l') for part in ('upperarm', 'forearm')}
     regions['head'] = 'bip01_head'
@@ -134,6 +163,11 @@ def weapon_body_intersections(trigger_point=None):
         if region == 'trigger_index_pad':
             assert tree
             result[region]['nearest_surface_to_trigger_metres'] = tree.find_nearest(trigger_point)[3]
+            if trigger_tree:
+                contact_vertices={i for tri in trigger_triangles for i in tri}
+                result[region]['trigger_surface_to_index_metres']=min(tree.find_nearest(trigger_vertices[i])[3] for i in contact_vertices)
+                result[region]['trigger_triangle_intersections']=len(trigger_tree.overlap(tree))
+                result[region]['trigger_triangles']=len(trigger_triangles)
     return result
 
 scene = bpy.context.scene
@@ -181,8 +215,10 @@ for sample_index in range(a.samples):
         bpy.context.view_layer.update()
         trigger_point = None
         if a.weapon_ltx.stem == 'w_rpg7':
-            trigger_point = convert @ transform @ offset @ Vector((.0003,.1047,.1157))
-        report.append(dict(phase=phase, weapon_direction=list(direction), muzzle_forward_dot=float(direction.z),
+            trigger_point = convert @ transform @ offset @ Vector((.00042,.1022,.1771))
+        barrel_direction=(transform@offset).col[2].xyz.normalized()
+        report.append(dict(phase=phase, finger_attachment_direction=list(direction),
+                           weapon_direction=list(barrel_direction), muzzle_forward_dot=float(barrel_direction.z),
                            review_only_weapon_position=a.weapon_position,
                            review_only_attachment_matrix=bool(a.weapon_transform),
                            body_surface_intersections=weapon_body_intersections(trigger_point)))
