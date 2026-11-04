@@ -48,7 +48,7 @@ def locals_for(source,name,fraction,hip_zero=False):
   shift[0]=world['bip01'][0,3];shift[2]=world['bip01'][2,3]
  poses={}
  for n,m in world.items():
-  a=Matrix(m.tolist());a.translation-=__import__('mathutils').Vector(shift.tolist());poses[n]=c@a@c
+  a=Matrix(m.tolist());a.translation-=__import__('mathutils').Vector(shift.tolist());poses[n]=c@a@Matrix.Diagonal((1,1,-1,1))
  return {b.name:poses[b.parent.name].inverted()@poses[b.name] if b.parent else poses[b.name] for b in order}
 targets={'driver':locals_for(driver,'steering_idle_0_0',.2,True),
          'passenger':locals_for(chair,'animpoint_sit_normal_idle_1',.2,True)}

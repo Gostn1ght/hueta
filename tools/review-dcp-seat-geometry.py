@@ -26,6 +26,9 @@ def main():
     parser.add_argument('--layouts', type=Path)
     parser.add_argument('--passenger-omf', type=Path,
                         help='Optional separate candidate; source game data are left untouched')
+    parser.add_argument('--driver-omf', type=Path,
+                        help='Optional private driver candidate; never installs it')
+    parser.add_argument('--driver-motion', default='steering_idle_0_0')
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
     root = Path(__file__).resolve().parents[1]
     overlay = root / 'scripts/netcoop-overlay/client'
@@ -44,8 +47,9 @@ def main():
     extra = overlay / 'meshes/actors/modded_stalker_animations/netcoop_vehicle_passengers.omf'
     passenger_path = args.passenger_omf or (extra if extra.is_file() else None)
     passenger = reader.Motions(passenger_path, args.actor) if passenger_path else active
-    driver = reader.Motions(overlay / 'meshes/actors/stalker_animation.omf', args.actor)
+    driver = reader.Motions(args.driver_omf or overlay / 'meshes/actors/stalker_animation.omf', args.actor)
     convert = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
+    bone_axes = Matrix.Diagonal((1, 1, -1, 1))
     body_material = bpy.data.materials.new('Actor')
     body_material.diffuse_color = (.19, .56, .85, 1)
     car_material = bpy.data.materials.new('Vehicle')
@@ -55,9 +59,9 @@ def main():
     bodies = {}
     sources = {'lz_vehicle_passenger': active}
     sources.update({name: passenger for name in passenger.motions if name.startswith('lz_vehicle_passenger')})
-    clips = [('driver', driver, 'steering_idle_0_0')] + [(name, source, name) for name, source in sources.items()]
+    clips = [('driver', driver, args.driver_motion)] + [(name, source, name) for name, source in sources.items()]
     for role, source, motion in clips:
-        world = {n: convert @ Matrix(m.tolist()) @ convert
+        world = {n: convert @ Matrix(m.tolist()) @ bone_axes
                  for n, m in source.pose(motion, .2, matrices=True).items()}
         for bone in sorted(rig.pose.bones, key=lambda b: len(b.parent_recursive)):
             parent = {} if bone.parent is None else dict(
@@ -126,8 +130,16 @@ def main():
             obj.data.materials.append(car_material)
             bm = bmesh.new()
             bm.from_mesh(obj.data)
+            # Keep the steering wheel in a roof/cabin cutaway. Cutting every
+            # high face also removed its upper rim, making a correct grip
+            # appear to float above a half-wheel in the resulting image.
+            steering_groups = {group.index for group in obj.vertex_groups
+                               if any(token in group.name.lower() for token in ('steer', 'stear', 'rul'))}
+            keep = {vertex.index for vertex in obj.data.vertices
+                    if any(group.group in steering_groups and group.weight > .1 for group in vertex.groups)}
             bmesh.ops.delete(bm, geom=[f for f in bm.faces
-                if all((obj.matrix_world @ v.co).z > height for v in f.verts)], context='FACES')
+                if all((obj.matrix_world @ v.co).z > height for v in f.verts)
+                and not any(v.index in keep for v in f.verts)], context='FACES')
             bm.to_mesh(obj.data)
             bm.free()
         spawned = []

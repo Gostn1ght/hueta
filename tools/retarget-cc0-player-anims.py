@@ -19,7 +19,14 @@ p.add_argument('--clip',action='append',help='source.glb=motion_name; repeat for
 p.add_argument('--seat-origin',action='store_true',help='Place the pelvis at the seat anchor, without changing its orientation')
 p.add_argument('--seat-fit',action='append',default=[],help='Review only: motion_name:ankle_drop_metres; fit feet and hands to a seated pose, preserving limb lengths')
 p.add_argument('--seat-foot-forward',action='append',default=[],help='motion_name:metres; shorter footwell for compact cabins (default 0.4)')
+p.add_argument('--prone-grounded',action='store_true',help='Review only: reduce crawl knee tuck, level feet and turn the head forward; not a weapon grip')
+p.add_argument('--prone-grip',choices=['knife','pistol','rifle','launcher'],help='Review only: use the game skeleton\'s real weapon hand/finger pose; not a complete locomotion set')
+p.add_argument('--grip-hand-dependence',type=int,choices=[1,2],default=1,help='Actual weapon LTX hand_dependence for the review')
+p.add_argument('--prone-stock-idle',action='store_true',help='Review composite: body from existing X-Ray loophole_prone_visual instead of CC0 (not CC0 output)')
 args=p.parse_args(sys.argv[sys.argv.index('--')+1:])
+assert not (args.prone_grounded and args.seat_origin), 'Prone and seated fitting are separate reviews'
+assert not args.prone_grip or args.prone_grounded, 'Weapon review requires the grounded body review'
+assert not args.prone_stock_idle or args.prone_grip, 'Stock body composite is an armed idle review'
 seat_fits={}
 for value in args.seat_fit:
  name,drop=value.split(':');drop=float(drop)
@@ -101,6 +108,66 @@ def fit_seat(world, drop, forward):
   hand=Vector((sign*.16,support.y,max(.15,support.z+.09)))
   seat_limb(world,prefix+'upperarm',prefix+'forearm',prefix+'hand',hand,
             Vector((sign*.08, -1, -.1)))
+
+def orient_branch(world, bone, rotation):
+ final=rotation.to_matrix().to_4x4();final.translation=world[bone].translation
+ transform=final@world[bone].inverted()
+ for descendant in order:
+  if descendant.name==bone or any(parent.name==bone for parent in descendant.parent_recursive):world[descendant.name]=transform@world[descendant.name]
+
+def ground_prone(world):
+ """Keep donor timing, with a lower knee tuck on the game's actual limb lengths."""
+ hip=world['bip01_pelvis'].translation
+ for side,sign in [('l',-1),('r',1)]:
+  prefix='bip01_'+side+'_';foot=world[prefix+'foot'].translation.copy()
+  # The source pulls one ankle almost under the hip. Shorten that travel,
+  # rather than flattening/rescaling the thigh or knee transforms.
+  tuck=max(0.,min(1.,(foot.y-hip.y+.8)/.5))
+  endpoint=Vector((sign*(.16+.04*tuck),hip.y-.83+.10*tuck,.075+.015*tuck))
+  seat_limb(world,prefix+'thigh',prefix+'calf',prefix+'foot',endpoint,Vector((sign,-.15,-.15)))
+  toe=rest[prefix+'toe0'].translation-rest[prefix+'foot'].translation
+  rotation=toe.rotation_difference(Vector((sign*.02,-1,-.10)))@rest[prefix+'foot'].to_quaternion()
+  orient_branch(world,prefix+'foot',rotation)
+  assert world[prefix+'toe0'].translation.z>.02, 'Toes must stay above the ground, not only ankles'
+ # The source looks down about 50 degrees. A horizontal head is needed for
+ # the next aiming review; it does not yet supply a firearm/launcher grip.
+ orient_branch(world,'bip01_head',rest['bip01_head'].to_quaternion())
+
+weapon_pose=None
+stock_body=None
+if args.prone_grip:
+ spec=importlib.util.spec_from_file_location('poses',root/'scripts/read-omf-poses.py')
+ reader=importlib.util.module_from_spec(spec);spec.loader.exec_module(reader)
+ stock=reader.Motions(root/'scripts/netcoop-overlay/client/meshes/actors/stalker_animation.omf',template)
+ slot={'knife':5,'pistol':1,'rifle':2,'launcher':4}[args.prone_grip]
+ convert=Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+ bone_axes=Matrix.Diagonal((1,1,-1,1))
+ raw={n:Matrix(matrix.tolist()) for n,matrix in stock.pose(f'norm_torso_{slot}_aim_0',.2,matrices=True).items()}
+ # Stock keys include their own aim offset. Normalize the actual engine's
+ # weapon basis, not the wrist's display axes, to the horizontal view.
+ right=raw['bip01_r_finger1'];left=raw['bip01_r_finger11' if args.grip_hand_dependence==1 else 'bip01_l_finger1']
+ direction=(left.translation-right.translation).normalized()
+ lateral=right.col[1].xyz.cross(direction).normalized();up=direction.cross(lateral).normalized()
+ basis=Matrix.Identity(4)
+ for i,axis in enumerate((lateral,up,direction)):basis.col[i].xyz=axis
+ alignment=basis.inverted()
+ weapon_pose={n:convert@alignment@matrix@bone_axes for n,matrix in raw.items()}
+ if args.prone_stock_idle:
+  stock_body=reader.Motions(root/'scripts/netcoop-overlay/client/meshes/actors/stalker_smart_cover_animation.omf',template)
+
+def fit_prone_weapon(world):
+ # Engine weapons are attached through finger1/finger11, not merely the palm.
+ # Preserve the complete proven in-game finger grip and both-hand spacing.
+ targets={'knife':(.25,.68,.15),'pistol':(.11,.88,.23),'rifle':(.12,.68,.26),'launcher':(.21,.72,.29)}
+ shift=Vector(targets[args.prone_grip])-weapon_pose['bip01_r_finger1'].translation
+ for side,sign in [('r',1),('l',-1)]:
+  if side=='l' and args.prone_grip=='knife':continue
+  prefix='bip01_'+side+'_'
+  endpoint=weapon_pose[prefix+'hand'].translation+shift
+  seat_limb(world,prefix+'upperarm',prefix+'forearm',prefix+'hand',endpoint,Vector((sign*.12,0,-1)))
+  for bone in order:
+   if bone.name==prefix+'hand' or any(parent.name==prefix+'hand' for parent in bone.parent_recursive):
+    world[bone.name]=Matrix.Translation(shift)@weapon_pose[bone.name]
 samples=[];snapshots=[];actions=[]
 clay=bpy.data.materials.new('Review actual game actor');clay.diffuse_color=(.38,.48,.39,1)
 for obj in target_meshes:obj.data.materials.clear();obj.data.materials.append(clay)
@@ -140,6 +207,10 @@ for row,(file,name) in enumerate(clips):
    else:pose=world[parent.name]@rest[parent.name].inverted()@rest[dst] if parent else rest[dst].copy()
    world[dst]=pose
   if name in seat_fits:fit_seat(world,seat_fits[name],seat_forward.get(name,.4))
+  if stock_body:
+   world={n:convert@Matrix(matrix.tolist())@bone_axes for n,matrix in stock_body.pose('loophole_prone_visual',frame/frames,matrices=True).items()}
+  elif args.prone_grounded:ground_prone(world)
+  if args.prone_grip:fit_prone_weapon(world)
   for bone in order:
    parent=bone.parent;pose=world[bone.name]
    kwargs={} if parent is None else dict(parent_matrix=world[parent.name],parent_matrix_local=parent.bone.matrix_local)
@@ -151,7 +222,7 @@ for row,(file,name) in enumerate(clips):
  item=target.xray.motions_collection.add();item.name=name
  for col,fraction in enumerate([0,.25,.5,.75]):
   bpy.context.scene.frame_set(round((frames-1)*fraction));bpy.context.view_layer.update()
-  samples.append(dict(clip=name,fraction=fraction,frame=round((frames-1)*fraction),frames=frames,seat_ankle_drop=seat_fits.get(name),seat_foot_forward=seat_forward.get(name,.4) if name in seat_fits else None,points={n:list(target.pose.bones[n].matrix.translation) for n in ['bip01_head','bip01_pelvis','bip01_l_hand','bip01_r_hand','bip01_l_foot','bip01_r_foot']}))
+  samples.append(dict(clip=name,fraction=fraction,frame=round((frames-1)*fraction),frames=frames,seat_ankle_drop=seat_fits.get(name),seat_foot_forward=seat_forward.get(name,.4) if name in seat_fits else None,points={n:list(target.pose.bones[n].matrix.translation) for n in ['bip01_head','bip01_pelvis','bip01_l_hand','bip01_r_hand','bip01_l_foot','bip01_r_foot']},world={b.name:[list(row) for row in b.matrix] for b in order}))
   for obj in target_meshes:
    mesh=bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
    snap=bpy.data.objects.new(f'{name}_{fraction}',mesh);bpy.context.collection.objects.link(snap)
@@ -167,14 +238,18 @@ assert bpy.ops.xray_export.omf_file(filepath=str(out/'candidate.omf'))=={'FINISH
 # alone does not prove that bone coordinates survived OMF conversion.
 spec=importlib.util.spec_from_file_location('poses',root/'scripts/read-omf-poses.py')
 reader=importlib.util.module_from_spec(spec);spec.loader.exec_module(reader)
-exported=reader.Motions(out/'candidate.omf',template);worst=0
+exported=reader.Motions(out/'candidate.omf',template);worst=0;worst_rotation=0
+roundtrip_c=Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+roundtrip_s=Matrix.Diagonal((1,1,-1,1))
 for row in samples:
- pose=exported.pose(row['clip'],row['frame']/row['frames'])
- for bone,expected in row['points'].items():
-  actual=pose[bone]
-  worst=max(worst,(Vector((actual[0],actual[2],actual[1]))-Vector(expected)).length)
+ pose=exported.pose(row['clip'],row['frame']/row['frames'],matrices=True)
+ for bone,expected in row['world'].items():
+  actual=roundtrip_c@Matrix(pose[bone].tolist())@roundtrip_s;expected=Matrix(expected)
+  worst=max(worst,(actual.translation-expected.translation).length)
+  worst_rotation=max(worst_rotation,max(abs(actual[r][c]-expected[r][c]) for r in range(3) for c in range(3)))
 assert worst<.001,('OMF roundtrip changed the reviewed pose',worst)
-(out/'roundtrip.json').write_text(json.dumps(dict(max_error_metres=worst,samples=len(samples),clips=list(exported.motions),source_commit=provenance['commit'],template_sha256=hashlib.sha256(template.read_bytes()).hexdigest(),candidate_sha256=hashlib.sha256((out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
+assert worst_rotation<.002,('OMF roundtrip changed the bone orientation',worst_rotation)
+(out/'roundtrip.json').write_text(json.dumps(dict(max_error_metres=worst,samples=len(samples),clips=list(exported.motions),source_commit=provenance['commit'],body_source='X-Ray loophole_prone_visual (existing bundled asset; not CC0)' if stock_body else 'Mesh2Motion CC0',grip_source=f'X-Ray norm_torso_{slot}_aim_0 (existing bundled asset; not CC0)' if args.prone_grip else None,template_sha256=hashlib.sha256(template.read_bytes()).hexdigest(),candidate_sha256=hashlib.sha256((out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
 print('OMF_ROUNDTRIP_MAX_ERROR_METRES',worst,flush=True)
 for obj in target_meshes:obj.hide_render=True
 target.hide_render=True

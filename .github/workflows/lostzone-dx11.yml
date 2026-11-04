@@ -120,6 +120,7 @@ jobs:
           python scripts/check-netcoop-weapon-parts.py
           python scripts/check-netcoop-loadout.py
           python scripts/check-netcoop-anims.py
+          python scripts/check-player-pose-basis.py
           python scripts/check-netcoop-artefacts.py
           python scripts/check-netcoop-artefact-hunt.py
           python scripts/check-netcoop-master.py

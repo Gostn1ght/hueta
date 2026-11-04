@@ -1,0 +1,521 @@
+{
+  "installed": false,
+  "game_tested": false,
+  "raw_fbx_private": true,
+  "rpg": {
+    "candidate_sha256": "129f5432ff61838201a77b8e0d354277812cf310720b2678058abc947e7c0baf",
+    "roundtrip_position_metres": 8.385153147001362e-05,
+    "roundtrip_rotation_coefficient": 0.00018984079360961914,
+    "samples": [
+      {
+        "phase": 0.0,
+        "weapon_direction": [
+          -2.9306653232197277e-05,
+          6.5125896071549505e-06,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.0625,
+        "weapon_direction": [
+          -1.7910087990458123e-05,
+          -4.233293657307513e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.125,
+        "weapon_direction": [
+          -7.489210111089051e-05,
+          -1.546684688946698e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.1875,
+        "weapon_direction": [
+          -4.884315058006905e-05,
+          -3.0933995731174946e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.25,
+        "weapon_direction": [
+          -0.00013105242396704853,
+          2.9303646442713216e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.3125,
+        "weapon_direction": [
+          -2.686517473193817e-05,
+          1.6281924217764754e-06,
+          0.9999999403953552
+        ],
+        "muzzle_forward_dot": 0.9999999403953552,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.375,
+        "weapon_direction": [
+          7.327116691158153e-06,
+          -5.373218664317392e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.4375,
+        "weapon_direction": [
+          -7.489282870665193e-05,
+          2.1979418306727894e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.5,
+        "weapon_direction": [
+          2.360871440032497e-05,
+          -1.6281872376566753e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.5625,
+        "weapon_direction": [
+          -0.00014327837561722845,
+          6.756877701263875e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.625,
+        "weapon_direction": [
+          -2.9309228921192698e-05,
+          4.9662859964882955e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.6875,
+        "weapon_direction": [
+          1.1397384696465451e-05,
+          -2.5237064619432203e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.75,
+        "weapon_direction": [
+          -8.140684258250985e-06,
+          2.197984758822713e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.8125,
+        "weapon_direction": [
+          7.082729280227795e-05,
+          -2.0352670617285185e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.875,
+        "weapon_direction": [
+          1.139699452323839e-05,
+          -4.477390757529065e-05,
+          0.9999999403953552
+        ],
+        "muzzle_forward_dot": 0.9999999403953552,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      },
+      {
+        "phase": 0.9375,
+        "weapon_direction": [
+          -4.070408067491371e-06,
+          1.7909796952153556e-05,
+          1.0
+        ],
+        "muzzle_forward_dot": 1.0,
+        "body_surface_intersections": {
+          "r_upperarm": {
+            "triangles": 370,
+            "intersecting_pairs": 0
+          },
+          "r_forearm": {
+            "triangles": 677,
+            "intersecting_pairs": 0
+          },
+          "l_upperarm": {
+            "triangles": 362,
+            "intersecting_pairs": 0
+          },
+          "l_forearm": {
+            "triangles": 696,
+            "intersecting_pairs": 0
+          },
+          "head": {
+            "triangles": 3679,
+            "intersecting_pairs": 0
+          }
+        }
+      }
+    ]
+  },
+  "zil_driver": {
+    "candidate_sha256": "7e32e7012ab2e38af05375638376ef663e91e13cd8e88d16649fbb71863d47f8",
+    "roundtrip_position_metres": 8.076904980531051e-05,
+    "roundtrip_rotation_coefficient": 0.00014662742614746094,
+    "wheel_contacts_review": {
+      "frames": 151,
+      "max_finger_anchor_error_metres": 9.4188770813318e-05,
+      "max_pelvis_shift_metres": 3.2155493553843714e-12,
+      "installed": false
+    },
+    "model_sha256": "44725b4898ea1cd53d68eb753e7a3b511e969bb2f595fea5920fe9518da1ead2",
+    "torso_lean_degrees": 3
+  }
+}

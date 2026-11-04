@@ -27,7 +27,7 @@ for name in ['mahito','areke']:
  poses=[(None,'rest',0),(stock,'norm_walk_fwd_0',0),(stock,'norm_walk_fwd_0',.5),(stock,'steering_idle_0_0',.2),(seated,'lz_vehicle_passenger',.2)]
  if prone:poses.append((prone,'review_cc0_crawl',.25))
  for col,(motions,clip,phase) in enumerate(poses):
-  world={n:c@Matrix(m.tolist())@c for n,m in motions.pose(clip,phase,matrices=True).items()} if motions else {b.name:b.matrix_local.copy() for b in rig.data.bones}
+  world={n:c@Matrix(m.tolist())@Matrix.Diagonal((1,1,-1,1)) for n,m in motions.pose(clip,phase,matrices=True).items()} if motions else {b.name:b.matrix_local.copy() for b in rig.data.bones}
   for bone in order:
    parent=bone.parent;kwargs={} if parent is None else dict(parent_matrix=world[parent.name],parent_matrix_local=parent.bone.matrix_local)
    bone.matrix_basis=bone.bone.convert_local_to_pose(world[bone.name],bone.bone.matrix_local,invert=True,**kwargs)
