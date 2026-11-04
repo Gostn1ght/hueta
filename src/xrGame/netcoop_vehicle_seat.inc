@@ -143,8 +143,11 @@ bool CActor::netcoop_seat_animation()
 		if(type>=SActorVehicleAnims::TYPES_NUMBER) type=0;
 		SVehicleAnimCollection& anims=m_vehicle_anims->m_vehicles_type_collections[type];
 		const float steering=car ? car->netcoop_steer():0.f;
-		motion=steering<-.015f ? anims.steer_left:steering>.015f ? anims.steer_right:anims.idles[0];
-		freeze=motion!=anims.idles[0];progress=_min(.999f,_abs(steering)/.6f);
+		const LPCSTR key=steering<-.015f ? "netcoop_driver_steer_left":steering>.015f ? "netcoop_driver_steer_right":"netcoop_driver_pose";
+		const LPCSTR fitted=car ? READ_IF_EXISTS(pSettings,r_string,car->cNameSect(),key,""):"";
+		if(fitted && *fitted) motion=k->ID_Cycle_Safe(fitted);
+		if(!motion.valid()) motion=steering<-.015f ? anims.steer_left:steering>.015f ? anims.steer_right:anims.idles[0];
+		freeze=_abs(steering)>.015f;progress=_min(.999f,_abs(steering)/.6f);
 	} else if(!motion.valid()) motion=k->ID_Cycle_Safe(m_netcoop_passenger_pose.c_str());
 	if(!motion.valid()) return false;
 	if(motion!=m_netcoop_seat_motion) {

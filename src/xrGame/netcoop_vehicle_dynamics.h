@@ -4,6 +4,24 @@
 
 namespace netcoop_vehicle_dynamics
 {
+// Automatic launch clutch for manual gears without a separate clutch pedal.
+// Retains the donor torque curve and gear ratio; supplies no external force.
+inline float clutch_rpm(float wheel_rpm, bool pulling, float idle, float peak, float maximum)
+{
+    if (!pulling || !std::isfinite(wheel_rpm) || !std::isfinite(idle) ||
+        !std::isfinite(peak) || !std::isfinite(maximum) || idle <= 0.f || maximum < idle)
+        return wheel_rpm;
+    const float launch = std::min(maximum, std::max(idle * 1.25f, peak * .75f));
+    return std::max(wheel_rpm, launch);
+}
+
+inline float engine_torque(float power, float rpm)
+{
+    if (!std::isfinite(power) || !std::isfinite(rpm) || rpm <= .0001f || power <= 0.f)
+        return 0.f;
+    return power / rpm;
+}
+
 // A single solver step below idle is not a stalled engine. Only a sustained
 // heavily loaded clutch can stall it; a long rendered frame adds no more
 // than one bounded physics interval. Fuel/overload shutoffs remain separate.

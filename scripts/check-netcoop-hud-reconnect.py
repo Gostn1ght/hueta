@@ -24,6 +24,10 @@ assert(not init and not scuffed_fix and not xml and not progress_health_head)
 assert(not preview.health.head and not preview.bonus.head and tg_anm==0 and show_hud_change_time==0)
 netcoop_reset_actor();assert(health.head==3 and timedhp.head==2)
 hud=nil;netcoop_reset_actor();assert(health.head==3)
+init=true;xml={};progress_health_head={};get_hud=function()error('old HUD root')end
+netcoop_reset_actor();assert(not init and not xml and not progress_health_head and health.head==3)
+get_hud=function()return {GetCustomStatic=function()error('old child')end}end
+init=true;netcoop_reset_actor();assert(not init and health.head==3)
 ''')
 dot=(root/'scripts/netcoop-overlay/client/ui_hud_dotmarks.script').read_text(encoding='cp1251')
 def block(start,end):

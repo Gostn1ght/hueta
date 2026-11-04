@@ -38,3 +38,26 @@ for multiplayer in (False,True):
             assert lua.eval('flags.ret_value') is False
             cases+=1
 print(f'PASS actual pickup wrapper {cases}: MP disabled-DotMarks fallback, normal target selection and SP unchanged')
+
+# Scanner startup/clock rollback is not an inventory denial. Execute both real
+# monkeypatch variants and keep deliberate denials once the scanner is ready.
+for addon in ('liz_fdda_redone_item_pickup','take_item_anim'):
+    for rebinding in (False,True):
+        lua=LuaRuntime()
+        lua.execute("""
+            calls=0;intercepts=0
+            ui_hud_dotmarks={fdda_handles_pickups=function()return true end,
+              killswitch=function()return false end,
+              netcoop_pickup_rebinding=function()return rebinding end,
+              item_pickup_intercept=function(obj,flags)intercepts=intercepts+1;flags.ret_value=false end}
+            netcoop_enabled=function()return true end
+            flags={ret_value=false}
+        """)
+        lua.globals().rebinding=rebinding
+        lua.execute(addon+'={actor_on_item_before_pickup=function()calls=calls+1 end}')
+        lua.execute(source)
+        lua.execute(addon+'.actor_on_item_before_pickup({},flags)')
+        assert lua.globals().calls==0
+        assert lua.eval('flags.ret_value') is rebinding
+        assert lua.globals().intercepts==int(not rebinding)
+print('PASS scanner rebinding: both FDDA variants defer to native checks; ready-scanner denials preserved')

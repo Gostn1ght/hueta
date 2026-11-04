@@ -41,7 +41,7 @@ namespace netcoop{bool active=true;bool enabled(){return active;}}
 struct Shell{Fvector v;void get_LinearVel(Fvector&o){o=v;}void Enable(){}};
 struct CCar{
  struct {bool on=false,pilot=false;}m_netcoop_heli;
- bool m_netcoop_parking=true,brp=false,fwp=false,bkp=false,b_breaks=false;
+ bool m_netcoop_parking=false,brp=false,fwp=false,bkp=false,b_breaks=false;
  bool b_engine_on=false,b_clutch=false,b_auto_switch_transmission=true,b_transmission_switching=false;
  bool driving=false,parked=true,m_netcoop_lights=false;u32 m_netcoop_shift_at=0;
  float m_current_rpm=0,m_current_engine_power=0,m_min_rpm=850,m_break_start=0,m_break_time=.5f;
@@ -83,10 +83,9 @@ struct CCar{
     'void CCar::UpdatePower()', 'void CCar::UpdateBack()',
 ]) + r'''
 int main(){
- CCar c;c.netcoop_engage(true);assert(c.parked&&c.m_netcoop_parking&&!c.driving);
+ CCar c;c.netcoop_engage(true);assert(!c.parked&&!c.m_netcoop_parking&&!c.driving);
  c.PressForward();assert(!c.b_engine_on&&!c.driving&&!c.started); // ignition is explicit
- c.netcoop_toggle(0);assert(c.b_engine_on&&!c.driving);
- c.netcoop_toggle(5);assert(!c.m_netcoop_parking&&!c.parked&&c.driving);
+ c.netcoop_toggle(0);assert(c.b_engine_on&&!c.driving&&!c.parked);c.PressForward();assert(c.driving);
  c.ReleaseForward();assert(!c.driving&&c.gear==1);
  c.netcoop_shift(true);assert(c.gear==2);
  c.netcoop_shift(true);assert(c.gear==2);Device.dwTimeGlobal+=200;
@@ -115,10 +114,13 @@ int main(){
  c.shell.v={std::numeric_limits<float>::quiet_NaN(),0,0};c.netcoop_shift(true);assert(c.gear==0);
  c.shell.v={0,0,0};c.netcoop_toggle(0);c.PressForward();assert(c.gear==0&&c.driving); // W in deliberate R
  c.ReleaseForward();assert(c.gear==0);c.netcoop_shift(true);assert(c.gear==1);
- c.netcoop_engage(false);assert(c.m_netcoop_parking&&c.parked&&!c.driving&&!c.b_engine_on);
+ c.netcoop_engage(false);assert(!c.m_netcoop_parking&&!c.parked&&!c.driving&&!c.b_engine_on);
+ c.netcoop_engage(true);assert(!c.parked);c.netcoop_toggle(5);
+ c.netcoop_engage(false);assert(c.m_netcoop_parking&&c.parked);
+ c.netcoop_engage(true);assert(c.m_netcoop_parking&&c.parked);
  c.gear=999;Device.dwTimeGlobal+=200;c.netcoop_shift(false);assert(c.gear==999);
  c.m_gear_ratious.clear();c.netcoop_shift(true);assert(c.gear==999);
- CCar heli;heli.m_netcoop_heli.on=true;heli.netcoop_toggle(5);assert(heli.m_netcoop_parking);
+ CCar heli;heli.m_netcoop_heli.on=true;heli.netcoop_toggle(5);assert(!heli.m_netcoop_parking);
  heli.netcoop_shift(true);assert(heli.gear==1);heli.netcoop_engage(true);assert(!heli.parked);
  netcoop::active=false;CCar sp;sp.netcoop_shift(true);assert(sp.gear==1);
  sp.simulated_rpm=4000;sp.UpdatePower();assert(sp.auto_up==1);sp.simulated_rpm=500;sp.UpdatePower();assert(sp.auto_down==1);

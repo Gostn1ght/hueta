@@ -6610,3 +6610,9 @@ function netcoop_reset_actor()
     cfg.main_ui_drawn = false
     reset_nearby_item_tables()
 end
+
+-- During a handoff the scanner has no current target/HUD yet. Let the engine
+-- validate its original pickup instead of interpreting that as a denied item.
+function netcoop_pickup_rebinding()
+    return not cfg or cfg.netcoop_restart or (not scanning and not killswitch("pickup"))
+end

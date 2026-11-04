@@ -113,3 +113,22 @@ dotmarks=(root/'scripts/netcoop-overlay/client/ui_hud_dotmarks.script').read_tex
 reset=dotmarks[dotmarks.index('function netcoop_reset_actor()'):]
 LuaRuntime().execute('cfg=nil\n'+reset+'\nnetcoop_reset_actor()')
 print('PASS actor bootstrap: stale optional PDA/BHS widgets cannot abort input/binder/state restore; disabled DotMarks is safe')
+
+# A previous map may retire a binder after the next map has reused its ID.
+fresh.execute(r"""
+local replacement={id=function()return 7 end}
+local old={object=actor}
+local deletes=0
+function db.del_obj()deletes=deletes+1 end
+function db.delete_enemy()deletes=deletes+1 end
+object_binder={net_destroy=function()return 'retired' end}
+on_actor_spawned(replacement)
+local storage={pstor={['health.head']=3}};db.storage[7]=storage
+on_actor_destroyed(actor)
+assert(db.actor==replacement and db.storage[7]==storage)
+assert(bind_stalker.actor_binder.update(old)==nil)
+assert(bind_stalker.actor_binder.net_destroy(old)=='retired')
+assert(deletes==0 and db.actor==replacement and db.storage[7]==storage)
+db.del_actor(actor);assert(deletes==0 and db.actor==replacement)
+""")
+print('PASS retired actor with reused ID cannot update/reset/delete replacement body or limb storage')

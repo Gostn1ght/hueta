@@ -137,15 +137,17 @@ function on_actor_spawned(obj)
 end
 
 function on_actor_destroyed(obj)
-	if obj and controlled_actor_id == obj:id() then
-		netcoop_emission_view.reset()
-		netcoop_psi_view.reset()
+	if obj and obj == controlled_actor then
 		destroyed_actor_id = controlled_actor_id
 		controlled_actor = nil
 		controlled_actor_id = nil
 		player_state_ready, next_player_state, pending_player_state = false, 0, nil
 		player_state_spawn_ready = false
 		rawset(db, "actor", nil)
+		for _, name in ipairs({"netcoop_emission_view", "netcoop_psi_view"}) do
+			local module = _G[name]
+			if module and module.reset then pcall(module.reset) end
+		end
 	end
 end
 
@@ -157,7 +159,7 @@ install_actor_lifecycle = function()
 	binder.__netcoop_lifecycle = true
 	local destroy, update = binder.net_destroy, binder.update
 	binder.update = function(self, ...)
-		if self.__netcoop_destroying or self.object:id() ~= controlled_actor_id then return end
+		if self.__netcoop_destroying or self.object ~= controlled_actor then return end
 		if not player_state_spawn_ready then
 			-- BHS globals and raw limb keys can still describe the previous
 			-- body. Its first update must not kill this one before restore.
@@ -183,10 +185,14 @@ install_actor_lifecycle = function()
 	binder.net_destroy = function(self, ...)
 		if self.__netcoop_destroying then return end
 		self.__netcoop_destroying = true
-		if self.object:id() ~= controlled_actor_id then
+		if self.object ~= controlled_actor then
 			if USE_MARSHAL then UnregisterScriptCallback("save_state", self) end
-			db.del_obj(self.object)
-			db.delete_enemy(self.object)
+			-- Network IDs can be reused by another location. Never erase the
+			-- replacement body's storage when an old binder finishes late.
+			if self.object:id() ~= controlled_actor_id then
+				db.del_obj(self.object)
+				db.delete_enemy(self.object)
+			end
 			return object_binder.net_destroy(self)
 		end
 		local ok, err = pcall(destroy, self, ...)
@@ -198,8 +204,11 @@ install_actor_lifecycle = function()
 	db.del_actor = function(obj)
 		obj = obj or rawget(db, "actor")
 		if not obj then return end
+		if obj ~= controlled_actor then
+			if obj:id() ~= controlled_actor_id then db.del_obj(obj) end
+			return
+		end
 		db.del_obj(obj)
-		if obj:id() ~= controlled_actor_id then return end
 		db.actor_proxy:net_destroy()
 		on_actor_destroyed(obj)
 	end

@@ -36,17 +36,42 @@ struct Shell{float mass=1000;float getMass(){return mass;}};
 struct Sound{void Start(){}};
 struct CCar{
  Shell shell;Sound sound;Sound*m_car_sound=&sound;
- float m_fuel=1,m_current_rpm=0,m_netcoop_low_rpm_seconds=0;bool b_engine_on=false,b_starting=false;unsigned m_dwStartTime=0;
+ float m_fuel=1,m_current_rpm=0,m_netcoop_low_rpm_seconds=0;
+ float m_min_rpm=100,m_torque_rpm=300,m_max_rpm=600,m_power_rpm=450;
+ float m_rpm_increment_factor=.5f,m_rpm_decrement_factor=.5f,m_current_engine_power=10000;
+ bool m_speed_governed=false,b_transmission_switching=false,b_clutch=true,fwp=true,bkp=false,brp=false,m_netcoop_parking=false;
+ float wheels=0;float EngineRpmFromWheels(){return wheels;}
+ bool netcoop_manual_controls()const{return netcoop::active;}
+ float EngineDriveSpeed();float EngineCurTorque();bool b_engine_on=false,b_starting=false;unsigned m_dwStartTime=0;
  struct Wheel{CCar*car=nullptr;float radius=.35f,last_torque=-1,last_speed=-1;void ApplyDriveAxisVelTorque(float speed,float torque){last_speed=speed;last_torque=torque;}};
  struct SWheelBreak{Wheel*pwheel;float hand_break_torque=.018f;void HandBreak();};
  std::vector<SWheelBreak>m_breaking_wheels;
  Shell*PPhysicsShell(){return &shell;}float EffectiveGravity(){return 9.81f;}
  void PlayExhausts(){}void Starter();void StartEngine();
 };
+template<class T>void limit_above(T&v,T max){if(v>max)v=max;}
 constexpr float EPS=.0001f;
-''' + method('src/xrGame/Car.cpp', 'void CCar::Starter()') + method('src/xrGame/Car.cpp', 'void CCar::StartEngine()') + method('src/xrGame/CarWheels.cpp', 'void CCar::SWheelBreak::HandBreak()') + r'''
+''' + method('src/xrGame/Car.cpp', 'void CCar::Starter()') + method('src/xrGame/Car.cpp', 'void CCar::StartEngine()') + method('src/xrGame/CarWheels.cpp', 'void CCar::SWheelBreak::HandBreak()') + method('src/xrGame/Car.cpp', 'float CCar::EngineDriveSpeed()') + method('src/xrGame/Car.cpp', 'float CCar::EngineCurTorque()') + r'''
 int main(){
  using namespace netcoop_vehicle_dynamics;
+ // Real engine method under sustained near-stationary wheel load: automatic
+ // clutch keeps usable torque without changing the selected gear or wheels.
+ CCar hill;hill.b_engine_on=true;hill.m_current_rpm=100;float load_seconds=0;
+ for(int i=0;i<6000;++i){
+  hill.wheels=float(i%10);hill.m_current_rpm=hill.EngineDriveSpeed();
+  assert(hill.m_current_rpm>=100 && hill.m_current_rpm<=600);
+  assert(!stall_due(true,true,false,false,true,false,hill.m_current_rpm,100,.01f,load_seconds));
+  assert(std::isfinite(hill.EngineCurTorque())&&hill.EngineCurTorque()>0);
+ }
+ hill.wheels=400;hill.m_current_rpm=400;assert(hill.EngineDriveSpeed()==400); // clutch locked at road speed
+ hill.fwp=false;hill.wheels=0;assert(hill.EngineDriveSpeed()==200); // no throttle floor
+ hill.m_current_rpm=0;hill.m_current_engine_power=0;assert(hill.EngineCurTorque()==0);
+ hill.m_current_engine_power=1000;assert(hill.EngineCurTorque()==0);
+ assert(clutch_rpm(0,false,100,300,600)==0);
+ assert(clutch_rpm(0,true,100,300,150)==150);
+ assert(std::isfinite(engine_torque(1000,0)));
+ netcoop::active=false;hill.fwp=true;hill.m_current_rpm=100;assert(hill.EngineDriveSpeed()==50);
+ netcoop::active=true;
  CCar car;CCar::Wheel wheel;wheel.car=&car;car.m_breaking_wheels={{&wheel},{&wheel}};
  car.m_breaking_wheels[0].HandBreak();assert(wheel.last_speed==0&&std::abs(wheel.last_torque-1800)<.01f);
  car.shell.mass=10000;wheel.radius=.6f;car.m_breaking_wheels[0].HandBreak();
