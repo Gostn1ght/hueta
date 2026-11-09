@@ -175,7 +175,12 @@ def weapon_body_intersections(trigger_point=None):
                 triangle_bones.append(max(weights,key=weights.get))
             evaluated.to_mesh_clear()
         tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True) if triangles else None
-        result[region] = dict(triangles=len(triangles), intersecting_pairs=len(weapon_tree.overlap(tree)) if tree else 0)
+        overlaps=weapon_tree.overlap(tree) if tree else []
+        by_bone={}
+        for _,index in overlaps:
+            name=triangle_bones[index];by_bone[name]=by_bone.get(name,0)+1
+        result[region] = dict(triangles=len(triangles), intersecting_pairs=len(overlaps),
+                              intersections_by_dominant_bone=by_bone)
         if region == 'trigger_index_pad':
             assert tree
             result[region]['nearest_surface_to_trigger_metres'] = tree.find_nearest(trigger_point)[3]

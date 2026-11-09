@@ -64,26 +64,17 @@ for kind in ("torchelo", "detector"):
         for action in actions:
             assert f"xrr_norm_torso_{base}_{kind}_{action}" in dev, (base, kind, action) and '#include "Flashlight.h"' in anim
 prone=merge.parse(str(actors/'modded_stalker_animations/netcoop_player_prone.omf'))
-expected={f'lz_prone_{grip}_{direction}' for grip in ('empty','knife','pistol','rifle') for direction in ('idle','fwd','back','left','right')}
+expected={f'lz_prone_{grip}_{direction}' for grip in ('empty','knife','pistol','rifle','launcher') for direction in ('idle','fwd','back','left','right')}
 assert {d['name'] for d in prone['defs']}==expected | {'lz_vehicle_passenger','lz_vehicle_enter_driver','lz_vehicle_exit_driver','lz_vehicle_enter_passenger','lz_vehicle_exit_passenger'}
 assert all(not d['flags']&2 for d in prone['defs']), 'prone movement must loop'
 import hashlib,json
-qa=json.loads((root.parent/'docs/audit/167_PRONE_POSE_QA.json').read_text())
-passenger=json.loads((root.parent/'docs/audit/180_PASSENGER_MOTION_QA.json').read_text())
-assert qa['omf_sha256']==passenger['previous_omf_sha256']
-assert passenger['omf_sha256']==hashlib.sha256(prone['data']).hexdigest()
+qa=json.loads((root.parent/'docs/audit/190_CONNECTED_MOTIONS.json').read_text())
+assert qa['prone']['sha256']==hashlib.sha256(prone['data']).hexdigest()
+assert len(qa['prone']['connected'])==20 and qa['raw_files_private']
 for name,blob in prone['blobs'].values():
-    if name!='lz_vehicle_passenger':
-        assert hashlib.sha256(blob).hexdigest()==passenger['unchanged_motions'][name], name
-assert 0.2<qa['sampled_head_height'][0]<=qa['sampled_head_height'][1]<0.5
-for grip in ('empty','knife','pistol','rifle'):
-    samples=[s for s in qa['samples'] if s['clip']==f'lz_prone_{grip}_fwd']
-    assert len(samples)==4
-    for side in ('l','r'):
-        foot=[s['bones'][f'bip01_{side}_foot'] for s in samples]
-        assert max(p[1] for p in foot)-min(p[1] for p in foot)>.12
-        assert all(.02<p[2]<.3 for p in foot)
-print("netcoop anims: OK; 20 isolated prone cycles, low body, moving feet, exact QA asset checksum")
+    if name in qa['preserved_motion_hashes']:
+        assert hashlib.sha256(blob).hexdigest()==qa['preserved_motion_hashes'][name],name
+print('PASS 20 connected captured prone cycles; legacy RPG and vehicle motions preserved exactly')
 
 # Independently decode exported keys, not authoring-scene metadata. Verify
 # that the passenger remains upright, faces the seat and keeps both feet
@@ -106,7 +97,7 @@ for phase in (0,.125,.25,.375,.5,.625,.75,.875,.99):
     assert -.65<feet[0][1]<-.25 and -.65<feet[1][1]<-.25
     assert feet[0][0]<-.1 and feet[1][0]>.1
     assert .2<feet[0][2]<.65 and .2<feet[1][2]<.65
-print('PASS decoded passenger keys: upright facing seat, hip at anchor, symmetric low feet; other 24 motions unchanged')
+print('PASS decoded passenger keys: upright facing seat, hip at anchor, symmetric low feet; legacy passenger pose retained')
 
 # Low cabins cannot use an ankle half a metre below the seat. Validate the
 # actual additional keys, including every skeleton segment (no stretched legs).
@@ -136,3 +127,48 @@ for name,drop in fit_qa['ankle_drops'].items():
             assert abs(float(hand[0]))<.17 and float(hand[1])>.14
         assert bones['bip01_head'][2,2]>.93
 print('PASS fitted passenger keys: three low-seat heights, compact feet/hands, all 47 bone lengths preserved')
+
+# Independently decode the actual newly connected clips: finite poses, real
+# articulated gait and stable bone lengths through all weapon variants.
+reference=motion.pose('lz_prone_empty_fwd',0,matrices=True)
+for name in qa['prone']['connected']:
+    frames=[]
+    for phase in (0,.125,.25,.375,.5,.625,.75,.875,.99):
+        pose=motion.pose(name,phase,matrices=True);frames.append(pose)
+        assert all(math.isfinite(float(v)) for matrix in pose.values() for row in matrix for v in row)
+        assert .10<float(pose['bip01_head'][1,3])<.75,(name,'not prone')
+        for bone,parent in skeleton['parents'].items():
+            if not parent or bone in ('bip01','bip01_pelvis'):continue
+            length=float(sum((pose[bone][:3,3]-pose[parent][:3,3])**2))**.5
+            rest=float(sum((reference[bone][:3,3]-reference[parent][:3,3])**2))**.5
+            assert abs(length-rest)<.001,(name,bone,length,rest)
+    if not name.endswith('_idle'):
+        excursion=max(float(sum((pose[f'bip01_{side}_foot'][:3,3]-frames[0][f'bip01_{side}_foot'][:3,3])**2))**.5 for pose in frames for side in ('l','r'))
+        assert excursion>.015,(name,'frozen gait')
+
+bindings=json.loads((root.parent/'tools/dcp-driver-pose-fits.json').read_text())
+driver_path=actors/'modded_stalker_animations/netcoop_vehicle_driving.omf'
+assert hashlib.sha256(driver_path.read_bytes()).hexdigest()==qa['driving']['sha256']
+driver_data=merge.parse(driver_path)
+assert len(bindings)==qa['driving']['models']==43
+assert {d['name'] for d in driver_data['defs']}=={row[key] for row in bindings.values() for key in ('idle','left','right')}
+driving=poses.Motions(driver_path,parents=skeleton['parents'])
+for visual,row in bindings.items():
+    assert hashlib.sha256((root/'netcoop-overlay/client/meshes'/visual).read_bytes()).hexdigest()==row['model_sha256']
+    for role in ('client','server'):
+        config=(root/f'netcoop-overlay/{role}/configs/mod_system_lz_dcp_vehicles.ltx').read_text(encoding='cp1251')
+        block=config.split('['+row['section']+']',1)[1].split('\n[',1)[0]
+        for field,key in [('netcoop_driver_pose','idle'),('netcoop_driver_steer_left','left'),('netcoop_driver_steer_right','right')]:
+            assert field+' = '+row[key] in block,(row['section'],field)
+    base=driving.pose(row['idle'],0,matrices=True)
+    for key in ('idle','left','right'):
+        for phase in (0,.5,.99):
+            pose=driving.pose(row[key],phase,matrices=True)
+            assert max(abs(float(v)) for v in pose['bip01_pelvis'][:3,3])<.001
+            assert all(math.isfinite(float(v)) for matrix in pose.values() for line in matrix for v in line)
+            for bone,parent in skeleton['parents'].items():
+                if not parent or bone in ('bip01','bip01_pelvis'):continue
+                length=float(sum((pose[bone][:3,3]-pose[parent][:3,3])**2))**.5
+                rest=float(sum((base[bone][:3,3]-base[parent][:3,3])**2))**.5
+                assert abs(length-rest)<.001,(row['section'],key,bone)
+print('PASS decoded 20 prone cycles and 129 fitted driver motions: articulated gait, 47 bone lengths, exact model bindings in both roles')

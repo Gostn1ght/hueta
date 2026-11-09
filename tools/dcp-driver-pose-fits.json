@@ -1,0 +1,432 @@
+{
+  "physics/vehicles/bmw/veh_bmw_u_02.ogf": {
+    "section": "dcp_bmw5",
+    "model_sha256": "014348a3c582cca475c97185c0b0e3460d8b2d8b30d0deee76a7b92d257ad657",
+    "idle": "lz_drive_bmw5_idle",
+    "left": "lz_drive_bmw5_left",
+    "right": "lz_drive_bmw5_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/bmw/veh_bmw_u_01.ogf": {
+    "section": "dcp_bmw7",
+    "model_sha256": "c15e77d1467e2448f72eacfbfed0459373ad84106e2b9953704d09d470ce3ac0",
+    "idle": "lz_drive_bmw7_idle",
+    "left": "lz_drive_bmw7_left",
+    "right": "lz_drive_bmw7_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "lz_vehicle_passenger_compact"
+  },
+  "physics/vehicles/brdm/veh_brdm_u_01.ogf": {
+    "section": "dcp_brdm",
+    "model_sha256": "90b0c7dfd9708994f58fc61704c3c56e160fa45128063fd6fca27af3fd6ec521",
+    "idle": "lz_drive_brdm_idle",
+    "left": "lz_drive_brdm_left",
+    "right": "lz_drive_brdm_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 18,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/btr/veh_btr_u_01.ogf": {
+    "section": "dcp_btr",
+    "model_sha256": "2876b155c2211515814659c6eda493db3a6fcc46b35275acb2530d26df4abc9b",
+    "idle": "lz_drive_btr_idle",
+    "left": "lz_drive_btr_left",
+    "right": "lz_drive_btr_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 18,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/buggy/veh_buggy_u_01.ogf": {
+    "section": "dcp_buggy",
+    "model_sha256": "1956f2803035f9eb3f66c3ee713c48e19fe419a5f322371582a58ee8bc91fa14",
+    "idle": "lz_drive_buggy_idle",
+    "left": "lz_drive_buggy_left",
+    "right": "lz_drive_buggy_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/dacia/veh_dacia_u_01.ogf": {
+    "section": "dcp_dacia",
+    "model_sha256": "8df08585a3a58188f0ad4b8d9ce1d48275cf3fb8a3ba43188d6bb027f3dd504b",
+    "idle": "lz_drive_dacia_idle",
+    "left": "lz_drive_dacia_left",
+    "right": "lz_drive_dacia_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/volga/veh_gaz21_u_01.ogf": {
+    "section": "dcp_gaz21",
+    "model_sha256": "73e7d7d2810ab725425d0d2b081b2f7487950f78b20507b0712d86380de9a48a",
+    "idle": "lz_drive_gaz21_idle",
+    "left": "lz_drive_gaz21_left",
+    "right": "lz_drive_gaz21_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/volga/veh_gaz21_u_02.ogf": {
+    "section": "dcp_gaz21_2",
+    "model_sha256": "6397d62a90efb9318d5afd715b801e4108b2bb4718f59181e7eab53e46cd12b2",
+    "idle": "lz_drive_gaz21_2_idle",
+    "left": "lz_drive_gaz21_2_left",
+    "right": "lz_drive_gaz21_2_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/volga/veh_gaz24_u_01.ogf": {
+    "section": "dcp_gaz24",
+    "model_sha256": "7d7ca3c74c1ab41a8c179b4c09fa8f5fc056a4560b429e479210cbe7057e871c",
+    "idle": "lz_drive_gaz24_idle",
+    "left": "lz_drive_gaz24_left",
+    "right": "lz_drive_gaz24_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/golf/veh_golf_u_01.ogf": {
+    "section": "dcp_golf",
+    "model_sha256": "4946c083bf8ece06ba57c930324df3aad1db46be90e426e94b4b75e4f77fc95b",
+    "idle": "lz_drive_golf_idle",
+    "left": "lz_drive_golf_left",
+    "right": "lz_drive_golf_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 9,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_04.ogf": {
+    "section": "dcp_kamaz_army",
+    "model_sha256": "0e736b143d6f44f793b4558f1a6c754a656e38b10a068bcccd9ab3c292afacb8",
+    "idle": "lz_drive_kamaz_army_idle",
+    "left": "lz_drive_kamaz_army_left",
+    "right": "lz_drive_kamaz_army_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 24,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/kamaz/veh_kamaz_u_03.ogf": {
+    "section": "dcp_kamaz_army_tent",
+    "model_sha256": "98080838d7d19e22bba59beb5de1cecab73909d35d4b99431cc462a68afa487d",
+    "idle": "lz_drive_kamaz_army_tent_idle",
+    "left": "lz_drive_kamaz_army_tent_left",
+    "right": "lz_drive_kamaz_army_tent_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 24,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/lada/veh_lada_u_02.ogf": {
+    "section": "dcp_lada_2101",
+    "model_sha256": "99310dbd6278c00cd4181d8c878ac06c7df12b904c88e581cee84f59896cdfaa",
+    "idle": "lz_drive_lada_2101_idle",
+    "left": "lz_drive_lada_2101_left",
+    "right": "lz_drive_lada_2101_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/lada/veh_lada_u_01.ogf": {
+    "section": "dcp_lada_2107",
+    "model_sha256": "f7ee6b4b53a7ed0aa8ec707399ef240b63b2d82403581a55c20cb886e4bd5e6d",
+    "idle": "lz_drive_lada_2107_idle",
+    "left": "lz_drive_lada_2107_left",
+    "right": "lz_drive_lada_2107_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 18,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/lada/veh_lada_u_03.ogf": {
+    "section": "dcp_lada_2108",
+    "model_sha256": "86794b718f927ce0ede09263474f9b74d094f8e82d4c15ade50bde655d98143a",
+    "idle": "lz_drive_lada_2108_idle",
+    "left": "lz_drive_lada_2108_left",
+    "right": "lz_drive_lada_2108_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/lada/veh_lada_u_05.ogf": {
+    "section": "dcp_lada_2109",
+    "model_sha256": "129bfeb12b59045c9936764f4e1a5d1160bca47b2b9858d1550cf637a868df93",
+    "idle": "lz_drive_lada_2109_idle",
+    "left": "lz_drive_lada_2109_left",
+    "right": "lz_drive_lada_2109_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 12,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/luaz/veh_luaz_u_01.ogf": {
+    "section": "dcp_luaz",
+    "model_sha256": "544b14b60db538ba4501872e8541f0d8768df59d862d9d296396d367299b4e99",
+    "idle": "lz_drive_luaz_idle",
+    "left": "lz_drive_luaz_left",
+    "right": "lz_drive_luaz_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/luaz/veh_luaz_u_02.ogf": {
+    "section": "dcp_luaz_2",
+    "model_sha256": "c255e71566d2f05bd7d3b2d24322cc7f15569571aa63ec91dbeba22071a4d6f4",
+    "idle": "lz_drive_luaz_2_idle",
+    "left": "lz_drive_luaz_2_left",
+    "right": "lz_drive_luaz_2_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_01.ogf": {
+    "section": "dcp_mercedes",
+    "model_sha256": "0671513668ca767cd8871c0b4df001b65b0f91480c4d4c1e74528a728354e3ac",
+    "idle": "lz_drive_mercedes_idle",
+    "left": "lz_drive_mercedes_left",
+    "right": "lz_drive_mercedes_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_03.ogf": {
+    "section": "dcp_mercedes_2",
+    "model_sha256": "0b24b657e6e35d1cdd07d0592ea9492a894c503a7d91883f53a787668ce57f73",
+    "idle": "lz_drive_mercedes_2_idle",
+    "left": "lz_drive_mercedes_2_left",
+    "right": "lz_drive_mercedes_2_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/mercedes/veh_mercedes_u_02.ogf": {
+    "section": "dcp_mercedes_retro",
+    "model_sha256": "af85dba8723c07c02a46ed4fa0edae8b81e4972a3c9bce1f8fd3b97f3e939d80",
+    "idle": "lz_drive_mercedes_retro_idle",
+    "left": "lz_drive_mercedes_retro_left",
+    "right": "lz_drive_mercedes_retro_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_01.ogf": {
+    "section": "dcp_moskvich",
+    "model_sha256": "a8bdb95a64dfdfd31e7ab2b768206cda1654d9a2e54cf6fe206935d75fcded95",
+    "idle": "lz_drive_moskvich_idle",
+    "left": "lz_drive_moskvich_left",
+    "right": "lz_drive_moskvich_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_05.ogf": {
+    "section": "dcp_moskvich_2715",
+    "model_sha256": "191f14de75e4f1ea3804bc971d37a956bf49c5c5c63e3a368ad3472637b92751",
+    "idle": "lz_drive_moskvich_2715_idle",
+    "left": "lz_drive_moskvich_2715_left",
+    "right": "lz_drive_moskvich_2715_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "lz_vehicle_passenger_floor"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_06.ogf": {
+    "section": "dcp_moskvich_2715tun",
+    "model_sha256": "812903aee6fba86d488f3e81980f28f8294f7c3226f4b2723a0291f4f508b4e2",
+    "idle": "lz_drive_moskvich_2715tun_idle",
+    "left": "lz_drive_moskvich_2715tun_left",
+    "right": "lz_drive_moskvich_2715tun_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "lz_vehicle_passenger_floor"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_03.ogf": {
+    "section": "dcp_moskvich_412",
+    "model_sha256": "1a93af9ae25c34f65d7172467c168c62aa8216fb6524c30fe0bb13334b2822bf",
+    "idle": "lz_drive_moskvich_412_idle",
+    "left": "lz_drive_moskvich_412_left",
+    "right": "lz_drive_moskvich_412_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/moskvitch/veh_moskvich_u_02.ogf": {
+    "section": "dcp_moskvich_tunned",
+    "model_sha256": "f225c811a072707a14063743ae485cb0fd55a21ca7a605651ea8a4680948df1e",
+    "idle": "lz_drive_moskvich_tunned_idle",
+    "left": "lz_drive_moskvich_tunned_left",
+    "right": "lz_drive_moskvich_tunned_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/niva/veh_niva_u_01.ogf": {
+    "section": "dcp_niva_green",
+    "model_sha256": "4c1e726ba3016f11c70d706b4d16394bdccbda5a31ca0c5fd2ce49774793c58b",
+    "idle": "lz_drive_niva_green_idle",
+    "left": "lz_drive_niva_green_left",
+    "right": "lz_drive_niva_green_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/niva/veh_niva_u_02.ogf": {
+    "section": "dcp_niva_white",
+    "model_sha256": "b1a6b9d199533154f6fd91945ef5e71579805807153123f3c81953c640a10695",
+    "idle": "lz_drive_niva_white_idle",
+    "left": "lz_drive_niva_white_left",
+    "right": "lz_drive_niva_white_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/oka/veh_oka_u_01.ogf": {
+    "section": "dcp_oka",
+    "model_sha256": "e71762d9deb1bcab40233a95aa13d2c80b959bf0cc3659f6b71eab86ba42d06f",
+    "idle": "lz_drive_oka_idle",
+    "left": "lz_drive_oka_left",
+    "right": "lz_drive_oka_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 18,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/raf/veh_raf_u_01.ogf": {
+    "section": "dcp_raf",
+    "model_sha256": "f6abd673a7b66648922535f5da4c7bc8d8abc99ee4149638520ef340db634ba4",
+    "idle": "lz_drive_raf_idle",
+    "left": "lz_drive_raf_left",
+    "right": "lz_drive_raf_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 21,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/niva/veh_super_niva.ogf": {
+    "section": "dcp_super_niva",
+    "model_sha256": "074c23bde8d07b8de48140a018a470f5b8f54bc6addbeee572e28ecec2da5582",
+    "idle": "lz_drive_super_niva_idle",
+    "left": "lz_drive_super_niva_left",
+    "right": "lz_drive_super_niva_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/toyota/veh_toyota_u_01.ogf": {
+    "section": "dcp_toyota",
+    "model_sha256": "d8aeb8ae46110c064cea20e59c7e6ccb367f44ca566b6ec41ef0abe03aafa410",
+    "idle": "lz_drive_toyota_idle",
+    "left": "lz_drive_toyota_left",
+    "right": "lz_drive_toyota_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/uaz/veh_uaz_u_01.ogf": {
+    "section": "dcp_uaz",
+    "model_sha256": "ca8aab2a5fb38d387f402b0cac99fc4b0cea1be85c5b144d994f8aacf1df105c",
+    "idle": "lz_drive_uaz_idle",
+    "left": "lz_drive_uaz_left",
+    "right": "lz_drive_uaz_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/uaz/veh_uaz_u_05_gun.ogf": {
+    "section": "dcp_uaz_army_gun",
+    "model_sha256": "8b438dd2ce5024b01fec5a7adf719514ca0aaeb329e44ed83d9220dd8b68ad87",
+    "idle": "lz_drive_uaz_army_gun_idle",
+    "left": "lz_drive_uaz_army_gun_left",
+    "right": "lz_drive_uaz_army_gun_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 9,
+    "lower_body_motion": "lz_vehicle_passenger_low"
+  },
+  "physics/vehicles/uaz/veh_uaz_jag.ogf": {
+    "section": "dcp_uaz_jag",
+    "model_sha256": "5015ee449acdb007929aff7bdf93cd88ba74173ec0d55b47fb0334b999bb275a",
+    "idle": "lz_drive_uaz_jag_idle",
+    "left": "lz_drive_uaz_jag_left",
+    "right": "lz_drive_uaz_jag_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/uaz/veh_uaz_van_u_01.ogf": {
+    "section": "dcp_uaz_van",
+    "model_sha256": "bf8449cdaa6add1efa253f23e0dcaa49376fc6b43ab339c15ff1f5cb0486e100",
+    "idle": "lz_drive_uaz_van_idle",
+    "left": "lz_drive_uaz_van_left",
+    "right": "lz_drive_uaz_van_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 24,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/ural/veh_ural_u_01.ogf": {
+    "section": "dcp_ural",
+    "model_sha256": "f6ab193dee12ed80d3d01bd2e6f8c37fc68b51c4cefc3e55a613bbe78fd31efc",
+    "idle": "lz_drive_ural_idle",
+    "left": "lz_drive_ural_left",
+    "right": "lz_drive_ural_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 21,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zaz/veh_zaz_u_01.ogf": {
+    "section": "dcp_zaz",
+    "model_sha256": "af4922cb163803360bf1a4590f102211d83d2e08308e0a7383eb039e25381686",
+    "idle": "lz_drive_zaz_idle",
+    "left": "lz_drive_zaz_left",
+    "right": "lz_drive_zaz_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 12,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zaz968/veh_zaz_968_u_01.ogf": {
+    "section": "dcp_zaz968",
+    "model_sha256": "5dd3c33ddf6d098bdfea829076025a7c5176e5a3016f3d04b2d6108a8bddd866",
+    "idle": "lz_drive_zaz968_idle",
+    "left": "lz_drive_zaz968_left",
+    "right": "lz_drive_zaz968_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zaz968/veh_zaz_968_u_02.ogf": {
+    "section": "dcp_zaz968_2",
+    "model_sha256": "6950e6af5e30aafc1ed0eced095e094b68dc94e8814e6dcaec03d83c0ecc5175",
+    "idle": "lz_drive_zaz968_2_idle",
+    "left": "lz_drive_zaz968_2_left",
+    "right": "lz_drive_zaz968_2_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 15,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zaz/veh_zaz_u_02.ogf": {
+    "section": "dcp_zaz_2",
+    "model_sha256": "3ec3c866cc617022de838d4a816ff44bf6d6e5bf01db208dcac706fc61b829d8",
+    "idle": "lz_drive_zaz_2_idle",
+    "left": "lz_drive_zaz_2_left",
+    "right": "lz_drive_zaz_2_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 12,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zil/veh_zil_u_01.ogf": {
+    "section": "dcp_zil",
+    "model_sha256": "8481a18fe341ce29a63eef0aa003148ebdd1285b1f73d3490dccc3d5583a1c84",
+    "idle": "lz_drive_zil_idle",
+    "left": "lz_drive_zil_left",
+    "right": "lz_drive_zil_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 9,
+    "lower_body_motion": "steering_idle_0_0"
+  },
+  "physics/vehicles/zil/veh_zil_u_02.ogf": {
+    "section": "dcp_zil131",
+    "model_sha256": "44725b4898ea1cd53d68eb753e7a3b511e969bb2f595fea5920fe9518da1ead2",
+    "idle": "lz_drive_zil131_idle",
+    "left": "lz_drive_zil131_left",
+    "right": "lz_drive_zil131_right",
+    "wheel": "stearing_wheel",
+    "torso_lean_degrees": 6,
+    "lower_body_motion": "steering_idle_0_0"
+  }
+}

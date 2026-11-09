@@ -21,6 +21,7 @@ for name in ('source-dir', 'template', 'addons', 'out'):
     p.add_argument('--' + name, type=Path, required=True)
 p.add_argument('--clip', action='append', required=True)
 p.add_argument('--root-mode', choices=['in-place', 'seat', 'preserve'], default='in-place')
+p.add_argument('--lock-facing', action='store_true', help='Remove donor turn yaw; the network actor owns facing')
 p.add_argument('--steering-fit', type=Path, help='Private model-specific wheel contacts in actor Blender space')
 p.add_argument('--weapon-grip', choices=['pistol', 'rifle', 'launcher', 'knife'], help='Private idle review: original game weapon grip, with captured elbow bend planes')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
@@ -30,6 +31,7 @@ if steering_fit:
     assert a.root_mode == 'seat'
     assert hashlib.sha256(Path(steering_fit['model_path']).read_bytes()).hexdigest() == steering_fit['model_sha256']
 a.out.mkdir(parents=True, exist_ok=True)
+(a.out / 'review.json').unlink(missing_ok=True) # a failed retry cannot retain an old approval receipt
 root = Path(__file__).resolve().parents[1]
 provenance = json.loads((a.source_dir / 'provenance.json').read_text())
 assert provenance['source'] == 'https://www.mixamo.com/' and not provenance['raw_redistribution']
@@ -161,6 +163,13 @@ def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
 def fit_weapon(world):
     """Keep the source body; place proven finger grips through unstretched arms."""
     anchor = world['bip01_r_finger1'].translation.copy()
+    if a.weapon_grip in ('rifle', 'pistol'):
+        # A crawling donor alternates hands across its centreline. A two-hand
+        # weapon must stay on its firing shoulder rather than follow that hand
+        # through the head/torso at every stride.
+        shoulders = (world['bip01_r_upperarm'].translation + world['bip01_l_upperarm'].translation) * .5
+        anchor = shoulders + Vector((.25 if a.weapon_grip=='rifle' else .04, .30, -.12))
+
     if a.weapon_grip == 'launcher':
         anchor += Vector((.10, 0, .09))
         shoulder = world['bip01_r_upperarm'].translation
@@ -169,9 +178,29 @@ def fit_weapon(world):
         # lowering only the elbow still leaves the tube through the arm.
         anchor.z = max(anchor.z, shoulder.z + .055)
         anchor.x = max(anchor.x, shoulder.x + .075)
-    shift = anchor - canonical['bip01_r_finger1'].translation
+    # Both wrists must be reachable by this skeleton. Moving only the left
+    # wrist destroys the weapon grip; project the whole grip into the two arm
+    # reach volumes instead, without changing limb lengths or the body pose.
+    origin = canonical['bip01_r_finger1'].translation
+    labels = ('r',) if a.weapon_grip == 'knife' else ('r', 'l')
+    minimum_x = world['bip01_head'].translation.x + .22 if a.weapon_grip == 'rifle' else None
+    for _ in range(128):
+        corrected = False
+        for label in labels:
+            shoulder, elbow, wrist = [world[f'bip01_{label}_{part}'].translation for part in ('upperarm','forearm','hand')]
+            reach = (elbow-shoulder).length + (wrist-elbow).length - .012
+            centre = shoulder - (canonical[f'bip01_{label}_hand'].translation - origin)
+            delta = anchor - centre
+            if delta.length > reach:
+                anchor = centre + delta.normalized() * reach
+                corrected = True
+        if minimum_x is not None and anchor.x < minimum_x:
+            anchor.x = minimum_x
+            corrected = True
+        if not corrected: break
+    shift = anchor - origin
     desired = {name: Matrix.Translation(shift) @ matrix for name, matrix in canonical.items()}
-    fit_hands(world, desired, ('r',) if a.weapon_grip == 'knife' else ('r', 'l'), a.weapon_grip == 'launcher')
+    fit_hands(world, desired, ('r',) if a.weapon_grip == 'knife' else ('r', 'l'), a.weapon_grip in ('launcher', 'rifle', 'pistol'))
 
 
 def fit_steering(world):
@@ -262,6 +291,12 @@ for file, name in clips:
             else:
                 pose = world[parent.name] @ rest[parent.name].inverted() @ rest[dst] if parent else rest[dst].copy()
             world[dst] = pose
+        if a.lock_facing:
+            hips = world['bip01_r_thigh'].translation - world['bip01_l_thigh'].translation
+            yaw = math.atan2(hips.y, hips.x)
+            pivot = world['bip01_pelvis'].translation
+            turn = Matrix.Translation(pivot) @ Matrix.Rotation(-yaw, 4, 'Z') @ Matrix.Translation(-pivot)
+            world = {name: turn @ matrix for name, matrix in world.items()}
         if canonical:
             fit_weapon(world)
         if steering_fit:
@@ -318,7 +353,7 @@ assert worst < .001, worst
 assert worst_angle < .002, worst_angle
 assert worst_rotation_coefficient < .002, worst_rotation_coefficient
 (a.out / 'review.json').write_text(json.dumps(dict(source=provenance['source'], raw_files_private=True, installed=False,
-    root_mode=a.root_mode, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
+    root_mode=a.root_mode, lock_facing=a.lock_facing, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
     roundtrip_max_rotation_coefficient=worst_rotation_coefficient,
     candidate_sha256=hashlib.sha256((a.out / 'candidate.omf').read_bytes()).hexdigest()), indent=2) + '\n')
 print('PRIVATE_MIXAMO_REVIEW_READY', a.out, 'roundtrip error', worst)

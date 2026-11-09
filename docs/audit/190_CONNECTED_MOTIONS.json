@@ -1,0 +1,255 @@
+{
+  "source": "https://www.mixamo.com/",
+  "license_reference": "https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html",
+  "raw_files_private": true,
+  "prone": {
+    "sha256": "536c61ad76e3d35a40e60bc92e93aeb8d43542162bb117b2017f01ed6667e0a9",
+    "connected": [
+      "lz_prone_empty_fwd",
+      "lz_prone_empty_idle",
+      "lz_prone_empty_back",
+      "lz_prone_empty_left",
+      "lz_prone_empty_right",
+      "lz_prone_rifle_fwd",
+      "lz_prone_rifle_idle",
+      "lz_prone_rifle_back",
+      "lz_prone_rifle_left",
+      "lz_prone_rifle_right",
+      "lz_prone_pistol_fwd",
+      "lz_prone_pistol_idle",
+      "lz_prone_pistol_back",
+      "lz_prone_pistol_left",
+      "lz_prone_pistol_right",
+      "lz_prone_knife_fwd",
+      "lz_prone_knife_idle",
+      "lz_prone_knife_back",
+      "lz_prone_knife_left",
+      "lz_prone_knife_right"
+    ],
+    "preserved_launcher_fallback": [
+      "lz_prone_launcher_fwd",
+      "lz_prone_launcher_idle",
+      "lz_prone_launcher_back",
+      "lz_prone_launcher_left",
+      "lz_prone_launcher_right"
+    ],
+    "sources": [
+      {
+        "grip": "empty",
+        "sha256": "4b30ef0f89668049a1f0bf4ac3bb5df13d761d202a7922b388d4002ac8a79226",
+        "clips": [
+          {
+            "source": "Prone Forward.fbx",
+            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
+            "clip": "review_empty_fwd",
+            "frames": 71,
+            "scale": 0.9769133543173685
+          },
+          {
+            "source": "Prone Idle.fbx",
+            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
+            "clip": "review_empty_idle",
+            "frames": 149,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Crawl Backwards In Prone.fbx",
+            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
+            "clip": "review_empty_back",
+            "frames": 30,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Left Turn.fbx",
+            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
+            "clip": "review_empty_left",
+            "frames": 32,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Right Turn.fbx",
+            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
+            "clip": "review_empty_right",
+            "frames": 41,
+            "scale": 0.9769139654996354
+          }
+        ],
+        "roundtrip_max_error_metres": 0.00014418478455643677
+      },
+      {
+        "grip": "rifle",
+        "sha256": "4c788c561053a76e2fc2186da6a0e91ec89e98fd419b9373a08936910a7de0c7",
+        "clips": [
+          {
+            "source": "Prone Forward.fbx",
+            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
+            "clip": "review_rifle_fwd",
+            "frames": 71,
+            "scale": 0.9769133543173685
+          },
+          {
+            "source": "Prone Idle.fbx",
+            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
+            "clip": "review_rifle_idle",
+            "frames": 149,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Crawl Backwards In Prone.fbx",
+            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
+            "clip": "review_rifle_back",
+            "frames": 30,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Left Turn.fbx",
+            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
+            "clip": "review_rifle_left",
+            "frames": 32,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Right Turn.fbx",
+            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
+            "clip": "review_rifle_right",
+            "frames": 41,
+            "scale": 0.9769139654996354
+          }
+        ],
+        "roundtrip_max_error_metres": 0.0001497955918144986
+      },
+      {
+        "grip": "pistol",
+        "sha256": "25e8cf5943697b2217470effa7a6f354b74c49a186d78acf6a9d2817604e44a4",
+        "clips": [
+          {
+            "source": "Prone Forward.fbx",
+            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
+            "clip": "review_pistol_fwd",
+            "frames": 71,
+            "scale": 0.9769133543173685
+          },
+          {
+            "source": "Prone Idle.fbx",
+            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
+            "clip": "review_pistol_idle",
+            "frames": 149,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Crawl Backwards In Prone.fbx",
+            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
+            "clip": "review_pistol_back",
+            "frames": 30,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Left Turn.fbx",
+            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
+            "clip": "review_pistol_left",
+            "frames": 32,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Right Turn.fbx",
+            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
+            "clip": "review_pistol_right",
+            "frames": 41,
+            "scale": 0.9769139654996354
+          }
+        ],
+        "roundtrip_max_error_metres": 0.00011104708046627523
+      },
+      {
+        "grip": "knife",
+        "sha256": "c68d68709dbea10e0dbe640b2c2b94211b81c511d79dde0dc70e9f4bdd46460f",
+        "clips": [
+          {
+            "source": "Prone Forward.fbx",
+            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
+            "clip": "review_knife_fwd",
+            "frames": 71,
+            "scale": 0.9769133543173685
+          },
+          {
+            "source": "Prone Idle.fbx",
+            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
+            "clip": "review_knife_idle",
+            "frames": 149,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Crawl Backwards In Prone.fbx",
+            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
+            "clip": "review_knife_back",
+            "frames": 30,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Left Turn.fbx",
+            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
+            "clip": "review_knife_left",
+            "frames": 32,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Right Turn.fbx",
+            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
+            "clip": "review_knife_right",
+            "frames": 41,
+            "scale": 0.9769139654996354
+          }
+        ],
+        "roundtrip_max_error_metres": 0.00014418478455643677
+      }
+    ]
+  },
+  "driving": {
+    "sha256": "feed0ef3398fad584e5454fc87b172e640e2063089be090a0aa96f8997e87559",
+    "models": 43,
+    "motions": 129,
+    "roundtrip_max_error_metres": 5.8406349702529185e-05,
+    "skipped": [
+      {
+        "section": "dcp_btr82",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.23912394046783447, 0.751274824142456, 0.5118272304534912], 'r': [0.23912391066551208, 0.751274824142456, 0.5118272304534912]})"
+      },
+      {
+        "section": "dcp_dt75",
+        "skipped": "no physical steering-wheel mesh"
+      },
+      {
+        "section": "dcp_kamaz",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.23563998937606812, 0.770970344543457, 0.5102702379226685], 'r': [0.2277500033378601, 0.770970344543457, 0.5102702379226685]})"
+      },
+      {
+        "section": "dcp_kamaz_fura",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.23563998937606812, 0.770970344543457, 0.5102702379226685], 'r': [0.2277500033378601, 0.770970344543457, 0.5102702379226685]})"
+      },
+      {
+        "section": "dcp_paz",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.23596656322479248, 0.6988510489463806, 0.42681896686553955], 'r': [0.27514439821243286, 0.6988510489463806, 0.42681896686553955]})"
+      },
+      {
+        "section": "dcp_paz3206",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.23623281717300415, 0.6597110629081726, 0.4291003942489624], 'r': [0.22843307256698608, 0.6597113013267517, 0.4291003942489624]})"
+      },
+      {
+        "section": "dcp_tractor",
+        "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.8506622910499573, 2.4661355018615723, -0.9184179902076721], 'r': [-0.5178312063217163, 2.2454800605773926, -0.7726057171821594]})"
+      }
+    ]
+  },
+  "preserved_motion_hashes": {
+    "lz_vehicle_passenger": "dd841d259eedc16181179921a776ea053d29bbdf85ed23ea291ae2f947793d1b",
+    "lz_vehicle_enter_driver": "32265a8bea8d8768d1a162f56dfc095679767be7f41d9be6f89aefc2d9063240",
+    "lz_vehicle_exit_driver": "4733b2021ee90ab7da22a67c7a3be53601cb7b022208063963dc624351781571",
+    "lz_vehicle_enter_passenger": "7a52b7b16c38df2a2cb302b0b317ce65a750357ccdeacdc5ffbad2fabbcd5186",
+    "lz_vehicle_exit_passenger": "c5d042c0bd72c0e52ee02a6e3be7198a44b186ebb14e984413c239d63ab02ea2",
+    "lz_prone_launcher_fwd": "a9b263e5db8db9bd1cc01ace819af3be270ce08c9392c3a3bbffa337e6c7ef85",
+    "lz_prone_launcher_idle": "62fcb01ac49c2841938b7b50be70f35e776ee2f80b940cdc27db53923e371d71",
+    "lz_prone_launcher_back": "2158c5b37279e600ffd36cd1f221b37500249d911808f6923abd12fac901bacd",
+    "lz_prone_launcher_left": "46d9bd9487c12adb77b68669a4fb5282ee2087f08e40c18597adcf9225895f08",
+    "lz_prone_launcher_right": "59cfd1a4b2d93257e2e729a8d4f6e516b22c32457eff4ff4648bb759fb078c0e"
+  }
+}
