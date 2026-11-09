@@ -23,6 +23,8 @@ end
 
 local controlled_actor = nil
 local controlled_actor_id = nil
+local controlled_actor_storage = nil
+local retiring_actor_storage = nil
 local destroyed_actor_id = nil
 local use_own_actor_id -- defined below
 local install_actor_lifecycle
@@ -44,6 +46,8 @@ local function local_actor()
 	if e and e:clsid() == clsid.script_actor and e:id() ~= destroyed_actor_id then
 		controlled_actor = e
 		controlled_actor_id = e:id()
+        controlled_actor_storage = db.storage[controlled_actor_id] or {object=e}
+        db.storage[controlled_actor_id] = controlled_actor_storage
 		use_own_actor_id(e)
 	end
 	return controlled_actor
@@ -109,6 +113,8 @@ function on_actor_spawned(obj)
 	player_state_spawn_ready = false
 	next_player_state = 0
 	controlled_actor_id = obj:id()
+    controlled_actor_storage = db.storage[controlled_actor_id] or {object=obj}
+    db.storage[controlled_actor_id] = controlled_actor_storage
 	destroyed_actor_id = nil
 	db.actor = obj
 	-- Recover control and bind the new body before touching optional UI.
@@ -136,11 +142,12 @@ function on_actor_spawned(obj)
 	if pending_player_state then use_player_state(pending_player_state) end
 end
 
-function on_actor_destroyed(obj)
-	if obj and obj == controlled_actor then
+function on_actor_destroyed(obj, storage)
+    if obj and obj:id() == controlled_actor_id and storage and storage == controlled_actor_storage then
 		destroyed_actor_id = controlled_actor_id
 		controlled_actor = nil
 		controlled_actor_id = nil
+        controlled_actor_storage = nil
 		player_state_ready, next_player_state, pending_player_state = false, 0, nil
 		player_state_spawn_ready = false
 		rawset(db, "actor", nil)
@@ -158,8 +165,13 @@ install_actor_lifecycle = function()
 	if not binder or binder.__netcoop_lifecycle then return end
 	binder.__netcoop_lifecycle = true
 	local destroy, update = binder.net_destroy, binder.update
+    local function owns_body(self)
+        -- CScriptGameObject pointer conversion allocates fresh Lua userdata.
+        -- Compare the binder's reinit storage table, never wrapper identity.
+        return self.object:id() == controlled_actor_id and self.st == controlled_actor_storage
+    end
 	binder.update = function(self, ...)
-		if self.__netcoop_destroying or self.object ~= controlled_actor then return end
+		if self.__netcoop_destroying or not owns_body(self) then return end
 		if not player_state_spawn_ready then
 			-- BHS globals and raw limb keys can still describe the previous
 			-- body. Its first update must not kill this one before restore.
@@ -185,7 +197,7 @@ install_actor_lifecycle = function()
 	binder.net_destroy = function(self, ...)
 		if self.__netcoop_destroying then return end
 		self.__netcoop_destroying = true
-		if self.object ~= controlled_actor then
+		if not owns_body(self) then
 			if USE_MARSHAL then UnregisterScriptCallback("save_state", self) end
 			-- Network IDs can be reused by another location. Never erase the
 			-- replacement body's storage when an old binder finishes late.
@@ -195,23 +207,25 @@ install_actor_lifecycle = function()
 			end
 			return object_binder.net_destroy(self)
 		end
+        local previous = retiring_actor_storage
+        retiring_actor_storage = self.st
 		local ok, err = pcall(destroy, self, ...)
-		on_actor_destroyed(self.object)
+        retiring_actor_storage = previous
+		on_actor_destroyed(self.object, self.st)
 		if not ok then error(err) end
 	end
 	-- db.del_actor in base-game ignores its argument and dereferences db.actor.
 	-- Use the valid binder object, then clear the fallback pointer as well.
 	db.del_actor = function(obj)
-		obj = obj or rawget(db, "actor")
-		if not obj then return end
-		if obj ~= controlled_actor then
-			if obj:id() ~= controlled_actor_id then db.del_obj(obj) end
-			return
-		end
-		db.del_obj(obj)
-		db.actor_proxy:net_destroy()
-		on_actor_destroyed(obj)
-	end
+        obj = obj or rawget(db, "actor")
+        -- Only the owned binder's scoped destructor may clear actor globals.
+        -- An unscoped/stale caller has no proof of which reused ID it owns.
+        local storage = retiring_actor_storage
+        if not obj or not storage or obj:id() ~= controlled_actor_id or storage ~= controlled_actor_storage then return end
+        db.del_obj(obj)
+        db.actor_proxy:net_destroy()
+        on_actor_destroyed(obj, storage)
+    end
 end
 
 function is_pure_client()

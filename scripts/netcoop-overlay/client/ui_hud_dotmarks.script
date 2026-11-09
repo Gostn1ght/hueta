@@ -1370,6 +1370,7 @@ end
 
 --- @param feature string
 function killswitch(feature)
+	if not cfg then return true end
 	if cfg.killswitch_all then return true end
 	if feature then
 		feature = ("killswitch_" .. feature)

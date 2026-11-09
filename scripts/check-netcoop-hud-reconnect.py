@@ -70,3 +70,34 @@ cfg.disable_addon=true;netcoop_reset_actor();actor_on_first_update();assert(not 
 cfg.disable_addon=false;dependencies_failed=true;netcoop_reset_actor();actor_on_first_update();assert(not scanning and handlers==1)
 ''')
 print('PASS actual HUD/pickup reconnect: owned widgets only, no healing, held/loot locks cleared, fresh HUD and timer, disabled/dependency failure respected')
+
+# Execute the actual nested bar builder with a replaced custom-static root.
+# Cached userdata must rebind even when no actor-spawn callback was emitted.
+a=bhs.index('local function ParamBar(')
+b=bhs.index('--- green bkg lines',a)
+bar=bhs[a:b].rstrip()
+ui=LuaRuntime()
+ui.execute("""
+bar_roots={};display={types={}};healthstatus=true;show_hud_type=1
+show_hud_change_time=0;scuffed_fix=true;disable_hud_fps_fix_tmr=1000
+function time_global()return 1000 end
+function netcoop_enabled()return true end
+function CreateTimeEvent()end
+function get_hud()return hud end
+xml={InitProgressBar=function(self,name,root)
+ return {owner=root,Show=function()end,SetProgressPos=function(self,v)self.value=v end}
+end}
+roots={};hud={GetCustomStatic=function(self,n)return roots[n]end,
+ AddCustomStatic=function(self,n)local wnd={SetAutoDelete=function()end};roots[n]={wnd=function()return wnd end}end,
+ RemoveCustomStatic=function(self,n)roots[n]=nil end}
+"""+bar+"""
+local first=ParamBar(nil,'head','bodypart',11,11,true)
+assert(first and first.value==100,'first frame displays real health, never placeholder 55/red')
+roots.head=nil
+local second=ParamBar(first,'head','bodypart',3,11,true)
+assert(second and second~=first and second.owner~=first.owner and second.value==300/11)
+local wnd={};roots.head={wnd=function()return wnd end}
+local third=ParamBar(second,'head','bodypart',11,11,true)
+assert(third~=second and third.owner==wnd and third.value==100)
+""")
+print('PASS real limb bar builder: replaced HUD roots rebind, expired throttle cannot block MP startup, first frame uses actual health')

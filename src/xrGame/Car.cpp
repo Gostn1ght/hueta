@@ -61,6 +61,27 @@ static CBlend* car_play_cycle_safe(IKinematicsAnimated* animated, LPCSTR request
 #include "netcoop.h"
 #endif
 
+// Validate optional donor turrets before constructing their shooting object.
+static bool car_mounted_weapon_available(IKinematics& model, CInifile& definition)
+{
+    if (!definition.line_exist("mounted_weapon_definition", "wpn_section")) return false;
+    const LPCSTR section = definition.r_string("mounted_weapon_definition", "wpn_section");
+    if (!section || !*section || !pSettings->section_exist(section) || !pSettings->line_exist(section, "ammo_class")) {
+        Msg("! [diag][vehicle] mounted weapon unavailable: section=%s", section ? section : "<empty>");
+        return false;
+    }
+    const LPCSTR ammo = pSettings->r_string(section, "ammo_class");
+    if (!ammo || !*ammo || !pSettings->section_exist(ammo)) {
+        Msg("! [diag][vehicle] mounted weapon unavailable: ammo=%s section=%s", ammo ? ammo : "<empty>", section);
+        return false;
+    }
+    const LPCSTR keys[] = {"rotate_x_bone", "rotate_y_bone", "fire_bone"};
+    for (const auto key : keys)
+        if (!definition.line_exist("mounted_weapon_definition", key) ||
+            model.LL_BoneID(definition.r_string("mounted_weapon_definition", key)) == BI_NONE) return false;
+    return true;
+}
+
 CCar::CCar()
 #ifdef CAR_NEW
 :m_visual_camera(this)
@@ -263,7 +284,7 @@ BOOL CCar::net_Spawn(CSE_Abstract* DC)
 	CInifile* pUserData = PKinematics(Visual())->LL_UserData();
 	if (pUserData->section_exist("destroyed"))
 		CPHDestroyable::Load(pUserData, "destroyed");
-	if (pUserData->section_exist("mounted_weapon_definition"))
+	if (pUserData->section_exist("mounted_weapon_definition") && car_mounted_weapon_available(*PKinematics(Visual()), *pUserData))
 		m_car_weapon = xr_new<CCarWeapon>(this);
 
 	if (pUserData->section_exist("visual_memory_definition"))

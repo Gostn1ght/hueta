@@ -88,7 +88,7 @@ fresh.execute(declarations+'\nuse_own_actor_id=function()end\n'+code+spawn+lifec
 on_actor_spawned(actor)
 assert(input_resets==1,'new body releases input lock held by an interrupted old-body animation')
 use_player_state('@7|-');assert(acks==0 and pending_player_state=='@7|-')
-assert(bind_stalker.actor_binder.update({object=actor})==123)
+assert(bind_stalker.actor_binder.update({object=actor,st=db.storage[7]})==123)
 assert(acks==1 and player_state_ready and pending_player_state==nil)
 assert(zzz_player_injuries.health.head==11 and db.storage[7].pstor['health.head']==11)
 ''')
@@ -105,7 +105,7 @@ ui_hud_dotmarks={netcoop_reset_actor=function() resets=resets+1 end}
 on_actor_spawned(actor)
 assert(input_resets==2 and resets==1 and logs==2,'optional resets are isolated; essential input restoration runs')
 use_player_state('@7|-')
-assert(bind_stalker.actor_binder.update({object=actor})==123)
+assert(bind_stalker.actor_binder.update({object=actor,st=db.storage[7]})==123)
 assert(acks==2 and zzz_player_injuries.health.head==11,'restore and input must survive an optional HUD failure')
 ''')
 # Execute the actual disabled-DotMarks reset path (dependency failure => cfg=nil).
@@ -117,14 +117,15 @@ print('PASS actor bootstrap: stale optional PDA/BHS widgets cannot abort input/b
 # A previous map may retire a binder after the next map has reused its ID.
 fresh.execute(r"""
 local replacement={id=function()return 7 end}
-local old={object=actor}
+local old={object=actor,st=db.storage[7]}
 local deletes=0
 function db.del_obj()deletes=deletes+1 end
 function db.delete_enemy()deletes=deletes+1 end
 object_binder={net_destroy=function()return 'retired' end}
+db.storage[7]={pstor={}} -- actual new actor_binder.reinit creates a new table
 on_actor_spawned(replacement)
-local storage={pstor={['health.head']=3}};db.storage[7]=storage
-on_actor_destroyed(actor)
+local storage=db.storage[7];storage.pstor={['health.head']=3}
+on_actor_destroyed(actor,old.st)
 assert(db.actor==replacement and db.storage[7]==storage)
 assert(bind_stalker.actor_binder.update(old)==nil)
 assert(bind_stalker.actor_binder.net_destroy(old)=='retired')
@@ -132,3 +133,28 @@ assert(deletes==0 and db.actor==replacement and db.storage[7]==storage)
 db.del_actor(actor);assert(deletes==0 and db.actor==replacement)
 """)
 print('PASS retired actor with reused ID cannot update/reset/delete replacement body or limb storage')
+
+# Faithful pointer-wrapper aliases: equal native ID and storage but distinct
+# Lua wrappers, as luabind's pointer_converter constructs with lua_newuserdata.
+alias=LuaRuntime()
+alias.execute(r"""
+db={storage={[7]={pstor={}}},actor_proxy={net_destroy=function()end}}
+level={enable_input=function()end};now=100;updates=0;destroyed=0
+function time_global()return now end
+function printf()end
+function quiet_busy_hands()end
+function CreateTimeEvent()end
+actor={id=function()return 7 end}
+binder_alias={id=function()return 7 end};assert(actor~=binder_alias)
+function db.del_obj(obj)db.storage[obj:id()]=nil end
+bind_stalker={actor_binder={update=function(self)updates=updates+1 end,
+ net_destroy=function(self)destroyed=destroyed+1;db.del_actor(self.object) end}}
+"""+declarations+'\nuse_own_actor_id=function()end\n'+spawn+lifecycle+r"""
+on_actor_spawned(actor)
+local body={object=binder_alias,st=db.storage[7]}
+bind_stalker.actor_binder.update(body)
+assert(updates==1,'a new Lua wrapper for the same native body MUST update')
+bind_stalker.actor_binder.net_destroy(body)
+assert(destroyed==1 and db.actor==nil and db.storage[7]==nil)
+""")
+print('PASS real wrapper-alias regression: same body updates and retires despite unequal Lua userdata wrappers')

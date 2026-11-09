@@ -807,6 +807,7 @@ local progress_health_leftarm_time=nil
 local progress_health_rightleg_time=nil
 local progress_health_leftleg_time=nil
 
+local bar_roots = {}
 local scuffed_fix = false	
 local xml = nil
 local function HUDUpdate()
@@ -1109,33 +1110,30 @@ local function HUDUpdate()
 				end
 			end
 			
-			local cs_name = hud:GetCustomStatic(customstatic) 
-			if (cs_name == nil) then 
-				if not (scuffed_fix) then
-					hud:AddCustomStatic(customstatic, true)
-					cs_name = hud:GetCustomStatic(customstatic)
-					local w = cs_name:wnd()
-					barhandler = xml:InitProgressBar(barname, w)		
-					barhandler:Show(true)
-					barhandler:SetProgressPos(55)
-					scuffed_fix = true
-					CreateTimeEvent("bvcx", "bvcx", disable_hud_fps_fix_tmr, worst_possible_fix)
-				end
-			else
+			local cs_name = hud:GetCustomStatic(customstatic)
+            if not cs_name then
+                barhandler = nil
+                -- In multiplayer the loading clock/event may restart. A dead
+                -- FPS-throttle timer must not prevent creating the new bars.
+                if (netcoop_enabled and netcoop_enabled()) or not scuffed_fix then
+                    hud:AddCustomStatic(customstatic, true)
+                    cs_name = hud:GetCustomStatic(customstatic)
+                    scuffed_fix = true
+                    CreateTimeEvent("bvcx", "bvcx", disable_hud_fps_fix_tmr, worst_possible_fix)
+                end
+            end
+            if cs_name then
+                local root = cs_name:wnd()
+                if bar_roots[customstatic] ~= root then
+                    bar_roots[customstatic], barhandler = root, nil
+                end
                 if not barhandler then
-                    barhandler = xml:InitProgressBar(barname, cs_name:wnd())
+                    barhandler = xml:InitProgressBar(barname, root)
                     barhandler:Show(true)
                 end
-				if not param_max then --default 0 to 100
-					param=param*100
-					if not param then param=0 end
-					barhandler:SetProgressPos(param)
-				else
-					param=param*100/param_max
-					if not param then param=0 end
-					barhandler:SetProgressPos(param)
-				end
-			end
+                local value = param_max and (param * 100 / param_max) or param * 100
+                barhandler:SetProgressPos(math.max(0, math.min(100, value)))
+            end
 			if show_hud_type<1 or (time_global()-show_hud_change_time<50) then --not show
 				if (cs_name ~= nil) then
 					hud:RemoveCustomStatic(customstatic)
@@ -1860,6 +1858,7 @@ end
 -- Limb health itself is restored separately from the authoritative snapshot.
 function netcoop_reset_actor()
     init, scuffed_fix, xml = false, false, nil
+    bar_roots = {}
     progress_stamina, progress_health = nil, nil
     progress_health_head, progress_health_torso = nil, nil
     progress_health_rightarm, progress_health_leftarm = nil, nil

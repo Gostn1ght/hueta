@@ -335,6 +335,7 @@ jobs:
           python scripts/check-native-vehicle-dynamics.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-vehicle-manual.py
+          python scripts/check-native-vehicle-mounted.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-vehicle-impact.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
