@@ -26,9 +26,14 @@ p.add_argument('--steering-fit', type=Path, help='Private model-specific wheel c
 p.add_argument('--weapon-grip', choices=['pistol', 'rifle', 'launcher', 'knife'], help='Private idle review: original game weapon grip, with captured elbow bend planes')
 p.add_argument('--prone-aim-layer', type=Path, help='Reviewed same-skeleton OMF weapon hold; parent-relative arms follow captured chest motion')
 p.add_argument('--prone-aim-motion', default='review_rifle_idle')
+p.add_argument('--grounding-audit', type=Path, help='Complete per-key actor/weapon floor audit for this same source and rig')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert not (a.weapon_grip and a.steering_fit)
 steering_fit = json.loads(a.steering_fit.read_text()) if a.steering_fit else None
+grounding = json.loads(a.grounding_audit.read_text()) if a.grounding_audit else None
+if grounding:
+    assert a.prone_aim_layer and grounding['actor_sha256'] == hashlib.sha256(a.template.read_bytes()).hexdigest()
+    assert grounding['aim_layer_sha256'] == hashlib.sha256(a.prone_aim_layer.read_bytes()).hexdigest()
 if steering_fit:
     assert a.root_mode == 'seat'
     assert hashlib.sha256(Path(steering_fit['model_path']).read_bytes()).hexdigest() == steering_fit['model_sha256']
@@ -326,6 +331,14 @@ for file, name in clips:
             fit_weapon(world)
         if steering_fit:
             fit_steering(world)
+        if grounding:
+            contact = grounding['clips'][name]
+            assert contact['frames'] == frames and contact['source_sha256'] == verified[file]['sha256']
+            lift = contact['lift_metres'][frame]
+            assert 0 <= lift < .3
+            # One smooth root correction moves the WHOLE rig, preserving all
+            # joints and the weapon grip. Do not lift wrists independently.
+            world = {bone_name: Matrix.Translation((0,0,lift)) @ matrix for bone_name,matrix in world.items()}
         for bone in order:
             kwargs = {} if bone.parent is None else dict(parent_matrix=world[bone.parent.name], parent_matrix_local=bone.parent.bone.matrix_local)
             bone.matrix_basis = bone.bone.convert_local_to_pose(world[bone.name], bone.bone.matrix_local, invert=True, **kwargs)
@@ -380,6 +393,7 @@ assert worst_rotation_coefficient < .002, worst_rotation_coefficient
 (a.out / 'review.json').write_text(json.dumps(dict(source=provenance['source'], raw_files_private=True, installed=False,
     root_mode=a.root_mode, lock_facing=a.lock_facing, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
     roundtrip_max_rotation_coefficient=worst_rotation_coefficient,
+    grounding=None if not a.grounding_audit else dict(sha256=hashlib.sha256(a.grounding_audit.read_bytes()).hexdigest(),method='circular max envelope followed by binomial smoothing; whole rig translation'),
     aim_layer=None if not a.prone_aim_layer else dict(sha256=hashlib.sha256(a.prone_aim_layer.read_bytes()).hexdigest(),motion=a.prone_aim_motion),
     candidate_sha256=hashlib.sha256((a.out / 'candidate.omf').read_bytes()).hexdigest()), indent=2) + '\n')
 print('PRIVATE_MIXAMO_REVIEW_READY', a.out, 'roundtrip error', worst)

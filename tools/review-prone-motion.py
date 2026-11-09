@@ -31,6 +31,8 @@ p.add_argument('--only-close-up', action='store_true', help='Skip the three full
 p.add_argument('--close-up-view', choices=('both','outer','inner'), default='both')
 p.add_argument('--render-frames', help='Comma-separated sample indices to render; audit still includes every sample')
 p.add_argument('--preview-width', type=int, default=1000)
+p.add_argument('--views', default='top,side,front', help='Comma-separated review cameras')
+p.add_argument('--skip-surface-audit', action='store_true', help='Render-only sequence after a separate skin-intersection audit')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert 1 <= a.samples <= 300
 assert not a.only_close_up or a.close_up
@@ -238,6 +240,12 @@ for sample_index in range(a.samples):
         for obj, original in weapon:
             obj.matrix_world = convert @ transform @ offset @ convert @ original
         bpy.context.view_layer.update()
+        body_min_z = 1e9
+        for skin in body:
+            evaluated = skin.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            mesh = evaluated.to_mesh()
+            body_min_z = min(body_min_z, min((evaluated.matrix_world @ vertex.co).z for vertex in mesh.vertices))
+            evaluated.to_mesh_clear()
         trigger_point = None
         if a.weapon_ltx.stem == 'w_rpg7':
             trigger_point = convert @ transform @ offset @ Vector((.00042,.1022,.1771))
@@ -246,10 +254,12 @@ for sample_index in range(a.samples):
                            weapon_direction=list(barrel_direction), muzzle_forward_dot=float(barrel_direction.z),
                            review_only_weapon_position=a.weapon_position,
                            review_only_attachment_matrix=bool(a.weapon_transform),
-                           body_surface_intersections=weapon_body_intersections(trigger_point)))
+                           body_min_z=body_min_z, weapon_min_z=min((obj.matrix_world @ vertex.co).z for obj in weapon_meshes for vertex in obj.data.vertices),
+                           body_surface_intersections=None if a.skip_surface_audit else weapon_body_intersections(trigger_point)))
     center = Vector((0, .1, .23))
     render_sample=not a.no_render and sample_index in render_frames
     for name, location in ([] if not render_sample or a.only_close_up else [('top', (0, .1, 5)), ('side', (4, .1, .8)), ('front', (2, 3, 1.4))]):
+        if name not in a.views.split(','):continue
         camera.data.ortho_scale = 3.6 if name == 'top' else 2.8
         camera.location = location
         camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
