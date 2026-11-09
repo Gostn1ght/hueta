@@ -78,26 +78,29 @@ b=bhs.index('--- green bkg lines',a)
 bar=bhs[a:b].rstrip()
 ui=LuaRuntime()
 ui.execute("""
-bar_roots={};display={types={}};healthstatus=true;show_hud_type=1
+created=0;display={types={}};healthstatus=true;show_hud_type=1
 show_hud_change_time=0;scuffed_fix=true;disable_hud_fps_fix_tmr=1000
 function time_global()return 1000 end
 function netcoop_enabled()return true end
 function CreateTimeEvent()end
 function get_hud()return hud end
 xml={InitProgressBar=function(self,name,root)
+ created=created+1
  return {owner=root,Show=function()end,SetProgressPos=function(self,v)self.value=v end}
 end}
 roots={};hud={GetCustomStatic=function(self,n)return roots[n]end,
- AddCustomStatic=function(self,n)local wnd={SetAutoDelete=function()end};roots[n]={wnd=function()return wnd end}end,
+ AddCustomStatic=function(self,n)local id={};roots[n]={wnd=function()return {native=id,SetAutoDelete=function()end} end}end,
  RemoveCustomStatic=function(self,n)roots[n]=nil end}
 """+bar+"""
 local first=ParamBar(nil,'head','bodypart',11,11,true)
 assert(first and first.value==100,'first frame displays real health, never placeholder 55/red')
+for i=1,200 do assert(ParamBar(first,'head','bodypart',11,11,true)==first) end
+assert(created==1,'fresh wrappers for the same native window must not allocate duplicate progress bars')
 roots.head=nil
 local second=ParamBar(first,'head','bodypart',3,11,true)
 assert(second and second~=first and second.owner~=first.owner and second.value==300/11)
-local wnd={};roots.head={wnd=function()return wnd end}
+assert(created==2,'a disappeared/recreated static receives exactly one new bar')
 local third=ParamBar(second,'head','bodypart',11,11,true)
-assert(third~=second and third.owner==wnd and third.value==100)
+assert(third==second and created==2 and third.value==100)
 """)
-print('PASS real limb bar builder: replaced HUD roots rebind, expired throttle cannot block MP startup, first frame uses actual health')
+print('PASS real limb bar builder: recreated owned statics rebind without wrapper-alias allocations, expired throttle cannot block MP startup, first frame uses actual health')

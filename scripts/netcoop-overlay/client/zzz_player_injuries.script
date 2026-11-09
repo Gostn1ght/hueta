@@ -807,7 +807,6 @@ local progress_health_leftarm_time=nil
 local progress_health_rightleg_time=nil
 local progress_health_leftleg_time=nil
 
-local bar_roots = {}
 local scuffed_fix = false	
 local xml = nil
 local function HUDUpdate()
@@ -1124,9 +1123,9 @@ local function HUDUpdate()
             end
             if cs_name then
                 local root = cs_name:wnd()
-                if bar_roots[customstatic] ~= root then
-                    bar_roots[customstatic], barhandler = root, nil
-                end
+                -- Window userdata has the same aliasing rule as game objects.
+                -- Reuse this bar until its owned static disappears or actor reset
+                -- clears the cache; never compare native-window Lua wrappers.
                 if not barhandler then
                     barhandler = xml:InitProgressBar(barname, root)
                     barhandler:Show(true)
@@ -1858,7 +1857,6 @@ end
 -- Limb health itself is restored separately from the authoritative snapshot.
 function netcoop_reset_actor()
     init, scuffed_fix, xml = false, false, nil
-    bar_roots = {}
     progress_stamina, progress_health = nil, nil
     progress_health_head, progress_health_torso = nil, nil
     progress_health_rightarm, progress_health_leftarm = nil, nil
