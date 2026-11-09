@@ -147,6 +147,27 @@ for name in qa['prone']['connected']:
         assert excursion>.015,(name,'frozen gait')
 
 bindings=json.loads((root.parent/'tools/dcp-driver-pose-fits.json').read_text())
+
+# A crawling donor plants and rolls its wrist. The rifle hold is an authored
+# assembly: both hands retain their relative grip, elbows remain below the
+# shoulders, and the barrel does not inherit that planting roll. Decode every
+# stored key, rather than checking only the attractive idle preview.
+for direction in ('idle','fwd','back','left','right'):
+    name='lz_prone_rifle_'+direction
+    row=next(d for d in prone['defs'] if d['name']==name)
+    import struct
+    count=struct.unpack_from('<I',prone['blobs'][row['motion']][1])[0]
+    reference_distance=None
+    for frame in range(count):
+        pose=motion.pose(name,frame/count,matrices=True)
+        def point(bone):return pose[bone][:3,3]
+        delta=point('bip01_r_finger11')-point('bip01_r_finger1')
+        assert float(delta[2])/float(sum(delta*delta))**.5>.995,(name,frame,'rifle planting roll')
+        assert point('bip01_r_forearm')[1]<point('bip01_r_upperarm')[1]-.05,(name,frame,'raised elbow')
+        distance=float(sum((point('bip01_l_hand')-point('bip01_r_hand'))**2))**.5
+        if reference_distance is None:reference_distance=distance
+        assert abs(distance-reference_distance)<.001,(name,frame,'hands separated from grip')
+print('PASS every rifle key: reviewed grip follows the body without planting roll or raised elbow')
 driver_path=actors/'modded_stalker_animations/netcoop_vehicle_driving.omf'
 assert hashlib.sha256(driver_path.read_bytes()).hexdigest()==qa['driving']['sha256']
 driver_data=merge.parse(driver_path)

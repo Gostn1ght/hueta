@@ -3,18 +3,13 @@
   "license_reference": "https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html",
   "raw_files_private": true,
   "prone": {
-    "sha256": "536c61ad76e3d35a40e60bc92e93aeb8d43542162bb117b2017f01ed6667e0a9",
+    "sha256": "e049067e490a19d80cac4dd1a8bb7dd6edea94208301d3daca14bb5cdec6fb12",
     "connected": [
       "lz_prone_empty_fwd",
       "lz_prone_empty_idle",
       "lz_prone_empty_back",
       "lz_prone_empty_left",
       "lz_prone_empty_right",
-      "lz_prone_rifle_fwd",
-      "lz_prone_rifle_idle",
-      "lz_prone_rifle_back",
-      "lz_prone_rifle_left",
-      "lz_prone_rifle_right",
       "lz_prone_pistol_fwd",
       "lz_prone_pistol_idle",
       "lz_prone_pistol_back",
@@ -24,7 +19,12 @@
       "lz_prone_knife_idle",
       "lz_prone_knife_back",
       "lz_prone_knife_left",
-      "lz_prone_knife_right"
+      "lz_prone_knife_right",
+      "lz_prone_rifle_fwd",
+      "lz_prone_rifle_idle",
+      "lz_prone_rifle_back",
+      "lz_prone_rifle_left",
+      "lz_prone_rifle_right"
     ],
     "preserved_launcher_fallback": [
       "lz_prone_launcher_fwd",
@@ -75,48 +75,6 @@
           }
         ],
         "roundtrip_max_error_metres": 0.00014418478455643677
-      },
-      {
-        "grip": "rifle",
-        "sha256": "4c788c561053a76e2fc2186da6a0e91ec89e98fd419b9373a08936910a7de0c7",
-        "clips": [
-          {
-            "source": "Prone Forward.fbx",
-            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
-            "clip": "review_rifle_fwd",
-            "frames": 71,
-            "scale": 0.9769133543173685
-          },
-          {
-            "source": "Prone Idle.fbx",
-            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
-            "clip": "review_rifle_idle",
-            "frames": 149,
-            "scale": 0.9769139654996354
-          },
-          {
-            "source": "Crawl Backwards In Prone.fbx",
-            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
-            "clip": "review_rifle_back",
-            "frames": 30,
-            "scale": 0.9769139654996354
-          },
-          {
-            "source": "Prone Left Turn.fbx",
-            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
-            "clip": "review_rifle_left",
-            "frames": 32,
-            "scale": 0.9769139654996354
-          },
-          {
-            "source": "Prone Right Turn.fbx",
-            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
-            "clip": "review_rifle_right",
-            "frames": 41,
-            "scale": 0.9769139654996354
-          }
-        ],
-        "roundtrip_max_error_metres": 0.0001497955918144986
       },
       {
         "grip": "pistol",
@@ -201,8 +159,54 @@
           }
         ],
         "roundtrip_max_error_metres": 0.00014418478455643677
+      },
+      {
+        "grip": "rifle",
+        "sha256": "fcd407f26536e1ed8c6efcac19a42792d11bc1a89a60b2137f8c7e007b253b24",
+        "clips": [
+          {
+            "source": "Prone Forward.fbx",
+            "sha256": "300c105ddde519d1d4952127ebd92a743d2d29d186c36b69ff37599b3f2f2000",
+            "clip": "review_rifle_fwd",
+            "frames": 71,
+            "scale": 0.9769133543173685
+          },
+          {
+            "source": "Prone Idle.fbx",
+            "sha256": "7c93a23df91c3957b2ac7039f1de60b01575a7ea8b195f2abff769859324bed5",
+            "clip": "review_rifle_idle",
+            "frames": 149,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Crawl Backwards In Prone.fbx",
+            "sha256": "c7764a83d94917588738f0c82616119ec0be5d05614b64d4d06adb0e876c9c80",
+            "clip": "review_rifle_back",
+            "frames": 30,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Left Turn.fbx",
+            "sha256": "c0c6c87ede28b6890d8247b8f45fab5eab98a18e3d534c37576d84b7695da27b",
+            "clip": "review_rifle_left",
+            "frames": 32,
+            "scale": 0.9769139654996354
+          },
+          {
+            "source": "Prone Right Turn.fbx",
+            "sha256": "fd14aac29e5036eccc6590a22f6ab11f7a57a5b061a445a004d8a3e6bdf6de4c",
+            "clip": "review_rifle_right",
+            "frames": 41,
+            "scale": 0.9769139654996354
+          }
+        ],
+        "roundtrip_max_error_metres": 0.00013176194536816026
       }
-    ]
+    ],
+    "rifle_aim_layer": {
+      "sha256": "4c788c561053a76e2fc2186da6a0e91ec89e98fd419b9373a08936910a7de0c7",
+      "motion": "review_rifle_idle"
+    }
   },
   "driving": {
     "sha256": "feed0ef3398fad584e5454fc87b172e640e2063089be090a0aa96f8997e87559",

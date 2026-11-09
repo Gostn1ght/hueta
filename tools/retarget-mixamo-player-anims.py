@@ -24,6 +24,8 @@ p.add_argument('--root-mode', choices=['in-place', 'seat', 'preserve'], default=
 p.add_argument('--lock-facing', action='store_true', help='Remove donor turn yaw; the network actor owns facing')
 p.add_argument('--steering-fit', type=Path, help='Private model-specific wheel contacts in actor Blender space')
 p.add_argument('--weapon-grip', choices=['pistol', 'rifle', 'launcher', 'knife'], help='Private idle review: original game weapon grip, with captured elbow bend planes')
+p.add_argument('--prone-aim-layer', type=Path, help='Reviewed same-skeleton OMF weapon hold; parent-relative arms follow captured chest motion')
+p.add_argument('--prone-aim-motion', default='review_rifle_idle')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert not (a.weapon_grip and a.steering_fit)
 steering_fit = json.loads(a.steering_fit.read_text()) if a.steering_fit else None
@@ -82,6 +84,16 @@ mapping = {dst: 'mixamorig:' + src for dst, src in mapping.items()}
 align = Matrix.Rotation(math.pi, 4, 'Z')  # downloaded default character faces -Y
 samples = []
 metadata = []
+aim_layer = None
+if a.prone_aim_layer:
+    assert a.weapon_grip == 'rifle' and a.lock_facing
+    spec_layer = importlib.util.spec_from_file_location('aim_poses', root / 'scripts/read-omf-poses.py')
+    layer_reader = importlib.util.module_from_spec(spec_layer)
+    spec_layer.loader.exec_module(layer_reader)
+    layer_pose = layer_reader.Motions(a.prone_aim_layer, a.template).pose(a.prone_aim_motion, 0, matrices=True)
+    layer_c = Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+    layer_s = Matrix.Diagonal((1,1,-1,1))
+    aim_layer = {name:layer_c @ Matrix(matrix.tolist()) @ layer_s for name,matrix in layer_pose.items()}
 canonical = None
 if a.weapon_grip:
     spec = importlib.util.spec_from_file_location('poses', root / 'scripts/read-omf-poses.py')
@@ -297,7 +309,20 @@ for file, name in clips:
             pivot = world['bip01_pelvis'].translation
             turn = Matrix.Translation(pivot) @ Matrix.Rotation(-yaw, 4, 'Z') @ Matrix.Translation(-pivot)
             world = {name: turn @ matrix for name, matrix in world.items()}
-        if canonical:
+        if aim_layer:
+            # The locomotion donor plants its hands. Its wrist roll must not
+            # rotate the held rifle into the ground. Retain the reviewed
+            # weapon hold as a hierarchy-local layer: chest sway and the
+            # engine's view callback carry BOTH hands and weapon together.
+            chest = 'bip01_neck'
+            hips = world['bip01_r_thigh'].translation - world['bip01_l_thigh'].translation
+            heading = math.atan2(hips.y, hips.x)
+            arm_frame = Matrix.Translation(world[chest].translation) @ Matrix.Rotation(heading, 4, 'Z') @ Matrix.Translation(-aim_layer[chest].translation)
+            for bone in order:
+                bone_name, parent = bone.name, bone.parent
+                if bone_name.startswith(('bip01_r_', 'bip01_l_')) and any(part in bone_name for part in ('clavicle','upperarm','forearm','hand','finger')):
+                    world[bone_name] = arm_frame @ aim_layer[bone_name]
+        elif canonical:
             fit_weapon(world)
         if steering_fit:
             fit_steering(world)
@@ -355,5 +380,6 @@ assert worst_rotation_coefficient < .002, worst_rotation_coefficient
 (a.out / 'review.json').write_text(json.dumps(dict(source=provenance['source'], raw_files_private=True, installed=False,
     root_mode=a.root_mode, lock_facing=a.lock_facing, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
     roundtrip_max_rotation_coefficient=worst_rotation_coefficient,
+    aim_layer=None if not a.prone_aim_layer else dict(sha256=hashlib.sha256(a.prone_aim_layer.read_bytes()).hexdigest(),motion=a.prone_aim_motion),
     candidate_sha256=hashlib.sha256((a.out / 'candidate.omf').read_bytes()).hexdigest()), indent=2) + '\n')
 print('PRIVATE_MIXAMO_REVIEW_READY', a.out, 'roundtrip error', worst)
