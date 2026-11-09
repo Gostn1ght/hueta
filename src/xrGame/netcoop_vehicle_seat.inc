@@ -1,3 +1,4 @@
+#include "netcoop_vehicle_dynamics.h"
 // Included in netcoop.cpp after netcoop_vehicle_client.inc (it closes and
 // reopens namespace netcoop): CActor seated in a vehicle (doc 100, doc 151).
 
@@ -161,7 +162,7 @@ bool CActor::netcoop_seat_animation()
 	}
 	for(auto* blend:m_netcoop_seat_blends) if(blend) {
 		blend->speed=freeze ? 0.f:1.f;
-		if(freeze) blend->timeCurrent=progress*blend->timeTotal;
+		if(freeze) blend->timeCurrent=netcoop_vehicle_dynamics::frozen_motion_time(progress,blend->timeTotal);
 	}
 	return true;
 }

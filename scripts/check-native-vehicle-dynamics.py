@@ -54,6 +54,15 @@ constexpr float EPS=.0001f;
 ''' + method('src/xrGame/Car.cpp', 'void CCar::Starter()') + method('src/xrGame/Car.cpp', 'void CCar::StartEngine()') + method('src/xrGame/CarWheels.cpp', 'void CCar::SWheelBreak::HandBreak()') + method('src/xrGame/Car.cpp', 'float CCar::EngineDriveSpeed()') + method('src/xrGame/Car.cpp', 'float CCar::EngineCurTorque()') + r'''
 int main(){
  using namespace netcoop_vehicle_dynamics;
+ for(unsigned count:{2u,31u,151u}){
+  const float duration=float(count)/30.f;
+  assert(frozen_motion_time(0,duration)==0);
+  const float last=frozen_motion_time(.999f,duration)*30.f;
+  assert(last>=0 && last<float(count-1));
+  assert(std::abs(frozen_motion_time(1,duration)*30.f-float(count-1))<.0001f);
+ }
+ assert(frozen_motion_time(1,0)==0);
+ assert(frozen_motion_time(std::numeric_limits<float>::quiet_NaN(),1)==0);
  // Real engine method under sustained near-stationary wheel load: automatic
  // clutch keeps usable torque without changing the selected gear or wheels.
  CCar hill;hill.b_engine_on=true;hill.m_current_rpm=100;float load_seconds=0;

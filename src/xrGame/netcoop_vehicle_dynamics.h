@@ -4,6 +4,14 @@
 
 namespace netcoop_vehicle_dynamics
 {
+// A frozen steering pose must not sample the wrap from its last key back
+// to the first. OMF duration includes that extra 1/30 second loop interval.
+inline float frozen_motion_time(float progress, float duration)
+{
+    if (!std::isfinite(progress) || !std::isfinite(duration) || duration <= 0.f) return 0.f;
+    return std::max(0.f, std::min(1.f, progress)) * std::max(0.f, duration - 1.f / 30.f);
+}
+
 // Automatic launch clutch for manual gears without a separate clutch pedal.
 // Retains the donor torque curve and gear ratio; supplies no external force.
 inline float clutch_rpm(float wheel_rpm, bool pulling, float idle, float peak, float maximum)
