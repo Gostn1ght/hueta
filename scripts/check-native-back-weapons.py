@@ -103,8 +103,8 @@ struct CCustomDevice:CInventoryItem{bool IsHidden(){return true;}void renderable
 struct WeaponBase:CInventoryItem{unsigned normal_draws=0;void renderable_Render(){++normal_draws;}};
 struct CWeapon:WeaponBase{
  using inherited=WeaponBase;bool m_netcoop_back_mode=false,m_netcoop_back_valid=false,m_strapped_mode=false,can_strap=true,single=false;
- Fmatrix m_Offset,m_StrapOffset;u32 dwXF_Frame=u32(-1);int capacity=30,state=0;unsigned draws=0,lights=0,hud_calls=0;
- bool netcoop_back_carried()const;bool netcoop_back_transform(Fmatrix&)const;void UpdateXForm();void UpdatePosition(const Fmatrix&);void renderable_Render();
+ Fmatrix m_Offset,m_StrapOffset,m_netcoop_prone_offset;u32 dwXF_Frame=u32(-1);int capacity=30,state=0;unsigned draws=0,lights=0,hud_calls=0;
+ bool netcoop_prone_attachment_active()const{return false;}bool netcoop_back_carried()const;bool netcoop_back_transform(Fmatrix&)const;void UpdateXForm();void UpdatePosition(const Fmatrix&);void renderable_Render();
  int GetAmmoMagSize()const{return capacity;}bool can_be_strapped()const{return can_strap;}bool strapped_mode()const{return m_strapped_mode;}
  bool IsSingleHanded()const{return single;}int GetState(){return state;}int HandDependence(){return 1;}
  Fvector& Position(){return pose.c;}void RenderLight(){++lights;}bool IsZoomed(){return false;}bool IsRotatingToZoom(){return false;}

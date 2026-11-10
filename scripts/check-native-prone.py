@@ -38,20 +38,20 @@ struct PhysicsSupport{Movement value;Movement* movement(){return &value;}};
 namespace netcoop{bool client=true;bool pure_client(){return client;}}
 struct IKinematicsAnimated{
  virtual ~IKinematicsAnimated()=default;
- std::map<std::string,MotionID> motions;std::string last;CBlend blends[128];unsigned plays=0;bool fail=false,missing_part=false;
+ std::map<std::string,MotionID> motions;std::string last;CBlend blends[256];unsigned plays=0;bool fail=false,missing_part=false;
  CMotionDef def;
  MotionID ID_Cycle_Safe(LPCSTR name){last=name;auto i=motions.find(name);return i==motions.end()?MotionID{}:i->second;}
  CMotionDef* LL_GetMotionDef(MotionID){return &def;}
  u16 LL_PartID(LPCSTR name){return missing_part?BI_NONE:std::string(name)=="legs"?0:std::string(name)=="torso"?1:2;}
  CBlend* LL_PlayCycle(u16 part,MotionID,bool,float,float,float speed,bool once,void*,void*,int){
-  assert(part<3 && !once && speed>0);if(fail)return nullptr;assert(plays<128);auto& result=blends[plays++];result.speed=speed;return &result;
+  assert(part<3 && !once && speed>0);if(fail)return nullptr;assert(plays<256);auto& result=blends[plays++];result.speed=speed;return &result;
  }
 };
 struct CActor{
  bool alive=true,seated=false,m_bAnimTorsoPlayed=false;int m_rp_index=-1;
  MotionID m_netcoop_prone_motion,m_current_legs,m_current_torso,m_current_head;
  CBlend* m_netcoop_prone_blends[3]{};CBlend* m_current_legs_blend=nullptr;CBlend* m_current_torso_blend=nullptr;
- bool m_netcoop_prone_torso_free=true;Inventory inv;PhysicsSupport test_physics;
+ bool m_netcoop_prone_torso_free=true,m_netcoop_prone_launcher_authored=false;Inventory inv;PhysicsSupport test_physics;
  IKinematicsAnimated* test_model=nullptr;
  Inventory& inventory(){return inv;}bool g_Alive(){return alive;}bool netcoop_seated(){return seated;}
  PhysicsSupport* character_physics_support(){return &test_physics;}
@@ -80,6 +80,15 @@ int main(){
  actor.inv.active=&launcher;
  for(auto pair:{std::make_pair(mcLStrafe,"left"),std::make_pair(mcRStrafe,"right"),std::make_pair(mcFwd,"fwd"),std::make_pair(0u,"idle")}) {
   assert(actor.netcoop_prone_animation(prone|pair.first));assert(model.last==std::string("lz_prone_launcher_")+pair.second);
+ }
+ for(auto pair:{std::make_pair(mcLStrafe,"left"),std::make_pair(mcRStrafe,"right"),std::make_pair(mcFwd,"fwd"),std::make_pair(mcBack,"back"),std::make_pair(0u,"idle")}) {
+  const std::string name=std::string("lz_prone_launcher2_")+pair.second;
+  model.motions[name]={100};assert(actor.netcoop_prone_animation(prone|pair.first));
+  assert(actor.m_netcoop_prone_launcher_authored && model.last==name);
+  actor.m_bAnimTorsoPlayed=true;assert(actor.netcoop_prone_animation(prone|pair.first));
+  assert(!actor.m_netcoop_prone_launcher_authored);actor.m_bAnimTorsoPlayed=false;
+  model.motions.erase(name);assert(actor.netcoop_prone_animation(prone|pair.first));
+  assert(!actor.m_netcoop_prone_launcher_authored);
  }
  model.motions.erase("lz_prone_launcher_idle");
  assert(actor.netcoop_prone_animation(prone) && model.last=="lz_prone_rifle_idle");

@@ -309,6 +309,7 @@ jobs:
           python scripts/check-native-rp-motion.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-prone.py
+          python scripts/check-native-prone-attachment.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-physics-replica.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

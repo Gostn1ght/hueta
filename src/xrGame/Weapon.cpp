@@ -1655,10 +1655,40 @@ void CWeapon::SetDefaults()
 	m_zoom_params.m_bIsZoomModeNow = false;
 }
 
+void CWeapon::netcoop_load_prone_attachment(LPCSTR section)
+{
+	m_netcoop_prone_offset_valid=false;
+	const LPCSTR prone_keys[]={"netcoop_prone_right","netcoop_prone_up","netcoop_prone_forward","netcoop_prone_position"};
+	bool complete=true;
+	for(LPCSTR key:prone_keys) if(!pSettings->line_exist(section,key)) complete=false;
+	if(complete) {
+		m_netcoop_prone_offset.identity();
+		m_netcoop_prone_offset.i=pSettings->r_fvector3(section,prone_keys[0]);
+		m_netcoop_prone_offset.j=pSettings->r_fvector3(section,prone_keys[1]);
+		m_netcoop_prone_offset.k=pSettings->r_fvector3(section,prone_keys[2]);
+		m_netcoop_prone_offset.c=pSettings->r_fvector3(section,prone_keys[3]);
+		const auto& m=m_netcoop_prone_offset;
+		m_netcoop_prone_offset_valid=_valid(m) && _abs(DET(m)-1.f)<.002f && m.c.magnitude()<1.f &&
+			_abs(m.i.square_magnitude()-1.f)<.002f && _abs(m.j.square_magnitude()-1.f)<.002f &&
+			_abs(m.k.square_magnitude()-1.f)<.002f && _abs(m.i.dotproduct(m.j))<.002f &&
+			_abs(m.i.dotproduct(m.k))<.002f && _abs(m.j.dotproduct(m.k))<.002f;
+		if(!m_netcoop_prone_offset_valid) Msg("! [diag][weapon] rejected invalid prone attachment for %s",section);
+	}
+
+}
+
+bool CWeapon::netcoop_prone_attachment_active() const
+{
+	const CActor* actor=netcoop::pure_client() ? smart_cast<const CActor*>(H_Parent()):nullptr;
+	return m_netcoop_prone_offset_valid && actor && actor->g_Alive() &&
+		actor->m_netcoop_prone_motion.valid() && actor->m_netcoop_prone_launcher_authored &&
+		!actor->netcoop_seated() && !m_strapped_mode;
+}
+
 void CWeapon::UpdatePosition(const Fmatrix& trans)
 {
 	Position().set(trans.c);
-	XFORM().mul(trans, m_strapped_mode ? m_StrapOffset : m_Offset);
+	XFORM().mul(trans, netcoop_prone_attachment_active() ? m_netcoop_prone_offset : m_strapped_mode ? m_StrapOffset : m_Offset);
 	VERIFY(!fis_zero(DET(renderable.xform)));
 }
 
@@ -2479,6 +2509,7 @@ void CWeapon::reload(LPCSTR section)
 		m_Offset.setHPB(ypr.x, ypr.y, ypr.z);
 		m_Offset.translate_over(pos);
 	}
+	netcoop_load_prone_attachment(section);
 
 	m_StrapOffset = m_Offset;
 	if (pSettings->line_exist(section, "strap_position") && pSettings->line_exist(section, "strap_orientation"))

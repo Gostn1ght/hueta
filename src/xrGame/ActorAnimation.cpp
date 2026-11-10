@@ -723,6 +723,7 @@ void CActor::netcoop_tp_item_attach(LPCSTR item)
 
 bool CActor::netcoop_prone_animation(u32 movement)
 {
+	m_netcoop_prone_launcher_authored = false;
 	const bool prone=netcoop::pure_client() && g_Alive() && !netcoop_seated() && m_rp_index<0 &&
 		(movement & mcCrouch) && !(movement & (mcClimb|mcJump|mcFall|mcSprint)) && !isActorAccelerated(movement,IsZoomAimingMode());
 	if(!prone) {
@@ -743,6 +744,18 @@ bool CActor::netcoop_prone_animation(u32 movement)
 	LPCSTR direction=(movement & mcFwd) ? "fwd":(movement & mcBack) ? "back":(movement & mcLStrafe) ? "left":(movement & mcRStrafe) ? "right":"idle";
 	string128 name;xr_sprintf(name,"lz_prone_%s_%s",grip,direction);
 	MotionID motion=model->ID_Cycle_Safe(name);
+	bool authored_launcher=false;
+	if(smart_cast<CWeaponRPG7*>(active)) {
+		xr_sprintf(name,"lz_prone_launcher2_%s",direction);
+		MotionID authored=model->ID_Cycle_Safe(name);
+		if(authored.valid()) {
+			motion=authored;
+			authored_launcher=true;
+		} else {
+			xr_sprintf(name,"lz_prone_launcher_%s",direction);
+			motion=model->ID_Cycle_Safe(name);
+		}
+	}
 	// Older actor packs only contain the original four grips. Keep their
 	// existing rifle fallback until a complete launcher set is installed.
 	if(!motion.valid() && smart_cast<CWeaponRPG7*>(active)) {
@@ -771,6 +784,7 @@ bool CActor::netcoop_prone_animation(u32 movement)
 	const float speed=control && _valid(control->GetVelocity()) ? control->GetVelocity().magnitude():0.f;
 	const float rate=(movement & mcAnyMove) ? _max(0.3f,_min(3.f,speed*2.6666667f)):1.f;
 	for(u32 i=0;i<3;++i) if(m_netcoop_prone_blends[i]) m_netcoop_prone_blends[i]->speed=rate;
+	m_netcoop_prone_launcher_authored=authored_launcher && torso_free;
 	return true;
 }
 

@@ -166,6 +166,8 @@ public:
 	void set_mFirePoint2(Fvector &fire_point);
 	void set_mShellPoint(Fvector &fire_point);
 	Fmatrix get_mOffset() { return m_Offset; };
+	bool netcoop_prone_attachment_active() const;
+	void netcoop_load_prone_attachment(LPCSTR section);
 	Fmatrix get_mStrapOffset() { return m_StrapOffset; };
 
 	virtual void create_physic_shell();
@@ -527,6 +529,8 @@ protected:
 	SafemodeAnm m_safemode_anm[2];
 
 	Fmatrix m_Offset;
+	Fmatrix m_netcoop_prone_offset;
+	bool m_netcoop_prone_offset_valid = false;
 	Fvector m_hud_offset[2];
 	Fvector m_hud_aim_rot;
 	// 0-èñïîëüçóåòñÿ áåç ó÷àñòèÿ ðóê, 1-îäíà ðóêà, 2-äâå ðóêè
