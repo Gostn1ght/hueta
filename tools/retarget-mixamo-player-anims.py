@@ -26,6 +26,7 @@ p.add_argument('--steering-fit', type=Path, help='Private model-specific wheel c
 p.add_argument('--weapon-grip', choices=['pistol', 'rifle', 'launcher', 'knife'], help='Private idle review: original game weapon grip, with captured elbow bend planes')
 p.add_argument('--prone-aim-layer', type=Path, help='Reviewed same-skeleton OMF weapon hold; parent-relative arms follow captured chest motion')
 p.add_argument('--prone-aim-motion', default='review_rifle_idle')
+p.add_argument('--no-save-blend', action='store_true', help='Export motion and review without a large editable scene')
 p.add_argument('--grounding-audit', type=Path, help='Complete per-key actor/weapon floor audit for this same source and rig')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert not (a.weapon_grip and a.steering_fit)
@@ -91,7 +92,7 @@ samples = []
 metadata = []
 aim_layer = None
 if a.prone_aim_layer:
-    assert a.weapon_grip == 'rifle' and a.lock_facing
+    assert a.weapon_grip in ('rifle','launcher') and a.lock_facing
     spec_layer = importlib.util.spec_from_file_location('aim_poses', root / 'scripts/read-omf-poses.py')
     layer_reader = importlib.util.module_from_spec(spec_layer)
     spec_layer.loader.exec_module(layer_reader)
@@ -361,7 +362,8 @@ for file, name in clips:
 bpy.ops.object.select_all(action='DESELECT')
 target.select_set(True)
 bpy.context.view_layer.objects.active = target
-bpy.ops.wm.save_as_mainfile(filepath=str(a.out / 'candidate.blend'))
+if not a.no_save_blend:
+    bpy.ops.wm.save_as_mainfile(filepath=str(a.out / 'candidate.blend'))
 assert bpy.ops.xray_export.omf_file(filepath=str(a.out / 'candidate.omf'), high_quality=True, fmt_ver='cscop') == {'FINISHED'}
 spec = importlib.util.spec_from_file_location('poses', root / 'scripts/read-omf-poses.py')
 reader = importlib.util.module_from_spec(spec)
