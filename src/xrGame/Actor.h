@@ -681,6 +681,7 @@ public:
 	// pose meet the model's steering wheel bone; measured once per sitting down.
 	Fvector m_netcoop_driver_fit;
 	u32 m_netcoop_driver_fit_at = 0; // 0: measured; else the time to measure
+	bool netcoop_authored_launcher_pose() const { return m_netcoop_prone_motion.valid() && m_netcoop_prone_launcher_authored; }
 	bool netcoop_authored_pose() const { return m_netcoop_prone_motion.valid() || netcoop_seated(); }
 	bool netcoop_seated() const { return m_netcoop_seat_car != 0xffff; }
 	void netcoop_seat_enter(u16 car, u8 seat, bool driver, const Fmatrix& local, const Fvector& eye);

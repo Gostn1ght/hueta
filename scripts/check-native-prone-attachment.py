@@ -15,6 +15,8 @@ def method(name):
         depth+=(text[end]=='{')-(text[end]=='}');end+=1
     return text[start:end]
 
+actor_header=(root/'src/xrGame/Actor.h').read_text(encoding='utf-8')
+assert 'bool netcoop_authored_launcher_pose() const { return m_netcoop_prone_motion.valid() && m_netcoop_prone_launcher_authored; }' in actor_header
 source=r'''
 #include <cassert>
 #include <cmath>
@@ -46,7 +48,7 @@ struct Ini{std::map<std::string,Fvector> rows;bool line_exist(LPCSTR,LPCSTR key)
 Ini*pSettings=&ini;
 struct Entity{virtual ~Entity()=default;};
 struct Motion{bool present=true;bool valid()const{return present;}};
-struct CActor:Entity{bool alive=true,seated=false,m_netcoop_prone_launcher_authored=true;Motion m_netcoop_prone_motion;bool g_Alive()const{return alive;}bool netcoop_seated()const{return seated;}};
+struct CActor:Entity{bool alive=true,seated=false,m_netcoop_prone_launcher_authored=true;Motion m_netcoop_prone_motion;bool g_Alive()const{return alive;}bool netcoop_seated()const{return seated;}bool netcoop_authored_launcher_pose() const { return m_netcoop_prone_motion.valid() && m_netcoop_prone_launcher_authored; }};
 template<class T,class U>T smart_cast(U*value){return dynamic_cast<T>(value);}
 namespace netcoop{bool client=true;bool pure_client(){return client;}}
 struct CWeapon {

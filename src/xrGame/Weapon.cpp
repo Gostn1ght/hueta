@@ -1681,7 +1681,7 @@ bool CWeapon::netcoop_prone_attachment_active() const
 {
 	const CActor* actor=netcoop::pure_client() ? smart_cast<const CActor*>(H_Parent()):nullptr;
 	return m_netcoop_prone_offset_valid && actor && actor->g_Alive() &&
-		actor->m_netcoop_prone_motion.valid() && actor->m_netcoop_prone_launcher_authored &&
+		actor->netcoop_authored_launcher_pose() &&
 		!actor->netcoop_seated() && !m_strapped_mode;
 }
 
