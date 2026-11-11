@@ -16,7 +16,7 @@ def method(name):
     return text[start:end]
 
 actor_header=(root/'src/xrGame/Actor.h').read_text(encoding='utf-8')
-assert 'bool netcoop_authored_launcher_pose() const { return m_netcoop_prone_motion.valid() && m_netcoop_prone_launcher_authored; }' in actor_header
+actor_accessor=next(line.strip() for line in actor_header.splitlines() if 'bool netcoop_authored_launcher_pose() const' in line)
 source=r'''
 #include <cassert>
 #include <cmath>
@@ -48,7 +48,7 @@ struct Ini{std::map<std::string,Fvector> rows;bool line_exist(LPCSTR,LPCSTR key)
 Ini*pSettings=&ini;
 struct Entity{virtual ~Entity()=default;};
 struct Motion{bool present=true;bool valid()const{return present;}};
-struct CActor:Entity{bool alive=true,seated=false,m_netcoop_prone_launcher_authored=true;Motion m_netcoop_prone_motion;bool g_Alive()const{return alive;}bool netcoop_seated()const{return seated;}bool netcoop_authored_launcher_pose() const { return m_netcoop_prone_motion.valid() && m_netcoop_prone_launcher_authored; }};
+struct CActor:Entity{protected:bool m_netcoop_prone_launcher_authored=true;Motion m_netcoop_prone_motion;public:bool alive=true,seated=false;bool g_Alive()const{return alive;}bool netcoop_seated()const{return seated;}void set_authored(bool v){m_netcoop_prone_launcher_authored=v;}void set_prone(bool v){m_netcoop_prone_motion.present=v;}__ACTUAL_ACTOR_ACCESSOR__};
 template<class T,class U>T smart_cast(U*value){return dynamic_cast<T>(value);}
 namespace netcoop{bool client=true;bool pure_client(){return client;}}
 struct CWeapon {
@@ -68,8 +68,8 @@ int main(){
  weapon.netcoop_load_prone_attachment("rpg");assert(!weapon.m_netcoop_prone_offset_valid);weapon.UpdatePosition(world);assert(weapon.XFORM().c.x==13&&weapon.XFORM().c.y==22&&weapon.XFORM().c.z==29);
  ini.rows={{"netcoop_prone_right",{1,0,0}},{"netcoop_prone_up",{0,1,0}},{"netcoop_prone_forward",{0,0,1}},{"netcoop_prone_position",{.1f,.2f,.3f}}};
  weapon.netcoop_load_prone_attachment("rpg");assert(weapon.netcoop_prone_attachment_active());weapon.UpdatePosition(world);assert(std::abs(weapon.XFORM().c.x-10.3f)<.0001f&&std::abs(weapon.XFORM().c.z-29.9f)<.0001f&&weapon.Position().x==10);
- actor.m_netcoop_prone_launcher_authored=false;assert(!weapon.netcoop_prone_attachment_active());actor.m_netcoop_prone_launcher_authored=true;
- actor.m_netcoop_prone_motion.present=false;assert(!weapon.netcoop_prone_attachment_active());actor.m_netcoop_prone_motion.present=true;
+ actor.set_authored(false);assert(!weapon.netcoop_prone_attachment_active());actor.set_authored(true);
+ actor.set_prone(false);assert(!weapon.netcoop_prone_attachment_active());actor.set_prone(true);
  actor.alive=false;assert(!weapon.netcoop_prone_attachment_active());actor.alive=true;actor.seated=true;assert(!weapon.netcoop_prone_attachment_active());actor.seated=false;
  netcoop::client=false;assert(!weapon.netcoop_prone_attachment_active());netcoop::client=true;
  weapon.m_strapped_mode=true;assert(!weapon.netcoop_prone_attachment_active());weapon.UpdatePosition(world);assert(weapon.XFORM().c.x==16);weapon.m_strapped_mode=false;
@@ -79,6 +79,7 @@ int main(){
  std::puts("PASS actual optional prone mount: complete rigid basis, finite bounded data, world composition, no effect on legacy clips/standing/dead/seated/NPC/server/strapped weapons");
 }
 '''
+source=source.replace('__ACTUAL_ACTOR_ACCESSOR__',actor_accessor)
 with TemporaryDirectory(prefix='prone-mount-native-') as temporary:
     folder=Path(temporary);cpp=folder/'mount.cpp';exe=folder/'mount.exe';cpp.write_text(source,encoding='utf-8')
     subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX',str(cpp),'/Fe:'+str(exe)],cwd=folder,check=True)
