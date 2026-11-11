@@ -38,3 +38,6 @@ scripts/netcoop-overlay/*/ui_hud_dotmarks.script text eol=crlf
 scripts/netcoop-overlay/*/treasure_manager.script text eol=crlf
 scripts/netcoop-overlay/*/ssfx_water.script text eol=crlf
 scripts/netcoop-overlay/*/ssfx_wetness.script text eol=crlf
+
+# Paired RPG mount is byte-hashed in animation audit on Windows and Linux.
+scripts/netcoop-overlay/*/configs/mod_system_zzzzzzzz_netcoop_prone_rpg.ltx text eol=crlf
