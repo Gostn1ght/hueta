@@ -25,16 +25,27 @@ p.add_argument('--lock-facing', action='store_true', help='Remove donor turn yaw
 p.add_argument('--steering-fit', type=Path, help='Private model-specific wheel contacts in actor Blender space')
 p.add_argument('--weapon-grip', choices=['pistol', 'rifle', 'launcher', 'knife'], help='Private idle review: original game weapon grip, with captured elbow bend planes')
 p.add_argument('--prone-aim-layer', type=Path, help='Reviewed same-skeleton OMF weapon hold; parent-relative arms follow captured chest motion')
+p.add_argument('--launcher-forearm-roll', type=float, default=0., help='Bounded right cuff twist; wrist and finger anchors remain fixed')
+p.add_argument('--launcher-grip-shift', nargs=3, type=float, default=[.06,0,0], help='Bounded shared grip translation in heading space, metres')
+p.add_argument('--launcher-level-torso', action='store_true', help='Experimental horizontal torso with supported elbows and a level weapon grip')
+p.add_argument('--launcher-stable-torso', action='store_true', help='Experimental aiming crawl: retain coherent upper-body weapon hold over captured hips and legs')
+p.add_argument('--aim-follow-chest', action='store_true', help='Experimental rigid chest-relative arm layer; requires geometry and aim review')
 p.add_argument('--prone-aim-motion', default='review_rifle_idle')
 p.add_argument('--no-save-blend', action='store_true', help='Export motion and review without a large editable scene')
 p.add_argument('--grounding-audit', type=Path, help='Complete per-key actor/weapon floor audit for this same source and rig')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 assert not (a.weapon_grip and a.steering_fit)
+assert all(math.isfinite(v) and abs(v)<=.15 for v in a.launcher_grip_shift)
+assert math.isfinite(a.launcher_forearm_roll) and abs(a.launcher_forearm_roll)<=45
 steering_fit = json.loads(a.steering_fit.read_text()) if a.steering_fit else None
 grounding = json.loads(a.grounding_audit.read_text()) if a.grounding_audit else None
 if grounding:
     assert a.prone_aim_layer and grounding['actor_sha256'] == hashlib.sha256(a.template.read_bytes()).hexdigest()
     assert grounding['aim_layer_sha256'] == hashlib.sha256(a.prone_aim_layer.read_bytes()).hexdigest()
+    assert grounding['retarget_tool_sha256'] == hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'Retarget implementation changed since the floor audit'
+    assert grounding['aim_motion'] == a.prone_aim_motion
+    expected_recipe = {key: getattr(a,key) for key in ('root_mode','lock_facing','weapon_grip','aim_follow_chest','launcher_stable_torso','launcher_level_torso','launcher_grip_shift','launcher_forearm_roll')}
+    assert grounding['recipe'] == expected_recipe, 'Grounding audit belongs to a different retarget recipe'
 if steering_fit:
     assert a.root_mode == 'seat'
     assert hashlib.sha256(Path(steering_fit['model_path']).read_bytes()).hexdigest() == steering_fit['model_sha256']
@@ -139,7 +150,7 @@ if a.weapon_grip:
                 canonical[bone.name] = c @ transform @ local[bone.name] @ s
 
 
-def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
+def fit_hands(world, desired, labels=('r', 'l'), launcher=False, ground_elbows=False):
     """Solve wrists without moving the seated/prone body or scaling limbs."""
     for label in labels:
         first, middle, last = ['bip01_' + label + '_' + name for name in ('upperarm', 'forearm', 'hand')]
@@ -154,11 +165,23 @@ def fit_hands(world, desired, labels=('r', 'l'), launcher=False):
         # Keep the RPG elbow behind its wrist, so the forearm approaches the
         # grip forwards instead of forcing a near-right-angle wrist bend.
         hand_direction = (desired[f'bip01_{label}_finger1'].translation - endpoint).normalized()
-        pole = endpoint - lower * hand_direction - origin if launcher else joint - origin
+        pole = Vector((0,0,-1)) if ground_elbows else endpoint - lower * hand_direction - origin if launcher else joint - origin
         bend = pole - axis * pole.dot(axis)
         assert bend.length > .0001
         bend.normalize()
-        elbow = origin + axis * along + bend * math.sqrt(max(0, upper * upper - along * along))
+        radius=math.sqrt(max(0,upper*upper-along*along))
+        if ground_elbows and radius>.0001:
+            centre=origin+axis*along
+            sideways=axis.cross(bend).normalized()
+            # Select a point on the unchanged two-bone circle near the
+            # pelvis-relative support plane, rather than its lowest point.
+            # The latter turns whole-rig floor correction into a push-up.
+            target_height=world['bip01_pelvis'].translation.z-.18
+            cosine=max(-1,min(1,(target_height-centre.z)/(radius*bend.z))) if abs(bend.z)>.0001 else 1
+            sine=math.sqrt(max(0,1-cosine*cosine))
+            choices=[bend*cosine+sideways*sine,bend*cosine-sideways*sine]
+            bend=max(choices,key=lambda pole:pole.dot(joint-centre))
+        elbow = origin + axis * along + bend * radius
         for name, child, point in [(first, middle, elbow), (middle, last, endpoint)]:
             pivot = world[name].translation.copy()
             rotation = (world[child].translation - pivot).rotation_difference(point - pivot).to_matrix().to_4x4()
@@ -315,6 +338,21 @@ for file, name in clips:
             pivot = world['bip01_pelvis'].translation
             turn = Matrix.Translation(pivot) @ Matrix.Rotation(-yaw, 4, 'Z') @ Matrix.Translation(-pivot)
             world = {name: turn @ matrix for name, matrix in world.items()}
+        if a.launcher_stable_torso:
+            assert aim_layer and a.weapon_grip == 'launcher' and not a.aim_follow_chest
+            hips = world['bip01_r_thigh'].translation-world['bip01_l_thigh'].translation
+            heading = math.atan2(hips.y,hips.x)
+            torso_frame = Matrix.Translation(world['bip01_pelvis'].translation) @ Matrix.Rotation(heading,4,'Z') @ Matrix.Translation(-aim_layer['bip01_pelvis'].translation)
+            if a.launcher_level_torso:
+                forward=(aim_layer['bip01_neck'].translation-aim_layer['bip01_pelvis'].translation).normalized()
+                right=aim_layer['bip01_r_upperarm'].translation-aim_layer['bip01_l_upperarm'].translation
+                right=(right-forward*right.dot(forward)).normalized()
+                source_frame=Matrix((right,forward,right.cross(forward))).transposed()
+                rotation=Matrix.Rotation(heading,3,'Z') @ source_frame.transposed()
+                torso_frame=Matrix.Translation(world['bip01_pelvis'].translation) @ rotation.to_4x4() @ Matrix.Translation(-aim_layer['bip01_pelvis'].translation)
+            for bone in order:
+                if bone.name == 'bip01_spine' or any(parent.name == 'bip01_spine' for parent in bone.parent_recursive):
+                    world[bone.name] = torso_frame @ aim_layer[bone.name]
         if aim_layer:
             # The locomotion donor plants its hands. Its wrist roll must not
             # rotate the held rifle into the ground. Retain the reviewed
@@ -324,10 +362,47 @@ for file, name in clips:
             hips = world['bip01_r_thigh'].translation - world['bip01_l_thigh'].translation
             heading = math.atan2(hips.y, hips.x)
             arm_frame = Matrix.Translation(world[chest].translation) @ Matrix.Rotation(heading, 4, 'Z') @ Matrix.Translation(-aim_layer[chest].translation)
+            if a.aim_follow_chest:
+                assert aim_layer and a.weapon_grip == 'launcher'
+                arm_frame = world[chest] @ aim_layer[chest].inverted()
+            desired={name:matrix.copy() for name,matrix in world.items()}
             for bone in order:
                 bone_name, parent = bone.name, bone.parent
                 if bone_name.startswith(('bip01_r_', 'bip01_l_')) and any(part in bone_name for part in ('clavicle','upperarm','forearm','hand','finger')):
-                    world[bone_name] = arm_frame @ aim_layer[bone_name]
+                    desired[bone_name] = arm_frame @ aim_layer[bone_name]
+                    if not a.launcher_level_torso:
+                        world[bone_name] = desired[bone_name]
+            if a.launcher_level_torso:
+                assert a.launcher_stable_torso and a.weapon_grip=='launcher'
+                # Keep the launch tube outside the flattened backpack edge.
+                lateral=Matrix.Rotation(heading,3,'Z') @ Vector(a.launcher_grip_shift)
+                for bone_key in desired:
+                    if bone_key.startswith(('bip01_r_','bip01_l_')) and any(part in bone_key for part in ('upperarm','forearm','hand','finger')):
+                        desired[bone_key].translation+=lateral
+                shared_shift=lateral.copy()
+                # Project the whole two-hand grip into both reach spheres.
+                # Independent wrist clamping would break the weapon hold.
+                for iteration in range(32):
+                    changed=False
+                    for label in ('r','l'):
+                        upper,lower,hand=[f'bip01_{label}_{part}' for part in ('upperarm','forearm','hand')]
+                        reach=(world[lower].translation-world[upper].translation).length+(world[hand].translation-world[lower].translation).length-.015
+                        delta=desired[hand].translation-world[upper].translation
+                        if delta.length>reach:
+                            shift=delta*(reach/delta.length-1)
+                            shared_shift+=shift;changed=True
+                            for bone_key in desired:
+                                if bone_key.startswith(('bip01_r_','bip01_l_')) and any(part in bone_key for part in ('upperarm','forearm','hand','finger')):
+                                    desired[bone_key].translation+=shift
+                    if not changed:break
+                assert shared_shift.length<.2,('Grip would need excessive translation',shared_shift.length)
+                fit_hands(world,desired,launcher=True,ground_elbows=True)
+                if a.launcher_forearm_roll:
+                    cuff='bip01_r_forearm'
+                    pivot=world[cuff].translation.copy()
+                    axis=(world['bip01_r_hand'].translation-pivot).normalized()
+                    turn=Matrix.Translation(pivot) @ Matrix.Rotation(math.radians(a.launcher_forearm_roll),4,axis) @ Matrix.Translation(-pivot)
+                    world[cuff]=turn @ world[cuff]
         elif canonical:
             fit_weapon(world)
         if steering_fit:
@@ -347,9 +422,10 @@ for file, name in clips:
             bone.keyframe_insert('rotation_quaternion', frame=frame)
             bone.keyframe_insert('scale', frame=frame)
         bpy.context.view_layer.update()
-        if frame in sorted({0, frames // 4, frames // 2, 3 * frames // 4, frames - 1}):
-            samples.append(dict(clip=name, frame=frame, frames=frames,
-                                matrices={bone: [list(row) for row in target.pose.bones[bone].matrix] for bone in rest}))
+        # Validate every exported key: sample-only checks can miss a bent limb
+        # or a discontinuity between the five former review checkpoints.
+        samples.append(dict(clip=name, frame=frame, frames=frames,
+                            matrices={bone: [list(row) for row in target.pose.bones[bone].matrix] for bone in rest}))
     for curve in action.fcurves:
         for key in curve.keyframe_points:
             key.interpolation = 'LINEAR'
@@ -393,7 +469,8 @@ assert worst < .001, worst
 assert worst_angle < .002, worst_angle
 assert worst_rotation_coefficient < .002, worst_rotation_coefficient
 (a.out / 'review.json').write_text(json.dumps(dict(source=provenance['source'], raw_files_private=True, installed=False,
-    root_mode=a.root_mode, lock_facing=a.lock_facing, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
+    retarget_tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), verified_keys=len(samples),
+    root_mode=a.root_mode, lock_facing=a.lock_facing, aim_follow_chest=a.aim_follow_chest, launcher_stable_torso=a.launcher_stable_torso, launcher_level_torso=a.launcher_level_torso, launcher_grip_shift=a.launcher_grip_shift, launcher_forearm_roll=a.launcher_forearm_roll, weapon_grip=a.weapon_grip, steering_fit=steering_fit, clips=metadata, roundtrip_max_error_metres=worst, roundtrip_max_angle_radians=worst_angle,
     roundtrip_max_rotation_coefficient=worst_rotation_coefficient,
     grounding=None if not a.grounding_audit else dict(sha256=hashlib.sha256(a.grounding_audit.read_bytes()).hexdigest(),method='circular max envelope followed by binomial smoothing; whole rig translation'),
     aim_layer=None if not a.prone_aim_layer else dict(sha256=hashlib.sha256(a.prone_aim_layer.read_bytes()).hexdigest(),motion=a.prone_aim_motion),

@@ -34,8 +34,11 @@ for clip in metadata['clips']:
     clips[name] = dict(frames=count, source_sha256=clip['sha256'],
                        report_sha256=digest(report_path), lift_metres=lift,
                        max_lift_metres=max(lift))
-result = dict(installed=False, actor_sha256=digest(a.actor),
+result = dict(installed=False, retarget_tool_sha256=metadata['retarget_tool_sha256'], actor_sha256=digest(a.actor),
               aim_layer_sha256=digest(a.aim_layer),
-              candidate_sha256=digest(a.candidate/'candidate.omf'), clips=clips)
+              candidate_sha256=digest(a.candidate/'candidate.omf'),
+              recipe={key: metadata.get(key, False) for key in
+                      ('root_mode', 'lock_facing', 'weapon_grip', 'aim_follow_chest', 'launcher_stable_torso', 'launcher_level_torso', 'launcher_grip_shift', 'launcher_forearm_roll')},
+              aim_motion=metadata['aim_layer']['motion'], clips=clips)
 a.out.write_text(json.dumps(result, indent=2)+'\n', encoding='utf-8')
 print('Grounding audit:', len(clips), 'clips,', sum(c['frames'] for c in clips.values()), 'keys')

@@ -34,7 +34,7 @@ assert 0 <= a.hud_grip_frame <= 1
 assert not a.fit_index_contact or a.rpg_trigger_fit, '--fit-index-contact requires --rpg-trigger-fit'
 assert not a.avoid_index_penetration or a.fit_index_contact
 assert 0 <= a.trigger_clearance_mm <= 15
-assert abs(a.grip_lateral_mm)<=10
+assert abs(a.grip_lateral_mm)<=35
 a.out.mkdir(parents=True, exist_ok=True)
 root = Path(__file__).resolve().parents[1]
 

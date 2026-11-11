@@ -1,0 +1,122 @@
+{
+  "installed": false,
+  "base_sha256": "01fd68c42f73b6e21fbc03838da0692d43449c6d0bbd3b87f4e34c0a6584b64d",
+  "sha256": "d94990af20bf45310238043cd612acb1edc39eb3a9b460b672c28c75529366a1",
+  "connected": [
+    "lz_prone_launcher2_fwd",
+    "lz_prone_launcher2_idle",
+    "lz_prone_launcher2_back",
+    "lz_prone_launcher2_left",
+    "lz_prone_launcher2_right"
+  ],
+  "source_sha256": "500d38aee9cc2df740b9791d7ad31af082438ee31160c221cd7a74769394baaa",
+  "grip_sha256": "69300761112a45a6c17072f5945c219688876772b56882d5444b0c58b003f7dd",
+  "matrix_game": [
+    [
+      0.9088395237922668,
+      0.40971553325653076,
+      0.07838251441717148,
+      -0.0934857428073883
+    ],
+    [
+      -0.1535976678133011,
+      0.5033842325210571,
+      -0.8503010272979736,
+      0.10851631313562393
+    ],
+    [
+      -0.3878381550312042,
+      0.7607478499412537,
+      0.5204269289970398,
+      -0.1321587711572647
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "config_sha256": "63dd49fae5098fa23207d9dbba41be3afe69083cc77ddba662c2f8c8892cabb3",
+  "verified_keys": 323,
+  "preserved_motion_hashes": {
+    "lz_prone_empty_idle": "aa4a15c326d6872d2bdc0af4af89c15d1b98e664ae5f774b63aeebef7fd94e20",
+    "lz_prone_empty_fwd": "d75138d5d37a684f07266230225c4f466a1cee41327257fb52cffaacada16118",
+    "lz_prone_empty_back": "4df05301ad32e9786e43d82d8727ae3d8ae3758297e7cec8c0f1d0d2200a243c",
+    "lz_prone_empty_left": "68f333018300a9fd4d516ccf3d2e1cdb39bf44ecad36eab03e50b395cf7b3938",
+    "lz_prone_empty_right": "278ff66023e839a30813b9d7e31c61894d292d8045c97f85cfde8e40a95359a9",
+    "lz_prone_knife_idle": "8013d28606c665da3452fc0615d427a22e3824b443a967fd1efb0a57ca474015",
+    "lz_prone_knife_fwd": "6a633a6bf81fc01e520c425d5519ac62f50921f4e15121a81ea56de832a95c2d",
+    "lz_prone_knife_back": "e7dc35eeba82acbdd9a3604f54eaddb13e079c38c2140434376ef2f84cd3b974",
+    "lz_prone_knife_left": "34468f97dddee4c54cb1156d4c017759817c8e7afbae46fc598eb8e9c169cc79",
+    "lz_prone_knife_right": "3b73acfac09464b7e42724add31573bb83da9633d3b43a163ad22eacfb1cf310",
+    "lz_prone_pistol_idle": "9813b3f5b7ff599574bcb24807413c7eaadd9f14c5cdc35ec72219dd5b41bc14",
+    "lz_prone_pistol_fwd": "9920003a788224e6c9f811c2f9d0da8f9f4d6eea7511d908a6eafb8017b29f5f",
+    "lz_prone_pistol_back": "77651c1af60ef28d50dd34b3854a00fdacb05f3f75f6f6e67722b834519ff501",
+    "lz_prone_pistol_left": "24478ddc72f836c47ccb15dcfafca1790fa37bd94cc262790dd996f2cfafc941",
+    "lz_prone_pistol_right": "f01f10d91d4177c75a8bd6856f406ac196476960c01f94178462be10ec86a220",
+    "lz_prone_rifle_idle": "88453058186404ad3d36b5beba77f8425f60b8acf8834a8a631df24af8d55905",
+    "lz_prone_rifle_fwd": "18dfee45e893b71c4705eac9711279531115a03646a56b7644b353afa616377c",
+    "lz_prone_rifle_back": "f7fd08d32204869878448178988c5025afc286d6408450f383ba014fe9761d09",
+    "lz_prone_rifle_left": "04d0767e3b55365ca1b275da2e9a8f1935d42fed170c63ef3583cfd5d519babe",
+    "lz_prone_rifle_right": "982b0b1afed40411bb156283a98f52e86ffb810f4cac7cedeb407d15a538fde5",
+    "lz_vehicle_passenger": "dd841d259eedc16181179921a776ea053d29bbdf85ed23ea291ae2f947793d1b",
+    "lz_vehicle_enter_driver": "32265a8bea8d8768d1a162f56dfc095679767be7f41d9be6f89aefc2d9063240",
+    "lz_vehicle_exit_driver": "4733b2021ee90ab7da22a67c7a3be53601cb7b022208063963dc624351781571",
+    "lz_vehicle_enter_passenger": "7a52b7b16c38df2a2cb302b0b317ce65a750357ccdeacdc5ffbad2fabbcd5186",
+    "lz_vehicle_exit_passenger": "c5d042c0bd72c0e52ee02a6e3be7198a44b186ebb14e984413c239d63ab02ea2",
+    "lz_prone_launcher_fwd": "a9b263e5db8db9bd1cc01ace819af3be270ce08c9392c3a3bbffa337e6c7ef85",
+    "lz_prone_launcher_idle": "62fcb01ac49c2841938b7b50be70f35e776ee2f80b940cdc27db53923e371d71",
+    "lz_prone_launcher_back": "2158c5b37279e600ffd36cd1f221b37500249d911808f6923abd12fac901bacd",
+    "lz_prone_launcher_left": "46d9bd9487c12adb77b68669a4fb5282ee2087f08e40c18597adcf9225895f08",
+    "lz_prone_launcher_right": "59cfd1a4b2d93257e2e729a8d4f6e516b22c32457eff4ff4648bb759fb078c0e"
+  },
+  "raw_files_private": true,
+  "verification": {
+    "installed": false,
+    "clips": [
+      {
+        "motion": "review_launcher2_fwd",
+        "frames": 71,
+        "body_min": 0.005999326705932617,
+        "weapon_min": 0.14174145460128784,
+        "aim_min": 0.9980007410049438,
+        "bad": []
+      },
+      {
+        "motion": "review_launcher2_idle",
+        "frames": 149,
+        "body_min": 0.005999445915222168,
+        "weapon_min": 0.14172515273094177,
+        "aim_min": 0.9979997277259827,
+        "bad": []
+      },
+      {
+        "motion": "review_launcher2_back",
+        "frames": 30,
+        "body_min": 0.005999326705932617,
+        "weapon_min": 0.14179907739162445,
+        "aim_min": 0.9980015754699707,
+        "bad": []
+      },
+      {
+        "motion": "review_launcher2_left",
+        "frames": 32,
+        "body_min": 0.005999445915222168,
+        "weapon_min": 0.1417321264743805,
+        "aim_min": 0.9980000257492065,
+        "bad": []
+      },
+      {
+        "motion": "review_launcher2_right",
+        "frames": 41,
+        "body_min": 0.0059996843338012695,
+        "weapon_min": 0.14178016781806946,
+        "aim_min": 0.9980010390281677,
+        "bad": []
+      }
+    ]
+  },
+  "notice": "assets/animations/prone-rpg/NOTICE.md",
+  "distribution_terms": "Noncommercial derived animation; source credits retained; raw sources excluded"
+}

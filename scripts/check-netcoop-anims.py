@@ -65,11 +65,17 @@ for kind in ("torchelo", "detector"):
             assert f"xrr_norm_torso_{base}_{kind}_{action}" in dev, (base, kind, action) and '#include "Flashlight.h"' in anim
 prone=merge.parse(str(actors/'modded_stalker_animations/netcoop_player_prone.omf'))
 expected={f'lz_prone_{grip}_{direction}' for grip in ('empty','knife','pistol','rifle','launcher') for direction in ('idle','fwd','back','left','right')}
-assert {d['name'] for d in prone['defs']}==expected | {'lz_vehicle_passenger','lz_vehicle_enter_driver','lz_vehicle_exit_driver','lz_vehicle_enter_passenger','lz_vehicle_exit_passenger'}
+import json
+launcher_qa=json.loads((root.parent/'docs/audit/195_CONNECTED_LAUNCHER_MOTIONS.json').read_text(encoding='utf-8'))
+assert {d['name'] for d in prone['defs']}==expected | set(launcher_qa['connected']) | {'lz_vehicle_passenger','lz_vehicle_enter_driver','lz_vehicle_exit_driver','lz_vehicle_enter_passenger','lz_vehicle_exit_passenger'}
 assert all(not d['flags']&2 for d in prone['defs']), 'prone movement must loop'
 import hashlib,json
 qa=json.loads((root.parent/'docs/audit/190_CONNECTED_MOTIONS.json').read_text())
-assert qa['prone']['sha256']==hashlib.sha256(prone['data']).hexdigest()
+assert qa['prone']['sha256']==launcher_qa['base_sha256']
+assert launcher_qa['sha256']==hashlib.sha256(prone['data']).hexdigest()
+for name,blob in prone['blobs'].values():
+    if name in launcher_qa['preserved_motion_hashes']:
+        assert hashlib.sha256(blob).hexdigest()==launcher_qa['preserved_motion_hashes'][name],name
 assert len(qa['prone']['connected'])==20 and qa['raw_files_private']
 for name,blob in prone['blobs'].values():
     if name in qa['preserved_motion_hashes']:
@@ -168,6 +174,51 @@ for direction in ('idle','fwd','back','left','right'):
         if reference_distance is None:reference_distance=distance
         assert abs(distance-reference_distance)<.001,(name,frame,'hands separated from grip')
 print('PASS every rifle key: reviewed grip follows the body without planting roll or raised elbow')
+
+# Dedicated RPG uses a paired authored motion/mount; preserve the 30 older
+# motions and validate every decoded key, not a posed preview scene.
+import numpy as np
+config_name='mod_system_zzzzzzzz_netcoop_prone_rpg.ltx'
+mount=np.eye(4)
+for role in ('client','server'):
+    config=root/f'netcoop-overlay/{role}/configs'/config_name
+    assert hashlib.sha256(config.read_bytes()).hexdigest()==launcher_qa['config_sha256']
+    text=config.read_text(encoding='ascii');assert '![wpn_rpg7]' in text
+    for label,column in (('right',0),('up',1),('forward',2),('position',3)):
+        values=re.search(r'^netcoop_prone_'+label+r'\s*=([^\n]+)',text,re.M).group(1)
+        mount[:3,column]=[float(v.strip()) for v in values.split(',')]
+    assert np.max(np.abs(mount-np.array(launcher_qa['matrix_game'])))<1e-7
+assert np.all(np.isfinite(mount)) and abs(np.linalg.det(mount[:3,:3])-1)<.002
+assert np.max(np.abs(mount[:3,:3].T@mount[:3,:3]-np.eye(3)))<.002
+assert np.linalg.norm(mount[:3,3])<1
+reference_hands=None;checked=0
+for direction in ('idle','fwd','back','left','right'):
+    name='lz_prone_launcher2_'+direction
+    definition=next(row for row in prone['defs'] if row['name']==name)
+    count=struct.unpack_from('<I',prone['blobs'][definition['motion']][1])[0]
+    for frame in range(count):
+        pose=motion.pose(name,frame/count,matrices=True)
+        for bone,parent in skeleton['parents'].items():
+            assert np.all(np.isfinite(pose[bone]))
+            if parent and bone not in ('bip01','bip01_pelvis'):
+                actual=np.linalg.norm(pose[bone][:3,3]-pose[parent][:3,3])
+                expected_length=np.linalg.norm(reference[bone][:3,3]-reference[parent][:3,3])
+                assert abs(actual-expected_length)<.001,(name,frame,bone)
+        first=pose['bip01_r_finger1'];following=pose['bip01_r_finger11']
+        forward=following[:3,3]-first[:3,3];forward/=np.linalg.norm(forward)
+        side=np.cross(first[:3,1],forward);side/=np.linalg.norm(side)
+        basis=np.eye(4);basis[:3,:3]=np.column_stack((side,np.cross(forward,side),forward));basis[:3,3]=first[:3,3]
+        gun=basis@mount
+        assert gun[2,2]/np.linalg.norm(gun[:3,2])>.995,(name,frame,'launcher aim')
+        relative_hands=[np.linalg.inv(gun)@pose['bip01_'+side+'_hand'] for side in ('r','l')]
+        if reference_hands is None:reference_hands=relative_hands
+        assert max(np.max(np.abs(a-b)) for a,b in zip(relative_hands,reference_hands))<.002,(name,frame,'grip drift')
+        assert all(0<=pose['bip01_'+side+'_forearm'][1,3]<.2 for side in ('r','l')),(name,frame,'elbow support')
+        checked+=1
+assert checked==launcher_qa['verified_keys']==323
+assert 'lz_prone_launcher2_%s' in anim
+print('PASS 323 decoded RPG keys: paired mount, level aim, both fixed grips, supported elbows, 47 bone lengths; 30 legacy motions unchanged')
+
 driver_path=actors/'modded_stalker_animations/netcoop_vehicle_driving.omf'
 assert hashlib.sha256(driver_path.read_bytes()).hexdigest()==qa['driving']['sha256']
 driver_data=merge.parse(driver_path)

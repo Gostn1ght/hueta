@@ -5,6 +5,7 @@ Blender --background --python this.py -- --actor ACTOR --addons ADDONS
 Weapon transform follows CWeapon::UpdateXForm's finger anchors. No game starts.
 """
 import argparse
+import hashlib
 import importlib.util
 import math
 from pathlib import Path
@@ -22,6 +23,7 @@ for name in ('actor', 'addons', 'omf', 'out'):
 p.add_argument('--motion', required=True)
 p.add_argument('--weapon-ltx', type=Path)
 p.add_argument('--meshes', type=Path)
+p.add_argument('--cpu-render', action='store_true', help='Small Cycles CPU review without Workbench GPU rendering')
 p.add_argument('--no-render', action='store_true', help='Only audit weapon direction and skin intersections')
 p.add_argument('--samples', type=int, default=4)
 p.add_argument('--weapon-position', help='Review-only attachment override X,Y,Z; not an installed configuration')
@@ -29,6 +31,7 @@ p.add_argument('--weapon-transform', type=Path, help='Private review.json attach
 p.add_argument('--close-up', action='store_true', help='Also render the actual right hand and trigger at a readable scale')
 p.add_argument('--only-close-up', action='store_true', help='Skip the three full-body cameras')
 p.add_argument('--close-up-view', choices=('both','outer','inner'), default='both')
+p.add_argument('--frame-index-names',action='store_true',help='Unique frame names for full-rate video, including clips longer than 100 frames')
 p.add_argument('--render-frames', help='Comma-separated sample indices to render; audit still includes every sample')
 p.add_argument('--preview-width', type=int, default=1000)
 p.add_argument('--views', default='top,side,front', help='Comma-separated review cameras')
@@ -120,8 +123,10 @@ if a.weapon_ltx:
     one_hand = int(fields.get('hand_dependence', '2')) == 1
 
 
+_body_region_templates = None
+
 def weapon_body_intersections(trigger_point=None):
-    """Triangle surface intersections, excluding intentional hand contacts.
+    """Triangle surface intersections, including both complete hands.
 
     Use the actual deformed skin, not just joint distances. This is a review
     diagnostic for the selected model, not a universal collision guarantee.
@@ -146,46 +151,52 @@ def weapon_body_intersections(trigger_point=None):
                                  if all(i in indices for i in tri.vertices))
         evaluated.to_mesh_clear()
     trigger_tree=BVHTree.FromPolygons(trigger_vertices,trigger_triangles,all_triangles=True) if trigger_triangles else None
-    result = {}
+    global _body_region_templates
     regions = {f'{side}_{part}': f'bip01_{side}_{part}' for side in ('r', 'l') for part in ('upperarm', 'forearm')}
-    regions['head'] = 'bip01_head'
-    regions.update({part: 'bip01_' + part for part in ('spine', 'spine1', 'spine2', 'pelvis')})
+    for side in ('r','l'):
+        regions[side+'_hand_all']=tuple(b.name for b in rig.data.bones if b.name==f'bip01_{side}_hand' or b.name.startswith(f'bip01_{side}_finger'))
+    regions['head']='bip01_head'
+    regions.update({part:'bip01_'+part for part in ('spine','spine1','spine2','pelvis')})
     if trigger_point is not None:
-        regions['trigger_index_pad'] = ('bip01_r_finger1','bip01_r_finger11','bip01_r_finger12')
-    for region, group_name in regions.items():
-        vertices, triangles = [], []
-        triangle_bones=[]
-        for obj in body:
-            evaluated = obj.evaluated_get(depsgraph)
-            mesh = evaluated.to_mesh()
-            assert len(mesh.vertices) == len(obj.data.vertices), 'Contact review requires topology-preserving skinning'
-            mesh.calc_loop_triangles()
-            names = group_name if isinstance(group_name,tuple) else (group_name,)
-            groups = {group.index for name in names if (group:=obj.vertex_groups.get(name)) is not None}
-            influenced = {vertex.index for vertex in obj.data.vertices
-                if any(assignment.group in groups and assignment.weight >= .35 for assignment in vertex.groups)}
-            base = len(vertices)
-            vertices.extend(evaluated.matrix_world @ vertex.co for vertex in mesh.vertices)
-            for tri in mesh.loop_triangles:
-                if not any(i in influenced for i in tri.vertices):continue
-                triangles.append(tuple(base+i for i in tri.vertices))
-                weights={}
-                for i in tri.vertices:
-                    for assignment in obj.data.vertices[i].groups:
-                        name=obj.vertex_groups[assignment.group].name
-                        weights[name]=weights.get(name,0)+assignment.weight
-                triangle_bones.append(max(weights,key=weights.get))
-            evaluated.to_mesh_clear()
-        tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True) if triangles else None
+        regions['trigger_index_pad']=('bip01_r_finger1','bip01_r_finger11','bip01_r_finger12')
+    body_vertices=[];raw_triangles=[];weights_by_vertex=[]
+    for obj in body:
+        evaluated=obj.evaluated_get(depsgraph);mesh=evaluated.to_mesh()
+        assert len(mesh.vertices)==len(obj.data.vertices),'Contact review requires topology-preserving skinning'
+        base=len(body_vertices)
+        body_vertices.extend(evaluated.matrix_world@v.co for v in mesh.vertices)
+        evaluated.to_mesh_clear()
+        if _body_region_templates is None:
+            obj.data.calc_loop_triangles()
+            weights_by_vertex.extend({obj.vertex_groups[g.group].name:g.weight for g in v.groups} for v in obj.data.vertices)
+            raw_triangles.extend(tuple(base+i for i in tri.vertices) for tri in obj.data.loop_triangles)
+    if _body_region_templates is None:
+        templates={}
+        dominant=[]
+        for tri in raw_triangles:
+            totals={}
+            for i in tri:
+                for name,weight in weights_by_vertex[i].items():totals[name]=totals.get(name,0)+weight
+            dominant.append(max(totals,key=totals.get))
+        for region,group_names in regions.items():
+            selected=set(group_names if isinstance(group_names,tuple) else (group_names,))
+            influenced={i for i,weights in enumerate(weights_by_vertex) if any(n in selected and weight>=.35 for n,weight in weights.items())}
+            chosen=[i for i,tri in enumerate(raw_triangles) if any(v in influenced for v in tri)]
+            templates[region]=([raw_triangles[i] for i in chosen],[dominant[i] for i in chosen])
+        _body_region_templates=(len(body_vertices),templates)
+    count,templates=_body_region_templates
+    assert count==len(body_vertices)
+    result={}
+    for region,(triangles,triangle_bones) in templates.items():
+        tree=BVHTree.FromPolygons(body_vertices,triangles,all_triangles=True) if triangles else None
         overlaps=weapon_tree.overlap(tree) if tree else []
         by_bone={}
         for _,index in overlaps:
             name=triangle_bones[index];by_bone[name]=by_bone.get(name,0)+1
-        result[region] = dict(triangles=len(triangles), intersecting_pairs=len(overlaps),
-                              intersections_by_dominant_bone=by_bone)
-        if region == 'trigger_index_pad':
+        result[region]=dict(triangles=len(triangles),intersecting_pairs=len(overlaps),intersections_by_dominant_bone=by_bone)
+        if region=='trigger_index_pad':
             assert tree
-            result[region]['nearest_surface_to_trigger_metres'] = tree.find_nearest(trigger_point)[3]
+            result[region]['nearest_surface_to_trigger_metres']=tree.find_nearest(trigger_point)[3]
             if trigger_tree:
                 contact_vertices={i for tri in trigger_triangles for i in tri}
                 result[region]['trigger_surface_to_index_metres']=min(tree.find_nearest(trigger_vertices[i])[3] for i in contact_vertices)
@@ -199,6 +210,14 @@ def weapon_body_intersections(trigger_point=None):
 
 scene = bpy.context.scene
 scene.render.engine = 'BLENDER_WORKBENCH'
+if a.cpu_render:
+    assert a.preview_width <= 800, 'CPU review is limited to small previews'
+    scene.render.engine = 'CYCLES'
+    scene.cycles.device = 'CPU'
+    scene.cycles.samples = 16
+    scene.cycles.use_denoising = False
+    scene.render.threads_mode = 'FIXED'
+    scene.render.threads = 2
 scene.display.shading.light = 'STUDIO'
 scene.display.shading.color_type = 'MATERIAL'
 scene.display.shading.show_shadows = True
@@ -208,6 +227,14 @@ scene.render.resolution_y = round(a.preview_width*.65)
 scene.render.resolution_percentage = 100
 scene.world = bpy.data.worlds.new('World')
 scene.world.color = (.22, .22, .22)
+if a.cpu_render:
+    scene.world.use_nodes = True
+    background = scene.world.node_tree.nodes.get('Background')
+    background.inputs['Color'].default_value = (.65,.65,.65,1)
+    background.inputs['Strength'].default_value = .8
+    bpy.ops.object.light_add(type='AREA',location=(1,-2,4))
+    light=bpy.context.object;light.data.energy=350;light.data.shape='DISK';light.data.size=4
+    light.rotation_euler=(Vector((0,0,0))-light.location).to_track_quat('-Z','Y').to_euler()
 bpy.ops.mesh.primitive_plane_add(size=20, location=(0, 0, -.02))
 floor = bpy.context.object
 material = bpy.data.materials.new('Ground')
@@ -220,6 +247,8 @@ camera.data.ortho_scale = 2.35
 scene.camera = camera
 report = []
 for sample_index in range(a.samples):
+    if sample_index % 16 == 0:
+        print('PRONE_REVIEW_PROGRESS',a.motion,sample_index,a.samples,flush=True)
     phase = sample_index / a.samples
     game = motions.pose(a.motion, phase, matrices=True)
     world = {n: convert @ Matrix(m.tolist()) @ bone_axes for n, m in game.items()}
@@ -256,14 +285,15 @@ for sample_index in range(a.samples):
                            review_only_attachment_matrix=bool(a.weapon_transform),
                            body_min_z=body_min_z, weapon_min_z=min((obj.matrix_world @ vertex.co).z for obj in weapon_meshes for vertex in obj.data.vertices),
                            body_surface_intersections=None if a.skip_surface_audit else weapon_body_intersections(trigger_point)))
-    center = Vector((0, .1, .23))
+    frame_label=f'{sample_index:04}' if a.frame_index_names else f'{int(phase*100):02}'
+    center = Vector((0, .3 if trigger_components else .1, .23))
     render_sample=not a.no_render and sample_index in render_frames
     for name, location in ([] if not render_sample or a.only_close_up else [('top', (0, .1, 5)), ('side', (4, .1, .8)), ('front', (2, 3, 1.4))]):
         if name not in a.views.split(','):continue
-        camera.data.ortho_scale = 3.6 if name == 'top' else 2.8
+        camera.data.ortho_scale = 3.6 if name == 'top' or trigger_components else 2.8
         camera.location = location
         camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
-        scene.render.filepath = str(a.out / f'{name}-{int(phase*100):02}.png')
+        scene.render.filepath = str(a.out / f'{name}-{frame_label}.png')
         bpy.ops.render.render(write_still=True)
     if a.close_up and render_sample:
         center = world['bip01_r_hand'].translation.lerp(world['bip01_r_finger1'].translation,.6)
@@ -272,8 +302,15 @@ for sample_index in range(a.samples):
             if a.close_up_view!='both' and name!='trigger-'+a.close_up_view:continue
             camera.location = center+delta
             camera.rotation_euler = (center-camera.location).to_track_quat('-Z','Y').to_euler()
-            scene.render.filepath = str(a.out/f'{name}-{int(phase*100):02}.png')
+            scene.render.filepath = str(a.out/f'{name}-{frame_label}.png')
             bpy.ops.render.render(write_still=True)
 import json
 (a.out / 'weapon-directions.json').write_text(json.dumps(report, indent=2) + '\n')
+(a.out / 'review-inputs.json').write_text(json.dumps(dict(
+    actor_sha256=hashlib.sha256(a.actor.read_bytes()).hexdigest(),
+    omf_sha256=hashlib.sha256(a.omf.read_bytes()).hexdigest(),
+    motion=a.motion, samples=a.samples, surface_audit=not a.skip_surface_audit,
+    weapon_transform_sha256=None if not a.weapon_transform else hashlib.sha256(a.weapon_transform.read_bytes()).hexdigest(),
+    report_sha256=hashlib.sha256((a.out/'weapon-directions.json').read_bytes()).hexdigest()
+),indent=2)+'\n',encoding='utf-8')
 print('PRONE_REVIEW_READY', a.out)
