@@ -16,7 +16,9 @@ source=r'''
 #include <cstdio>
 using u32=unsigned;
 using u16=unsigned short;
-struct CObject{bool removed=false;virtual ~CObject()=default;bool getDestroy(){return removed;}};struct CCar:CObject{};
+struct CObject{bool removed=false;virtual ~CObject()=default;bool getDestroy(){return removed;}};
+struct CPhysicsShellHolder:CObject{bool buffered=false;bool netcoop_physics_buffered(){return buffered;}};
+struct CCar:CPhysicsShellHolder{};
 template<class T>T smart_cast(CObject* p){return dynamic_cast<T>(p);}
 namespace netcoop{bool client=false,active=false;bool enabled(){return active;}bool pure_client(){return client;}}
 struct Objects{std::map<u16,CObject*>items;CObject*net_Find(u16 id){auto i=items.find(id);return i==items.end()?nullptr:i->second;}};
@@ -50,6 +52,17 @@ int main(){
  assert(actor_collision_damage_local(&car));netcoop::active=true;
  assert(!actor_collision_damage_local(&car));netcoop::client=true;
  assert(!actor_collision_damage_local(&car));assert(actor_collision_damage_local(&ground));assert(actor_collision_damage_local(nullptr));
+ CPhysicsShellHolder fragment;fragment.buffered=true;
+ assert(!actor_collision_damage_local(nullptr,&fragment));
+ // The actual contact, rather than the attacker's credit, identifies the
+ // fixed replica. Falls against static geometry still use normal damage.
+ assert(!actor_collision_damage_local(&ground,&fragment));
+ fragment.buffered=false;assert(actor_collision_damage_local(&ground,&fragment));
+ fragment.buffered=true;netcoop::client=false;
+ assert(actor_collision_damage_local(&ground,&fragment));
+ netcoop::active=false;netcoop::client=true;
+ assert(actor_collision_damage_local(&ground,&fragment));
+ netcoop::active=true;
  // Damage credit can be the driver, the player itself, or absent. The
  // actual contacting wheel/car still belongs to the server's run-over path.
  CObject driver;assert(!actor_collision_damage_local(&driver,&car));assert(!actor_collision_damage_local(nullptr,&car));

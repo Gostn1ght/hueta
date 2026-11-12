@@ -936,7 +936,18 @@ static bool actor_collision_damage_local(CObject* initiator, CObject* contact = 
 {
     // Every network car impact is emitted by vehicle_run_over from measured
     // vehicle motion. Neither host nor replica penetration impulses are hits.
-    return !netcoop::enabled() || (!smart_cast<CCar*>(initiator) && !smart_cast<CCar*>(contact));
+    if (!netcoop::enabled()) return true;
+    if (smart_cast<CCar*>(initiator) || smart_cast<CCar*>(contact)) return false;
+    // Interpolated props/fragments use fixed local ODE bodies. The contact
+    // solver sees their artificial mass, not the original fragment mass;
+    // walking onto a resting piece must not create a client-authored hit.
+    // Keep the contact itself solid and retain ordinary static fall damage.
+    if (netcoop::pure_client())
+    {
+        CPhysicsShellHolder* replica = smart_cast<CPhysicsShellHolder*>(contact);
+        if (replica && replica->netcoop_physics_buffered()) return false;
+    }
+    return true;
 }
 
 void CActor::g_Physics(Fvector& _accel, float jump, float dt)

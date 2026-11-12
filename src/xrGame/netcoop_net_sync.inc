@@ -648,6 +648,23 @@ bool client_death_key(int key)
 	return true;
 }
 
+void client_sync_reset()
+{
+    // A different location server has a different time origin. Its first
+    // objects must not seed their monotonic interpolation clocks from the
+    // previous connection's estimate, which they can never rewind later.
+    s_snapshot_clock_valid = false;
+    s_clock_now_max = s_clock_prev_max = s_clock_candidate = s_clock_applied = 0.0;
+    s_clock_prev_valid = false;
+    s_clock_bucket_time = s_clock_candidates = s_clock_applied_time = 0;
+    s_snap_interval = s_frame_ema = 33.f;
+    s_snap_jitter = 5.f;
+    s_frame_last = 0;
+    s_own_dead = false;
+    s_respawn_sent = false;
+    s_death_time = s_respawn_sent_time = 0;
+}
+
 static u32 s_ai_reactions = 0, s_ai_reaction_sum = 0, s_ai_reaction_max = 0, s_ai_unseen = 0, s_ai_log_time = 0;
 
 static u64 s_prof_ticks[prof_count] = {};

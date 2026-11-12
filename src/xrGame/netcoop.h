@@ -452,6 +452,7 @@ u32 real_time_ms();
 // server clock is followed too. Falls back to Level().timeServer().
 void snapshot_sample(u32 server_stamp);
 u32 snapshot_now();
+void client_sync_reset(); // snapshot clock/death state belongs to one location connection
 // How far behind the estimated server time a client shows remote objects.
 u32 remote_interp_delay();
 // Same, but at least 1.5 times the object's own last snapshot interval
