@@ -88,7 +88,7 @@ struct CPhysicsShell {
  CPhysicsElement element;Fvector velocity,angular;float mass=2500;u16 count=1;unsigned lookups=0;
  u16 get_ElementsNumber(){return count;}
  CPhysicsElement* get_ElementByStoreOrder(u16 n){assert(n<count);++lookups;return &element;}
- void Enable(){}
+ unsigned enables=0;void Enable(){++enables;}
  float getMass(){return mass;}
  void get_LinearVel(Fvector& v){v=velocity;}
  void get_AngularVel(Fvector& v){v=angular;}
@@ -225,6 +225,20 @@ int main(){
  mh.auto_collective=true;mh.collective=0;mh.rotor=.4f;mh.ground_clearance=1.8f;mh.ground_probe=0;
  manual_shell.element.form.c.y=1.9f;manual_shell.velocity.set(2,0,0);manual_shell.element.force.set(0,0,0);
  manual.netcoop_heli_step(.01f);assert(mh.ground_height<.2f && manual_shell.element.force.x<0 && mh.collective==0);
+ // Engine-off landings still probe ground and apply gear-dependent damage.
+ // Previously the parked early-return bypassed this entire touchdown path.
+ CPhysicsShell stopped_shell;CCar stopped;stopped.test_shell=&stopped_shell;stopped.b_engine_on=false;
+ auto& sh=stopped.m_netcoop_heli;sh.on=true;sh.gear_supported=true;sh.gear_down=false;sh.gear_position=0;
+ sh.rotor=0;sh.airborne=true;sh.recent_sink=4;sh.ground_probe=0;
+ stopped_shell.element.form.c.y=.1f;stopped.netcoop_heli_step(.01f);
+ assert(stopped.health<.3f && !sh.airborne && sh.recent_sink==0 && stopped_shell.enables==0);
+ const float damaged=stopped.health;sh.ground_probe=0;stopped.netcoop_heli_step(.01f);
+ assert(stopped.health==damaged && stopped_shell.enables==0); // one touchdown, parked stays asleep
+ stopped.health=1;sh.gear_down=true;sh.gear_position=1;sh.airborne=true;sh.recent_sink=1;
+ stopped_shell.element.form.c.y=sh.gear_clearance+.1f;sh.ground_probe=0;stopped.netcoop_heli_step(.01f);
+ assert(stopped.health==1 && !sh.airborne && stopped_shell.enables==0); // gentle gear-down landing
+ sh.airborne=false;sh.ground_probe=0;stopped_shell.element.form.c.y=5;stopped.netcoop_heli_step(.01f);
+ assert(sh.airborne && stopped_shell.enables==0); // unpowered descent arms touchdown
  // Wind changes air-relative drag; rain adds bounded deterministic gusts.
  mh.ground_probe=0;manual_shell.element.form.c.y=50;manual_shell.velocity.set(0,0,0);mh.wind.set(20,0,0);mh.rain=1;
  manual_shell.element.force.set(0,0,0);manual.netcoop_heli_step(.01f);

@@ -274,10 +274,6 @@ void CCar::netcoop_heli_step(float dt)
 		return;
 	}
 	h.recent_speed = _max(speed, h.recent_speed - 30.f * dt);
-	if (h.rotor < 0.01f && !keys)
-		return; // parked: no forces, the body may sleep
-	shell->Enable();
-
 	Fmatrix xform;
 	body->GetGlobalTransformDynamic(&xform);
 	const float mass = shell->getMass();
@@ -306,6 +302,12 @@ void CCar::netcoop_heli_step(float dt)
 			h.airborne=false;h.recent_sink=0.f;
 		}
 	}
+	// Landing damage must also run with a stopped rotor (engine-off descent).
+	// A parked machine still sleeps: only powered flight needs extra forces.
+	if (h.rotor < 0.01f && !keys)
+		return;
+	shell->Enable();
+
 	const float near_ground = h.ground_height < h.rotor_diameter ? 1.f - _max(0.f, h.ground_height) / h.rotor_diameter : 0.f;
 	const float lift_factor = h.lift_ratio * h.rotor * h.rotor * (1.f + h.ground_effect * near_ground);
 
