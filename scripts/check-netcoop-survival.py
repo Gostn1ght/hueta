@@ -46,6 +46,18 @@ assert(claim(fresh)==first,"repeated claim does not duplicate an item")
 local original_transfer=fresh.transfer_item
 local returns={}
 function fresh:transfer_item(item,to) returns[#returns+1]={item,to} end
+-- Missing original or foreign ownership must prevent partial rollback.
+local missing=r.items[2];local original=items[missing];items[missing]=nil
+assert(not rollback(fresh) and #returns==0)
+items[missing]=original
+local previous=original.owner;original.owner=actors[9] or {_id=9,id=function(self)return self._id end}
+assert(not rollback(fresh) and #returns==0);original.owner=previous
+-- An offline corpse must be brought online before any item can be returned.
+local corpse=actors[7];actors[7]=nil;local wakeups=0
+function alife() return {object=function(_,id) return id==7 and {} or nil end,
+ set_switch_online=function(_,id,value) assert(id==7 and value);wakeups=wakeups+1 end} end
+assert(not rollback(fresh) and wakeups==1 and #returns==0)
+actors[7]=corpse
 assert(not rollback(fresh) and protected_body(7))
 for _,event in ipairs(returns) do event[1].owner=event[2] end
 assert(rollback(fresh) and rollback(fresh))
@@ -68,5 +80,40 @@ assert(claim(nextbody)~="pending" and items[100].owner==nextbody)
 complete(nextbody);assert(not protected_body(8))
 -- The fifth/final death retains no reservation, including the PDA.
 assert(prepare(nextbody,0) and not protected_body(10) and items[100].owner==nextbody)
+-- Repeated deaths/reconnect attempts across many random draws keep the
+-- same physical objects and exactly the configured surviving half.
+local prototype=body
+for seed=1,64 do
+ math.randomseed(seed);state={};actors={};items={}
+ local function make(id)
+  local a={_id=id,_name="Nickname"}
+  for key,value in pairs(prototype) do if type(value)=="function" then a[key]=value end end
+  actors[id]=a;return a
+ end
+ local current=make(1000)
+ for id=100,120 do
+  local item={_id=id,owner=current}
+  function item:id() return self._id end
+  function item:parent() return self.owner end
+  items[id]=item
+ end
+ local count=21
+ for remaining=4,1,-1 do
+  assert(prepare(current,remaining))
+  local reservation=state.netcoop_survival.user_1
+  local original_draw=table.concat(reservation.items,",")
+  assert(prepare(current,remaining) and table.concat(reservation.items,",")==original_draw)
+  local replacement=make(current:id()+1)
+  local claimed=claim(replacement);assert(claimed~="pending" and claimed~="legacy")
+  count=1+math.ceil((count-1)/2)
+  local actual=0
+  for _,item in pairs(items) do if item.owner==replacement then actual=actual+1 end end
+  assert(actual==count and items[100].owner==replacement)
+  assert(claim(replacement)==claimed)
+  complete(replacement);assert(not protected_body(current:id()))
+  current=replacement
+ end
+ assert(prepare(current,0) and next(state.netcoop_survival)==nil)
+end
 ''')
-print("PASS actual survival: half of gear, guaranteed same PDA until final death, stable draw, pending missing item, no partial mutation, physical transfer, repeat safe, corpse unlock")
+print("PASS actual survival: half of gear, guaranteed same PDA until final death, stable draw, pending missing item, no partial mutation, physical transfer, repeat safe, corpse unlock, 64 complete five-life sequences")

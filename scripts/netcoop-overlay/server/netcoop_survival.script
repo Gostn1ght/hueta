@@ -78,8 +78,14 @@ end
 function rollback(actor)
  local r=records()[char_of(actor)]
  if not r or r.name~=actor:character_name() then return true end
+ if #r.items==0 then return true end
  local body=level.object_by_id(r.body)
- if not body or body:id()==actor:id() then return false end
+ if not body then
+  local se=alife():object(r.body)
+  if se then alife():set_switch_online(r.body,true) end
+  return false
+ end
+ if body:id()==actor:id() then return false end
  -- Check every original before mutating any ownership.
  for _,id in ipairs(r.items) do
   local item=level.object_by_id(id)
