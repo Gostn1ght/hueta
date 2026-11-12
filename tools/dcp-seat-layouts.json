@@ -600,7 +600,7 @@
         "bone": "seat_left",
         "offset": [
           0,
-          0,
+          -0.04,
           0
         ],
         "yaw": 0

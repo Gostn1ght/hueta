@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import struct
 from pathlib import Path
 import sys
 
@@ -19,12 +20,23 @@ from mathutils.bvhtree import BVHTree
 p = argparse.ArgumentParser(description=__doc__)
 for key in ('actor', 'addons', 'candidate', 'out'):
     p.add_argument('--' + key, type=Path, required=True)
+p.add_argument('--driving', action='store_true', help='Review a single-model fitted driver library, including its moving steering wheel')
+p.add_argument('--layouts', type=Path, help='Private seat layout candidate, used consistently with the fitted motion')
 a = p.parse_args(sys.argv[sys.argv.index('--') + 1:])
 a.out.mkdir(parents=True, exist_ok=False)
 root = Path(__file__).resolve().parents[1]
 overlay = root / 'scripts/netcoop-overlay/client'
 review = json.loads((a.candidate.parent / 'review.json').read_text())
 assert hashlib.sha256(a.candidate.read_bytes()).hexdigest() == review['candidate_sha256']
+if a.driving:
+    rows = [r for r in review['rows'] if 'clips' in r]
+    assert len(rows) == 1, 'Select one model for an independent clearance review'
+    binding = rows[0]
+    merge_spec = importlib.util.spec_from_file_location('clearance_merge', root / 'scripts/tools/merge-player-anims.py')
+    merge = importlib.util.module_from_spec(merge_spec); merge_spec.loader.exec_module(merge)
+    library = merge.parse(a.candidate)
+    review.update(section=binding['section'], seat=0, door=None, model_sha256=binding['sha256'],
+        motions=[dict(motion=d['name'], frames=struct.unpack_from('<I', library['blobs'][d['motion']][1])[0]) for d in library['defs']])
 spec = importlib.util.spec_from_file_location('poses', root / 'scripts/read-omf-poses.py')
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
@@ -46,7 +58,10 @@ for line in (overlay / 'configs/mod_system_lz_dcp_vehicles.ltx').read_text(encod
         visual = line.split('=', 1)[1].strip().replace('\\', '/')
 model = overlay / 'meshes' / visual
 assert hashlib.sha256(model.read_bytes()).hexdigest() == review['model_sha256']
-layout = json.loads((root / 'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))[visual]['seats'][review['seat']]
+layout_path = a.layouts or root / 'tools/dcp-seat-layouts.json'
+if 'layout_sha256' in review:
+    assert hashlib.sha256(layout_path.read_bytes()).hexdigest() == review['layout_sha256'], 'Motion/seat layout mismatch'
+layout = json.loads(layout_path.read_text(encoding='utf-8'))[visual]['seats'][review['seat']]
 fleet = json.loads((root / 'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text())['rows']
 row = next(r for r in fleet if r['section'] == review['section'])
 import math
@@ -62,6 +77,9 @@ car_objects = set(bpy.data.objects) - before
 car = next(o for o in car_objects if o.type == 'ARMATURE')
 car_skin = [o for o in car_objects if o.type == 'MESH']
 door = car.pose.bones.get(review['door']) if review['door'] else None
+wheel = car.pose.bones[binding['wheel']] if a.driving else None
+if wheel:
+    wheel.rotation_mode = 'XYZ'
 if door:
     assert review.get('door_hinge',{}).get('outward_travel',0) > .05, 'Candidate lacks outward hinge proof'
     axis,angle=review['door_axis'],review['door_angle']
@@ -105,6 +123,8 @@ for clip in review['motions']:
             lead=clip.get('door_lead_frames');trail=clip.get('door_trail_frames')
             opened=smooth(frame/lead)*(1-smooth((frame-(lead+clip['source_frames']-1))/trail)) if lead and trail else smooth(t/.2)*(1-smooth((t-.85)/.15))
             door.rotation_euler[axis] = angle * opened
+        if wheel:
+            wheel.rotation_euler[2] = (-.6 if clip['motion'].endswith('_left') else .6 if clip['motion'].endswith('_right') else 0) * t
         bpy.context.view_layer.update()
         body, floor, body_tags = tree(skin)
         vehicle, _, vehicle_tags = tree(car_skin)
@@ -116,5 +136,10 @@ for clip in review['motions']:
 result = dict(installed=False, candidate_sha256=hashlib.sha256(a.candidate.read_bytes()).hexdigest(), model_sha256=review['model_sha256'], actor_sha256=hashlib.sha256(a.actor.read_bytes()).hexdigest(), tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), samples=samples)
 result['collision_free'] = all(r['intersection_pairs'] == 0 for r in samples)
 result['floor_clear'] = all(r['skin_floor_metres'] >= -.01 for r in samples)
+result['layout_sha256'] = hashlib.sha256(layout_path.read_bytes()).hexdigest()
+if a.driving:
+    result['review_kind'] = 'driver with animated steering wheel'
+    result['body_shell_and_door_clear'] = all(not any(count for region,count in r['intersections_by_bones'].items()
+        if region.endswith(' / root') or 'door' in region.split(' / ')[-1]) for r in samples)
 (a.out / 'clearance.json').write_text(json.dumps(result, indent=2) + '\n')
 print('ENTRY_CLEARANCE', len(samples), result['collision_free'], result['floor_clear'], max(r['intersection_pairs'] for r in samples), flush=True)

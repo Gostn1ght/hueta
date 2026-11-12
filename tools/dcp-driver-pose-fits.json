@@ -17,7 +17,17 @@
     "right": "lz_drive_bmw7_right",
     "wheel": "stearing_wheel",
     "torso_lean_degrees": 15,
-    "lower_body_motion": "lz_vehicle_passenger_compact"
+    "lower_body_motion": "lz_vehicle_passenger_compact",
+    "geometry_adjustment": {
+      "model_sha256": "c15e77d1467e2448f72eacfbfed0459373ad84106e2b9953704d09d470ce3ac0",
+      "torso_lean_degrees": 15,
+      "left_elbow_swivel": 0,
+      "right_elbow_swivel": -20,
+      "right_knee_pitch": 3,
+      "right_ankle_pitch": 35,
+      "stabilize_head": true,
+      "neck_pitch_degrees": -15
+    }
   },
   "physics/vehicles/brdm/veh_brdm_u_01.ogf": {
     "section": "dcp_brdm",

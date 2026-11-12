@@ -569,7 +569,7 @@
     }
   },
   "driving": {
-    "sha256": "feed0ef3398fad584e5454fc87b172e640e2063089be090a0aa96f8997e87559",
+    "sha256": "a517b631bed11af821f54be72f7bb4fbccfce6f2be9d47a2f06f7c7e0c7723b1",
     "models": 43,
     "motions": 129,
     "roundtrip_max_error_metres": 5.8406349702529185e-05,
@@ -602,7 +602,8 @@
         "section": "dcp_tractor",
         "skipped": "('wheel unreachable without excessive torso lean', {'l': [-0.8506622910499573, 2.4661355018615723, -0.9184179902076721], 'r': [-0.5178312063217163, 2.2454800605773926, -0.7726057171821594]})"
       }
-    ]
+    ],
+    "geometry_review": "200_BMW_DRIVER_GEOMETRY.json"
   },
   "preserved_motion_hashes": {
     "lz_vehicle_passenger": "dd841d259eedc16181179921a776ea053d29bbdf85ed23ea291ae2f947793d1b",

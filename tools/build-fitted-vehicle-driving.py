@@ -20,7 +20,10 @@ p=argparse.ArgumentParser(description=__doc__)
 for name in ('actor','addons','source','out'):
     p.add_argument('--'+name,type=Path,required=True)
 p.add_argument('--section',action='append')
+p.add_argument('--fit-overrides',type=Path,help='Private geometry-reviewed joint adjustments keyed by visual; model SHA required')
+p.add_argument('--layouts',type=Path,help='Private seat layout candidate; source layout remains unchanged')
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:]);a.out.mkdir(parents=True,exist_ok=True)
+overrides=json.loads(a.fit_overrides.read_text(encoding='utf-8')) if a.fit_overrides else {}
 (a.out/'review.json').unlink(missing_ok=True)
 root=Path(__file__).resolve().parents[1];overlay=root/'scripts/netcoop-overlay/client'
 sys.path.insert(0,str(a.addons));bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -55,7 +58,8 @@ scope=dict(Matrix=Matrix,Vector=Vector,math=math,order=order,a=SimpleNamespace(w
 exec(code[code.index('def fit_hands('):code.index('\ndef fit_weapon(')],scope)
 fit_hands=scope['fit_hands']
 rows={r['section']:r for r in json.loads((root/'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text())['rows']}
-layouts=json.loads((root/'tools/dcp-seat-layouts.json').read_text())
+layout_path=a.layouts or root/'tools/dcp-seat-layouts.json'
+layouts=json.loads(layout_path.read_text(encoding='utf-8'))
 models={};current=None
 for line in (overlay/'configs/mod_system_lz_dcp_vehicles.ltx').read_text(encoding='cp1251').splitlines():
     if line.startswith('['):current=line.split(']')[0][1:]
@@ -68,6 +72,14 @@ for section in selected:
     visual=models[section];path=overlay/'meshes'/visual
     before=set(bpy.data.objects);actions_before=set(bpy.data.actions)
     try:
+        adjustment=overrides.get(visual,{})
+        if adjustment:
+            assert adjustment['model_sha256']==hashlib.sha256(path.read_bytes()).hexdigest()
+            assert 0<=adjustment['torso_lean_degrees']<=45
+            for key in ('left_elbow_swivel','right_elbow_swivel','right_knee_pitch','right_ankle_pitch'):
+                assert math.isfinite(adjustment.get(key,0)) and abs(adjustment.get(key,0))<=60,key
+            assert isinstance(adjustment.get('stabilize_head',False),bool)
+            assert math.isfinite(adjustment.get('neck_pitch_degrees',0)) and abs(adjustment.get('neck_pitch_degrees',0))<=15
         bpy.ops.xray_import.ogf(directory=str(path.parent),files=[{'name':path.name}],import_motions=False)
         imported=set(bpy.data.objects)-before
         rig=next(o for o in imported if o.type=='ARMATURE')
@@ -106,6 +118,18 @@ for section in selected:
             lean=Matrix.Translation(pelvis)@Matrix.Rotation(math.radians(-lean_degrees),4,'X')@Matrix.Translation(-pelvis)
             for bone in order:
                 if bone.name=='bip01_spine' or any(p.name=='bip01_spine' for p in bone.parent_recursive):world[bone.name]=lean@world[bone.name]
+            if adjustment.get('stabilize_head',False):
+                # A donor's incidental head bob/look can hit a low coupe roof.
+                # Keep its neutral joint-local hold while the chest still moves;
+                # rotate about the neck joint, without shortening the neck.
+                for bone in order:
+                    if bone.name!='bip01_neck' and not any(p.name=='bip01_neck' for p in bone.parent_recursive):continue
+                    name=bone.name;parent=bone.parent.name
+                    world[name]=world[parent]@poses[0][parent].inverted()@poses[0][name]
+                    if name=='bip01_neck':
+                        origin=world[name].translation
+                        rotation=Matrix.Translation(origin)@Matrix.Rotation(math.radians(adjustment.get('neck_pitch_degrees',0)),4,'X')@Matrix.Translation(-origin)
+                        world[name]=rotation@world[name]
             turn=pivot@Matrix.Rotation(angle,4,'Z')@pivot.inverted()
             desired={n:m.copy() for n,m in world.items()}
             for label in ('r','l'):
@@ -114,12 +138,25 @@ for section in selected:
                 for bone in order:
                     if bone.name==hand or any(p.name==hand for p in bone.parent_recursive):desired[bone.name]=turn@Matrix.Translation(shift)@world[bone.name]
             fit_hands(world,desired)
+            # Swivel each elbow about the fixed shoulder/wrist line. Hands and
+            # all fingers keep the wheel grip, while neither arm bone stretches.
+            for label,key in (('l','left_elbow_swivel'),('r','right_elbow_swivel')):
+                origin=world[f'bip01_{label}_upperarm'].translation
+                endpoint=world[f'bip01_{label}_hand'].translation
+                rotation=Matrix.Translation(origin)@Matrix.Rotation(math.radians(adjustment.get(key,0)),4,(endpoint-origin).normalized())@Matrix.Translation(-origin)
+                for part in ('upperarm','forearm'):
+                    name=f'bip01_{label}_{part}';world[name]=rotation@world[name]
+            for joint,key in (('bip01_r_calf','right_knee_pitch'),('bip01_r_foot','right_ankle_pitch')):
+                origin=world[joint].translation
+                rotation=Matrix.Translation(origin)@Matrix.Rotation(math.radians(adjustment.get(key,0)),4,'X')@Matrix.Translation(-origin)
+                for bone in order:
+                    if bone.name==joint or any(parent.name==joint for parent in bone.parent_recursive):world[bone.name]=rotation@world[bone.name]
             return world,turn
         # Choose one constant torso lean per model, across the complete idle
         # and steering sweep. Never change hip/seat position or stretch arms.
         lean_degrees=None
         samples=[(pose,0) for pose in poses]+[(poses[0],angle) for angle in (-.6,-.3,0,.3,.6)]
-        for trial in range(0,31,3):
+        for trial in ([adjustment['torso_lean_degrees']] if adjustment else range(0,31,3)):
             try:
                 for base,angle in samples:fitted_world(base,angle,trial)
                 lean_degrees=trial;break
@@ -134,6 +171,11 @@ for section in selected:
                 for label in ('r','l'):
                     error=(world['bip01_'+label+'_finger1'].translation-turn@contacts[label]).length
                     max_error=max(max_error,error);assert error<.00001,error
+                for bone in order:
+                    if bone.parent and bone.name not in ('bip01','bip01_pelvis'):
+                        length=(world[bone.name].translation-world[bone.parent.name].translation).length
+                        expected_length=(rest[bone.name].translation-rest[bone.parent.name].translation).length
+                        assert abs(length-expected_length)<.001,('Joint length changed',name,i,bone.name,length,expected_length)
                 worlds.append(world)
             # Commit the action only after every frame passes arm reach checks.
             action=bpy.data.actions.new(name);action.use_fake_user=True;action.xray.fps=30;action.xray.speed=1
@@ -149,7 +191,7 @@ for section in selected:
             item=target.xray.motions_collection.add();item.name=name;clips.append(name)
             model_expected[name]=[(i,{n:m.copy() for n,m in worlds[i].items()}) for i in sorted({0,count//2,count-1})]
         expected.update(model_expected)
-        report.append(dict(section=section,visual=visual,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),clips=clips,wheel=wheel_name,torso_lean_degrees=lean_degrees,lower_body_motion=lower_clip,contacts={k:list(v) for k,v in contacts.items()},max_contact_error_metres=max_error))
+        report.append(dict(section=section,visual=visual,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),clips=clips,wheel=wheel_name,torso_lean_degrees=lean_degrees,lower_body_motion=lower_clip,geometry_adjustment=adjustment,contacts={k:list(v) for k,v in contacts.items()},max_contact_error_metres=max_error))
         print('FITTED_DRIVER',section,flush=True)
     except (AssertionError,StopIteration) as error:
         for obj in set(bpy.data.objects)-before:bpy.data.objects.remove(obj,do_unlink=True)
@@ -171,5 +213,5 @@ for name,samples in expected.items():
         for bone in order:
             worst=max(worst,(actual[bone.name].translation-world[bone.name].translation).length)
 assert worst<.001,worst
-(a.out/'review.json').write_text(json.dumps(dict(source=source_review,rows=report,roundtrip_max_error_metres=worst,installed=False,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
+(a.out/'review.json').write_text(json.dumps(dict(source=source_review,rows=report,layout_sha256=hashlib.sha256(layout_path.read_bytes()).hexdigest(),roundtrip_max_error_metres=worst,installed=False,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
 print('FLEET_DRIVER_READY',len(expected)//3,'models',worst,flush=True)

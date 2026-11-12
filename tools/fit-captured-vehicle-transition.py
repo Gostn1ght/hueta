@@ -21,6 +21,8 @@ for key in ('actor','addons','source','out'):
     p.add_argument('--'+key,type=Path,required=True)
 p.add_argument('--section',required=True)
 p.add_argument('--seat',type=int,default=0)
+p.add_argument('--driver-omf',type=Path,help='Optional private fitted driver candidate for the seated endpoint; never installs it')
+p.add_argument('--layouts',type=Path,help='Private seat layout candidate; source layout remains unchanged')
 p.add_argument('--render',action='store_true')
 p.add_argument('--save-blend',action='store_true',help='Save optional editable scene; omitted for lightweight numeric review')
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:]);a.out.mkdir(parents=True,exist_ok=True)
@@ -48,14 +50,24 @@ for line in (overlay/'configs/mod_system_lz_dcp_vehicles.ltx').read_text(encodin
     elif line.startswith('visual ='):models[current]=line.split('=',1)[1].strip().replace('\\','/')
     elif line.startswith('netcoop_passenger_pose ='):passenger[current]=line.split('=',1)[1].strip()
 visual=models[a.section];model=overlay/'meshes'/visual
-layout=json.loads((root/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))[visual]['seats'][a.seat]
+layout_path=a.layouts or root/'tools/dcp-seat-layouts.json'
+layout=json.loads(layout_path.read_text(encoding='utf-8'))[visual]['seats'][a.seat]
 row=next(r for r in json.loads((root/'docs/audit/169_FLEET_SEATS_AND_DECKS.json').read_text(encoding='utf-8'))['rows'] if r['section']==a.section)
 seat_game=Matrix(row['seat_matrices_game'][layout['bone']]);seat_game.translation+=Vector(layout['offset'])
 seat_matrix=c@(seat_game@Matrix.Rotation(math.radians(layout['yaw']),4,'Y'))@c
 actor.matrix_world=seat_matrix
 if a.seat==0:
     fit=json.loads((root/'tools/dcp-driver-pose-fits.json').read_text(encoding='utf-8'))[visual]
-    target=pose(reader.Motions(overlay/'meshes/actors/modded_stalker_animations/netcoop_vehicle_driving.omf',a.actor),fit['idle'],0)
+    driver_path=a.driver_omf or overlay/'meshes/actors/modded_stalker_animations/netcoop_vehicle_driving.omf'
+    if a.driver_omf:
+        driver_review=json.loads((driver_path.parent/'review.json').read_text(encoding='utf-8'))
+        assert hashlib.sha256(driver_path.read_bytes()).hexdigest()==driver_review['candidate_sha256']
+        if 'layout_sha256' in driver_review:
+            assert hashlib.sha256(layout_path.read_bytes()).hexdigest()==driver_review['layout_sha256'], 'Driver/transition seat layout mismatch'
+        driver_binding=next(r for r in driver_review['rows'] if r.get('section')==a.section and 'clips' in r)
+        assert driver_binding['sha256']==hashlib.sha256(model.read_bytes()).hexdigest()
+        fit=dict(idle=driver_binding['clips'][0])
+    target=pose(reader.Motions(driver_path,a.actor),fit['idle'],0)
 else:
     name=passenger[a.section]
     path=overlay/'meshes/actors/modded_stalker_animations'/('netcoop_vehicle_passengers.omf' if name.startswith('lz_vehicle_passenger_') else 'netcoop_player_prone.omf')
@@ -190,5 +202,5 @@ for sample in samples:
     actual=pose(readback,sample['motion'],sample['frame']/sample['frames'])
     for name,matrix in sample['matrices'].items():worst=max(worst,(actual[name].translation-Matrix(matrix).translation).length)
 assert worst<.001,worst
-(a.out/'review.json').write_text(json.dumps(dict(installed=False,section=a.section,seat=a.seat,model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),door=None if not door else door.name,door_axis=None if not door else door_axis,door_angle=None if not door else door_angle,door_hinge=door_hinge,door_helper_sha256=hashlib.sha256((root/'tools/vehicle-door-review.py').read_bytes()).hexdigest(),motions=metadata,roundtrip_max_error_metres=worst,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
+(a.out/'review.json').write_text(json.dumps(dict(installed=False,section=a.section,seat=a.seat,layout_sha256=hashlib.sha256(layout_path.read_bytes()).hexdigest(),driver_sha256=hashlib.sha256(driver_path.read_bytes()).hexdigest() if a.seat==0 else None,model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),door=None if not door else door.name,door_axis=None if not door else door_axis,door_angle=None if not door else door_angle,door_hinge=door_hinge,door_helper_sha256=hashlib.sha256((root/'tools/vehicle-door-review.py').read_bytes()).hexdigest(),motions=metadata,roundtrip_max_error_metres=worst,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
 print('CAPTURED_TRANSITIONS_REVIEW_READY',a.section,a.seat,worst)

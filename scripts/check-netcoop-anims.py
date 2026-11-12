@@ -225,6 +225,31 @@ driver_data=merge.parse(driver_path)
 assert len(bindings)==qa['driving']['models']==43
 assert {d['name'] for d in driver_data['defs']}=={row[key] for row in bindings.values() for key in ('idle','left','right')}
 driving=poses.Motions(driver_path,parents=skeleton['parents'])
+geometry_qa=json.loads((root.parent/'docs/audit/200_BMW_DRIVER_GEOMETRY.json').read_text(encoding='utf-8'))
+assert geometry_qa['library_sha256']==hashlib.sha256(driver_path.read_bytes()).hexdigest()
+layouts=json.loads((root.parent/'tools/dcp-seat-layouts.json').read_text(encoding='utf-8'))
+assert hashlib.sha256(json.dumps(layouts,sort_keys=True,separators=(',',':')).encode()).hexdigest()==geometry_qa['layout_canonical_sha256']
+assert geometry_qa['body_shell_and_door_clear'] and geometry_qa['floor_clear']
+assert layouts['physics/vehicles/bmw/veh_bmw_u_01.ogf']['seats'][0]==geometry_qa['driver_anchor_after']
+bmw_checked=0
+for definition in driver_data['defs']:
+    name=definition['name'];blob=driver_data['blobs'][definition['motion']][1]
+    if name in geometry_qa['preserved_motion_hashes']:
+        assert hashlib.sha256(blob).hexdigest()==geometry_qa['preserved_motion_hashes'][name], ('Unrelated driving motion changed',name)
+        continue
+    assert name in {'lz_drive_bmw7_'+mode for mode in ('idle','left','right')}
+    count=struct.unpack_from('<I',blob)[0]
+    for frame in range(count):
+        pose=driving.pose(name,frame/count,matrices=True)
+        for bone,parent in skeleton['parents'].items():
+            assert np.all(np.isfinite(pose[bone]))
+            if parent and bone not in ('bip01','bip01_pelvis'):
+                actual=np.linalg.norm(pose[bone][:3,3]-pose[parent][:3,3])
+                expected_length=np.linalg.norm(reference[bone][:3,3]-reference[parent][:3,3])
+                assert abs(actual-expected_length)<.001,(name,frame,bone,'Changed joint length')
+        bmw_checked+=1
+assert bmw_checked==geometry_qa['verified_keys']==213 and len(geometry_qa['preserved_motion_hashes'])==126
+print('PASS 213 BMW driver keys, seat review binding and 126 byte-identical unrelated driving motions')
 for visual,row in bindings.items():
     assert hashlib.sha256((root/'netcoop-overlay/client/meshes'/visual).read_bytes()).hexdigest()==row['model_sha256']
     for role in ('client','server'):
