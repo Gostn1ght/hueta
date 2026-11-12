@@ -63,10 +63,9 @@ car = next(o for o in car_objects if o.type == 'ARMATURE')
 car_skin = [o for o in car_objects if o.type == 'MESH']
 door = car.pose.bones.get(review['door']) if review['door'] else None
 if door:
-    limits = [(getattr(door.bone.xray.ikjoint, 'lim_' + axis + '_min'), getattr(door.bone.xray.ikjoint, 'lim_' + axis + '_max')) for axis in 'xyz']
-    axis = max(range(3), key=lambda i: limits[i][1] - limits[i][0])
-    angle = max(limits[axis], key=abs)
-    door.rotation_mode = 'XYZ'
+    assert review.get('door_hinge',{}).get('outward_travel',0) > .05, 'Candidate lacks outward hinge proof'
+    axis,angle=review['door_axis'],review['door_angle']
+    door.rotation_mode='XYZ'
 
 tag_cache = {}
 

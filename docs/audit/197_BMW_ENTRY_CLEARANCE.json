@@ -147,5 +147,7 @@
       },
       "end_regions": {}
     }
-  ]
+  ],
+  "moving_door_preview_valid": false,
+  "limitation": "Raw ODE limit sign made Blender preview open inward; door-related counts require v8 recheck. Static body/seat/steering and floor are unaffected."
 }

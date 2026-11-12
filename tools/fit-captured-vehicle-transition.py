@@ -66,11 +66,10 @@ car_objects=set(bpy.data.objects)-before;car=next(o for o in car_objects if o.ty
 doors=[b for b in car.data.bones if 'door' in b.name.lower() and not any(k in b.name.lower() for k in ('back','trunk'))]
 seat_point=seat_matrix.translation
 door=min(doors,key=lambda b:(b.matrix_local.translation-seat_point).length) if doors else None
+door_hinge=None
 if door:
-    limits=[(getattr(door.xray.ikjoint,'lim_'+axis+'_min'),getattr(door.xray.ikjoint,'lim_'+axis+'_max')) for axis in 'xyz']
-    door_axis=max(range(3),key=lambda i:limits[i][1]-limits[i][0]);door_angle=max(limits[door_axis],key=abs)
-    assert abs(door_angle)>.3,('No usable door joint',door.name,limits)
-    car.pose.bones[door.name].rotation_mode='XYZ'
+    hinge=module('vehicle_door_review',root/'tools/vehicle-door-review.py')
+    door_axis,door_angle,door_hinge=hinge.outward_hinge(car,[o for o in car_objects if o.type=='MESH'],car.pose.bones[door.name])
 source=reader.Motions(a.source,a.actor);parsed=merge.parse(a.source)
 source_names={d['name']:struct.unpack_from('<I',parsed['blobs'][d['motion']][1])[0] for d in parsed['defs']}
 def apply(world):
@@ -191,5 +190,5 @@ for sample in samples:
     actual=pose(readback,sample['motion'],sample['frame']/sample['frames'])
     for name,matrix in sample['matrices'].items():worst=max(worst,(actual[name].translation-Matrix(matrix).translation).length)
 assert worst<.001,worst
-(a.out/'review.json').write_text(json.dumps(dict(installed=False,section=a.section,seat=a.seat,model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),door=None if not door else door.name,motions=metadata,roundtrip_max_error_metres=worst,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
+(a.out/'review.json').write_text(json.dumps(dict(installed=False,section=a.section,seat=a.seat,model_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),door=None if not door else door.name,door_axis=None if not door else door_axis,door_angle=None if not door else door_angle,door_hinge=door_hinge,door_helper_sha256=hashlib.sha256((root/'tools/vehicle-door-review.py').read_bytes()).hexdigest(),motions=metadata,roundtrip_max_error_metres=worst,candidate_sha256=hashlib.sha256((a.out/'candidate.omf').read_bytes()).hexdigest()),indent=2)+'\n')
 print('CAPTURED_TRANSITIONS_REVIEW_READY',a.section,a.seat,worst)
