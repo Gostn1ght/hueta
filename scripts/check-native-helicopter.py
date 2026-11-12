@@ -239,6 +239,10 @@ int main(){
  assert(stopped.health==1 && !sh.airborne && stopped_shell.enables==0); // gentle gear-down landing
  sh.airborne=false;sh.ground_probe=0;stopped_shell.element.form.c.y=5;stopped.netcoop_heli_step(.01f);
  assert(sh.airborne && stopped_shell.enables==0); // unpowered descent arms touchdown
+ // Spawn-settling grace also applies to stopped-rotor touchdown checks.
+ stopped.health=1;sh.airborne=true;sh.recent_sink=8;sh.crash_armed=Device.dwTimeGlobal+5000;
+ sh.gear_down=false;sh.gear_position=0;sh.ground_probe=0;stopped_shell.element.form.c.y=.1f;
+ stopped.netcoop_heli_step(.01f);assert(stopped.health==1 && !sh.airborne && sh.recent_sink==0 && stopped_shell.enables==0);
  // Wind changes air-relative drag; rain adds bounded deterministic gusts.
  mh.ground_probe=0;manual_shell.element.form.c.y=50;manual_shell.velocity.set(0,0,0);mh.wind.set(20,0,0);mh.rain=1;
  manual_shell.element.force.set(0,0,0);manual.netcoop_heli_step(.01f);

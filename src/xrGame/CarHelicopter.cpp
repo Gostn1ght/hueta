@@ -291,7 +291,8 @@ void CCar::netcoop_heli_step(float dt)
 			? _max(0.f,hit.range - 0.5f-clearance) : 100.f;
 	}
 	h.recent_sink=_max(-velocity.y,h.recent_sink-3.f*dt);
-	if(h.gear_supported) {
+	if(Device.dwTimeGlobal<h.crash_armed) {h.airborne=false;h.recent_sink=0.f;}
+	else if(h.gear_supported) {
 		if(h.ground_height>1.f) h.airborne=true;
 		else if(h.airborne && h.ground_height<0.15f) {
 			const bool locked=h.gear_down && h.gear_position>=0.99f;
