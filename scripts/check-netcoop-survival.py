@@ -41,6 +41,17 @@ items[absent]=saved
 assert(claim(fresh)==first)
 for _,id in ipairs(r.items) do assert(items[id].owner==fresh) end
 assert(claim(fresh)==first,"repeated claim does not duplicate an item")
+-- Disconnect after a partial/asynchronous restore: preserve originals and
+-- leave the draw reserved for the next connection rather than deleting them.
+local original_transfer=fresh.transfer_item
+local returns={}
+function fresh:transfer_item(item,to) returns[#returns+1]={item,to} end
+assert(not rollback(fresh) and protected_body(7))
+for _,event in ipairs(returns) do event[1].owner=event[2] end
+assert(rollback(fresh) and rollback(fresh))
+for _,id in ipairs(r.items) do assert(items[id].owner==body) end
+fresh.transfer_item=original_transfer
+assert(claim(fresh)==first)
 complete(fresh);assert(not protected_body(7) and not state.netcoop_survival.user_1)
 local kept,left=0,0
 for _,v in pairs(items) do if v.owner==fresh then kept=kept+1 else left=left+1 end end

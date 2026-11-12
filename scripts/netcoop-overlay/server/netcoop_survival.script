@@ -73,6 +73,29 @@ function claim(actor)
  if pending then return "pending" end
  return #r.items>0 and table.concat(r.items,",") or "-"
 end
+-- An interrupted restore must not destroy the retained originals with the
+-- half-restored body. Return them before native disconnect cleanup proceeds.
+function rollback(actor)
+ local r=records()[char_of(actor)]
+ if not r or r.name~=actor:character_name() then return true end
+ local body=level.object_by_id(r.body)
+ if not body or body:id()==actor:id() then return false end
+ -- Check every original before mutating any ownership.
+ for _,id in ipairs(r.items) do
+  local item=level.object_by_id(id)
+  local parent=item and item:parent()
+  if not parent or (parent:id()~=r.body and parent:id()~=actor:id()) then return false end
+ end
+ local pending=false
+ for _,id in ipairs(r.items) do
+  local item=level.object_by_id(id)
+  if item:parent():id()==actor:id() then actor:transfer_item(item,body) end
+  if item:parent():id()~=r.body then pending=true end
+ end
+ if pending then return false end
+ r.slot_tries=nil
+ return true
+end
 function complete(actor)
  local char=char_of(actor)
  local r=records()[char]

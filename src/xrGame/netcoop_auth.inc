@@ -813,6 +813,25 @@ static void destroy_pending_actors(xrServer* server)
             }
             if (restoring && !login.empty())
             {
+                // Retained equipment can already be attached to this partial
+                // body. Return the same originals before DestroyObject kills
+                // its children; asynchronous ownership events need more frames.
+                s_character_restore[ids[i]].rejected = true; // stop concurrent restore retries reclaiming these items
+                ::luabind::functor<bool> rollback;
+                bool returned = false;
+                if (ai().script_engine().functor("netcoop_survival.rollback", rollback))
+                {
+                    try { returned = rollback(actor_object->lua_game_object()); }
+                    catch (...) { Msg("! [diag][survival] disconnected restore rollback pending actor=%u", ids[i]); }
+                }
+                if (!returned)
+                {
+                    give_to_server(server, server->game->get_entity_from_eid(ids[i]), 0);
+                    s_pending_lock.Enter();
+                    s_pending_actor_destroy.push_back(ids[i]);
+                    s_pending_lock.Leave();
+                    continue;
+                }
                 // These are copies of an unmodified checkpoint, not a live
                 // inventory to save. Retrying that save could never succeed
                 // and used to hold the account forever after disconnect.
