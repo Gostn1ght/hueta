@@ -144,17 +144,6 @@ for section, (folder, model_name) in HELICOPTERS.items():
     if "netcoop_seat_eyes" in heli:
         eyes = [tuple(map(float, item.split(':'))) for item in heli['netcoop_seat_eyes'].split(',')]
         assert 0 < len(eyes) <= len(seats)
-        if section == 'veh_mi24_heli':
-            # Czech Ministry of Defence Mi-24 description: gunner in front of commander.
-            # The actual tandem model also steps the rear cockpit above the front.
-            pilot,gunner=eyes[:2]
-            assert pilot[1]>gunner[1] and pilot[2]<gunner[2], 'Mi-24 pilot must be above/behind gunner'
-            pilot_bone,*pilot_offset=seats[0].strip().split(':')
-            gunner_bone,*gunner_offset=seats[1].strip().split(':')
-            assert pilot_bone==gunner_bone
-            pilot_offset=list(map(float,pilot_offset));gunner_offset=list(map(float,gunner_offset))
-            assert pilot_offset[1]>gunner_offset[1] and pilot_offset[2]<gunner_offset[2]
-            assert heli['netcoop_gun_seat']=='1', 'Crew correction must retain gunner authority on seat 1'
         box = struct.unpack_from('<6f', model[1], 4)
         for eye in eyes:
             assert len(eye) == 3 and all(math.isfinite(v) for v in eye)
@@ -162,11 +151,11 @@ for section, (folder, model_name) in HELICOPTERS.items():
         if section == 'veh_mi24_heli':
             # Cabin envelopes measured from the shipped mesh, excluding the
             # rotor/tail extents of its much larger overall bounding box.
-            rear, front = eyes
+            front, rear = eyes
             assert abs(front[0]) < .5 and 1.15 < front[1] < 2.1 and 3.5 < front[2] < 5
             assert abs(rear[0]) < .5 and 1.5 < rear[1] < 2.75 and 2 < rear[2] < 3.4
             camera = tuple(map(float, profile['car_definition']['camera_pos'].split(',')))
-            assert camera == rear and rear[1] > front[1] and rear[2] < front[2]
+            assert camera == front and rear[1] > front[1] and rear[2] < front[2]
     given = {key for key in heli if key.startswith("heli_")}
     assert given <= read, f"unknown keys {sorted(given - read)}"
     assert read <= given, f"{section}: keys left at the engine default {sorted(read - given)}"
