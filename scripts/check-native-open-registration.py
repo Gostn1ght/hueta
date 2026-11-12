@@ -131,7 +131,7 @@ int main(){
  // The 17.5 password migration erased the Google UID. Device alone cannot
  // restore it: a verified Google identity AND the remembered old password
  // are required, with all normal device/ban checks before persistence.
- for(const xr_string proof: {xr_string(),xr_string("wrong"),xr_string("fixture-digest")}){
+ for(const xr_string& proof: {xr_string(),xr_string("wrong"),xr_string("fixture-digest")}){
   reset();s_accounts["player"]=legacy(1,role_admin);request.legacy_hash=proof;finish_auth(&server,&request);
   const auto& a=s_accounts.at("player");
   if(proof=="fixture-digest"){
