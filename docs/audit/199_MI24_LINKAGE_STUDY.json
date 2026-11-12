@@ -1,0 +1,266 @@
+{
+  "installed": false,
+  "purpose": "Separate pyramid and telescopic shock; not validated for release",
+  "studies": [
+    {
+      "angle_degrees": 30,
+      "sides": {
+        "left": {
+          "attachment_a": [
+            -0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            -0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            -0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            -0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 5.828670879282072e-16,
+          "required_shock_stroke_metres": 0.4167167875313482,
+          "shock_length_range_metres": [
+            1.0886672166350306,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.043367136561169195,
+          "upward_travel_metres": 0.4624029900507086
+        },
+        "right": {
+          "attachment_a": [
+            0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 5.828670879282072e-16,
+          "required_shock_stroke_metres": 0.4167167875313482,
+          "shock_length_range_metres": [
+            1.0886672166350306,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.043367136561169195,
+          "upward_travel_metres": 0.4624029900507086
+        }
+      }
+    },
+    {
+      "angle_degrees": 45,
+      "sides": {
+        "left": {
+          "attachment_a": [
+            -0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            -0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            -0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            -0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 4.440892098500626e-16,
+          "required_shock_stroke_metres": 0.6260873058665384,
+          "shock_length_range_metres": [
+            0.8792966982998405,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.1670542259070451,
+          "upward_travel_metres": 0.6687896977933947
+        },
+        "right": {
+          "attachment_a": [
+            0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 4.440892098500626e-16,
+          "required_shock_stroke_metres": 0.6260873058665384,
+          "shock_length_range_metres": [
+            0.8792966982998405,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.1670542259070451,
+          "upward_travel_metres": 0.6687896977933947
+        }
+      }
+    },
+    {
+      "angle_degrees": 65,
+      "sides": {
+        "left": {
+          "attachment_a": [
+            -0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            -0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            -0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            -0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 8.881784197001252e-16,
+          "required_shock_stroke_metres": 0.8555169646047903,
+          "shock_length_range_metres": [
+            0.6498670395615885,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.420582586108053,
+          "upward_travel_metres": 0.8862028027739025
+        },
+        "right": {
+          "attachment_a": [
+            0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 8.881784197001252e-16,
+          "required_shock_stroke_metres": 0.8555169646047903,
+          "shock_length_range_metres": [
+            0.6498670395615885,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.420582586108053,
+          "upward_travel_metres": 0.8862028027739025
+        }
+      }
+    },
+    {
+      "angle_degrees": 85,
+      "sides": {
+        "left": {
+          "attachment_a": [
+            -0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            -0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            -0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            -0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 8.881784197001252e-16,
+          "required_shock_stroke_metres": 0.9302579148277189,
+          "shock_length_range_metres": [
+            0.5751260893386599,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.7466787115378197,
+          "upward_travel_metres": 1.0140486312204584
+        },
+        "right": {
+          "attachment_a": [
+            0.4255,
+            -0.4512,
+            0.9531
+          ],
+          "attachment_b": [
+            0.4745,
+            -1.6591,
+            0.2469
+          ],
+          "shock_upper": [
+            0.94,
+            -2.35,
+            1.24
+          ],
+          "hinge_axis": [
+            0.03499873355088445,
+            -0.8627544950227212,
+            -0.5044103190537674
+          ],
+          "maximum_rigid_length_error_metres": 8.881784197001252e-16,
+          "required_shock_stroke_metres": 0.9302579148277189,
+          "shock_length_range_metres": [
+            0.5751260893386599,
+            1.5053840041663789
+          ],
+          "inward_travel_metres": 0.7466787115378197,
+          "upward_travel_metres": 1.0140486312204584
+        }
+      }
+    }
+  ]
+}
