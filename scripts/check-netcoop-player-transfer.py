@@ -107,7 +107,8 @@ disconnect_end = engine.index('\nstruct StoreMoney',disconnect_start)
 disconnect_body = engine[disconnect_start:disconnect_end]
 assert disconnect_body.index('!character_save_actor(ids[i], nullptr, false) || !character_account_money_commit(server, ids[i])') < disconnect_body.index('cluster_lease_release(login.c_str())')
 give_start = engine.index('static void give_to_server(xrServer* server, CSE_Abstract* entity, u32 depth)\n{')
-give_body = engine[give_start:disconnect_start].replace('give_to_server(', 'captured_give_to_server(')
+give_end = engine.index('static bool character_return_survivors(', give_start)
+give_body = engine[give_start:give_end].replace('give_to_server(', 'captured_give_to_server(')
 disconnect_fixture = r'''
 namespace disconnect_fixture {
 template<class T>using xr_vector=std::vector<T>;
