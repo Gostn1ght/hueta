@@ -98,6 +98,8 @@ void CFlashlight::Load(LPCSTR section)
 
 	light_trace_bone = READ_IF_EXISTS(pSettings, r_string, section, "light_trace_bone", "");
 	m_light_section = READ_IF_EXISTS(pSettings, r_string, section, "light_section", "torch_definition");
+	m_netcoop_world_glow = READ_IF_EXISTS(pSettings, r_bool, section, "netcoop_world_glow", false);
+	m_netcoop_world_drain = READ_IF_EXISTS(pSettings, r_float, section, "power_drain", 0.001f);
 }
 
 //Switch light render on/off without touching torch state
@@ -114,9 +116,40 @@ void CFlashlight::SwitchLightOnly()
 	glow_render->set_active(lightRenderState);
 }
 
+bool CFlashlight::UpdateWorldGlow()
+{
+    // The original glowstick script creates an ALife lamp, unavailable on a
+    // pure client. Render the replicated dropped item itself, never a copy.
+    if (!netcoop::enabled() || !m_netcoop_world_glow || H_Parent()) return false;
+    if (!netcoop::pure_client() && GetCondition() > 0.01f)
+        ChangeCondition(-_max(0.f, m_netcoop_world_drain) * _max(0.f, Device.fTimeDelta));
+    const bool active = !getDestroy() && GetCondition() > 0.01f;
+    if (m_bWorking != active) TurnDeviceInternal(active);
+    if (!active) return true;
+    UpdateXForm();
+    Fmatrix emitter = XFORM();
+    IKinematics* visual = smart_cast<IKinematics*>(Visual());
+    const u16 bone = visual && light_trace_bone.size() ? visual->LL_BoneID(light_trace_bone) : BI_NONE;
+    if (bone != BI_NONE)
+    {
+        visual->CalculateBones();
+        emitter.mul_43(XFORM(), visual->LL_GetBoneInstance(bone).mTransform);
+    }
+    light_render->set_hud_mode(false);
+    light_omni->set_hud_mode(false);
+    light_render->set_position(emitter.c);
+    light_omni->set_position(emitter.c);
+    glow_render->set_position(emitter.c);
+    light_render->set_rotation(emitter.k, emitter.i);
+    light_omni->set_rotation(emitter.k, emitter.i);
+    glow_render->set_direction(emitter.k);
+    return true;
+}
+
 void CFlashlight::UpdateCL()
 {
 	inherited::UpdateCL();
+	if (UpdateWorldGlow()) return;
 
 	CActor* actor = smart_cast<CActor*>(H_Parent());
 	if (!actor)

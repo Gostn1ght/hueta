@@ -27,6 +27,9 @@ protected:
 	ref_light light_omni;
 	ref_glow glow_render;
 	shared_str m_light_section;
+	bool m_netcoop_world_glow = false;
+	float m_netcoop_world_drain = 0.001f;
+	bool UpdateWorldGlow();
 
 	void SwitchLightOnly();
 
