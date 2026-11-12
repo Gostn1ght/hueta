@@ -200,6 +200,9 @@ float CActorCondition::GetZoneMaxPower(ALife::EHitType hit_type) const
 
 void CActorCondition::UpdateCondition()
 {
+	// UpdateConditionTime already advanced the clock in the scheduler, so
+	// unblocking does not apply accumulated loading-time starvation/radiation.
+	if (netcoop::server_character_restoring(m_object->ID())) return;
 	float v_alcohol = IsSleeping() ? m_fV_AlcoholSleep : m_fV_Alcohol;
 	const bool local_view_actor = !g_dedicated_server && m_object == g_actor;
 	
@@ -515,6 +518,7 @@ void CActorCondition::UpdateSatiety()
 
 CWound* CActorCondition::ConditionHit(SHit* pHDS)
 {
+	if (netcoop::server_character_restoring(m_object->ID())) return NULL;
 	if (GodMode(m_object)) return NULL;
 	return inherited::ConditionHit(pHDS);
 }

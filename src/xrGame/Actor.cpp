@@ -548,6 +548,9 @@ struct playing_pred
 
 void CActor::Hit(SHit* pHDS)
 {
+	// Reject the whole hit before scripts, wounds, sounds and physical impulse
+	// can mutate a body whose character/inventory transaction is not ready.
+	if (netcoop::server_character_restoring(ID())) return;
 	netcoop::ServerVictimScope netcoop_victim(this);
 	bool b_initiated = pHDS->aim_bullet; // physics strike by poltergeist
 

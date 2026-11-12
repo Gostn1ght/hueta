@@ -38,6 +38,15 @@ static bool character_notify_ready(CActor* actor, bool new_life);
 static bool character_claim_survivors(CActor* actor, xr_vector<std::pair<u16,u16>>& expected);
 static void character_restore_timeout(u16 actor_id);
 
+bool server_character_restoring(u16 actor_id)
+{
+	// The unfinished body cannot act or save yet. Keep damage and condition
+	// simulation out of the same transaction until character_ready succeeds.
+	// This is not an admin/god-mode flag and ends when the restore gate is erased.
+	return enabled() && !pure_client() && g_pGameLevel && Level().Server &&
+		s_character_restore.find(actor_id) != s_character_restore.end();
+}
+
 bool server_character_accepts(xrClientData* CL, u16 type)
 {
 	if (!CL) return true;
