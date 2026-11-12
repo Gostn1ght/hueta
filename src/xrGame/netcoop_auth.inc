@@ -761,6 +761,15 @@ static void give_to_server(xrServer* server, CSE_Abstract* entity, u32 depth)
 		give_to_server(server, server->game->get_entity_from_eid(entity->children[i]), depth + 1);
 }
 
+static bool character_return_survivors(CGameObject* actor)
+{
+    ::luabind::functor<bool> rollback;
+    if (!ai().script_engine().functor("netcoop_survival.rollback", rollback)) return false;
+    try { return rollback(actor->lua_game_object()); }
+    catch (...) { Msg("! [diag][survival] disconnected restore rollback pending actor=%u", actor->ID()); }
+    return false;
+}
+
 static void destroy_pending_actors(xrServer* server)
 {
 	xr_vector<u16> ids;
@@ -817,14 +826,7 @@ static void destroy_pending_actors(xrServer* server)
                 // body. Return the same originals before DestroyObject kills
                 // its children; asynchronous ownership events need more frames.
                 s_character_restore[ids[i]].rejected = true; // stop concurrent restore retries reclaiming these items
-                ::luabind::functor<bool> rollback;
-                bool returned = false;
-                if (ai().script_engine().functor("netcoop_survival.rollback", rollback))
-                {
-                    try { returned = rollback(actor_object->lua_game_object()); }
-                    catch (...) { Msg("! [diag][survival] disconnected restore rollback pending actor=%u", ids[i]); }
-                }
-                if (!returned)
+                if (!character_return_survivors(actor_object))
                 {
                     give_to_server(server, server->game->get_entity_from_eid(ids[i]), 0);
                     s_pending_lock.Enter();
