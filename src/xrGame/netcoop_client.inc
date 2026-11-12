@@ -233,12 +233,22 @@ bool client_can_login()
 	return client_has_credentials();
 }
 
+// Connection options and the signed auth packet must name the same account.
+// A remembered password login survives cloud sign-out for legacy recovery;
+// it must not become the display/redirect identity of an active cloud user.
+static LPCSTR client_connection_login()
+{
+    if (firebase_enabled() && !s_firebase_session.id.empty())
+        return s_firebase_session.username.c_str();
+    return client_login();
+}
+
 void client_write_auth(NET_Packet& P)
 {
 	client_load_credentials();
     const bool cloud = firebase_enabled() && !s_firebase_session.id.empty();
 	P.w_u8(cloud ? 3 : s_client_register ? auth_register : auth_login);
-	P.w_stringZ(cloud ? s_firebase_session.username.c_str() : s_client_login.c_str());
+	P.w_stringZ(client_connection_login());
 	P.w_stringZ(cloud ? s_firebase_session.id.c_str() : s_client_key.c_str());
     P.w_u8(s_client_character_slot);
     P.w_stringZ(s_client_character_name.empty() ? s_client_login.c_str() : s_client_character_name.c_str());

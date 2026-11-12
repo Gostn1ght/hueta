@@ -1107,7 +1107,7 @@ static void client_cluster_transfer(LPCSTR data)
 		if (usable)
 			xr_strcpy(host, current);
 	}
-	xr_string name = client_login();
+	xr_string name = client_connection_login();
 	if (name.empty() || !login_valid(name.c_str())) name = "player";
 	Msg("[Lost Zone][cluster] moving to %s at %s:%u", level, host, port);
 	string512 command;

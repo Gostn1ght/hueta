@@ -135,6 +135,8 @@ jobs:
           python scripts/check-server-patch-precedence.py
       - name: Check actual item interpolation
         run: python scripts/check-netcoop-physics.py
+      - name: Check actual cloud connection identity and account admission
+        run: python scripts/check-native-open-registration.py
       - name: Check snapshot clock across location connections
         run: python scripts/check-native-session-clock.py
       - name: Check dropped chemical lights

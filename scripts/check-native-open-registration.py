@@ -13,6 +13,30 @@ end=text.index('    // Slot zero authenticates',start)
 admission=text[start:end]+'    return false;\n}\n' # the world master phase follows the prefix (doc 135)
 start=text.index('static bool read_account_link(')
 link_reader=text[start:text.index('\nvoid server_on_auth(',start)]
+client_source=(root/'src/xrGame/netcoop_client.inc').read_text(encoding='utf-8')
+identity_start=client_source.index('static LPCSTR client_connection_login()')
+identity_body=client_source[identity_start:client_source.index('void client_write_auth(',identity_start)]
+assert 'P.w_stringZ(client_connection_login());' in client_source
+assert 'xr_string name = client_connection_login();' in (root/'src/xrGame/netcoop_cluster.inc').read_text(encoding='utf-8')
+identity_fixture=r'''
+namespace client_identity_fixture {
+struct Session{std::string id,username;}s_firebase_session;
+bool cloud_enabled=true;bool firebase_enabled(){return cloud_enabled;}
+std::string legacy="previous_password_account";const char* client_login(){return legacy.c_str();}
+'''+identity_body+r'''
+void run(){
+ s_firebase_session={"active-token","cloud_account_A"};
+ assert(std::string(client_connection_login())=="cloud_account_A");
+ s_firebase_session.username="cloud_account_B";
+ assert(std::string(client_connection_login())=="cloud_account_B");
+ s_firebase_session.id.clear();
+ assert(std::string(client_connection_login())==legacy);
+ s_firebase_session.id="active-token";cloud_enabled=false;
+ assert(std::string(client_connection_login())==legacy);
+ cloud_enabled=true;
+}
+}
+'''
 source=r'''
 #include <algorithm>
 #include <cassert>
@@ -57,17 +81,18 @@ struct NET_Packet {
 };
 bool read_string(NET_Packet& p,char* out,unsigned capacity){
  unsigned n=0;while(p.r_elapsed()){char c=char(p.bytes[p.pos++]);if(!c){out[n]=0;return true;}
- if(n+1>=capacity)return false;out[n++]=c;}return false;
+ if(n+1>=capacity){return false;}out[n++]=c;}return false;
 }
 bool key_valid(LPCSTR key){return std::strlen(key)==64 && std::strspn(key,"0123456789abcdef")==64;}
 void SecureZeroMemory(void* p,unsigned n){std::memset(p,0,n);}
-''' + admission + link_reader + r'''
+''' + identity_fixture + admission + link_reader + r'''
 void reset(){s_accounts.clear();s_accounts_dirty=false;test_client={};saves=0;rejection.clear();banned=false;}
 Account legacy(unsigned approval,Role role=role_player){
  Account a;a.login="Player";a.salt="fixture-salt";a.hash="fixture-digest";a.device="fixture-device";
  a.role=role;a.approval=approval;a.has_money=true;a.money=5000;return a;
 }
 int main(){
+ client_identity_fixture::run();
  xrServer server;PendingAuth request;
  for(unsigned old: {0u,1u,2u})for(Role role: {role_player,role_admin}){
   reset();s_accounts["player"]=legacy(old,role);finish_auth(&server,&request);
