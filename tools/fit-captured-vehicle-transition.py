@@ -100,11 +100,21 @@ for obj in skin:
 for obj in car_objects:
     if obj.type=='MESH':
         material=bpy.data.materials.new('car');material.diffuse_color=(.5,.5,.48,1);obj.data.materials.clear();obj.data.materials.append(material)
-scene=bpy.context.scene;scene.render.engine='BLENDER_WORKBENCH';scene.display.shading.color_type='MATERIAL'
-scene.render.resolution_x=1000;scene.render.resolution_y=800;scene.render.resolution_percentage=100
+scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=4
+scene.render.threads_mode='FIXED';scene.render.threads=2
+scene.render.resolution_x=512;scene.render.resolution_y=410;scene.render.resolution_percentage=100
+scene.world=bpy.data.worlds.new('entry_review_world');scene.world.use_nodes=True
+scene.world.node_tree.nodes['Background'].inputs['Color'].default_value=(.3,.3,.3,1)
+scene.world.node_tree.nodes['Background'].inputs['Strength'].default_value=.7
+bpy.ops.object.light_add(type='AREA',location=seat_point+Vector((-3,-4,5)));bpy.context.object.data.energy=700;bpy.context.object.data.shape='DISK';bpy.context.object.data.size=5
 bpy.ops.object.camera_add();camera=bpy.context.object;scene.camera=camera;camera.data.type='ORTHO';camera.data.ortho_scale=4.5
 ground=float(row['visual_bounds_blender'][0][2]);bpy.ops.mesh.primitive_plane_add(size=20,location=(0,0,ground-.005))
 metadata=[];samples=[]
+# Both standing endpoints must be outside the real body, not inside the seat.
+# Warp only the standing portion; the seated endpoint stays exactly fitted.
+bounds=row['visual_bounds_blender'];side=-1 if seat_point.x<0 else 1
+standing_x=float(bounds[0 if side<0 else 1][0])+side*.45
+standing_y=float(seat_point.y)
 for leaving,source_name in [(False,'review_car_enter'),(True,'review_car_exit')]:
     frames=source_names[source_name];edge=0 if leaving else (frames-1)/frames
     end=pose(source,source_name,edge);align=target['bip01_pelvis']@end['bip01_pelvis'].inverted()
@@ -113,17 +123,43 @@ for leaving,source_name in [(False,'review_car_enter'),(True,'review_car_exit')]
         t=frame/(frames-1);world={n:align@m for n,m in pose(source,source_name,frame/frames).items()}
         world=local_blend(world,smooth((.18-t)/.18) if leaving else smooth((t-.82)/.18))
         sequence.append(world)
+    # Open before the body enters the doorway; close after it has cleared.
+    # These holds are a timing study, not a finished hand/handle animation.
+    lead=15;trail=15;source_frames=frames
+    sequence=[sequence[0]]*lead+sequence+[sequence[-1]]*trail
+    frames=len(sequence)
+    def body_t(frame):return max(0,min(1,(frame-lead)/(source_frames-1)))
+    def door_open(frame):
+        return smooth(frame/lead)*(1-smooth((frame-(lead+source_frames-1))/trail))
     actor.animation_data.action=None
     stand=sequence[-1 if leaving else 0];apply(stand)
     vertical=ground+.006-minimum_height()
+    old_standing=seat_matrix@stand['bip01'].translation
+    standing_shift=Vector((standing_x-old_standing.x,standing_y-old_standing.y,vertical))
+    floor_samples=[]
+    # Measure every key, then use a conservative smooth whole-rig lift. This
+    # preserves bone lengths and cannot silently hide a mid-cycle floor hit.
+    warped=[];required=[]
+    for frame,base in enumerate(sequence):
+        t=body_t(frame);weight=smooth((t-.25)/.75) if leaving else 1-smooth(t/.75)
+        shift=seat_matrix.to_3x3().inverted()@(standing_shift*weight)
+        world={n:Matrix.Translation(shift)@m for n,m in base.items()};apply(world)
+        warped.append(world);required.append(max(0,ground+.006-minimum_height()))
+    envelope=[max(required[max(0,i-4):min(frames,i+5)]) for i in range(frames)]
+    lifts=[sum(envelope[min(frames-1,max(0,i+j-2))]*w for j,w in enumerate((1,4,6,4,1)))/16 for i in range(frames)]
+    assert max(lifts)<.4,('Excessive entry floor correction',max(lifts))
+    for frame,world in enumerate(warped):
+        shift=seat_matrix.to_3x3().inverted()@Vector((0,0,lifts[frame]))
+        warped[frame]={n:Matrix.Translation(shift)@m for n,m in world.items()}
     name=f'lz_{"exit" if leaving else "enter"}_{a.section[4:]}_{a.seat:02}'
     action=bpy.data.actions.new(name);actor.animation_data.action=action;action.xray.fps=30;action.xray.speed=1
     for frame,base in enumerate(sequence):
         scene.frame_set(frame)
-        t=frame/(frames-1);weight=smooth((t-.25)/.75) if leaving else 1-smooth(t/.75)
+        t=body_t(frame);weight=smooth((t-.25)/.75) if leaving else 1-smooth(t/.75)
         # Correct model height at the standing endpoint without changing bones.
-        shift=seat_matrix.to_3x3().inverted()@Vector((0,0,vertical*weight))
-        world={n:Matrix.Translation(shift)@m for n,m in base.items()};apply(world)
+        world=warped[frame];apply(world)
+        floor_samples.append(minimum_height()-ground)
+        assert floor_samples[-1]>=.005,('Entry skin below ground',name,frame,floor_samples[-1])
         for bone in order:
             error=(bone.matrix.translation-world[bone.name].translation).length
             assert error<.0001,('Preview pose differs',name,frame,bone.name,error)
@@ -132,10 +168,10 @@ for leaving,source_name in [(False,'review_car_enter'),(True,'review_car_exit')]
             if bone.parent and bone.name not in ('bip01','bip01_pelvis'):
                 assert abs((world[bone.name].translation-world[bone.parent.name].translation).length-(rest[bone.name].translation-rest[bone.parent.name].translation).length)<.001
         samples.append(dict(motion=name,frame=frame,frames=frames,matrices={n:[list(r) for r in m] for n,m in world.items()}))
-        if frame in (0,frames//4,frames//2,3*frames//4,frames-1):
+        if frame in (0,frames//2,frames-1):
             if a.render:
                 if door:
-                    opened=smooth(t/.2)*(1-smooth((t-.85)/.15))
+                    opened=door_open(frame)
                     car.pose.bones[door.name].rotation_euler[door_axis]=door_angle*opened
                 bpy.context.view_layer.update()
                 centre=seat_point+Vector((0,0,.2));camera.location=centre+Vector((-3,-4,2));camera.rotation_euler=(centre-camera.location).to_track_quat('-Z','Y').to_euler()
@@ -143,8 +179,9 @@ for leaving,source_name in [(False,'review_car_enter'),(True,'review_car_exit')]
     for curve in action.fcurves:
         for key in curve.keyframe_points:key.interpolation='LINEAR'
     actor.xray.motions_collection.add().name=name
-    outside=seat_matrix@sequence[-1 if leaving else 0]['bip01'].translation+Vector((0,0,vertical))
-    metadata.append(dict(motion=name,frames=frames,duration_ms=round((frames-1)/30*1000),standing_root_blender=list(outside),ground_correction_metres=vertical))
+    outside=seat_matrix@stand['bip01'].translation+standing_shift
+    assert abs(outside.x-standing_x)<.001 and abs(outside.y-standing_y)<.001
+    metadata.append(dict(motion=name,frames=frames,source_frames=source_frames,door_lead_frames=lead,door_trail_frames=trail,duration_ms=round((frames-1)/30*1000),standing_root_blender=list(outside),ground_correction_metres=vertical,standing_margin_metres=.45,maximum_cycle_floor_lift_metres=max(lifts),minimum_skin_above_ground_metres=min(floor_samples),floor_violation_keys=[i for i,h in enumerate(floor_samples) if h<-.01]))
 bpy.ops.object.select_all(action='DESELECT');actor.select_set(True);bpy.context.view_layer.objects.active=actor
 if a.save_blend:
     bpy.ops.wm.save_as_mainfile(filepath=str(a.out/'candidate.blend'))
