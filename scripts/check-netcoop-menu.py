@@ -528,7 +528,13 @@ last_window.names={};drafts={};last_window:ShowProfile(1);last_window:OnBack()
 assert(last_window.mode=='characters' and last_window.account_verified, 'profile Back returns to the room with the account retained')
 last_window:ResetCloud()
 -- Switch account: sign-in form with the old email; Tab walks the fields.
+last_window.pending_login='previous_account';last_window.names={'Old character'}
+last_window.previews={{visual='old'}};last_window.previous_life_name='Old character'
+last_window.cloud_join={1,'Old character'};last_window.profile_data={name='Old character'}
 callbacks.btn_reset();assert(cloud_state==0 and last_window.screen=='login' and last_window.focus_index==2)
+assert(last_window.pending_login==nil and #last_window.names==0 and #last_window.previews==0)
+assert(last_window.cloud_join==nil and last_window.profile_data==nil and last_window.previous_life_name==nil,
+    'switching account must discard the old character and pending entry')
 last_window:OnKeyboard(DIK_keys.DIK_TAB,ui_events.WINDOW_KEY_PRESSED);assert(last_window.focus_index==1)
 last_window:OnKeyboard(DIK_keys.DIK_TAB,ui_events.WINDOW_KEY_PRESSED);assert(last_window.focus_index==2)
 -- Forgot password keeps the form and reports the result there.
@@ -679,3 +685,19 @@ for i,key in enumerate(['flat_account','enter_zone','server','settings','flat_qu
 print('Actual flat labels reach CP1251 fonts byte-for-byte; no UTF8 literals or replacement characters PASS')
 
 temporary.cleanup()
+
+lua.execute(r"""
+-- A reused window must route with the identity that signs the auth packet.
+local account, route, character = netcoop_firebase_account, last_window.WithRoute, netcoop_character
+netcoop_firebase_account=function() return 'new_cloud_account' end
+netcoop_character=function() return true end
+last_window.pending_login='old_cloud_account'
+last_window.pending_ip='127.0.0.1';last_window.pending_port=5446
+local routed
+last_window.WithRoute=function(self,ip,port,login,slot,ready) routed=login end
+last_window:EnterWorld(1,'New character','stalker',1,'')
+assert(routed=='new_cloud_account' and last_window.pending_login=='new_cloud_account',
+ 'route identity must agree with the current cloud auth rather than the old window')
+netcoop_firebase_account=account;last_window.WithRoute=route;netcoop_character=character
+""")
+print('Account switch: stale character state cleared; entry routes with current cloud identity PASS')

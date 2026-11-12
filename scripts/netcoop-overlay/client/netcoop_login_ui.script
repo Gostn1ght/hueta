@@ -559,6 +559,13 @@ function netcoop_login_wnd:EnterWorld(slot, name, faction, economy, loadout)
 		return self:SetMsg("! Invalid character selection")
 	end
 	local login, ip, port = self.pending_login, self.pending_ip, self.pending_port
+    -- The window survives switching cloud accounts. Route with the identity
+    -- that signs this connection, never the previous window's login.
+    if cloud_enabled() then
+        login = netcoop_firebase_account()
+        if not login or login == "" then return self:RequireLogin() end
+        self.pending_login = login
+    end
 	write_last(login, ip .. ":" .. port)
 
     self:WithRoute(ip,port,login,slot,function(cip,cport)
@@ -1071,6 +1078,14 @@ function netcoop_login_wnd:SignOut()
     else
         self.force_login = true
     end
+    -- Discard in-memory state owned by the previous account; its disk cache
+    -- remains scoped by cloud UID and can be reused only by that identity.
+    self.route_wait, self.role_probe, self.cloud_join = nil, nil, nil
+    self.pending_login, self.names, self.previews = nil, {}, {}
+    self.profile_data, self.previous_life_name = nil, nil
+    self.slot, self.profile_slot = 1, nil
+    if self.creator then self.creator.netcoop_creation_slot = nil end
+    netcoop_preview_clear()
     self.form_mode, self.editing_email, self.resend_at = "login", false, nil
     self.ed_email:SetText(email); self.ed_pass:SetText(""); self.ed_pass2:SetText("")
     auth_message, auth_kind = tr("signed_out"), "info"
