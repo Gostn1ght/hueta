@@ -13,6 +13,7 @@
 #include "ai_monster_space.h"
 #include "graph_engine_space.h"
 #include "netcoop_motion_identity.h"
+#include "../xrEngine/SkeletonMotions.h"
 
 class CMotionDef;
 class CBlend;
@@ -66,6 +67,9 @@ private:
 	// Netcoop stable animation identity of the current visual (doc 204).
 	// Rebuilt by reload(); holds no pointers into the visual.
 	netcoop::MotionIdentityTable m_netcoop_motions;
+	// Retained references prevent stale slot addresses from being recycled
+	// while the table still describes them. No renderer/visual is retained.
+	xr_vector<shared_motions> m_netcoop_motion_slots;
 
 private:
 	CWeapon* m_weapon;

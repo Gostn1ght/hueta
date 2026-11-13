@@ -980,7 +980,7 @@ void CAI_Stalker::net_Export(NET_Packet& P)
 	u32 wire[3];
 	for (int i = 0; i < 3; ++i)
 		wire[i] = anims[i].valid() ? am.netcoop_motion_wire(anims[i]) : netcoop::motion_wire_invalid;
-	P.w_u8(anim_mode ? u8(anim_mode | netcoop::motion_mode_hashed) : anim_mode);
+	P.w_u8(anim_mode && netcoop::enabled() ? u8(anim_mode | netcoop::motion_mode_hashed) : anim_mode);
 	for (int i = 0; i < 3; ++i)
 		P.w_u32(wire[i]);
 

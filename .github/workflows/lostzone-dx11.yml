@@ -140,6 +140,8 @@ jobs:
         run: python scripts/check-native-open-registration.py
       - name: Check snapshot clock across location connections
         run: python scripts/check-native-session-clock.py
+      - name: Check stable NPC motion identity and visual cache
+        run: python scripts/check-native-npc-motion-identity.py
       - name: Check dropped chemical lights
         run: python scripts/check-native-world-glow.py
       - name: Check unfinished character damage isolation
@@ -354,6 +356,8 @@ jobs:
           python scripts/check-native-destroy-progress.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-session-clock.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-npc-motion-identity.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-world-glow.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
