@@ -974,9 +974,15 @@ void CAI_Stalker::net_Export(NET_Packet& P)
 		anims[1] = am.torso().animation();
 		anims[2] = am.legs().animation();
 	}
-	P.w_u8(anim_mode);
+	// Stable name hashes, flagged by the high mode bit (doc 204): OMF slot
+	// order differs between processes, so raw MotionIDs are not portable.
+	// Mode 0 is written unchanged.
+	u32 wire[3];
 	for (int i = 0; i < 3; ++i)
-		P.w_u32(anims[i].valid() ? anims[i].val : u32(-1));
+		wire[i] = anims[i].valid() ? am.netcoop_motion_wire(anims[i]) : netcoop::motion_wire_invalid;
+	P.w_u8(anim_mode ? u8(anim_mode | netcoop::motion_mode_hashed) : anim_mode);
+	for (int i = 0; i < 3; ++i)
+		P.w_u32(wire[i]);
 
 	u8 hands_flags = 0;
 	CWeapon* weapon = smart_cast<CWeapon*>(inventory().ActiveItem());

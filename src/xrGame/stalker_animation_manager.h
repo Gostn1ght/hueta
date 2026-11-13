@@ -12,6 +12,7 @@
 #include "stalker_animation_script.h"
 #include "ai_monster_space.h"
 #include "graph_engine_space.h"
+#include "netcoop_motion_identity.h"
 
 class CMotionDef;
 class CBlend;
@@ -62,6 +63,9 @@ private:
 	CAI_Stalker* m_object;
 	IRenderVisual* m_visual;
 	IKinematicsAnimated* m_skeleton_animated;
+	// Netcoop stable animation identity of the current visual (doc 204).
+	// Rebuilt by reload(); holds no pointers into the visual.
+	netcoop::MotionIdentityTable m_netcoop_motions;
 
 private:
 	CWeapon* m_weapon;
@@ -182,6 +186,9 @@ private:
 	void update_impl();
 	// Netcoop client puppet: plays the animations the server stalker plays.
 	bool play_netcoop_puppet();
+	// Builds m_netcoop_motions from the visual the stalker has now; false if
+	// that visual is not the one this manager plays on.
+	bool netcoop_motions_ready();
 
 private:
 	static void global_play_callback(CBlend* blend);
@@ -197,6 +204,9 @@ public:
 	virtual void update();
 	void play_fx(float power_factor, int fx_index);
 	void play_delayed_callbacks();
+	// Wire value of a local cycle for the netcoop snapshot, or
+	// netcoop::motion_wire_invalid.
+	u32 netcoop_motion_wire(const MotionID& motion);
 
 public:
 	void add_script_animation(LPCSTR animation, bool hand_usage = false, bool use_movement_controller = false);
