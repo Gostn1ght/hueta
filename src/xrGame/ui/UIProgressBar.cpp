@@ -40,7 +40,10 @@ void CUIProgressBar::UpdateProgressBar()
 
 	float progressbar_unit = 1 / (m_MaxPos - m_MinPos);
 
-	float fCurrentLength = m_ProgressPos.x * progressbar_unit;
+	// Geometry and gradient use a fraction of the configured range.
+	// A nonzero minimum is the empty point, not an extra filled segment.
+	float fCurrentLength = (m_ProgressPos.x - m_MinPos) * progressbar_unit;
+	clamp(fCurrentLength, 0.f, 1.f);
 
 	if (m_orient_mode == om_horz || m_orient_mode == om_back)
 	{

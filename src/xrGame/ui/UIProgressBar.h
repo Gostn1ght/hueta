@@ -54,6 +54,9 @@ public:
 	{
 		m_MinPos = _Min;
 		m_MaxPos = _Max;
+		if (m_MaxPos < m_MinPos) m_MaxPos = m_MinPos;
+		clamp(m_ProgressPos.x, m_MinPos, m_MaxPos);
+		clamp(m_ProgressPos.y, m_MinPos, m_MaxPos);
 		UpdateProgressBar();
 	}
 
