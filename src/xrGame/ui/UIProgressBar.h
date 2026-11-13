@@ -65,7 +65,7 @@ public:
 
 	void SetProgressPos(float _Pos);
 	float GetProgressPos() { return m_ProgressPos.y; }
-    void SnapProgressPos() { m_ProgressPos.x = m_ProgressPos.y; }
+    void SnapProgressPos() { m_ProgressPos.x = m_ProgressPos.y; UpdateProgressBar(); }
 
     CUIStatic& GetProgressStatic() { return m_UIProgressItem; }
 

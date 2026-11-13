@@ -13,6 +13,7 @@ header=(root/'src/xrGame/ui/UIProgressBar.h').read_text(encoding='utf-8')
 update=function(cpp,'void CUIProgressBar::UpdateProgressBar()')
 setpos=function(cpp,'void CUIProgressBar::SetProgressPos(float _Pos)')
 setrange=function(header,'void SetRange(float _Min, float _Max)').replace('void SetRange(', 'void CUIProgressBar::SetRange(',1)
+snap=function(header,'void SnapProgressPos()').replace('void SnapProgressPos(', 'void CUIProgressBar::SnapProgressPos(',1)
 if os.environ.get('GITHUB_ACTIONS')!='true':raise SystemExit('Native checks must run in GitHub Actions')
 source=r"""
 #include <algorithm>
@@ -31,9 +32,9 @@ struct CUIProgressBar{
  bool m_bUseColor=true,m_bUseGradient=true;
  Fcolor m_minColor,m_middleColor,m_maxColor;Item m_UIProgressItem;
  float GetWidth(){return 200;}float GetHeight(){return 80;}
- void UpdateProgressBar();void SetProgressPos(float);void SetRange(float,float);
+ void UpdateProgressBar();void SetProgressPos(float);void SetRange(float,float);void SnapProgressPos();
 };
-"""+update+'\n'+setpos+'\n'+setrange+r"""
+"""+update+'\n'+setpos+'\n'+setrange+'\n'+snap+r"""
 void near(float a,float b){assert(std::fabs(a-b)<0.001f);}
 int main(){
  CUIProgressBar bar;
@@ -53,6 +54,12 @@ int main(){
  bar.SetProgressPos(500);near(bar.m_ProgressPos.y,100);near(bar.m_CurrentLength,0);
  bar.m_ProgressPos.x=999;bar.UpdateProgressBar();near(bar.m_CurrentLength,200);near(bar.m_UIProgressItem.color,1);
  bar.m_ProgressPos.x=-999;bar.UpdateProgressBar();near(bar.m_CurrentLength,0);near(bar.m_UIProgressItem.color,0);
+ // Snap must update geometry/color now: Update() will see x==y and skip it.
+ bar.SetRange(0,100);bar.m_ProgressPos={0,0};bar.UpdateProgressBar();
+ bar.SetProgressPos(100);near(bar.m_CurrentLength,0);bar.SnapProgressPos();
+ near(bar.m_ProgressPos.x,100);near(bar.m_CurrentLength,200);near(bar.m_UIProgressItem.color,1);
+ bar.SetProgressPos(0);near(bar.m_CurrentLength,200);bar.SnapProgressPos();
+ near(bar.m_CurrentLength,0);near(bar.m_UIProgressItem.color,0);
  bar.SetRange(0,0);assert(std::isfinite(bar.m_CurrentLength));near(bar.m_CurrentLength,0);
  bar.SetRange(50,10);assert(bar.m_MaxPos>=bar.m_MinPos&&std::isfinite(bar.m_CurrentLength));
  bar.m_bUseGradient=false;bar.m_maxColor.fraction=0.75f;bar.UpdateProgressBar();near(bar.m_UIProgressItem.color,0.75f);
