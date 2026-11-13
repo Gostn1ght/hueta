@@ -1555,6 +1555,7 @@
     <ClInclude Include="stalker_animation_data_storage.h" />
     <ClInclude Include="stalker_animation_data_storage_inline.h" />
     <ClInclude Include="stalker_animation_manager.h" />
+    <ClInclude Include="netcoop_motion_identity.h" />
     <ClInclude Include="stalker_animation_manager_impl.h" />
     <ClInclude Include="stalker_animation_manager_inline.h" />
     <ClInclude Include="stalker_animation_names.h" />

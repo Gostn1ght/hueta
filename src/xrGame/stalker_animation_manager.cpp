@@ -14,6 +14,7 @@
 #include "stalker_movement_manager_smart_cover.h"
 
 #include "CharacterPhysicsSupport.h"
+#include "netcoop.h"
 
 // TODO:
 // stalker animation manager consists of 5 independent managers,
@@ -26,6 +27,8 @@
 
 CStalkerAnimationManager::CStalkerAnimationManager(CAI_Stalker* object) :
 	m_object(object),
+	m_visual(nullptr),
+	m_skeleton_animated(nullptr),
 	m_global(object),
 	m_head(object),
 	m_torso(object),
@@ -37,6 +40,8 @@ CStalkerAnimationManager::CStalkerAnimationManager(CAI_Stalker* object) :
 
 void CStalkerAnimationManager::reinit()
 {
+	m_netcoop_motions.reset();
+	m_netcoop_motion_slots.clear();
 	m_direction_start = 0;
 	m_current_direction = eMovementDirectionForward;
 	m_target_direction = eMovementDirectionForward;
@@ -76,6 +81,7 @@ void CStalkerAnimationManager::reload()
 	// The visual may have changed: forget the old identity before any early
 	// return; it is rebuilt lazily from the visual in use.
 	m_netcoop_motions.reset();
+	m_netcoop_motion_slots.clear();
 
 	m_crouch_state_config = object().SpecificCharacter().crouch_type();
 	VERIFY((m_crouch_state_config == 0) || (m_crouch_state_config == 1) || (m_crouch_state_config == -1));
@@ -86,7 +92,6 @@ void CStalkerAnimationManager::reload()
 
 	m_skeleton_animated = smart_cast<IKinematicsAnimated*>(m_visual);
 	VERIFY(m_skeleton_animated);
-	netcoop_motions_ready();
 
 	m_data_storage = stalker_animation_data_storage().object(m_skeleton_animated);
 	VERIFY(m_data_storage);
@@ -152,18 +157,25 @@ bool CStalkerAnimationManager::standing() const
 
 bool CStalkerAnimationManager::netcoop_motions_ready()
 {
+	if (!netcoop::enabled())
+		return false;
 	// Only the visual this manager plays on may be described; after an early
 	// return of reload() m_skeleton_animated can belong to an old visual.
 	IKinematicsAnimated* skeleton = smart_cast<IKinematicsAnimated*>(object().Visual());
 	if (!skeleton || skeleton != m_skeleton_animated)
 		return false;
-	if (m_netcoop_motions.built())
+	const u16 count = skeleton->LL_MotionsSlotCount();
+	bool current = m_netcoop_motions.built() && m_netcoop_motion_slots.size() == count;
+	for (u16 slot = 0; current && slot < count; ++slot)
+		current = m_netcoop_motion_slots[slot] == skeleton->LL_MotionsSlot(slot);
+	if (current)
 		return true;
+	m_netcoop_motions.reset();
+	m_netcoop_motion_slots.clear();
 
 	// Copies keep every slot (and so every name) alive during the build;
 	// shared_motions accessors are not const.
 	xr_vector<shared_motions> slots;
-	const u16 count = skeleton->LL_MotionsSlotCount();
 	slots.reserve(count);
 	std::vector<netcoop::MotionIdentityEntry> entries;
 	for (u16 slot = 0; slot < count; ++slot)
@@ -174,11 +186,14 @@ bool CStalkerAnimationManager::netcoop_motions_ready()
 			entries.push_back({cycle.first.c_str(), slot, cycle.second});
 	}
 	m_netcoop_motions.build(std::move(entries));
+	m_netcoop_motion_slots.swap(slots);
 	return true;
 }
 
 u32 CStalkerAnimationManager::netcoop_motion_wire(const MotionID& motion)
 {
+	if (!netcoop::enabled())
+		return motion.valid() ? motion.val : netcoop::motion_wire_invalid;
 	if (!motion.valid() || !netcoop_motions_ready())
 		return netcoop::motion_wire_invalid;
 	return m_netcoop_motions.encode(motion.slot, motion.idx);
