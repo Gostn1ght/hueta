@@ -375,6 +375,8 @@ jobs:
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-eatable-uses.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-netcoop-physics.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-owner-regressions.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-corpse-animation.py

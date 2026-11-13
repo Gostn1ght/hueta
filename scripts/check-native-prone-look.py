@@ -90,6 +90,21 @@ int main(){
  auto standing=bone(a);CActor::ShoulderCallback(&standing);
  assert(near(standing.mTransform.yaw,.2f*y_shoulder_factor));
  assert(near(standing.mTransform.pitch,-.1f*p_shoulder_factor));pivot(standing);
+ // A corpse may still carry a look callback before/after shell creation.
+ // Cover ordinary and vehicle callbacks too, not only a prone corpse.
+ for(bool authored:{false,true}) {
+  a.prone=authored;a.alive=false;
+  for(auto callback:{CActor::Spin0Callback,CActor::Spin1Callback,CActor::ShoulderCallback,
+                    CActor::HeadCallback,CActor::VehicleHeadCallback}) {
+   auto dead=bone(a);callback(&dead);
+   assert(!dead.mTransform.writes);pivot(dead);
+  }
+ }
+ a.prone=false;a.alive=true;
+ for(auto callback:{CActor::Spin0Callback,CActor::Spin1Callback,CActor::ShoulderCallback,
+                   CActor::HeadCallback,CActor::VehicleHeadCallback}) {
+  auto living=bone(a);callback(&living);assert(living.mTransform.writes==1);pivot(living);
+ }
  puts("PASS actual prone look callbacks: hips fixed, bounded chest/head aim, seated/dead/action exclusions, finite inputs and standing path");
 }
 '''

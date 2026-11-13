@@ -71,6 +71,7 @@ void CActor::Spin0Callback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
+	if (!A->g_Alive()) return; // A retained look callback must never rotate a corpse.
 	if(A->netcoop_authored_pose()) return;
 
 	Fmatrix spin;
@@ -87,6 +88,7 @@ void CActor::Spin1Callback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
+	if (!A->g_Alive()) return; // A retained look callback must never rotate a corpse.
 	if(A->netcoop_authored_pose()) return;
 
 	Fmatrix spin;
@@ -103,6 +105,7 @@ void CActor::ShoulderCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
+	if (!A->g_Alive()) return; // A retained look callback must never rotate a corpse.
 	if(A->netcoop_authored_pose()) {
 		if (!A->netcoop_seated() && A->g_Alive() && !A->m_bAnimTorsoPlayed)
 			netcoop_prone_look(B, angle_normalize_signed(A->r_torso.yaw - A->r_model_yaw - A->r_model_yaw_delta),
@@ -125,6 +128,7 @@ void CActor::HeadCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
+	if (!A->g_Alive()) return; // A retained look callback must never rotate a corpse.
 	if(A->netcoop_authored_pose()) return;
 	Fmatrix spin;
 	float bone_yaw;
@@ -146,6 +150,7 @@ void CActor::VehicleHeadCallback(CBoneInstance* B)
 {
 	CActor* A = static_cast<CActor*>(B->callback_param());
 	VERIFY(A);
+	if (!A->g_Alive()) return; // A retained look callback must never rotate a corpse.
 	if(A->netcoop_authored_pose()) return;
 	Fmatrix spin;
 	float bone_yaw = angle_normalize_signed(A->r_torso.yaw) * 0.75f;

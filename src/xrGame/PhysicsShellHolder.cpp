@@ -656,20 +656,33 @@ u32 CPhysicsShellHolder::netcoop_interpolation_time(u32 interval)
     return m_netcoop_render_time;
 }
 
-static float netcoop_physics_coordinate(float a, float b, float va, float vb, float seconds, float t)
+static float netcoop_physics_coordinate(float a, float b, float va, float vb, float seconds, float t, bool free_apex = false)
 {
     const float distance = b - a;
-    if (seconds <= 0.f || _abs(distance) < EPS_S) return a + distance * t;
+    if (seconds <= 0.f || (!free_apex && _abs(distance) < EPS_S)) return a + distance * t;
     float ta = va * seconds, tb = vb * seconds;
-    if (ta * distance < 0.f) ta = 0.f;
-    if (tb * distance < 0.f) tb = 0.f;
-    const float limit = 3.f * _abs(distance);
-    clamp(ta, -limit, limit); clamp(tb, -limit, limit);
-    const float alpha = ta / distance, beta = tb / distance;
-    const float length = alpha * alpha + beta * beta;
-    if (length > 9.f) { const float scale = 3.f / _sqrt(length); ta *= scale; tb *= scale; }
+    if (!free_apex)
+    {
+        if (ta * distance < 0.f) ta = 0.f;
+        if (tb * distance < 0.f) tb = 0.f;
+        const float limit = 3.f * _abs(distance);
+        clamp(ta, -limit, limit); clamp(tb, -limit, limit);
+        const float alpha = ta / distance, beta = tb / distance;
+        const float length = alpha * alpha + beta * beta;
+        if (length > 9.f) { const float scale = 3.f / _sqrt(length); ta *= scale; tb *= scale; }
+    }
     const float t2 = t * t, t3 = t2 * t;
     return (2.f*t3-3.f*t2+1.f)*a + (t3-2.f*t2+t)*ta + (-2.f*t3+3.f*t2)*b + (t3-t2)*tb;
+}
+
+static float netcoop_physics_height(float a, float b, float va, float vb, float seconds, float t, float gravity)
+{
+    // A free-flight apex legitimately rises above both sample heights.
+    // Keep monotone bounds for impacts, resting items and invalid segments.
+    const bool apex = seconds > 0.f && gravity > 0.f && va > 0.f && vb < 0.f &&
+        _abs(vb - va + gravity * seconds) <= .05f + gravity * seconds * .1f &&
+        _abs(b - a - (va + vb) * .5f * seconds) <= .005f + .05f * gravity * seconds * seconds;
+    return netcoop_physics_coordinate(a, b, va, vb, seconds, t, apex);
 }
 
 void CPhysicsShellHolder::netcoop_physics_update()
@@ -728,7 +741,9 @@ void CPhysicsShellHolder::netcoop_physics_update()
 	const NetcoopPhysicsSnapshot& last = m_netcoop_physics.size() > 1 ? m_netcoop_physics[1] : first;
 	const s32 span = s32(last.stamp - first.stamp);
 	const float factor = span > 0 ? _max(0.f, _min(1.f, float(s32(time - first.stamp)) / span)) : 0.f;
-	const bool ballistic = smart_cast<CMissile*>(this) || smart_cast<CCustomRocket*>(this);
+	const bool gravity_projectile = smart_cast<CMissile*>(this) != nullptr;
+	const bool ballistic = gravity_projectile || smart_cast<CCustomRocket*>(this);
+	const float gravity = gravity_projectile ? physics_world()->Gravity() : 0.f;
 	const s32 late=s32(time-last.stamp);
 	const float predict=ballistic && late>0 ? float(_min(late,150))*.001f:0.f;
 	for (u16 i = 0; i < first.states.size(); ++i)
@@ -738,7 +753,7 @@ void CPhysicsShellHolder::netcoop_physics_update()
 		const float seconds = _max(0.f, float(span) / 1000.f);
 		state.position.set(
 		    netcoop_physics_coordinate(a.position.x,b.position.x,a.linear_vel.x,b.linear_vel.x,seconds,factor),
-		    netcoop_physics_coordinate(a.position.y,b.position.y,a.linear_vel.y,b.linear_vel.y,seconds,factor),
+		    netcoop_physics_height(a.position.y,b.position.y,a.linear_vel.y,b.linear_vel.y,seconds,factor,gravity),
 		    netcoop_physics_coordinate(a.position.z,b.position.z,a.linear_vel.z,b.linear_vel.z,seconds,factor));
 		state.quaternion.slerp(first.states[i].quaternion, last.states[i].quaternion, factor);
 		if(predict>0.f && b.enabled && b.linear_vel.square_magnitude()<2000.f*2000.f) {

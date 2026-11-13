@@ -40,6 +40,23 @@ int main(){
  // A free-fall interval reproduces the parabolic midpoint from endpoint velocities.
  float mid=netcoop_physics_coordinate(1,.9f,-1,-3,.05f,.5f);
  assert(std::abs(mid-.9625f)<.00001f);
+ // Equal heights on opposite sides of an airborne apex must not flatten it.
+ // Endpoint velocities follow gravity; compare the entire segment with y(t).
+ for(float seconds:{.05f,.1f,.2f}) {
+  const float gravity=9.81f,va=gravity*seconds*.5f,vb=-va;
+  for(int i=0;i<=100;++i) {
+   const float t=float(i)/100.f;
+   const float expected=3.f+va*seconds*t-.5f*gravity*seconds*seconds*t*t;
+   const float y=netcoop_physics_height(3,3,va,vb,seconds,t,gravity);
+   assert(std::abs(y-expected)<.00001f);
+  }
+  assert(netcoop_physics_height(3,3,va,vb,seconds,.5f,gravity)>3.f);
+ }
+ // Upward/downward impact velocities that do not match gravity stay bounded.
+ assert(netcoop_physics_height(3,3,100,-100,.05f,.4f,9.81f)==3);
+ assert(netcoop_physics_height(3,3,-1,1,.2f,.5f,9.81f)==3);
+ assert(netcoop_physics_height(3,3,1,-1,.2f,.5f,0)==3);
+ assert(netcoop_physics_height(3,3,1,-1,0,.5f,9.81f)==3);
  std::mt19937 gen(7731);std::uniform_real_distribution<float> pos(-20,20),vel(-200,200);
  for(int n=0;n<10000;++n){float a=pos(gen),b=pos(gen),va=vel(gen),vb=vel(gen);
    float previous=a;
@@ -69,5 +86,8 @@ int main(){
 with tempfile.TemporaryDirectory() as folder:
     path = Path(folder)
     (path/'check.cpp').write_text(fixtures+interpolation+contact+checks)
-    subprocess.run(['g++','-std=c++17','-O2','-Wall','-Wextra',str(path/'check.cpp'),'-o',str(path/'check')],check=True)
-    subprocess.run([str(path/'check')],check=True)
+    exe=path/('check.exe' if os.name=='nt' else 'check')
+    command=(['cl','/nologo','/std:c++17','/EHsc','/W4',str(path/'check.cpp'),'/Fe:'+str(exe)] if os.name=='nt' else
+             ['g++','-std=c++17','-O2','-Wall','-Wextra',str(path/'check.cpp'),'-o',str(exe)])
+    subprocess.run(command,cwd=path,check=True)
+    subprocess.run([str(exe)],cwd=path,check=True)

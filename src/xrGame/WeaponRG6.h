@@ -26,6 +26,13 @@ public:
 	void netcoop_shot_effect(u8 kind) override;
 
 protected:
+	bool m_netcoop_launch_pending = false;
+	u32 m_netcoop_rockets_spawning = 0;
+	u16 m_netcoop_launch_owner = u16(-1);
+	Fvector m_netcoop_launch_pos, m_netcoop_launch_dir;
+	float m_netcoop_launch_speed = 0.f;
+	bool netcoop_launch_grenade(const Fvector& pos, const Fvector& dir, float speed);
+	void netcoop_finish_pending_launch();
 	virtual void FireStart();
 	virtual void FireTrace(const Fvector& P, const Fvector& D);
 	virtual u8 AddCartridge(u8 cnt);

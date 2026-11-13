@@ -20,24 +20,24 @@ CWeaponRG6::~CWeaponRG6()
 
 BOOL CWeaponRG6::net_Spawn(CSE_Abstract* DC)
 {
+	m_netcoop_launch_pending = false;
+	m_netcoop_rockets_spawning = 0;
 	BOOL l_res = inheritedSG::net_Spawn(DC);
 	if (!l_res) return l_res;
 
-	if (iAmmoElapsed && !getCurrentRocket())
+	if (iAmmoElapsed && !getCurrentRocket() && !m_netcoop_rockets_spawning)
 	{
-		shared_str grenade_name = m_ammoTypes[0];
-		shared_str fake_grenade_name = pSettings->r_string(grenade_name, "fake_grenade_name");
-
-		if (fake_grenade_name.size())
+		// Restored cylinders can contain different grenade types. Recreate
+		// each projectile from its cartridge, not the first supported ammo.
+		for (const auto& cartridge : m_magazine)
 		{
-			int k = iAmmoElapsed;
-			while (k)
+			shared_str fake = pSettings->r_string(cartridge.m_ammoSect, "fake_grenade_name");
+			if (fake.size())
 			{
-				k--;
-				inheritedRL::SpawnRocket(*fake_grenade_name, this);
+				if (netcoop::enabled() && OnServer()) ++m_netcoop_rockets_spawning;
+				inheritedRL::SpawnRocket(fake, this);
 			}
 		}
-		//			inheritedRL::SpawnRocket(*fake_grenade_name, this);
 	}
 
 
@@ -179,13 +179,37 @@ void CWeaponRG6::FireTrace(const Fvector& P, const Fvector& D)
 
 bool CWeaponRG6::netcoop_fire_shot(u8 kind, const Fvector& pos, const Fvector& dir)
 {
-	if (kind != 1 || !OnServer() || !H_Parent() || !getRocketCount() || !iAmmoElapsed || m_magazine.empty()) return false;
+	if (kind != 1 || !OnServer() || !H_Parent() || !iAmmoElapsed || m_magazine.empty() || m_netcoop_launch_pending) return false;
 #ifdef CROCKETLAUNCHER_CHANGE
 	LPCSTR ammo_name = m_ammoTypes[m_ammoType].c_str();
 	const float launch_speed = READ_IF_EXISTS(pSettings, r_float, ammo_name, "ammo_grenade_vel", CRocketLauncher::m_fLaunchSpeed);
 #else
 	const float launch_speed = m_fLaunchSpeed;
 #endif
+	if (!getRocketCount())
+	{
+		// Reload/spawn ownership arrives asynchronously. Reserve this shot,
+		// rather than consuming the client's predicted shot without launching.
+		m_netcoop_launch_pending = true;
+		m_netcoop_launch_owner = H_Parent()->ID();
+		m_netcoop_launch_pos = pos; m_netcoop_launch_dir = dir;
+		m_netcoop_launch_speed = launch_speed;
+		if (!m_netcoop_rockets_spawning)
+		{
+			shared_str fake = pSettings->r_string(m_magazine.back().m_ammoSect, "fake_grenade_name");
+			++m_netcoop_rockets_spawning;
+			inheritedRL::SpawnRocket(fake, this);
+		}
+	}
+	else if (!netcoop_launch_grenade(pos, dir, launch_speed)) return false;
+	OnShot();
+	netcoop_consume_projectile();
+	return true;
+}
+
+bool CWeaponRG6::netcoop_launch_grenade(const Fvector& pos, const Fvector& dir, float speed)
+{
+	if (!getRocketCount() || !H_Parent()) return false;
 	Fvector velocity;
 	velocity.set(dir).normalize_safe();
 	Fmatrix launch;
@@ -193,7 +217,7 @@ bool CWeaponRG6::netcoop_fire_shot(u8 kind, const Fvector& pos, const Fvector& d
 	launch.k.set(velocity);
 	Fvector::generate_orthonormal_basis(launch.k, launch.j, launch.i);
 	launch.c.set(pos);
-	velocity.mul(launch_speed);
+	velocity.mul(speed);
 	CRocketLauncher::LaunchRocket(launch, velocity, zero_vel);
 	if (CExplosiveRocket* grenade = smart_cast<CExplosiveRocket*>(getCurrentRocket()))
 		grenade->SetInitiator(H_Parent()->ID());
@@ -203,9 +227,16 @@ bool CWeaponRG6::netcoop_fire_shot(u8 kind, const Fvector& pos, const Fvector& d
 	netcoop_write_launch(P, getCurrentRocket());
 	u_EventSend(P);
 	dropCurrentRocket();
-	OnShot();
-	netcoop_consume_projectile();
 	return true;
+}
+
+void CWeaponRG6::netcoop_finish_pending_launch()
+{
+	if (!m_netcoop_launch_pending || !getRocketCount()) return;
+	m_netcoop_launch_pending = false;
+	// A late ownership event must not fire from a different player's weapon.
+	if (!OnServer() || !H_Parent() || H_Parent()->ID() != m_netcoop_launch_owner || getDestroy()) return;
+	netcoop_launch_grenade(m_netcoop_launch_pos, m_netcoop_launch_dir, m_netcoop_launch_speed);
 }
 
 void CWeaponRG6::netcoop_shot_effect(u8 kind)
@@ -221,6 +252,7 @@ u8 CWeaponRG6::AddCartridge(u8 cnt)
 	while (k)
 	{
 		--k;
+		if (netcoop::enabled() && OnServer()) ++m_netcoop_rockets_spawning;
 		inheritedRL::SpawnRocket(*fake_grenade_name, this);
 	}
 	return t;
@@ -236,7 +268,13 @@ void CWeaponRG6::OnEvent(NET_Packet& P, u16 type)
 	case GE_OWNERSHIP_TAKE:
 		{
 			P.r_u16(id);
+			const u32 count = getRocketCount();
 			inheritedRL::AttachRocket(id, this);
+			if (getRocketCount() > count)
+			{
+				if (m_netcoop_rockets_spawning) --m_netcoop_rockets_spawning;
+				netcoop_finish_pending_launch();
+			}
 		}
 		break;
 	case GE_OWNERSHIP_REJECT:
