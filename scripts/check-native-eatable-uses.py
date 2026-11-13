@@ -20,7 +20,7 @@ def function(text, signature):
 item = (root / 'src/xrGame/eatable_item.cpp').read_text(encoding='utf-8')
 use = function(item, 'bool CEatableItem::UseBy(CEntityAlive* entity_alive)')
 effects = function(item, 'void CEatableItem::ApplyEffectsOnly(CEntityAlive* entity_alive)')
-inventory = (root / 'src/xrGame/inventory.cpp').read_text(encoding='utf-8')
+inventory = (root / 'src/xrGame/Inventory.cpp').read_text(encoding='utf-8')
 eat = function(inventory, 'bool CInventory::Eat(PIItem pIItem)')
 assert eat.index('pItemToEat->Empty()') < eat.index('if (netcoop::pure_client())')
 assert eat.index('pItemToEat->Empty()') < eat.index('actor->callback(GameObject::eUseObject)')
