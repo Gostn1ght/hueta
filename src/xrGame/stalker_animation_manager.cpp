@@ -73,6 +73,9 @@ void CStalkerAnimationManager::reinit()
 void CStalkerAnimationManager::reload()
 {
 	m_visual = object().Visual();
+	// The visual may have changed: forget the old identity before any early
+	// return; it is rebuilt lazily from the visual in use.
+	m_netcoop_motions.reset();
 
 	m_crouch_state_config = object().SpecificCharacter().crouch_type();
 	VERIFY((m_crouch_state_config == 0) || (m_crouch_state_config == 1) || (m_crouch_state_config == -1));
@@ -83,6 +86,7 @@ void CStalkerAnimationManager::reload()
 
 	m_skeleton_animated = smart_cast<IKinematicsAnimated*>(m_visual);
 	VERIFY(m_skeleton_animated);
+	netcoop_motions_ready();
 
 	m_data_storage = stalker_animation_data_storage().object(m_skeleton_animated);
 	VERIFY(m_data_storage);
@@ -144,4 +148,38 @@ bool CStalkerAnimationManager::standing() const
 		return (true);
 
 	return (false);
+}
+
+bool CStalkerAnimationManager::netcoop_motions_ready()
+{
+	// Only the visual this manager plays on may be described; after an early
+	// return of reload() m_skeleton_animated can belong to an old visual.
+	IKinematicsAnimated* skeleton = smart_cast<IKinematicsAnimated*>(object().Visual());
+	if (!skeleton || skeleton != m_skeleton_animated)
+		return false;
+	if (m_netcoop_motions.built())
+		return true;
+
+	// Copies keep every slot (and so every name) alive during the build;
+	// shared_motions accessors are not const.
+	xr_vector<shared_motions> slots;
+	const u16 count = skeleton->LL_MotionsSlotCount();
+	slots.reserve(count);
+	std::vector<netcoop::MotionIdentityEntry> entries;
+	for (u16 slot = 0; slot < count; ++slot)
+	{
+		slots.push_back(skeleton->LL_MotionsSlot(slot));
+		shared_motions& motions = slots.back();
+		for (const auto& cycle : *motions.cycle())
+			entries.push_back({cycle.first.c_str(), slot, cycle.second});
+	}
+	m_netcoop_motions.build(std::move(entries));
+	return true;
+}
+
+u32 CStalkerAnimationManager::netcoop_motion_wire(const MotionID& motion)
+{
+	if (!motion.valid() || !netcoop_motions_ready())
+		return netcoop::motion_wire_invalid;
+	return m_netcoop_motions.encode(motion.slot, motion.idx);
 }

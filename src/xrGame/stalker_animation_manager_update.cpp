@@ -220,15 +220,26 @@ void CStalkerAnimationManager::play_legs()
 bool CStalkerAnimationManager::play_netcoop_puppet()
 {
 	CAI_Stalker& stalker = object();
-	if (!stalker.netcoop_puppet() || !stalker.m_netcoop_anim_mode)
+	// Mode 0 (dead, no snapshot, local selection) keeps the local animations.
+	if (!stalker.netcoop_puppet() || !(stalker.m_netcoop_anim_mode & netcoop::motion_mode_mask))
+		return false;
+	if (!netcoop_motions_ready())
+		return false;
+
+	// Unknown, ambiguous or (legacy) nonexistent animations fall back to the
+	// local selection below update_impl(); no wire value is ever indexed.
+	u32 keys[3];
+	u8 mode = 0;
+	if (!netcoop::resolve_motion_snapshot(m_netcoop_motions, stalker.m_netcoop_anim_mode,
+		stalker.m_netcoop_anim, keys, mode))
 		return false;
 
 	MotionID anims[3];
 	for (int i = 0; i < 3; ++i)
-		if (stalker.m_netcoop_anim[i] != u32(-1))
-			anims[i].val = stalker.m_netcoop_anim[i];
+		if (keys[i] != netcoop::motion_wire_invalid)
+			anims[i].val = keys[i];
 
-	switch (stalker.m_netcoop_anim_mode)
+	switch (mode)
 	{
 	case 1:
 	case 2:
