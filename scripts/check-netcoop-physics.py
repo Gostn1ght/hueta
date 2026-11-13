@@ -7,7 +7,7 @@ import tempfile
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('Native checks must run on GitHub Actions.')
 root = Path(__file__).resolve().parents[1]
-source = (root/'src/xrGame/PhysicsShellHolder.cpp').read_text()
+source = (root/'src/xrGame/PhysicsShellHolder.cpp').read_text(encoding='utf-8-sig')
 begin = source.index('static float netcoop_physics_coordinate(')
 end = source.index('\nvoid CPhysicsShellHolder::netcoop_physics_update()', begin)
 interpolation = source[begin:end]
@@ -80,12 +80,12 @@ int main(){
  netcoop_item_ground_contact<netcoop_profile_weapon>(collide,true,dynamic,nullptr,nullptr);assert(dynamic.surface.mu==0);
  dContact wall;wall.geom.normal[1]=0;
  netcoop_item_ground_contact<netcoop_profile_weapon>(collide,true,wall,nullptr,nullptr);assert(wall.surface.mu==0);
- puts("Actual physics: ballistic midpoint, 1M monotone samples, per-profile static-ground friction and dynamic/wall exclusions PASS");
+ puts("Actual physics: airborne apex parabola, impact fallback, 1M monotone samples, per-profile static-ground friction and dynamic/wall exclusions PASS");
 }
 '''
 with tempfile.TemporaryDirectory() as folder:
     path = Path(folder)
-    (path/'check.cpp').write_text(fixtures+interpolation+contact+checks)
+    (path/'check.cpp').write_text(fixtures+interpolation+contact+checks,encoding='utf-8')
     exe=path/('check.exe' if os.name=='nt' else 'check')
     command=(['cl','/nologo','/std:c++17','/EHsc','/W4',str(path/'check.cpp'),'/Fe:'+str(exe)] if os.name=='nt' else
              ['g++','-std=c++17','-O2','-Wall','-Wextra',str(path/'check.cpp'),'-o',str(exe)])
