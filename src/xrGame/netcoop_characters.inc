@@ -47,22 +47,6 @@ bool server_character_restoring(u16 actor_id)
 		s_character_restore.find(actor_id) != s_character_restore.end();
 }
 
-bool server_character_needs_survival_body(u16 body_id)
-{
-	if (!enabled() || pure_client() || !g_pGameLevel || !Level().Server || s_character_restore.empty())
-		return false;
-	::luabind::functor<bool> needed;
-	if (!ai().script_engine().functor("netcoop_survival.body_for_character", needed)) return false;
-	for (const auto& restore : s_character_restore)
-	{
-		const auto character = s_actor_character.find(restore.first);
-		if (character == s_actor_character.end()) continue;
-		try { if (needed(body_id, character->second.c_str())) return true; }
-		catch (...) { return false; }
-	}
-	return false;
-}
-
 bool server_character_accepts(xrClientData* CL, u16 type)
 {
 	if (!CL) return true;

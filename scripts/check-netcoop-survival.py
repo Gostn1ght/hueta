@@ -39,7 +39,6 @@ for id=100,110 do
  assert(item_reserved(7,id)==(retained[id]==true),"reserve only the selected original items, not the whole corpse")
  assert(not item_reserved(999,id),"unrelated corpse remains lootable")
 end
-assert(body_for_character(7,"user:1") and not body_for_character(8,"user:1") and not body_for_character(7,"other:1"))
 assert(can_transfer(7,8) and not can_transfer(7,9),"NPC cannot take equipment reserved for respawn")
 local absent=r.items[2];local saved=items[absent];items[absent]=nil
 assert(claim(fresh)=="pending" and items[100].owner==body,"no partial transfer on missing item")
@@ -70,7 +69,7 @@ assert(rollback(fresh) and rollback(fresh))
 for _,id in ipairs(r.items) do assert(items[id].owner==body) end
 fresh.transfer_item=original_transfer
 assert(claim(fresh)==first)
-complete(fresh);assert(not body_for_character(7,"user:1"));assert(not protected_body(7) and not state.netcoop_survival.user_1)
+complete(fresh);assert(not protected_body(7) and not state.netcoop_survival.user_1)
 local kept,left=0,0
 for _,v in pairs(items) do if v.owner==fresh then kept=kept+1 else left=left+1 end end
 assert(kept==6 and left==5 and items[100].owner==fresh)

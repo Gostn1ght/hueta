@@ -274,8 +274,6 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor);
 void server_character_spawn_items(xrClientData* CL);
 bool server_character_accepts(xrClientData* CL, u16 type);
 bool server_character_restoring(u16 actor_id);
-// Keep only a currently restoring character's reserved corpse in ALife runtime.
-bool server_character_needs_survival_body(u16 body_id);
 bool server_stopping();
 void server_character_save_actor(u16 actor_id);
 void server_physics_update(xrServer* server);

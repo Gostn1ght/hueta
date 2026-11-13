@@ -147,9 +147,7 @@ jobs:
       - name: Check unfinished character damage isolation
         run: python scripts/check-native-character-restore-damage.py
       - name: Check player corpse loot and reserved originals
-        run: |
-          python scripts/check-native-corpse-loot-access.py
-          python scripts/check-native-survival-body-online.py
+        run: python scripts/check-native-corpse-loot-access.py
       - name: Check actual car closed-door spawn and physics state
         run: python scripts/check-native-car-lifecycle.py
       - name: Check actual detached item and replica teardown paths
@@ -368,7 +366,6 @@ jobs:
           python scripts/check-native-character-restore-damage.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-corpse-loot-access.py
-          python scripts/check-native-survival-body-online.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-owner-regressions.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

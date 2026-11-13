@@ -21,7 +21,6 @@
 #include "xrServer.h"
 #include "level.h"
 #include "map_manager.h"
-#include "netcoop.h"
 
 void CSE_ALifeDynamicObject::on_spawn()
 {
@@ -155,7 +154,7 @@ void CSE_ALifeDynamicObject::try_switch_online()
 		return;
 	}
 
-	if (!can_switch_offline() || netcoop::server_character_needs_survival_body(ID))
+	if (!can_switch_offline())
 	{
 		alife().switch_online(this);
 		return;
@@ -172,7 +171,7 @@ void CSE_ALifeDynamicObject::try_switch_online()
 
 void CSE_ALifeDynamicObject::try_switch_offline()
 {
-	if (!can_switch_offline() || netcoop::server_character_needs_survival_body(ID))
+	if (!can_switch_offline())
 		return;
 
 	if (!can_switch_online())
