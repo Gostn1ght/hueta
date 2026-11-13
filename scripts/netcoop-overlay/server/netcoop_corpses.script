@@ -92,7 +92,11 @@ local function process_removals(sim)
 	local children = nil
 	for id in pairs(removing) do
 		local se = sim:object(id)
-		if not se then
+		-- Reservation/story protection can appear after the previous frame
+		-- queued this corpse. Recheck before releasing it or its children.
+		if protected(id) then
+			removing[id] = nil
+		elseif not se then
 			removing[id] = nil
 		else
 			if not children then

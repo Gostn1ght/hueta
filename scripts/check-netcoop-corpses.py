@@ -14,6 +14,8 @@ function printf() end
 state = {}
 alife_storage_manager = {get_state = function() return state end}
 objects, players, story = {}, {}, {}
+reserved = {}
+netcoop_survival = {protected_body = function(id) return reserved[id] == true end}
 db = {storage = {}}
 function pos(x) return {x = x, distance_to_sqr = function(self, o) return (self.x - o.x)^2 end} end
 function corpse(id, x) objects[id] = {id = id, position = pos(x), online = true, alive = function() return false end,
@@ -57,5 +59,16 @@ clock = clock + 39 * 60; tick = tick + 31000; frames(2)
 assert(objects[40], "39 minutes after the player left: kept")
 clock = clock + 2 * 60; tick = tick + 31000; frames(3)
 assert(not objects[40] and not objects[41], "40 minutes alone: removed with its loot")
+-- A reservation acquired after enqueue must be checked again at deletion.
+corpse(50,0); item(51,50); state.netcoop_corpses[50] = clock - c.corpse_time - 1
+tick=tick+31000;frames(1) -- selected for cleanup, not deleted yet
+assert(objects[50] and objects[51])
+reserved[50]=true;frames(2)
+assert(objects[50] and objects[51], "late survival reservation preserves corpse and original items")
+reserved[50]=nil;tick=tick+31000;frames(3)
+assert(not objects[50] and not objects[51], "after reservation ends normal cleanup resumes")
+corpse(60,0);item(61,60);state.netcoop_corpses[60]=clock-c.corpse_time-1
+tick=tick+31000;frames(1);story[60]="late_story";frames(2)
+assert(objects[60] and objects[61], "late story protection also cancels queued deletion")
 ''')
-print("Corpses: removed with their loot on a server restart and after 40 min without a player within 100 m (a visit restarts the count); story corpses and world items stay PASS")
+print("Corpses: removed with their loot on a server restart and after 40 min without a player within 100 m (a visit restarts the count); story corpses and world items stay; late survival/story protection cancels queued deletion PASS")
