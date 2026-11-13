@@ -116,6 +116,14 @@ function protected_body(id)
  for _,r in pairs(records()) do if r.body==id then return true end end
  return false
 end
+function item_reserved(body_id, item_id)
+ for _,r in pairs(records()) do
+  if r.body==body_id then
+   for _,id in ipairs(r.items) do if id==item_id then return true end end
+  end
+ end
+ return false
+end
 function can_transfer(body_id,recipient_id)
  for char,r in pairs(records()) do
   if r.body==body_id then return netcoop_actor_character(recipient_id)==char end

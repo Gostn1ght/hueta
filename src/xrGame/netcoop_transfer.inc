@@ -88,6 +88,9 @@ bool server_script_transfer(u16 from, u16 to, u16 item_id)
 	if (!item || item->ID_Parent != from || !server->game->get_entity_from_eid(from) ||
 		!server->game->get_entity_from_eid(to) ||
 		!smart_cast<CInventoryItem*>(Level().Objects.net_Find(item_id))) return false;
+	// NPC searches must not steal the retained originals while the owner's
+	// next body claims them through this same script transaction.
+	if (!corpse_script_transfer_allowed(server->game->get_entity_from_eid(from), to, item_id)) return false;
 	if (LPCSTR failure = server_inventory_take_failure(server, to, item_id))
 	{
 		Msg("! [Lost Zone][inv] script transfer item=%u from=%u to=%u refused: %s", item_id, from, to, failure);
@@ -130,6 +133,8 @@ void server_on_transfer(xrServer* server, xrClientData* CL, NET_Packet& P)
 	else if (from == to) failure = "same place";
 	else if (source == transfer_end_none) failure = "source is out of reach";
 	else if (target == transfer_end_none) failure = "target is out of reach";
+	else if (source == transfer_end_corpse && corpse_item_reserved(server->game->get_entity_from_eid(from), item_id))
+		failure = "item is reserved for the next life";
 	else if (source != transfer_end_self && target != transfer_end_self) failure = "player is not part of the transfer";
 	else if (target == transfer_end_self) failure = server_inventory_take_failure(server, to, item_id);
 

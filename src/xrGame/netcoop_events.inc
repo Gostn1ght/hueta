@@ -18,12 +18,26 @@ static bool accessible_corpse(xrClientData* CL, CSE_Abstract* entity)
 	CEntityAlive* body = smart_cast<CEntityAlive*>(Level().Objects.net_Find(entity->ID));
 	CEntityAlive* actor = smart_cast<CEntityAlive*>(Level().Objects.net_Find(CL->owner->ID));
 	CInventoryOwner* inventory = smart_cast<CInventoryOwner*>(body);
-	::luabind::functor<bool> reserved;
-	if(body && ai().script_engine().functor("netcoop_survival.protected_body",reserved)) {
-		try {if(reserved(int(entity->ID)))return false;}catch(...){return false;}
-	}
 	return body && !body->g_Alive() && actor && actor->g_Alive() && inventory &&
 		!inventory->deadbody_closed_status() && actor->Position().distance_to(body->Position()) <= 3.f;
+}
+
+static bool corpse_item_reserved(CSE_Abstract* holder, u16 item_id)
+{
+	if (!holder || !smart_cast<CSE_ALifeCreatureActor*>(holder)) return false;
+	::luabind::functor<bool> reserved;
+	if (!ai().script_engine().functor("netcoop_survival.item_reserved", reserved)) return true;
+	try { return reserved(int(holder->ID), int(item_id)); }
+	catch (...) { return true; } // never expose retained originals on a script/version failure
+}
+
+static bool corpse_script_transfer_allowed(CSE_Abstract* holder, u16 recipient, u16 item_id)
+{
+	if (!corpse_item_reserved(holder, item_id)) return true;
+	::luabind::functor<bool> claimant;
+	if (!ai().script_engine().functor("netcoop_survival.can_transfer", claimant)) return false;
+	try { return claimant(int(holder->ID), int(recipient)); }
+	catch (...) { return false; }
 }
 
 bool server_inventory_pickup_allowed(xrServer* server,ClientID sender,u16 owner_id,u16 item_id)
@@ -251,6 +265,7 @@ bool server_remote_event_allowed(xrServer* server, xrClientData* CL, NET_Packet&
 				CSE_Abstract* holder = item && item->ID_Parent != 0xffff
 					? server->game->get_entity_from_eid(item->ID_Parent)
 					: NULL;
+				if (holder && holder != CL->owner && corpse_item_reserved(holder, item_id)) return false;
 				if (holder && holder != dest)
 				{
 					if (smart_cast<CSE_ALifeCreatureActor*>(holder) && holder != CL->owner && !accessible_corpse(CL, holder))

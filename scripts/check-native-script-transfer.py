@@ -25,6 +25,8 @@ struct Objects{std::map<u16,CObject*>values;CObject*net_Find(u16 id){auto i=valu
 struct World{xrServer*Server=nullptr;::Objects Objects;}world;World&Level(){return world;}
 template<class T>T smart_cast(CObject*object){return dynamic_cast<T>(object);}
 bool active=true,client=false,full=false,reject_take=false,reject_sell=false;
+bool reserve_allows=true;
+bool corpse_script_transfer_allowed(CSE_Abstract*,u16,u16){return reserve_allows;}
 int level=1;int*g_pGameLevel=&level;
 bool enabled(){return active;}bool pure_client(){return client;}
 template<class...T>void Msg(LPCSTR,T...){}
@@ -44,6 +46,7 @@ int main(){
  assert(!server_script_transfer(1,3,3)&&steps==0);
  assert(!server_script_transfer(9,2,3)&&steps==0);
  assert(!server_script_transfer(1,9,3)&&steps==0);
+ reserve_allows=false;assert(!server_script_transfer(1,2,3)&&steps==0&&game.entities[3].ID_Parent==1);reserve_allows=true;
  full=true;assert(!server_script_transfer(1,2,3)&&game.entities[3].ID_Parent==1&&steps==0);full=false;
  reject_take=true;assert(!server_script_transfer(1,2,3)&&game.entities[3].ID_Parent==1&&steps==3);reject_take=false;
  reject_sell=true;assert(!server_script_transfer(1,2,3)&&game.entities[3].ID_Parent==1&&steps==5);reject_sell=false;

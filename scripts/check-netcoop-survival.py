@@ -34,6 +34,11 @@ assert(#r.items==6 and r.items[1]==100 and r.remaining==4)
 local first=table.concat(r.items,",")
 assert(prepare(body,4) and table.concat(r.items,",")==first,"same death must never reroll")
 assert(protected_body(7) and reserved("user:1","Nickname"))
+local retained={};for _,id in ipairs(r.items) do retained[id]=true end
+for id=100,110 do
+ assert(item_reserved(7,id)==(retained[id]==true),"reserve only the selected original items, not the whole corpse")
+ assert(not item_reserved(999,id),"unrelated corpse remains lootable")
+end
 assert(can_transfer(7,8) and not can_transfer(7,9),"NPC cannot take equipment reserved for respawn")
 local absent=r.items[2];local saved=items[absent];items[absent]=nil
 assert(claim(fresh)=="pending" and items[100].owner==body,"no partial transfer on missing item")
