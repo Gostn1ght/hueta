@@ -158,3 +158,39 @@ bind_stalker.actor_binder.net_destroy(body)
 assert(destroyed==1 and db.actor==nil and db.storage[7]==nil)
 """)
 print('PASS real wrapper-alias regression: same body updates and retires despite unequal Lua userdata wrappers')
+
+# Use the real BHS timer and decay path, through the real snapshot encoder.
+bhs = (root / 'scripts/netcoop-overlay/client/zzz_player_injuries.script').read_text(encoding='cp1251')
+lua.globals().healing_code = bhs[bhs.index('function netcoop_healing_state()'):]
+decay_start = bhs.index('if time_global()-medkits.lastregen>medkits.timedhealth then')
+lua.globals().decay_code = bhs[decay_start:bhs.index('if regen>0 and init then', decay_start)]
+lua.execute(r'''
+local b=zzz_player_injuries
+setmetatable(b,{__index=_G})
+b.SaveHealthStatus=function() end
+b.medkits={timedhealth=120000,lastregen=925000}
+setfenv(assert(loadstring(healing_code)),b)()
+now=1000000;b.health.head=7;b.timedhp.head=2
+local snapshot=fixture_collect()
+assert(snapshot:find('healing=',1,true) and #snapshot<3000)
+now=100 -- another level uses a restarted clock
+b.medkits={timedhealth=60000,lastregen=now}
+fixture_begin_body();use_player_state('@7|'..snapshot)
+local t=b.netcoop_healing_state()
+assert(t.interval==120000 and t.remaining==45000,'drug interval and remainder must cross location clocks')
+assert(b.health.head==7 and b.timedhp.head==2,'timer restoration must not heal limbs')
+now=45100;setfenv(assert(loadstring(decay_code)),b)()
+assert(b.health.head==7,'temporary HP must not expire before the original deadline')
+now=45101;setfenv(assert(loadstring(decay_code)),b)()
+assert(b.health.head==6 and b.timedhp.head==1,'actual BHS decay must resume at the saved deadline')
+t=b.netcoop_healing_state();assert(t.remaining==120000)
+fixture_begin_body();use_player_state('@7|-')
+t=b.netcoop_healing_state();assert(t.interval==60000 and t.remaining==60000,'fresh life must not inherit previous drug')
+for _,bad in ipairs({false,3,{}, {interval=0,remaining=0},{interval=-1,remaining=1},
+ {interval=0/0,remaining=1},{interval=math.huge,remaining=1},{interval=100,remaining=-1}}) do
+ b.netcoop_restore_healing(bad);t=b.netcoop_healing_state();assert(t.interval==60000 and t.remaining==60000)
+end
+b.netcoop_restore_healing({interval=100,remaining=200});assert(b.netcoop_healing_state().remaining==100)
+b.netcoop_restore_healing({interval=100,remaining=0});assert(b.netcoop_healing_state().remaining==0)
+''')
+print('PASS actual BHS medicine clock: snapshot round-trip, restarted location clock, original decay deadline, fresh/legacy defaults and invalid input')

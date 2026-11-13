@@ -1889,3 +1889,27 @@ function netcoop_reset_actor()
         end
     end
 end
+
+
+-- Serialize durations, never an absolute timestamp from another location.
+-- Temporary HP and its medicine-specific decay clock are one state.
+function netcoop_healing_state()
+    local interval = medkits.timedhealth
+    local elapsed = math.max(0, time_global() - medkits.lastregen)
+    return { interval = interval, remaining = math.max(0, interval - elapsed) }
+end
+
+function netcoop_restore_healing(saved)
+    local function duration(value)
+        return type(value) == "number" and value == value and value >= 0 and value <= 86400000
+    end
+    local interval, remaining = 60000, 60000
+    if type(saved) == "table" and duration(saved.interval) and saved.interval > 0 and duration(saved.remaining) then
+        interval = saved.interval
+        remaining = math.min(interval, saved.remaining)
+    end
+    -- Missing data means a fresh life or a legacy checkpoint, not the drug
+    -- last used by a different body in this running client.
+    medkits.timedhealth = interval
+    medkits.lastregen = time_global() - (interval - remaining)
+end

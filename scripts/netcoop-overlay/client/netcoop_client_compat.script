@@ -1228,6 +1228,9 @@ local function collect_player_state()
 	local injuries = zzz_player_injuries
 	if injuries and injuries.health and injuries.timedhp then
 		state.injuries = { health = {}, timedhp = {} }
+		if type(injuries.netcoop_healing_state) == "function" then
+			state.injuries.healing = injuries.netcoop_healing_state()
+		end
 		for _, limb in ipairs({"head", "torso", "leftarm", "rightarm", "leftleg", "rightleg"}) do
 			state.injuries.health[limb] = injuries.health[limb]
 			state.injuries.timedhp[limb] = injuries.timedhp[limb]
@@ -1299,6 +1302,9 @@ function use_player_state(data)
 	end
 	if injuries and injuries.maxhp and injuries.health and injuries.timedhp then
 		local saved = type(state.injuries) == "table" and state.injuries or {}
+		if type(injuries.netcoop_restore_healing) == "function" then
+			injuries.netcoop_restore_healing(saved.healing)
+		end
 		local storage = db.storage[a:id()]
 		if not storage then storage = {object=a}; db.storage[a:id()] = storage end
 		storage.pstor = storage.pstor or {}
