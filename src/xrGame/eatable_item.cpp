@@ -122,7 +122,7 @@ void CEatableItem::OnH_B_Independent(bool just_before_destroy)
 
 void CEatableItem::ApplyEffectsOnly(CEntityAlive* entity_alive)
 {
-	if (!entity_alive)
+	if (!entity_alive || Empty())
 		return;
 	SMedicineInfluenceValues V;
 	V.Load(m_physic_item->cNameSect());
@@ -140,6 +140,9 @@ void CEatableItem::ApplyEffectsOnly(CEntityAlive* entity_alive)
 
 bool CEatableItem::UseBy(CEntityAlive* entity_alive)
 {
+	// Repeated requests may arrive before an exhausted item is detached.
+	// Reject them before applying medicine influences or boosters again.
+	if (!entity_alive || Empty()) return false;
 	SMedicineInfluenceValues V;
 	V.Load(m_physic_item->cNameSect());
 
@@ -161,7 +164,7 @@ bool CEatableItem::UseBy(CEntityAlive* entity_alive)
 	}
 
 	// If uses 255, then skip the decrement for infinite usages
-	if (m_iRemainingUses != (-1))
+	if (m_iRemainingUses != u8(-1))
 	{
 		if (m_iRemainingUses > 0)
 		{
