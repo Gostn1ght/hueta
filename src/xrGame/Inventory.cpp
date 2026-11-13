@@ -1137,7 +1137,7 @@ bool CInventory::Eat(PIItem pIItem)
 {
 	//устанаовить съедобна ли вещь
 	CEatableItem* pItemToEat = smart_cast<CEatableItem*>(pIItem);
-	if (!pItemToEat) return false;
+	if (!pItemToEat || pItemToEat->Empty()) return false;
 
 	CEntityAlive* entity_alive = smart_cast<CEntityAlive*>(m_pOwner);
 	if (!entity_alive) return false;
