@@ -39,7 +39,7 @@ int main(){
  CUIProgressBar bar;
  for(auto orient:{CUIProgressBar::om_horz,CUIProgressBar::om_back,CUIProgressBar::om_vert,CUIProgressBar::om_down}){
   bar.m_orient_mode=orient;const float length=orient==CUIProgressBar::om_horz||orient==CUIProgressBar::om_back?200.f:80.f;
-  for(auto range:{std::pair<float,float>{50,150},{-50,50},{0,100}}){
+  for(auto range:{std::pair<float,float>{50.f,150.f},{-50.f,50.f},{0.f,100.f}}){
    bar.SetRange(range.first,range.second);
    bar.m_ProgressPos.x=range.first;bar.UpdateProgressBar();near(bar.m_CurrentLength,0);near(bar.m_UIProgressItem.color,0);
    bar.m_ProgressPos.x=(range.first+range.second)/2;bar.UpdateProgressBar();near(bar.m_CurrentLength,length/2);near(bar.m_UIProgressItem.color,0.5f);
