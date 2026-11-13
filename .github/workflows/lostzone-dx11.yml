@@ -73,6 +73,7 @@ jobs:
           python scripts/check-netcoop-world-events.py
           python scripts/check-netcoop-respawn-state.py
           python scripts/check-netcoop-survival.py
+          python scripts/check-netcoop-world-glow-compat.py
           python scripts/check-netcoop-player-state.py
           python scripts/check-netcoop-hud-reconnect.py
           python scripts/check-netcoop-full-map-plan.py

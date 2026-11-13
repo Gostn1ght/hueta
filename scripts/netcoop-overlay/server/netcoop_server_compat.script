@@ -1393,7 +1393,23 @@ local function install_companions()
 	printf("[Lost Zone] companions follow the player who recruited them")
 end
 
+local function install_world_glowsticks()
+	local glow = zz_glowstick_mcm
+	if not glow or type(glow.spawn_glowstick) ~= "function" or glow.__netcoop_world_glow then return end
+	local spawn = glow.spawn_glowstick
+	glow.spawn_glowstick = function(id, thrown)
+		local item = id and level.object_by_id(id)
+		-- The native light belongs to this same replicated inventory object.
+		-- GAMMA's legacy replacement would delete it and create an ALife lamp,
+		-- losing its uid/ownership and duplicating the new world-light path.
+		if item and ini_sys:r_bool_ex(item:section(), "netcoop_world_glow", false) then return true end
+		return spawn(id, thrown)
+	end
+	glow.__netcoop_world_glow = true
+end
+
 function on_game_start()
+	install_world_glowsticks()
 	install_squad_witnesses()
 	RegisterScriptCallback("npc_on_hit_callback", on_camp_member_hit)
 	-- The dedicated server skips the single-player Actor binder constructor,
