@@ -116,6 +116,13 @@ function protected_body(id)
  for _,r in pairs(records()) do if r.body==id then return true end end
  return false
 end
+-- ALife may otherwise keep a distant corpse offline throughout admission.
+-- The native caller scopes this query to active restores, including rollback.
+function body_for_character(body_id, char)
+ char=string.gsub(char, ":", "_")
+ local r=records()[char]
+ return r and r.body==body_id and true or false
+end
 function item_reserved(body_id, item_id)
  for _,r in pairs(records()) do
   if r.body==body_id then
