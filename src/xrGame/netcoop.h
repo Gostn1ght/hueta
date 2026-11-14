@@ -451,6 +451,8 @@ u32 real_time_ms();
 // ~2 % against the server): it follows the newest server snapshots, the upper
 // envelope of (snapshot time - real time), decaying 5 % so that a slower
 // server clock is followed too. Falls back to Level().timeServer().
+// Read-only check of health/timestamp update header; never consumes packet bytes.
+bool snapshot_packet_stale(NET_Packet& packet, u32 newest);
 void snapshot_sample(u32 server_stamp);
 u32 snapshot_now();
 void client_sync_reset(); // snapshot clock/death state belongs to one location connection

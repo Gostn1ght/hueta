@@ -307,6 +307,11 @@ void CCustomMonster::net_Export(NET_Packet& P) // export to server
 void CCustomMonster::net_Import(NET_Packet& P)
 {
 	R_ASSERT(Remote());
+	// A late datagram must not roll back health/equipment, restart a corpse's
+	// live state or replace the interpolation history before it is rejected.
+	if (netcoop::pure_client() && Remote() && !NET.empty() &&
+		netcoop::snapshot_packet_stale(P, NET.back().dwTimeStamp)) return;
+
 	net_update N;
 
 	u8 flags;

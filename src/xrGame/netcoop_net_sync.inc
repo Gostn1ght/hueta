@@ -316,6 +316,16 @@ u32 real_time_ms()
 	return real_timer().GetElapsed_ms();
 }
 
+bool snapshot_packet_stale(NET_Packet& packet, u32 newest)
+{
+	if (packet.r_elapsed() < sizeof(float) + sizeof(u32)) return true;
+	const u32 position = packet.r_tell();
+	packet.r_float();
+	const u32 stamp = packet.r_u32();
+	packet.r_seek(position);
+	return stamp < newest;
+}
+
 void snapshot_sample(u32 server_stamp)
 {
 	if (!pure_client())

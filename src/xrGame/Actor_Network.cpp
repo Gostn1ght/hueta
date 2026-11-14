@@ -672,6 +672,11 @@ void CActor::net_Import(NET_Packet& P) // import from server
 	// CObjectList::net_Import alignment.
 	if (ID() == 0 && netcoop::pure_client())
 		return;
+	// A late datagram must not roll back health/equipment, restart a corpse's
+	// live state or replace the interpolation history before it is rejected.
+	if (netcoop::pure_client() && Remote() && !NET.empty() &&
+		netcoop::snapshot_packet_stale(P, NET.back().dwTimeStamp)) return;
+
 	// On the server only the player's position is taken from M_CL_UPDATE.
 	if (OnServer() && Level().Server)
 	{
@@ -827,12 +832,8 @@ void CActor::net_Import_Base(NET_Packet& P)
 	//----------- for E3 -----------------------------
 	if (Local() && OnClient()) return;
 	//-------------------------------------------------
-	// Netcoop: a player's snapshot times can jump back once (the server's
-	// estimate of that player's clock settles after the join). Rejecting
-	// every older snapshot froze the player for as long as the jump; start
-	// the timeline again instead.
-	if (!NET.empty() && N.dwTimeStamp + 300 < NET.back().dwTimeStamp && netcoop::pure_client() && Remote())
-		NET.clear();
+	// Server player snapshots use receipt time, not a drifting owner's
+	// clock estimate. Old datagrams never reset this object's timeline.
 	if (!NET.empty() && N.dwTimeStamp < NET.back().dwTimeStamp) return;
 
 	if (!NET.empty() && N.dwTimeStamp == NET.back().dwTimeStamp)
