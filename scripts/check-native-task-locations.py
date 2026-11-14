@@ -59,28 +59,28 @@ AI& ai(){return fixture_ai;}
 template<class...T>void Msg(const char*,T...){}
 
 struct CGameTaskManager{
- vGameTasks tasks;struct Flags{bool changed=true;bool test(int){return changed;}}m_flags;
+ vGameTasks fixture_store;struct Flags{bool changed=true;bool test(int){return changed;}}m_flags;
  enum{eChanged=1};unsigned changed=0,completions=0,failures=0;
- vGameTasks& GetGameTasks(){return tasks;}
- CGameTask* ActiveTask(){return tasks.empty()?nullptr:tasks.front().game_task;}
+ vGameTasks& GetGameTasks(){return fixture_store;}
+ CGameTask* ActiveTask(){return fixture_store.empty()?nullptr:fixture_store.front().game_task;}
  void SetTaskState(CGameTask* entry,ETaskState state){entry->state=state;entry->ChangeStateCallback();if(state==eTaskStateCompleted)++completions;else ++failures;}
  void UpdateActiveTask(){++changed;}void UpdateTasks();
 };
 ''' + callback + '\n' + update + r'''
 int main(){
  CGameTask local,foreign,finished;foreign.origin="radar";finished.state=eTaskStateCompleted;
- CGameTaskManager manager;manager.tasks={{&local},{&foreign},{nullptr},{&finished}};
+ CGameTaskManager manager;manager.fixture_store={{&local},{&foreign},{nullptr},{&finished}};
  manager.UpdateTasks();assert(local.checks==1&&foreign.checks==1&&!finished.checks);
  assert(local.spot.enabled&&manager.changed==1);
  // A foreign issuing map does not prevent completion on this map.
  foreign.next=eTaskStateCompleted;local.next=eTaskStateFail;manager.UpdateTasks();
  assert(manager.completions==1&&manager.failures==1&&foreign.checks==2);
  manager.UpdateTasks();assert(manager.completions==1&&manager.failures==1&&foreign.checks==2);
- CGameTask returning;returning.origin="another-location";manager.tasks={{&returning}};
+ CGameTask returning;returning.origin="another-location";manager.fixture_store={{&returning}};
  manager.UpdateTasks();assert(returning.checks==1);
  netcoop::client=true;manager.UpdateTasks();assert(returning.checks==1);
  netcoop::client=false;Device.paused=true;manager.UpdateTasks();assert(returning.checks==1);
- Device.paused=false;manager.tasks.clear();manager.UpdateTasks();
+ Device.paused=false;manager.fixture_store.clear();manager.UpdateTasks();
  CActor actor;current_actor=&actor;local.ChangeStateCallback();assert(fallback_calls==1&&scope_depth==0&&actor.legacy.calls==0);
  actor.legacy.valid=true;local.ChangeStateCallback();assert(fallback_calls==1&&actor.legacy.calls==1);
  actor.legacy.valid=false;callback_throws=true;local.ChangeStateCallback();assert(fallback_calls==2&&scope_depth==0);

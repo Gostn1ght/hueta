@@ -45,6 +45,7 @@ function install()
     end
 
     if netcoop_task_handin then netcoop_task_handin.install() end
+    if netcoop_task_objectives then netcoop_task_objectives.install() end
     local finish = manager.CRandomTask.set_task_completed
     if type(finish) == "function" and not wrapped[finish] then
         local replacement = function(self, id, ...)
@@ -106,6 +107,10 @@ function install()
                 return false
             end
             local result = complete(self, id, ...)
+            if result and netcoop_task_objectives and not netcoop_task_objectives.verified(entry, id) then
+                if entry then entry.last_check_task = nil end
+                return false
+            end
             if result and entry and not entry._netcoop_fetch_receipt and netcoop_task_handin and
                 netcoop_task_handin.requires_items(id) then
                 -- A legacy/forged forced flag is not evidence that goods
@@ -124,6 +129,11 @@ function install()
         local replacement = function(tsk, state, ...)
             local entry = task_entry(tsk:get_id())
             if entry and state == task.completed and entry.status == "completed" then return end
+            if entry and state == task.completed and netcoop_task_handin and
+                netcoop_task_handin.requires_items(tsk:get_id()) and
+                not (entry._netcoop_fetch_receipt and entry._netcoop_fetch_receipt.committed) then
+                error("task completion has no confirmed delivery")
+            end
             local giver = giver_object(entry)
             local compat = netcoop_server_compat
             local bind = giver and compat and compat.talk_speaker

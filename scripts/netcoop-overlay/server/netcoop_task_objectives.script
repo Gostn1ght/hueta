@@ -1,0 +1,85 @@
+-- Foreign ALife copies/missing IDs are not evidence of objective completion.
+local wrapped = setmetatable({}, {__mode = "k"})
+
+local function objectives()
+    local actor = db.actor
+    local storage = actor and db.storage[actor:id()]
+    if not storage then return end
+    storage.pstor = storage.pstor or {}
+    local context = storage.pstor.netcoop_quest_context or {}
+    storage.pstor.netcoop_quest_context = context
+    context.objectives = context.objectives or {}
+    return context.objectives
+end
+
+local function target(id, kind)
+    if kind == "bounty_task" then return axr_task_manager.bounties_by_id[id] end
+    local var = load_var(db.actor, id)
+    return type(var) == "table" and var.smart_id or nil
+end
+
+local function identify(id, kind)
+    local oid = target(id, kind)
+    local se = oid and alife_object(oid)
+    if not (se and se.m_game_vertex_id and game_graph()) then return end
+    local vertex = game_graph():vertex(se.m_game_vertex_id)
+    local map = vertex and alife():level_name(vertex:level_id())
+    if not map then return end
+    return {id = oid, name = se:name(), section = se:section_name(), map = map, kind = kind}
+end
+
+local function capture(id, kind)
+    local own = objectives()
+    if own then own[id] = identify(id, kind) end
+end
+
+function verified(entry, id)
+    if not entry or (entry.status_functor ~= "bounty_task" and entry.status_functor ~= "assault_task_status_functor") then return true end
+    local own = objectives()
+    local proof = own and own[id]
+    return proof and proof.kind == entry.status_functor and proof.completed == true or false
+end
+
+function install()
+    if xr_effects then
+        for effect, kind in pairs({setup_bounty_task = "bounty_task", setup_assault_task = "assault_task_status_functor"}) do
+            local previous = xr_effects[effect]
+            if type(previous) == "function" and not wrapped[previous] then
+                local objective_kind = kind
+                local replacement = function(actor, npc, params)
+                    local result = previous(actor, npc, params)
+                    if params and params[1] then capture(params[1], objective_kind) end
+                    return result
+                end
+                wrapped[replacement] = true; xr_effects[effect] = replacement
+            end
+        end
+    end
+    if not task_status_functor then return end
+    for _, name in ipairs({"bounty_task", "assault_task_status_functor"}) do
+        local previous = task_status_functor[name]
+        if type(previous) == "function" and not wrapped[previous] then
+            local kind = name
+            local replacement = function(entry, id)
+                if not entry then return end
+                local own = objectives()
+                if not own then return end
+                local proof = own[id]
+                if not proof then capture(id, kind); proof = own[id] end
+                if not proof or proof.kind ~= kind then return end
+                if proof.completed then entry.stage = 1; return end
+                -- Older saves with an unproven stage must be checked against
+                -- the target server, not rewarded from a cached return marker.
+                if entry.stage == 1 then entry.stage = 0 end
+                if level.name() ~= proof.map then return end
+                local se = alife_object(proof.id)
+                if not se or se:name() ~= proof.name or se:section_name() ~= proof.section or
+                    target(id, kind) ~= proof.id then return end
+                local result = previous(entry, id)
+                if result ~= "fail" and result ~= "reversed" and entry.stage == 1 then proof.completed = true end
+                return result
+            end
+            wrapped[replacement] = true; task_status_functor[name] = replacement
+        end
+    end
+end

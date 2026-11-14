@@ -285,3 +285,140 @@ assert(read().order.required_items[1].sec=='vodka'and axr_task_manager.bounties_
 """)
 assert compat.index('netcoop_task_context.bind_actor(actor)',compat.index('function restore_character_state')) < compat.index('task_manager.load_state(state)',compat.index('function restore_character_state'))
 print('PASS per-character GAMMA recipes/bounty targets: A/B isolation, A->B->A location checkpoint, unbind and fresh life/same-ID restore')
+
+# Execute actual GAMMA bounty and assault status functions under server-local
+# objective proof. Missing/foreign/reused IDs never become a kill certificate.
+lua.execute(r"""
+task_status_functor={};local fixture_clock=0
+function time_global()fixture_clock=fixture_clock+10000;return fixture_clock end
+axr_task_manager.is_task_giver_valid=function()return true end
+function IsStalker(_,kind)return kind=='stalker'end
+map_name='cordon';level.name=function()return map_name end
+local vertex_maps={[50]='radar',[60]='cordon'}
+function game_graph()return {vertex=function(_,id)return {level_id=function()return id end}end}end
+local sim=alife();function alife()return sim end
+sim.level_name=function(_,id)return vertex_maps[id]end
+function objective(id,name,vertex,kind)
+ local se={id=id,m_game_vertex_id=vertex,label=name,kind=kind,live=true}
+ function se:name()return self.label end
+ function se:section_name()return self.kind end
+ function se:clsid()return self.kind end
+ function se:alive()return self.live end
+ server_items[id]=se;return se
+end
+victim=objective(501,'named_bounty',50,'stalker')
+smart=objective(601,'named_smart',50,'smart')
+xr_effects.setup_bounty_task=function(_,_,params)axr_task_manager.bounties_by_id[params[1]]=501 end
+xr_effects.setup_assault_task=function(_,_,params)save_var(db.actor,params[1],{smart_id=601,squad_id=701,is_enemy=true})end
+SIMBOARD={smarts={[601]={smrt=smart}},squads={}}
+simulation_objects={available_by_id={[601]=true}};is_squad_monster={monster=true}
+function parse_list()return {'monster'}end
+function evaluate_squads_smarts(_,_,squad)return squad.live end
+function character_community()return 'actor_stalker'end
+""")
+lua.execute((fixtures/'bounty_status.lua').read_text(encoding='utf-8'))
+lua.execute('local cache_assault_func={};local factions_list={};'+(fixtures/'assault_status.lua').read_text(encoding='utf-8'))
+objectives_source=(root/'scripts/netcoop-overlay/server/netcoop_task_objectives.script').read_text(encoding='utf-8')
+lua.execute('local chunk=assert(loadstring(...));netcoop_task_objectives={};setmetatable(netcoop_task_objectives,{__index=_G});setfenv(chunk,netcoop_task_objectives);chunk()',objectives_source)
+lua.execute(r"""
+netcoop_task_objectives.install();local saved=task_status_functor.bounty_task
+netcoop_task_objectives.install();assert(saved==task_status_functor.bounty_task)
+db.actor=a;netcoop_task_context.bind_actor(a)
+xr_effects.setup_bounty_task(a,objects[27],{'hunt'})
+local bounty={stage=0,status_functor='bounty_task'}
+assert(task_status_functor.bounty_task(bounty,'hunt')==nil and bounty.stage==0)
+-- A dead clone on the giver map is not the actual target on Radar.
+victim.live=false;task_status_functor.bounty_task(bounty,'hunt');assert(bounty.stage==0)
+map_name='radar';victim.live=true;task_status_functor.bounty_task(bounty,'hunt');assert(bounty.stage==0)
+server_items[501]=nil;assert(task_status_functor.bounty_task(bounty,'hunt')==nil and bounty.stage==0)
+server_items[501]=victim;victim.label='reused_id';victim.live=false
+task_status_functor.bounty_task(bounty,'hunt');assert(bounty.stage==0)
+victim.label='named_bounty';task_status_functor.bounty_task(bounty,'hunt');assert(bounty.stage==1)
+assert(netcoop_task_objectives.verified(bounty,'hunt'))
+-- Completion is evidence carried back with this character, not re-tested
+-- against a respawned clone on the giver's server.
+map_name='cordon';victim.live=true;task_status_functor.bounty_task(bounty,'hunt');assert(bounty.stage==1)
+netcoop_task_context.bind_actor(b);db.actor=b
+assert(not netcoop_task_objectives.verified(bounty,'hunt'))
+netcoop_task_context.bind_actor(a);db.actor=a
+assert(netcoop_task_objectives.verified(bounty,'hunt'))
+xr_effects.setup_bounty_task(a,objects[27],{'hunt'})
+assert(not netcoop_task_objectives.verified(bounty,'hunt'),'a repeated task must not reuse the old kill')
+-- The actual assault functor must see living/absent enemy squads only on
+-- the target server. Its preserved completion can then return to giver.
+xr_effects.setup_assault_task(a,objects[27],{'raid'})
+local raid={stage=0,status_functor='assault_task_status_functor'}
+server_items[701]={live=true};SIMBOARD.squads[701]=true
+map_name='cordon';task_status_functor.assault_task_status_functor(raid,'raid');assert(raid.stage==0)
+map_name='radar';task_status_functor.assault_task_status_functor(raid,'raid');assert(raid.stage==0)
+server_items[701].live=false;task_status_functor.assault_task_status_functor(raid,'raid');assert(raid.stage==1)
+map_name='cordon';server_items[701].live=true
+task_status_functor.assault_task_status_functor(raid,'raid');assert(raid.stage==1 and netcoop_task_objectives.verified(raid,'raid'))
+""")
+print('PASS actual GAMMA bounty/assault: foreign/missing/reused target rejected, live target stays pending, local kill/clear proof survives return, actor and repeat-job isolation')
+
+lua.execute(r"""
+-- Fetching wrapped artefacts returns their empty container, with no timer
+-- depending on whichever db.actor happens to be bound a second later.
+local original_ini=task_manager.task_ini.r_string_ex
+task_manager.task_ini.r_string_ex=function(self,id,key)
+ if id=='contained'and key=='on_complete'then return '%=remove_artefact_item(contained_fetch)%'end
+ return original_ini(self,id,key)
+end
+all_items={};server_items={[27]={group_id=65535}};db.actor=a
+local combo=make_item(801,'af_medusa_lead_box');a.vars.contained_fetch='af_medusa'
+local created={};local refuse=false
+function alife_create_item(section,owner)
+ if refuse then return end
+ assert(owner==a and section=='lead_box')
+ local obj=make_item(901,section);created[#created+1]=obj
+ return {id=obj:id(),parent_id=a:id()}
+end
+local ok,plan=netcoop_task_handin.prepare('contained',{},a)
+assert(ok and plan.items[1].return_container=='lead_box')
+refuse=true;assert(not netcoop_task_handin.commit(plan,a,objects[27]))
+assert(server_items[801].parent_id==a:id()and not combo.removed and #created==0)
+refuse=false;assert(netcoop_task_handin.commit(plan,a,objects[27]))
+assert(combo.removed and #created==1 and server_items[901].parent_id==a:id()and not created[1].removed)
+assert(not netcoop_task_handin.commit(plan,a,objects[27]),'same combination cannot hand in again')
+""")
+print('PASS wrapped artefact delivery: original combination consumed, empty container returned once, spawn failure rolls back original and gives no reward')
+
+lua.execute(r"""
+-- Bring quests can demand several different sections or original quest IDs.
+-- The entire set is preflighted even if reward effects precede remove_item.
+local original_ini=task_manager.task_ini.r_string_ex
+task_manager.task_ini.r_string_ex=function(self,id,key)
+ if id=='bundle'and key=='on_complete'then return '%=reward_money(1000) =remove_item(bandage:2) =remove_item(vodka)%'end
+ if id=='original'and key=='on_complete'then return '%=remove_quest_item(parcel)%'end
+ if id=='delivery'and key=='on_complete'then return '%=remove_delivery_item(parcel)%'end
+ if id=='branch'and key=='on_complete'then return '{+choose_a} %=remove_item(bandage)%, %=remove_item(vodka)%'end
+ return original_ini(self,id,key)
+end
+local legacy_removes=0
+xr_effects.remove_item=function()legacy_removes=legacy_removes+1 end
+xr_effects.remove_quest_item=function()error('legacy original removal must not run')end
+xr_effects.remove_delivery_item=function()error('legacy delivery must not run')end
+netcoop_task_handin.install();all_items={};server_items={[27]={group_id=65535}};db.actor=a
+make_item(1001,'bandage');make_item(1002,'vodka')
+assert(not netcoop_task_handin.prepare('bundle',{},a),'no partial hand-in with missing bandage')
+assert(server_items[1001].parent_id==a:id()and server_items[1002].parent_id==a:id())
+make_item(1003,'bandage');local ok,receipt=netcoop_task_handin.prepare('bundle',{},a)
+assert(ok and #receipt.items==3);assert(netcoop_task_handin.commit(receipt,a,objects[27]))
+assert(not server_items[1001]and not server_items[1002]and not server_items[1003])
+local previous=netcoop_task_handin.enter({_netcoop_fetch_receipt=receipt})
+xr_effects.remove_item(a,objects[27],{'bandage','2'});xr_effects.remove_item(a,objects[27],{'vodka'})
+assert(legacy_removes==0);netcoop_task_handin.enter(previous)
+xr_effects.remove_item(a,objects[27],{'unrelated'});assert(legacy_removes==1,'non-quest script removal retains upstream behavior')
+all_items={};server_items={[27]={group_id=65535}}
+local copy=make_item(1100,'parcel');local original=make_item(1101,'parcel');objects[1101]=original
+a.vars.parcel={item_1_id=1101,item_1_sec='parcel'}
+server_items[1101].parent_id=2
+assert(not netcoop_task_handin.prepare('original',{},a),'same section cannot replace another character original')
+server_items[1101].parent_id=a:id()
+local ok,receipt=netcoop_task_handin.prepare('original',{},a);assert(ok and #receipt.items==1 and receipt.items[1].id==1101)
+assert(netcoop_task_handin.commit(receipt,a,objects[27])and server_items[1100]and not server_items[1101])
+assert(not netcoop_task_handin.prepare('delivery',{},a),'a saved original delivery ID cannot be silently replaced')
+assert(not netcoop_task_handin.prepare('branch',{},a),'never consume both conditional branches')
+""")
+print('PASS multi-section bring/delivery quests: whole set before reward, exact quest IDs, no foreign substitution, original removal outside quest retained, conditional branch refusal')

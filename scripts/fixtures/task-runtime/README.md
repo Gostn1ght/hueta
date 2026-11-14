@@ -13,3 +13,5 @@ is a narrowed constructor fixture retaining the original reward field reads,
 including the reward_item/reward_money typo, with unrelated UI/world setup omitted.
 The test stubs engine objects, native task callbacks, inventory ownership and
 condlist execution; it does not replace a real two-client/map integration test.
+
+`bounty_status` and `assault_status` retain the complete GAMMA status functors from tasks_bounty.script and tasks_assault.script (Tronex); ALife/squad evaluation boundaries are mocked.
