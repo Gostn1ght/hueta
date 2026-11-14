@@ -36,7 +36,19 @@ function install()
     if type(check) == "function" and not wrapped[check] then
         local replacement = function(self, ...)
             self._netcoop_check_failed = false
+            if netcoop_task_identity then
+                local ready_ok, ready = pcall(netcoop_task_identity.refresh, self.id)
+                if not ready_ok or not ready then
+                    self._netcoop_check_failed = true
+                    if not ready_ok then note("item identity check failed", self.id, ready) end
+                    return
+                end
+            end
             local ok, result = pcall(check, self, ...)
+            if ok and netcoop_task_identity then
+                local identity_ok, err = pcall(netcoop_task_identity.refresh, self.id)
+                if not identity_ok then self._netcoop_check_failed = true; note("item identity capture failed", self.id, err) end
+            end
             if not ok then self._netcoop_check_failed = true; note("check failed", self.id, result); return end
             return result
         end

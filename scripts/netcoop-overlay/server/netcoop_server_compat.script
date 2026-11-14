@@ -267,6 +267,7 @@ local first_seen, state_sent = {}, {}
 local send_player_state
 
 function capture_character_state(actor)
+    if netcoop_task_identity then netcoop_task_identity.capture(actor) end
     if netcoop_task_context then netcoop_task_context.capture(actor) end
     local id = actor:id()
     local storage = db.storage[id] or {}
@@ -286,7 +287,7 @@ function capture_character_state(actor)
     return marshal.encode(state)
 end
 
-function restore_character_state(actor, encoded, respawn)
+function restore_character_state(actor, encoded, respawn, item_ids)
     local state = marshal.decode(encoded)
     local id = actor:id()
     db.storage[id] = db.storage[id] or {object=actor}
@@ -294,8 +295,10 @@ function restore_character_state(actor, encoded, respawn)
     db.storage[id].pstor_ctime = state.pstor_ctime or {}
     -- Restore module data before constructors evaluate their target functors.
     if netcoop_task_context then netcoop_task_context.bind_actor(actor) end
+    if netcoop_task_identity then netcoop_task_identity.restore(actor, state, item_ids) end
     player_tasks[id] = task_manager.CRandomTask()
     task_manager.load_state(state)
+    if netcoop_task_identity then netcoop_task_identity.capture(actor) end
     -- A new body must not inherit the lethal radiation/psy state. The
     -- explicit flag also handles saves made before this schema change.
     local new_body = respawn or state.netcoop_respawn

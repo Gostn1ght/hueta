@@ -21,6 +21,7 @@ static xr_map<u16, xr_string> s_actor_character;
 struct CharacterRestore
 {
 	xr_vector<std::pair<u16, u16>> places, entities; // runtime item -> expected parent
+    xr_vector<std::pair<u16, u16>> original_items; // saved network ID -> restored network ID
 	bool inventory_complete = false, attempted = false;
 	bool placements_sent = false;
 	bool survival_pending = false;
@@ -32,6 +33,20 @@ struct CharacterRestore
 	bool clock_started = false, rejected = false;
 };
 static xr_map<u16, CharacterRestore> s_character_restore;
+static xr_string character_restore_item_ids(u16 actor_id)
+{
+    xr_string result;
+    const auto found = s_character_restore.find(actor_id);
+    if (found == s_character_restore.end()) return result;
+    for (const auto& item : found->second.original_items)
+    {
+        string32 row;
+        xr_sprintf(row, "%u:%u;", u32(item.first), u32(item.second));
+        result += row;
+    }
+    return result;
+}
+
 static bool character_capture_progress(Character& character, CActor* actor);
 static bool character_restore_progress(Character& character, CActor* actor);
 static bool character_notify_ready(CActor* actor, bool new_life);
@@ -833,12 +848,14 @@ static bool character_spawn_saved_items(xrServer* server, xrClientData* CL, cons
 		if (!item) return false;
 		NET_Packet packet = saved.spawn;
 		if (!item->Spawn_Read(packet)) { F_entity_Destroy(item); return false; }
+        const u16 original_id = item->ID;
 		item->ID = item->ID_Phantom = 0xffff;
 		item->ID_Parent = parents[saved.parent];
 		item->s_flags.assign(M_SPAWN_OBJECT_LOCAL);
 		CSE_Abstract* spawned = server->game->spawn_end(item, CL->ID);
 		if (!spawned) return false;
 		item_state_restore(spawned->ID, saved.state);
+        if (original_id != 0xffff) restore.original_items.push_back(std::make_pair(original_id, spawned->ID));
 		restore.entities.push_back(std::make_pair(spawned->ID, parents[saved.parent]));
 		parents.push_back(spawned->ID);
 		if (!saved.parent && saved.place) restore.places.push_back(std::make_pair(spawned->ID, saved.place));
@@ -1090,7 +1107,11 @@ static void characters_restore_update()
 		if(it->second.survival_pending) {
 			if(it->second.attempted && u32(now-it->second.last_attempt)<1000){++it;continue;}
 			it->second.attempted=true;it->second.last_attempt=now;
-			if(!character_claim_survivors(actor,it->second.entities)){++it;continue;}
+            if(!character_claim_survivors(actor,it->second.entities)){++it;continue;}
+            // Reserved originals retain their network IDs when moved from
+            // the corpse; legacy quest references can be proven here too.
+            for (const auto& item : it->second.entities)
+                it->second.original_items.push_back(std::make_pair(item.first, item.first));
 			it->second.survival_pending=false;it->second.attempted=false;
 		}
 		bool ready = true;

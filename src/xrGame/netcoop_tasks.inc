@@ -616,7 +616,8 @@ static bool character_restore_progress(Character& character, CActor* actor)
 		}
 		if (reader.elapsed()) return false;
 	}
-	try { restore(actor->lua_game_object(), state, character.respawn); }
+    const xr_string item_ids = character_restore_item_ids(actor->ID());
+	try { restore(actor->lua_game_object(), state, character.respawn, item_ids.c_str()); }
 	catch (...) { Msg("! [Lost Zone] cannot restore character script state for %u", actor->ID()); return false; }
 	manager->MarkChanged();
 	return true;

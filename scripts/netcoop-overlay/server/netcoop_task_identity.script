@@ -1,0 +1,110 @@
+-- Network IDs are reallocated by character_spawn_saved_items. Quest
+-- parcels must follow their persistent item UID, never a same-section copy.
+local function uid(id)
+    local value = id and netcoop_item_uid and netcoop_item_uid(id)
+    return value and value ~= "" and value or nil
+end
+
+local function variables(actor, id)
+    local result, seen = {}, {}
+    local function add(key)
+        if not key or seen[key] then return end
+        seen[key] = true
+        local value = load_var(actor, key)
+        if type(value) == "table" and (value.item_1_id or value.item_2_id) then result[#result + 1] = {key = key, value = value} end
+    end
+    add(id)
+    local text = task_manager.task_ini:r_string_ex(id, "on_complete") or ""
+    for method, key in text:gmatch("=([%w_]+)%(([^:%)]+)") do
+        if method == "remove_quest_item" or method == "remove_delivery_item" then add(key) end
+    end
+    return result
+end
+
+function refresh(id, actor)
+    actor = actor or db.actor
+    if not actor then return false end
+    local rows = variables(actor, id)
+    if #rows == 0 then return true end
+    local owned = {}
+    actor:iterate_inventory(function(_, item)
+        local parent = item:parent()
+        local se = alife_object(item:id())
+        local key = parent and parent:id() == actor:id() and se and se.parent_id == actor:id() and uid(item:id())
+        if key then owned[key] = item end
+    end, actor)
+    local resolved = true
+    for _, row in ipairs(rows) do
+        local var = row.value
+        for index = 1, 2 do
+            local stem = "item_" .. index
+            local oid, section, key = var[stem .. "_id"], var[stem .. "_sec"], var[stem .. "_uid"]
+            if oid and section then
+                if key then
+                    local item = owned[key]
+                    if item and item:section() == section then
+                        var[stem .. "_id"] = item:id()
+                    elseif uid(oid) ~= key then
+                        -- Do not let GAMMA fail a parcel just because this
+                        -- server has no instance of its item (e.g. left behind).
+                        resolved = false
+                    end
+                elseif var[stem .. "_uid_required"] then resolved = false
+                else
+                    -- Learn identity only from the assigned object itself;
+                    -- never enroll a substitute by section/amount.
+                    local item = level.object_by_id(oid)
+                    local parent = item and item:parent()
+                    local se = item and alife_object(oid)
+                    if item and item:section() == section and parent and parent:id() == actor:id() and
+                        se and se.parent_id == actor:id() then var[stem .. "_uid"] = uid(oid) end
+                end
+            end
+        end
+        save_var(actor, row.key, var)
+    end
+    return resolved
+end
+
+function capture(actor)
+    if not actor then return end
+    local manager = task_manager.get_task_manager()
+    for id, entry in pairs(manager.task_info or {}) do
+        if entry.status ~= "completed" and entry.status ~= "fail" then refresh(id, actor) end
+    end
+end
+
+function restore(actor, state, text)
+    local ids = {}
+    for old, new in tostring(text or ""):gmatch("(%d+):(%d+);") do
+        old, new = tonumber(old), tonumber(new)
+        if old < 65535 and new < 65535 then
+            if ids[old] ~= nil then ids[old] = false else ids[old] = new end
+        end
+    end
+    for id in pairs(state.task_objects or {}) do
+        for _, row in ipairs(variables(actor, id)) do
+            local var = row.value
+            for index = 1, 2 do
+                local stem = "item_" .. index
+                local old, section = var[stem .. "_id"], var[stem .. "_sec"]
+                if old and section then
+                    local new = ids[old]
+                    local item = new and level.object_by_id(new)
+                    local se = new and alife_object(new)
+                    local parent = item and item:parent()
+                    if item and item:section() == section and parent and parent:id() == actor:id() and
+                        se and se.parent_id == actor:id() and (not var[stem .. "_uid"] or uid(new) == var[stem .. "_uid"]) then
+                        var[stem .. "_id"] = new
+                        var[stem .. "_uid"] = uid(new)
+                    elseif not var[stem .. "_uid"] then
+                        -- Legacy progress without an inventory mapping cannot
+                        -- prove that a reused network ID is its quest item.
+                        var[stem .. "_uid_required"] = true
+                    end
+                end
+            end
+            save_var(actor, row.key, var)
+        end
+    end
+end

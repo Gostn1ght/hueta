@@ -521,3 +521,48 @@ netcoop_task_context.bind_actor(nil);assert(not tasks_fetch.read(27))
 """)
 assert 'netcoop_task_context.register_callback(name, handler)' in compat
 print('PASS private GAMMA fetch offer cache uses original callback boundary and stays with the correct character/trader')
+
+# Native inventory restoration assigns new network IDs. Preserve the UID and
+# migrate legacy quest IDs only through the server's saved->restored mapping.
+identity_source=(root/'scripts/netcoop-overlay/server/netcoop_task_identity.script').read_text(encoding='utf-8')
+lua.execute('local chunk=assert(loadstring(...));netcoop_task_identity={};setmetatable(netcoop_task_identity,{__index=_G});setfenv(chunk,netcoop_task_identity);chunk()',identity_source)
+lua.execute(r"""
+item_uids={}
+function netcoop_item_uid(id)return item_uids[id]or''end
+all_items={};server_items={};db.actor=a
+a.vars.delivery={item_1_id=1301,item_1_sec='parcel'};a.vars.parcel=a.vars.delivery
+objects[1301]=make_item(1301,'parcel');item_uids[1301]='9007199254740993'
+assert(netcoop_task_identity.refresh('delivery',a))
+assert(a.vars.delivery.item_1_uid=='9007199254740993','UID is text, not an imprecise Lua double')
+-- Arrival at another server: old ID reused by a same-section copy, while
+-- the original UID was restored under another ID.
+all_items={};server_items={};objects[1301]=make_item(1301,'parcel');item_uids[1301]='unrelated'
+objects[1309]=make_item(1309,'parcel');item_uids[1309]='9007199254740993'
+assert(netcoop_task_identity.refresh('delivery',a)and a.vars.delivery.item_1_id==1309)
+local ok,plan=netcoop_task_handin.prepare('delivery',{},a)
+assert(ok and plan.items[1].id==1309,'same section at the old network ID is never a substitute')
+a.vars.delivery.item_1_id=1301;assert(not netcoop_task_handin.prepare('delivery',{},a),'UID check also protects a stale dialogue ID')
+-- Migrate a pre-fix saved quest with no UID by exact native restored mapping.
+a.vars.delivery={item_1_id=1301,item_1_sec='parcel'};a.vars.parcel=a.vars.delivery
+netcoop_task_identity.restore(a,{task_objects={delivery={}}},'1301:1309;')
+assert(a.vars.delivery.item_1_id==1309 and a.vars.delivery.item_1_uid=='9007199254740993')
+-- A different section, ambiguous mapping or foreign-owned restored object
+-- does not manufacture an identity for unprovable legacy progress.
+a.vars.delivery={item_1_id=1301,item_1_sec='parcel'};a.vars.parcel=a.vars.delivery
+netcoop_task_identity.restore(a,{task_objects={delivery={}}},'1301:1309;1301:1309;')
+assert(a.vars.delivery.item_1_uid_required and not netcoop_task_identity.refresh('delivery',a))
+a.vars.delivery={item_1_id=1301,item_1_sec='parcel'};a.vars.parcel=a.vars.delivery
+server_items[1309].parent_id=2
+netcoop_task_identity.restore(a,{task_objects={delivery={}}},'1301:1309;')
+assert(a.vars.delivery.item_1_uid_required and not a.vars.delivery.item_1_uid)
+server_items[1309].parent_id=a:id()
+-- A parcel known by UID but left on a different server stays pending; it
+-- never turns into a success/failure because this server recycled its ID.
+a.vars.delivery={item_1_id=1301,item_1_sec='parcel',item_1_uid='left_behind'};a.vars.parcel=a.vars.delivery
+assert(not netcoop_task_identity.refresh('delivery',a))
+""")
+assert compat.index('netcoop_task_identity.restore(actor, state, item_ids)') < compat.index('task_manager.load_state(state)')
+characters=(root/'src/xrGame/netcoop_characters.inc').read_text(encoding='utf-8')
+assert characters.index('const u16 original_id = item->ID;') < characters.index('item->ID = item->ID_Phantom = 0xffff;')
+assert 'restore.original_items.push_back(std::make_pair(original_id, spawned->ID))'in characters
+print('PASS quest parcel identity across network ID changes: text UID, exact native legacy migration, same-section copy/foreign/ambiguous rejection and pending unresolved original')

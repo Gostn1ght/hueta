@@ -117,7 +117,7 @@ local function generic(text, actor)
                 if type(var) ~= "table" or not var.item_1_sec then return false, "delivery object data is missing" end
                 for i = 1, method == "remove_quest_item" and 2 or 1 do
                     if var["item_" .. i .. "_sec"] then
-                        requests[#requests + 1] = {section = var["item_" .. i .. "_sec"], amount = 1, id = var["item_" .. i .. "_id"]}
+                        requests[#requests + 1] = {section = var["item_" .. i .. "_sec"], amount = 1, id = var["item_" .. i .. "_id"], uid = var["item_" .. i .. "_uid"]}
                         if method == "remove_quest_item" and not requests[#requests].id then return false, "quest object identity is missing" end
                     end
                 end
@@ -126,7 +126,8 @@ local function generic(text, actor)
                 local selected
                 if request.id then
                     local item = level.object_by_id(request.id)
-                    if not item or used[request.id] or item:section() ~= request.section or not belongs(item, actor) then
+                    if not item or used[request.id] or item:section() ~= request.section or not belongs(item, actor) or
+                        (request.uid and (not netcoop_item_uid or netcoop_item_uid(request.id) ~= request.uid)) then
                         return false, "original quest object is not owned by this character"
                     end
                     selected = {{item = item, id = request.id, take = 1, before = 1, condition = item:condition()}}

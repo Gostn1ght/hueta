@@ -99,7 +99,7 @@ void clear_tasks(CGameTaskManager* manager){for(auto& key:manager->entries)delet
 struct Info {u32 value=0;Info& registry(){return *this;}u32& objects(){return value;}};
 void load_data(u32& value,IReader& reader){value=reader.r_u32();}
 struct NET_Packet {
- bool readable=true;struct Buffer {u32 count=16;u8 data[32]={};}B;u32 position=2;
+ u16 saved_id=7;bool readable=true;struct Buffer {u32 count=16;u8 data[32]={};}B;u32 position=2;
  u32 r_tell()const{return position;}
  template<class T>void read(T& value){assert(position+sizeof(T)<=B.count);std::memcpy(&value,B.data+position,sizeof(T));position+=u32(sizeof(T));}
  void r_u32(u32& value){read(value);}void r_u16(u16& value){read(value);}void r_float(float& value){read(value);}
@@ -120,9 +120,9 @@ static bool character_notify_ready(CActor*,bool){++fixture_ready_calls;return fi
 int fixture_scope_depth=0;
 struct ServerVictimScope {explicit ServerVictimScope(CActor*){++fixture_scope_depth;}~ServerVictimScope(){--fixture_scope_depth;}};
 bool fixture_stopping=false;bool server_stopping(){return fixture_stopping;}
-bool fixture_available=true,fixture_throw=false,fixture_respawn=false;int fixture_restore_calls=0;std::string fixture_restored;
+bool fixture_available=true,fixture_throw=false,fixture_respawn=false;int fixture_restore_calls=0;std::string fixture_restored,fixture_item_ids;
 namespace luabind {using internal_string=std::string;
- template<class T>struct functor {void operator()(int*,const internal_string& state,bool respawn){fixture_respawn=respawn;++fixture_restore_calls;if(fixture_throw)throw 1;fixture_restored=state;}};
+ template<class T>struct functor {void operator()(int*,const internal_string& state,bool respawn,const char* item_ids){fixture_item_ids=item_ids;fixture_respawn=respawn;++fixture_restore_calls;if(fixture_throw)throw 1;fixture_restored=state;}};
 }
 struct ScriptEngine {bool functor(const char*,luabind::functor<void>&){return fixture_available;}};
 struct AI {ScriptEngine scripts;ScriptEngine& script_engine(){return scripts;}};
@@ -131,7 +131,7 @@ struct Flags {void assign(int){}};
 struct CSE_Abstract {
  virtual ~CSE_Abstract()=default;
  u16 ID=7,ID_Phantom=0xffff,ID_Parent=0xffff;Flags s_flags;
- bool Spawn_Read(NET_Packet& packet){return packet.readable;}
+ bool Spawn_Read(NET_Packet& packet){ID=packet.saved_id;return packet.readable;}
 };
 struct CSE_ALifeCreatureActor:CSE_Abstract {};
 struct xrClientData {
@@ -217,9 +217,10 @@ void save_cache_cases(CActor& actor){
 }
 void progress_cases(CActor& actor){
  Character character;character.progress=saved();const auto prior=character.progress;
+ s_character_restore[actor.ID()].original_items={{u16(41),u16(100)},{u16(42),u16(101)}};
  fixture_available=false;assert(!character_restore_progress(character,&actor));assert(fixture_manager.changed==0 && fixture_restore_calls==0);
  fixture_available=true;fixture_throw=true;assert(!character_restore_progress(character,&actor));assert(character.progress==prior);
- fixture_throw=false;character.respawn=true;assert(character_restore_progress(character,&actor));assert(fixture_respawn);assert(fixture_restored=="script" && actor.info.value==123);
+ fixture_throw=false;character.respawn=true;assert(character_restore_progress(character,&actor));assert(fixture_respawn);assert(fixture_restored=="script" && actor.info.value==123 && fixture_item_ids=="41:100;42:101;");
  assert(fixture_manager.entries.size()==1 && fixture_manager.entries[0].game_task->m_netcoop_origin=="source-map");
  character.progress=saved(0,false);assert(character_restore_progress(character,&actor));
  character.progress=saved(512);assert(character_restore_progress(character,&actor));assert(fixture_manager.entries.size()==512);
@@ -286,9 +287,11 @@ void timeout_cases(CActor& actor){
  characters_restore_update();assert(fixture_timeouts==1);
 }
 void inventory_cases(xrClientData& client){
- Character character;Character::Item first,second;first.place=1;first.state={1,2};second.parent=1;second.state={3,4};character.items={first,second};
+ Character character;Character::Item first,second;first.place=1;first.spawn.saved_id=41;second.spawn.saved_id=42;first.state={1,2};second.parent=1;second.state={3,4};character.items={first,second};
  {Game game;xrServer server{&game};CharacterRestore restore;assert(character_spawn_saved_items(&server,&client,character,restore));
-  assert(restore.entities.size()==2 && restore.places.size()==1);assert(game.created[0]->ID_Parent==client.owner->ID && game.created[1]->ID_Parent==game.created[0]->ID);
+  assert(restore.entities.size()==2 && restore.places.size()==1 && restore.original_items.size()==2);
+  assert(restore.original_items[0].first==41 && restore.original_items[0].second==game.created[0]->ID);
+  assert(restore.original_items[1].first==42 && restore.original_items[1].second==game.created[1]->ID);assert(game.created[0]->ID_Parent==client.owner->ID && game.created[1]->ID_Parent==game.created[0]->ID);
   assert(fixture_item_states[game.created[1]->ID]==second.state);}
  {Game game;game.fail_end=2;xrServer server{&game};CharacterRestore restore;assert(!character_spawn_saved_items(&server,&client,character,restore));assert(restore.entities.size()==1 && !restore.inventory_complete);}
  {Game game;game.fail_begin=1;xrServer server{&game};CharacterRestore restore;assert(!character_spawn_saved_items(&server,&client,character,restore));assert(restore.entities.empty());}
