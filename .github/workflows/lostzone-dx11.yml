@@ -158,6 +158,7 @@ jobs:
         run: |
           python scripts/check-native-vehicle-manual.py
           python scripts/check-native-device-ui-owner.py
+          python scripts/check-native-inventory-hands.py
       - name: Check actual detached item and replica teardown paths
         run: python scripts/check-native-detached-objects.py
       - name: Check texture memory recovery and dedicated input

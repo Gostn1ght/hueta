@@ -53,6 +53,7 @@ public:
 	virtual void HideDevice(bool bFastMode);
 	virtual void ShowDevice(bool bFastMode);
 	virtual void ForceHide();
+	void netcoop_holster(); // immediate vehicle holster, including secondary-hand light/work state
 	virtual bool CheckCompatibility(CHudItem* itm);
 
 	virtual void render_item_3d_ui();

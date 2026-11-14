@@ -101,6 +101,29 @@ void CCustomDevice::ForceHide()
 	g_player_hud->detach_item(this);
 }
 
+void CCustomDevice::netcoop_holster()
+{
+	const bool changed = GetState() != eHidden || m_bWorking || m_bNeedActivation || m_bZoomed || IsPending();
+	StopCurrentAnimWithoutCallback();
+	m_bNeedActivation = false;
+	m_bZoomed = false;
+	m_fZoomfactor = 0.f;
+	SetPending(FALSE);
+	if (m_bWorking) TurnDeviceInternal(false);
+	if (GetState() != eHidden)
+	{
+		if (g_player_hud && netcoop::client_owns_hud_item(&object())) SwitchState(eHidden);
+		else
+		{
+			// Dedicated/observer copies have no owner's HUD to animate.
+			SetState(eHidden);
+			SetNextState(eHidden);
+		}
+	}
+	if (changed) m_netcoop_state_sync = 0;
+	if (g_player_hud && IsAttachedToHUD()) g_player_hud->detach_item(this);
+}
+
 void CCustomDevice::ToggleDevice(bool bFastMode)
 {
 	m_bNeedActivation = false;

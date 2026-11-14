@@ -27,6 +27,7 @@
 #include "static_cast_checked.hpp"
 #include "player_hud.h"
 #include "PDA.h"
+#include "CustomDevice.h"
 
 using namespace InventoryUtilities;
 //Alundaio
@@ -257,6 +258,7 @@ bool CInventory::netcoop_holster_in_vehicle()
 	CActor* actor = smart_cast<CActor*>(m_pOwner);
 	if (!actor || !actor->netcoop_seated()) return false;
 	if (PIItem active = ActiveItem()) netcoop_remove_from_hands(active);
+	if (CCustomDevice* device = smart_cast<CCustomDevice*>(ItemFromSlot(DETECTOR_SLOT))) device->netcoop_holster();
 	m_iActiveSlot = m_iNextActiveSlot = m_iPrevActiveSlot = NO_ACTIVE_SLOT;
 	return true;
 }
