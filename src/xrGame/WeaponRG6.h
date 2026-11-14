@@ -29,9 +29,11 @@ protected:
 	bool m_netcoop_launch_pending = false;
 	u32 m_netcoop_rockets_spawning = 0;
 	u16 m_netcoop_launch_owner = u16(-1);
+	shared_str m_netcoop_launch_section;
 	Fvector m_netcoop_launch_pos, m_netcoop_launch_dir;
 	float m_netcoop_launch_speed = 0.f;
 	bool netcoop_launch_grenade(const Fvector& pos, const Fvector& dir, float speed);
+	bool netcoop_select_grenade(const shared_str& section);
 	void netcoop_finish_pending_launch();
 	virtual void FireStart();
 	virtual void FireTrace(const Fvector& P, const Fvector& D);

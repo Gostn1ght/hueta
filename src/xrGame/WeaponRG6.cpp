@@ -181,22 +181,24 @@ bool CWeaponRG6::netcoop_fire_shot(u8 kind, const Fvector& pos, const Fvector& d
 {
 	if (kind != 1 || !OnServer() || !H_Parent() || !iAmmoElapsed || m_magazine.empty() || m_netcoop_launch_pending) return false;
 #ifdef CROCKETLAUNCHER_CHANGE
-	LPCSTR ammo_name = m_ammoTypes[m_ammoType].c_str();
+	LPCSTR ammo_name = m_magazine.back().m_ammoSect.c_str();
 	const float launch_speed = READ_IF_EXISTS(pSettings, r_float, ammo_name, "ammo_grenade_vel", CRocketLauncher::m_fLaunchSpeed);
 #else
 	const float launch_speed = m_fLaunchSpeed;
 #endif
-	if (!getRocketCount())
+	const shared_str fake = pSettings->r_string(m_magazine.back().m_ammoSect, "fake_grenade_name");
+	if (!fake.size()) return false;
+	if (!netcoop_select_grenade(fake))
 	{
 		// Reload/spawn ownership arrives asynchronously. Reserve this shot,
 		// rather than consuming the client's predicted shot without launching.
 		m_netcoop_launch_pending = true;
 		m_netcoop_launch_owner = H_Parent()->ID();
+		m_netcoop_launch_section = fake;
 		m_netcoop_launch_pos = pos; m_netcoop_launch_dir = dir;
 		m_netcoop_launch_speed = launch_speed;
 		if (!m_netcoop_rockets_spawning)
 		{
-			shared_str fake = pSettings->r_string(m_magazine.back().m_ammoSect, "fake_grenade_name");
 			++m_netcoop_rockets_spawning;
 			inheritedRL::SpawnRocket(fake, this);
 		}
@@ -230,12 +232,40 @@ bool CWeaponRG6::netcoop_launch_grenade(const Fvector& pos, const Fvector& dir, 
 	return true;
 }
 
+bool CWeaponRG6::netcoop_select_grenade(const shared_str& section)
+{
+	for (auto it = m_rockets.begin(); it != m_rockets.end(); ++it)
+		if (*it && (*it)->cNameSect() == section)
+		{
+			// Creation callbacks need not arrive in cylinder order. Put the
+			// matching projectile in LaunchRocket's current (last) position.
+			std::iter_swap(it, m_rockets.end() - 1);
+			return true;
+		}
+	return false;
+}
+
 void CWeaponRG6::netcoop_finish_pending_launch()
 {
-	if (!m_netcoop_launch_pending || !getRocketCount()) return;
-	m_netcoop_launch_pending = false;
+	if (!m_netcoop_launch_pending) return;
 	// A late ownership event must not fire from a different player's weapon.
-	if (!OnServer() || !H_Parent() || H_Parent()->ID() != m_netcoop_launch_owner || getDestroy()) return;
+	if (!OnServer() || !H_Parent() || H_Parent()->ID() != m_netcoop_launch_owner || getDestroy())
+	{
+		m_netcoop_launch_pending = false;
+		return;
+	}
+	if (!netcoop_select_grenade(m_netcoop_launch_section))
+	{
+		// An older reload's different grenade can be the last outstanding
+		// creation. Once it arrives, request the missing reserved type.
+		if (!m_netcoop_rockets_spawning)
+		{
+			++m_netcoop_rockets_spawning;
+			inheritedRL::SpawnRocket(m_netcoop_launch_section, this);
+		}
+		return;
+	}
+	m_netcoop_launch_pending = false;
 	netcoop_launch_grenade(m_netcoop_launch_pos, m_netcoop_launch_dir, m_netcoop_launch_speed);
 }
 
