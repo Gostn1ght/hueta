@@ -134,6 +134,8 @@ protected:
 	bool m_netcoop_grenade_pending = false, m_netcoop_grenade_spawning = false;
 	u16 m_netcoop_grenade_owner = u16(-1);
 	shared_str m_netcoop_grenade_ammo;
+	float m_netcoop_grenade_speed = 0.f;
+	void LaunchGrenadeImpl(float launch_speed, bool consume);
 	Fvector m_netcoop_grenade_pos, m_netcoop_grenade_dir;
 	void netcoop_spawn_grenade(const shared_str& section);
 	bool netcoop_select_grenade(const shared_str& section);

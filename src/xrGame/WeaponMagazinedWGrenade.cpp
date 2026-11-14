@@ -397,12 +397,20 @@ void CWeaponMagazinedWGrenade::LaunchGrenade()
 		return;
 	}
 	if (!getRocketCount() || m_magazine.empty()) return;
+#ifdef CROCKETLAUNCHER_CHANGE
+	LPCSTR ammo_name = m_magazine.back().m_ammoSect.c_str();
+	const float launch_speed = READ_IF_EXISTS(pSettings, r_float, ammo_name, "ammo_grenade_vel", CRocketLauncher::m_fLaunchSpeed);
+#else
+	const float launch_speed = CRocketLauncher::m_fLaunchSpeed;
+#endif
+	LaunchGrenadeImpl(launch_speed, true);
+}
+
+void CWeaponMagazinedWGrenade::LaunchGrenadeImpl(float launch_speed, bool consume)
+{
+	if (!getRocketCount()) return;
 	R_ASSERT(m_bGrenadeMode);
 	{
-#ifdef CROCKETLAUNCHER_CHANGE
-		LPCSTR ammo_name = m_magazine.back().m_ammoSect.c_str();
-		float launch_speed = READ_IF_EXISTS(pSettings, r_float, ammo_name, "ammo_grenade_vel", CRocketLauncher::m_fLaunchSpeed);
-#endif
 		Fvector p1, d;
 		p1.set(get_LastFP2());
 		d.set(get_LastFD());
@@ -474,11 +482,7 @@ void CWeaponMagazinedWGrenade::LaunchGrenade()
 		};
 
 		d.normalize();
-#ifdef CROCKETLAUNCHER_CHANGE
 		d.mul(launch_speed);
-#else
-		d.mul(CRocketLauncher::m_fLaunchSpeed);
-#endif
 		VERIFY2(_valid(launch_matrix), "CWeaponMagazinedWGrenade::SwitchState. Invalid launch_matrix!");
 		CRocketLauncher::LaunchRocket(launch_matrix, d, zero_vel);
 
@@ -488,10 +492,13 @@ void CWeaponMagazinedWGrenade::LaunchGrenade()
 
 		if (OnServer() && (Local() || netcoop::server_player_copy(H_Parent())))
 		{
-			VERIFY(m_magazine.size());
-			m_magazine.pop_back();
-			--iAmmoElapsed;
-			VERIFY((u32) iAmmoElapsed == m_magazine.size());
+			if (consume)
+			{
+				VERIFY(m_magazine.size());
+				m_magazine.pop_back();
+				--iAmmoElapsed;
+				VERIFY((u32)iAmmoElapsed == m_magazine.size());
+			}
 
 			NET_Packet P;
 			u_EventGen(P, GE_LAUNCH_ROCKET, ID());
@@ -508,21 +515,32 @@ bool CWeaponMagazinedWGrenade::netcoop_fire_shot(u8 kind, const Fvector& pos, co
 	if (kind != 2 || !OnServer() || !H_Parent() || !iAmmoElapsed || m_magazine.empty() || m_netcoop_grenade_pending) return false;
 	const shared_str fake = pSettings->r_string(m_magazine.back().m_ammoSect, "fake_grenade_name");
 	if (!fake.size()) return false;
-	if (!netcoop_select_grenade(fake))
-	{
-		m_netcoop_grenade_pending = true;
-		m_netcoop_grenade_owner = H_Parent()->ID();
-		m_netcoop_grenade_ammo = m_magazine.back().m_ammoSect;
-		m_netcoop_grenade_pos = pos; m_netcoop_grenade_dir = dir;
-		netcoop_spawn_grenade(fake);
-		return true;
-	}
+#ifdef CROCKETLAUNCHER_CHANGE
+	LPCSTR ammo_name = m_magazine.back().m_ammoSect.c_str();
+	const float launch_speed = READ_IF_EXISTS(pSettings, r_float, ammo_name, "ammo_grenade_vel", CRocketLauncher::m_fLaunchSpeed);
+#else
+	const float launch_speed = CRocketLauncher::m_fLaunchSpeed;
+#endif
+
 	// Ownership can arrive after the owner's aim changed. LaunchGrenade and
 	// GAMMA callbacks must see the reserved aim and the correct actor scope.
 	m_netcoop_aim_pos = pos; m_netcoop_aim_dir = dir;
 	m_netcoop_aim_time = Device.dwTimeGlobal;
 	netcoop::ServerVictimScope scope(smart_cast<CActor*>(H_Parent()));
-	LaunchGrenade();
+	if (!netcoop_select_grenade(fake))
+	{
+		m_netcoop_grenade_pending = true;
+		m_netcoop_grenade_owner = H_Parent()->ID();
+		m_netcoop_grenade_ammo = m_magazine.back().m_ammoSect;
+		m_netcoop_grenade_speed = launch_speed;
+		m_netcoop_grenade_pos = pos; m_netcoop_grenade_dir = dir;
+		// Reserve before owner ammo reports arrive; creation can take later frames.
+		netcoop_consume_projectile();
+		OnShot();
+		netcoop_spawn_grenade(fake);
+		return true;
+	}
+	LaunchGrenadeImpl(launch_speed, true);
 	OnShot();
 	return true;
 }
@@ -551,12 +569,20 @@ bool CWeaponMagazinedWGrenade::netcoop_select_grenade(const shared_str& section)
 void CWeaponMagazinedWGrenade::netcoop_finish_pending_grenade()
 {
 	if (!m_netcoop_grenade_pending) return;
+	// The accepted cartridge is already reserved, as with RG6/RPG. Owner
+	// reports and a later reload must not consume another round or cancel it.
+	if (!OnServer() || !H_Parent() || H_Parent()->ID() != m_netcoop_grenade_owner || getDestroy() || !m_bGrenadeMode)
+	{
+		m_netcoop_grenade_pending = false;
+		return;
+	}
+	const shared_str fake = pSettings->r_string(m_netcoop_grenade_ammo, "fake_grenade_name");
+	if (!netcoop_select_grenade(fake)) { netcoop_spawn_grenade(fake); return; }
 	m_netcoop_grenade_pending = false;
-	// A cancelled mode/reload/drop must never spend the rifle magazine or
-	// fire a reserved grenade from another owner after its late creation.
-	if (!OnServer() || !H_Parent() || H_Parent()->ID() != m_netcoop_grenade_owner || getDestroy() ||
-		!m_bGrenadeMode || m_magazine.empty() || m_magazine.back().m_ammoSect != m_netcoop_grenade_ammo) return;
-	netcoop_fire_shot(2, m_netcoop_grenade_pos, m_netcoop_grenade_dir);
+	m_netcoop_aim_pos = m_netcoop_grenade_pos; m_netcoop_aim_dir = m_netcoop_grenade_dir;
+	m_netcoop_aim_time = Device.dwTimeGlobal;
+	netcoop::ServerVictimScope scope(smart_cast<CActor*>(H_Parent()));
+	LaunchGrenadeImpl(m_netcoop_grenade_speed, false);
 }
 
 void CWeaponMagazinedWGrenade::netcoop_shot_effect(u8 kind)

@@ -77,15 +77,15 @@ class CWeaponMagazinedWGrenade:public CWeapon,public CRocketLauncher{
 public:
  bool m_bGrenadeMode=false,server=true,destroyed=false;
  bool m_netcoop_grenade_pending=false,m_netcoop_grenade_spawning=false;
- u16 m_netcoop_grenade_owner=65535;shared_str m_netcoop_grenade_ammo,next_section="fake3",last_section;
+ float m_netcoop_grenade_speed=0,last_speed=0;u16 m_netcoop_grenade_owner=65535;shared_str m_netcoop_grenade_ammo,next_section="fake3",last_section;
  Fvector m_netcoop_grenade_pos,m_netcoop_grenade_dir,last_pos,last_dir;
  std::set<u16>attached;Parent* owner=&parent;
  CWeaponMagazinedWGrenade(){fixture_load("fake3");}
  void fixture_load(const shared_str& section){fixture_rockets.push_back({section});m_rockets.push_back(&fixture_rockets.back());}
  unsigned getRocketCount(){return unsigned(m_rockets.size());}
  Parent*H_Parent(){return owner;}bool OnServer(){return server;}bool getDestroy(){return destroyed;}
- void LaunchGrenade(){assert(!m_rockets.empty());last_section=m_rockets.back()->section;m_rockets.pop_back();
-  last_pos=m_netcoop_aim_pos;last_dir=m_netcoop_aim_dir;++launches;netcoop_consume_projectile();}
+ void LaunchGrenadeImpl(float speed,bool consume){last_speed=speed;assert(!m_rockets.empty());last_section=m_rockets.back()->section;m_rockets.pop_back();
+  last_pos=m_netcoop_aim_pos;last_dir=m_netcoop_aim_dir;++launches;if(consume)netcoop_consume_projectile();}
  void netcoop_spawn_grenade(const shared_str&);bool netcoop_select_grenade(const shared_str&);
  void netcoop_finish_pending_grenade();void take(NET_Packet&);
  bool netcoop_fire_shot(u8,const Fvector&,const Fvector&)override;void netcoop_shot_effect(u8)override;
@@ -156,16 +156,16 @@ int main(){
  CWeaponMagazinedWGrenade queued;queued.m_rockets.clear();queued.m_bGrenadeMode=true;
  queued.iAmmoElapsed=1;queued.m_magazine.resize(1);Fvector original_pos{2,3,4},original_dir{0,1,0};
  assert(queued.netcoop_fire_shot(2,original_pos,original_dir));
- assert(queued.m_netcoop_grenade_pending&&queued.m_netcoop_grenade_spawning&&queued.iAmmoElapsed==1&&queued.sounds==0);
+ assert(queued.m_netcoop_grenade_pending&&queued.m_netcoop_grenade_spawning&&queued.iAmmoElapsed==0&&queued.sounds==1);
  assert(queued.spawned_sections.size()==1&&!queued.netcoop_fire_shot(2,original_pos,original_dir));
  queued.netcoop_spawn_grenade("fake3");assert(queued.spawned_sections.size()==1);
  queued.m_netcoop_aim_pos={9,9,9};queued.m_netcoop_aim_dir={1,0,0};
  NET_Packet under_arrival;queued.take(under_arrival);
  assert(!queued.m_netcoop_grenade_pending&&!queued.m_netcoop_grenade_spawning&&queued.iAmmoElapsed==0);
  assert(queued.sounds==1&&queued.launches==1&&queued.last_pos.x==2&&queued.last_dir.y==1);
- assert(queued.last_scope==1&&fixture_scope_depth==0);
+ assert(queued.last_scope==1&&fixture_scope_depth==0&&queued.last_speed==30.f);
  queued.netcoop_finish_pending_grenade();assert(queued.launches==1&&queued.sounds==1);
- for(int cancel=0;cancel<6;++cancel){
+ for(int cancel=0;cancel<5;++cancel){
   CWeaponMagazinedWGrenade cancelled;cancelled.m_rockets.clear();cancelled.m_bGrenadeMode=true;
   cancelled.iAmmoElapsed=1;cancelled.m_magazine.resize(1);
   assert(cancelled.netcoop_fire_shot(2,original_pos,original_dir));
@@ -175,9 +175,8 @@ int main(){
   if(cancel==2)cancelled.destroyed=true;
   if(cancel==3)cancelled.server=false;
   if(cancel==4)cancelled.m_bGrenadeMode=false;
-  if(cancel==5)cancelled.m_magazine.back().m_ammoSect="34";
   cancelled.take(under_arrival);
-  assert(!cancelled.m_netcoop_grenade_pending&&cancelled.launches==0&&cancelled.iAmmoElapsed==1&&cancelled.sounds==0);
+  assert(!cancelled.m_netcoop_grenade_pending&&cancelled.launches==0&&cancelled.iAmmoElapsed==0&&cancelled.sounds==1);
  }
  CWeaponMagazinedWGrenade wrong;wrong.m_rockets.clear();wrong.m_bGrenadeMode=true;
  wrong.iAmmoElapsed=1;wrong.m_magazine.resize(1);wrong.m_netcoop_grenade_spawning=true;
@@ -186,7 +185,17 @@ int main(){
  assert(wrong.launches==0&&wrong.m_netcoop_grenade_pending&&wrong.spawned_sections.size()==1);
  wrong.next_section="fake3";under_arrival.id=3;wrong.take(under_arrival);
  assert(wrong.launches==1&&wrong.last_section=="fake3"&&wrong.iAmmoElapsed==0&&wrong.sounds==1);
- std::puts("PASS actual underbarrel async shot: reserved aim/actor, one child and cartridge, repeat refusal, mode/ammo/owner cancellation and wrong-type arrival recovery");
+ // An owner report may already have published the predicted empty magazine,
+ // or a later reload may have added a different cartridge before ownership.
+ CWeaponMagazinedWGrenade reloaded;reloaded.m_rockets.clear();reloaded.m_bGrenadeMode=true;
+ reloaded.iAmmoElapsed=1;reloaded.m_magazine.resize(1);reloaded.m_magazine.back().m_ammoSect="34";
+ assert(reloaded.netcoop_fire_shot(2,original_pos,original_dir));
+ assert(reloaded.iAmmoElapsed==0&&reloaded.m_magazine.empty()&&reloaded.sounds==1);
+ reloaded.iAmmoElapsed=1;reloaded.m_magazine.resize(1);reloaded.m_magazine.back().m_ammoSect="12";
+ reloaded.next_section="fake34";under_arrival.id=34;reloaded.take(under_arrival);
+ assert(reloaded.launches==1&&reloaded.last_section=="fake34"&&reloaded.last_speed==90.f);
+ assert(reloaded.iAmmoElapsed==1&&reloaded.m_magazine.back().m_ammoSect=="12"&&reloaded.sounds==1);
+ std::puts("PASS actual underbarrel async shot: reserved aim/actor, one child and cartridge, repeat refusal, mode/owner cancellation, owner reports, intervening reload and exact saved speed");
  pos.x=2;dir.z=1;
  CWeaponRG6 rg6;rg6.iAmmoElapsed=2;rg6.m_magazine.resize(2);rg6.fixture_load("fake3");
  assert(rg6.netcoop_fire_shot(1,pos,dir)&&rg6.launches==1&&rg6.iAmmoElapsed==1&&rg6.sounds==1);
