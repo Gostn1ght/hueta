@@ -155,6 +155,7 @@ void CLevel::net_Stop()
 	netcoop::zones_reset();
 	netcoop::vehicles_reset();
 	netcoop::map_players_reset();
+	netcoop::client_map_positions_reset();
 	netcoop::client_items_reset();
 	netcoop::client_sync_reset();
 

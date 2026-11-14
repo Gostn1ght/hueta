@@ -142,7 +142,9 @@ jobs:
       - name: Check snapshot clock across location connections
         run: python scripts/check-native-session-clock.py
       - name: Check task callbacks and cross-location task updates
-        run: python scripts/check-native-task-locations.py
+        run: |
+          python scripts/check-native-task-locations.py
+          python scripts/check-native-map-transition.py
       - name: Check mutant motion renderer bounds
         run: python scripts/check-native-monster-motion.py
       - name: Check stale actor, NPC and mutant snapshots
@@ -433,6 +435,8 @@ jobs:
           python scripts/check-native-task-clear.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-task-locations.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-map-transition.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-preview-pool.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

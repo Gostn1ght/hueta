@@ -446,7 +446,11 @@ void CMapLocation::UpdateSpot(CUICustomMap* map, CMapSpot* sp)
 		if (b_pointer)
 			UpdateSpotPointer(map, GetSpotPointer(sp));
 	}
-	else if (Level().name() == map->MapName() && GetSpotPointer(sp))
+    // A remote map spot has a server-provided position, not a local ALife
+    // object. Its marker can be drawn on that map, but SP graph routing
+    // must wait for a real object/graph/player (also during level teardown).
+	else if (m_owner_se_object && ai().get_game_graph() && Actor() &&
+        Level().name() == map->MapName() && GetSpotPointer(sp))
 	{
 		GameGraph::_GRAPH_ID dest_graph_id;
 
@@ -544,6 +548,8 @@ void CMapLocation::UpdateSpot(CUICustomMap* map, CMapSpot* sp)
 
 void CMapLocation::UpdateSpotPointer(CUICustomMap* map, CMapSpotPointer* sp)
 {
+    CObject* entity = Level().CurrentEntity();
+    if (!entity) return; // Task spots can arrive before the player is spawned.
 	if (sp->GetParent()) return; // already is child
 	float heading;
 	Fvector2 pointer_pos;
@@ -558,7 +564,7 @@ void CMapLocation::UpdateSpotPointer(CUICustomMap* map, CMapSpotPointer* sp)
 		Fvector ttt;
 		ttt.set(tt.x, 0.0f, tt.y);
 
-		float dist_to_target = Level().CurrentEntity()->Position().distance_to(ttt);
+		float dist_to_target = entity->Position().distance_to(ttt);
 		CGameTask* task = Level().GameTaskManager().HasGameTask(this, true);
 		if (task)
 		{

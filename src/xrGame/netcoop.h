@@ -83,6 +83,7 @@ bool pure_client(); // netcoop process without a local server
 // player's own PDA pins, far task targets, stashes).
 void client_map_position_set(u16 id, const Fvector& position, LPCSTR level);
 void client_map_position_clear(u16 id);
+void client_map_positions_reset();
 bool client_map_position(u16 id, Fvector& position, shared_str& level);
 LPCSTR role_name(u8 role);
 
