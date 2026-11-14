@@ -24,6 +24,10 @@ struct CSE_Abstract{};
 struct Fvector{float x=0,y=0,z=0;void set(const Fvector& v){*this=v;}};
 struct Cartridge{shared_str m_ammoSect="3";struct {float impair=1;}param_s;};
 struct Parent{u16 id=42;u16 ID(){return id;}}parent;
+using CActor=Parent;
+template<class T>T smart_cast(Parent* value){return static_cast<T>(value);}
+struct {u32 dwTimeGlobal=100;}Device;
+int fixture_scope_depth=0;
 struct Settings{
  shared_str r_string(const shared_str& section,const char*){return "fake"+section;}
  bool line_exist(LPCSTR,LPCSTR){return true;}
@@ -31,16 +35,20 @@ struct Settings{
 }settings;
 Settings* pSettings=&settings;
 struct NET_Packet{u16 id=10;void r_u16(u16& out){out=id;}};
-namespace netcoop {bool enabled(){return true;}}
+namespace netcoop {
+ bool enabled(){return true;}
+ struct ServerVictimScope{explicit ServerVictimScope(CActor* value){assert(value);++fixture_scope_depth;}~ServerVictimScope(){--fixture_scope_depth;}};
+}
 class CWeapon{
 public:
  std::vector<Cartridge>m_magazine;int iAmmoElapsed=0;Cartridge m_lastCartridge;
  struct{struct{float condition_shot_dec=1;}dummy;}unused;
  struct{float condition_shot_dec=1;}cur_silencer_koef;
  unsigned sounds=0,bullets=0,launches=0;float condition=1;
+ int last_scope=0;Fvector m_netcoop_aim_pos,m_netcoop_aim_dir;u32 m_netcoop_aim_time=0;
  virtual ~CWeapon()=default;
  virtual BOOL net_Spawn(CSE_Abstract*){return true;}
- void OnShot(){++sounds;}void FireTrace(const Fvector&,const Fvector&){++bullets;netcoop_consume_projectile();}
+ void OnShot(){++sounds;last_scope=fixture_scope_depth;}void FireTrace(const Fvector&,const Fvector&){++bullets;netcoop_consume_projectile();}
  float GetWeaponDeterioration(){return 0.1f;}void ChangeCondition(float change){condition+=change;}
  virtual bool netcoop_fire_shot(u8,const Fvector&,const Fvector&);
  virtual void netcoop_shot_effect(u8);void netcoop_consume_projectile();
@@ -64,11 +72,22 @@ public:
  void UpdateMissileVisibility(){}
  bool netcoop_fire_shot(u8,const Fvector&,const Fvector&)override;void netcoop_shot_effect(u8)override;
 };
-class CWeaponMagazinedWGrenade:public CWeapon{
+class CWeaponMagazinedWGrenade:public CWeapon,public CRocketLauncher{
  using inherited=CWeapon;
 public:
- bool m_bGrenadeMode=false,ready=true;unsigned getRocketCount(){return ready?1:0;}
- void LaunchGrenade(){++launches;netcoop_consume_projectile();}
+ bool m_bGrenadeMode=false,server=true,destroyed=false;
+ bool m_netcoop_grenade_pending=false,m_netcoop_grenade_spawning=false;
+ u16 m_netcoop_grenade_owner=65535;shared_str m_netcoop_grenade_ammo,next_section="fake3",last_section;
+ Fvector m_netcoop_grenade_pos,m_netcoop_grenade_dir,last_pos,last_dir;
+ std::set<u16>attached;Parent* owner=&parent;
+ CWeaponMagazinedWGrenade(){fixture_load("fake3");}
+ void fixture_load(const shared_str& section){fixture_rockets.push_back({section});m_rockets.push_back(&fixture_rockets.back());}
+ unsigned getRocketCount(){return unsigned(m_rockets.size());}
+ Parent*H_Parent(){return owner;}bool OnServer(){return server;}bool getDestroy(){return destroyed;}
+ void LaunchGrenade(){assert(!m_rockets.empty());last_section=m_rockets.back()->section;m_rockets.pop_back();
+  last_pos=m_netcoop_aim_pos;last_dir=m_netcoop_aim_dir;++launches;netcoop_consume_projectile();}
+ void netcoop_spawn_grenade(const shared_str&);bool netcoop_select_grenade(const shared_str&);
+ void netcoop_finish_pending_grenade();void take(NET_Packet&);
  bool netcoop_fire_shot(u8,const Fvector&,const Fvector&)override;void netcoop_shot_effect(u8)override;
 };
 class CWeaponRG6:public CWeapon,public CRocketLauncher{
@@ -100,7 +119,9 @@ public:
 for path,signatures in (
  ('src/xrGame/WeaponFire.cpp',('bool CWeapon::netcoop_fire_shot(','void CWeapon::netcoop_shot_effect(','void CWeapon::netcoop_consume_projectile(')),
  ('src/xrGame/WeaponRPG7.cpp',('bool CWeaponRPG7::netcoop_fire_shot(','void CWeaponRPG7::netcoop_shot_effect(')),
- ('src/xrGame/WeaponMagazinedWGrenade.cpp',('bool CWeaponMagazinedWGrenade::netcoop_fire_shot(','void CWeaponMagazinedWGrenade::netcoop_shot_effect(')),
+ ('src/xrGame/WeaponMagazinedWGrenade.cpp',('bool CWeaponMagazinedWGrenade::netcoop_fire_shot(','void CWeaponMagazinedWGrenade::netcoop_shot_effect(',
+   'void CWeaponMagazinedWGrenade::netcoop_spawn_grenade(','bool CWeaponMagazinedWGrenade::netcoop_select_grenade(',
+   'void CWeaponMagazinedWGrenade::netcoop_finish_pending_grenade(')),
  ('src/xrGame/WeaponRG6.cpp',('BOOL CWeaponRG6::net_Spawn(','bool CWeaponRG6::netcoop_fire_shot(','bool CWeaponRG6::netcoop_select_grenade(','void CWeaponRG6::netcoop_finish_pending_launch(','void CWeaponRG6::netcoop_shot_effect('))):
     source+='\n'+'\n'.join(method(path,s)for s in signatures)
 rg6=(root/'src/xrGame/WeaponRG6.cpp').read_text(encoding='utf-8')
@@ -108,6 +129,13 @@ take=rg6[rg6.index('case GE_OWNERSHIP_TAKE:'):rg6.index('case GE_OWNERSHIP_REJEC
 source+='\nvoid CWeaponRG6::take(NET_Packet& P){u16 id;switch(1){'+take.replace('case GE_OWNERSHIP_TAKE:','case 1:')+'}}\n'
 spawn=method('src/xrGame/WeaponRG6.cpp','BOOL CWeaponRG6::net_Spawn(')
 assert spawn.index('m_netcoop_rockets_spawning = 0') < spawn.index('inheritedSG::net_Spawn(DC)')
+underbarrel=(root/'src/xrGame/WeaponMagazinedWGrenade.cpp').read_text(encoding='utf-8')
+under_take=underbarrel[underbarrel.index('case GE_OWNERSHIP_TAKE:'):underbarrel.index('case GE_OWNERSHIP_REJECT:')]
+source+='\nvoid CWeaponMagazinedWGrenade::take(NET_Packet& P){u16 id;switch(1){'+under_take.replace('case GE_OWNERSHIP_TAKE:','case 1:')+'}}\n'
+under_spawn=method('src/xrGame/WeaponMagazinedWGrenade.cpp','BOOL CWeaponMagazinedWGrenade::net_Spawn(')
+assert under_spawn.index('m_netcoop_grenade_pending = m_netcoop_grenade_spawning = false') < under_spawn.index('inherited::net_Spawn(DC)')
+launch=method('src/xrGame/WeaponMagazinedWGrenade.cpp','void CWeaponMagazinedWGrenade::LaunchGrenade()')
+assert 'm_magazine.back().m_ammoSect.c_str()' in launch and 'm_magazine.empty()' in launch
 source+=r'''
 int main(){
  Fvector pos,dir;CWeapon rifle;rifle.iAmmoElapsed=1;rifle.m_magazine.resize(1);
@@ -125,6 +153,40 @@ int main(){
  gl.m_bGrenadeMode=true;assert(!gl.netcoop_fire_shot(0,pos,dir));
  assert(gl.netcoop_fire_shot(2,pos,dir)&&gl.bullets==0&&gl.launches==1&&gl.sounds==1&&gl.iAmmoElapsed==0);
  gl.netcoop_shot_effect(2);assert(gl.sounds==1);
+ CWeaponMagazinedWGrenade queued;queued.m_rockets.clear();queued.m_bGrenadeMode=true;
+ queued.iAmmoElapsed=1;queued.m_magazine.resize(1);Fvector original_pos{2,3,4},original_dir{0,1,0};
+ assert(queued.netcoop_fire_shot(2,original_pos,original_dir));
+ assert(queued.m_netcoop_grenade_pending&&queued.m_netcoop_grenade_spawning&&queued.iAmmoElapsed==1&&queued.sounds==0);
+ assert(queued.spawned_sections.size()==1&&!queued.netcoop_fire_shot(2,original_pos,original_dir));
+ queued.netcoop_spawn_grenade("fake3");assert(queued.spawned_sections.size()==1);
+ queued.m_netcoop_aim_pos={9,9,9};queued.m_netcoop_aim_dir={1,0,0};
+ NET_Packet under_arrival;queued.take(under_arrival);
+ assert(!queued.m_netcoop_grenade_pending&&!queued.m_netcoop_grenade_spawning&&queued.iAmmoElapsed==0);
+ assert(queued.sounds==1&&queued.launches==1&&queued.last_pos.x==2&&queued.last_dir.y==1);
+ assert(queued.last_scope==1&&fixture_scope_depth==0);
+ queued.netcoop_finish_pending_grenade();assert(queued.launches==1&&queued.sounds==1);
+ for(int cancel=0;cancel<6;++cancel){
+  CWeaponMagazinedWGrenade cancelled;cancelled.m_rockets.clear();cancelled.m_bGrenadeMode=true;
+  cancelled.iAmmoElapsed=1;cancelled.m_magazine.resize(1);
+  assert(cancelled.netcoop_fire_shot(2,original_pos,original_dir));
+  Parent other_holder;other_holder.id=43;
+  if(cancel==0)cancelled.owner=&other_holder;
+  if(cancel==1)cancelled.owner=nullptr;
+  if(cancel==2)cancelled.destroyed=true;
+  if(cancel==3)cancelled.server=false;
+  if(cancel==4)cancelled.m_bGrenadeMode=false;
+  if(cancel==5)cancelled.m_magazine.back().m_ammoSect="34";
+  cancelled.take(under_arrival);
+  assert(!cancelled.m_netcoop_grenade_pending&&cancelled.launches==0&&cancelled.iAmmoElapsed==1&&cancelled.sounds==0);
+ }
+ CWeaponMagazinedWGrenade wrong;wrong.m_rockets.clear();wrong.m_bGrenadeMode=true;
+ wrong.iAmmoElapsed=1;wrong.m_magazine.resize(1);wrong.m_netcoop_grenade_spawning=true;
+ assert(wrong.netcoop_fire_shot(2,original_pos,original_dir)&&wrong.spawned_sections.empty());
+ wrong.next_section="fake12";under_arrival.id=12;wrong.take(under_arrival);
+ assert(wrong.launches==0&&wrong.m_netcoop_grenade_pending&&wrong.spawned_sections.size()==1);
+ wrong.next_section="fake3";under_arrival.id=3;wrong.take(under_arrival);
+ assert(wrong.launches==1&&wrong.last_section=="fake3"&&wrong.iAmmoElapsed==0&&wrong.sounds==1);
+ std::puts("PASS actual underbarrel async shot: reserved aim/actor, one child and cartridge, repeat refusal, mode/ammo/owner cancellation and wrong-type arrival recovery");
  pos.x=2;dir.z=1;
  CWeaponRG6 rg6;rg6.iAmmoElapsed=2;rg6.m_magazine.resize(2);rg6.fixture_load("fake3");
  assert(rg6.netcoop_fire_shot(1,pos,dir)&&rg6.launches==1&&rg6.iAmmoElapsed==1&&rg6.sounds==1);

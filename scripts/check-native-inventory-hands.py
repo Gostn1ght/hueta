@@ -44,8 +44,8 @@ struct Item{
 };
 using PIItem=Item*;
 namespace netcoop{bool client_owns_hud_item(const Item* item){return active&&client&&item&&item->owned;}}
-struct Hud{unsigned detaches=0;template<class T>void detach_item(T* item){++detaches;item->attached=false;}}hud;
-Hud* g_player_hud=&hud;
+struct Hud{unsigned detaches=0;template<class T>void detach_item(T* item){++detaches;item->attached=false;}}fixture_player_hud;
+Hud* g_player_hud=&fixture_player_hud;
 struct CCustomDevice:Item{
  static constexpr unsigned eHidden=CHUDState::eHidden;
  bool m_bWorking=true,m_bNeedActivation=true,m_bZoomed=true,pending=true,animation=true,attached=true;
@@ -106,7 +106,7 @@ int main(){
  assert(server.hud.state==0&&server.hud.next==0&&!server.m_bWorking&&!server.pending&&server.sends==0);
  CCustomDevice loading;netcoop::client=true;loading.netcoop_holster();
  assert(loading.hud.state==0&&!loading.m_bWorking&&loading.sends==0);
- CCustomDevice observer;netcoop::client=true;observer.owned=false;observer.attached=false;g_player_hud=&hud;
+ CCustomDevice observer;netcoop::client=true;observer.owned=false;observer.attached=false;g_player_hud=&fixture_player_hud;
  observer.netcoop_holster();assert(observer.sends==0&&observer.hud.state==0&&!observer.m_bWorking);
  std::puts("PASS actual secondary device vehicle holster: animation/work/light off, no automatic reactivation, one owner event, no refresh flood, observer/dedicated HUD safe");
  std::puts("PASS actual hand removal and seated activation fence: hidden state, zoom, active/pending/previous slots, devices, NPC/freeplay guards");
