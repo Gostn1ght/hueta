@@ -843,6 +843,13 @@ function on_script_message(channel, data)
 			db.actor:give_game_news("Lost Zone",string.format(game.translate_string("st_lz_car_lives"),lives),"ui_inGame2_Pered_zadaniyami_voennih",0,7000)
 		end
 		return
+	elseif channel == "task_handin_refused" then
+        local keys = {
+            objective = "st_lz_task_handin_objective", items = "st_lz_task_handin_items",
+            giver = "st_lz_task_handin_giver", changed = "st_lz_task_handin_changed",
+        }
+        if keys[data] then show_text(game.translate_string(keys[data])) end
+        return
 	elseif channel == "registration" then
 		-- Older servers may send this notice; there is no approval queue now.
 		return

@@ -9,6 +9,14 @@ local function note(kind, id, err)
     end
 end
 
+local function refuse(kind)
+    local actor = db.actor
+    if actor and netcoop_send_to_actor then
+        pcall(netcoop_send_to_actor, actor:id(), "task_handin_refused", kind)
+    end
+    return false
+end
+
 local function task_entry(id)
     local manager = task_manager.get_task_manager()
     return manager and manager.task_info and manager.task_info[id]
@@ -67,7 +75,7 @@ function install()
             if entry.status == "completed" or entry.status == "fail" then return false end
             local actor = db.actor
             local npc = get_speaker()
-            if not (actor and actor.set_task_state and npc and actor:get_task(id, true)) then return false end
+            if not (actor and actor.set_task_state and npc and actor:get_task(id, true)) then return refuse("giver") end
             local recipient = entry.task_giver_id
             local delivery = entry.status_functor == "delivery_task"
             if delivery then
@@ -75,7 +83,7 @@ function install()
                 recipient = type(var) == "table" and var.target_id or nil
             end
             local se = alife_object and alife_object(npc:id())
-            if not recipient or (npc:id() ~= recipient and not (se and se.group_id == recipient)) then return false end
+            if not recipient or (npc:id() ~= recipient and not (se and se.group_id == recipient)) then return refuse("giver") end
             -- A displayed phrase/stage is only a cache. Recheck the actual
             -- server objective and inventory when the hand-in action runs.
             entry.check_time = nil
@@ -88,13 +96,13 @@ function install()
             if entry._netcoop_check_failed or entry.stage ~= stage or
                 entry.last_check_task == "fail" or entry.last_check_task == "reversed" then
                 entry.forced_status = nil
-                return false
+                return refuse("objective")
             end
             local ok, receipt = netcoop_task_handin.prepare(id, entry, actor)
-            if not ok then note("hand-in refused", id, receipt); return false end
+            if not ok then note("hand-in refused", id, receipt); return refuse("items") end
             if not netcoop_task_handin.commit(receipt, actor, npc) then
                 note("hand-in refused", id, "ownership or item count changed")
-                return false
+                return refuse("changed")
             end
             if delivery then entry.stage = 2 end
             entry._netcoop_fetch_receipt = receipt

@@ -1579,4 +1579,8 @@
   <string id="st_netcoop_check_connection"><text>Проверить соединение с миром</text></string>
   <string id="st_netcoop_character_history_empty"><text>Начало пути в Зоне. Описание и история сохраняются за персонажем.</text></string>
   <string id="st_netcoop_room_requires_dx11"><text>3D-комната доступна в DX11. Сейчас открыто обычное меню.</text></string>
+  <string id="st_lz_task_handin_objective"><text>Задание ещё не выполнено. Выполните цель и обратитесь к нужному персонажу.</text></string>
+  <string id="st_lz_task_handin_items"><text>Не хватает нужных предметов, их количества или состояния. Для квестовой вещи требуется оригинальный экземпляр.</text></string>
+  <string id="st_lz_task_handin_giver"><text>Этот персонаж не принимает данное задание, либо задание больше не активно.</text></string>
+  <string id="st_lz_task_handin_changed"><text>Передать предметы не удалось. Предложение не принято; попробуйте ещё раз.</text></string>
 </string_table>

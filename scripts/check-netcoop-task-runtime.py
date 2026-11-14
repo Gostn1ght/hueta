@@ -578,3 +578,36 @@ xr_effects.fetch_reward_and_remove(a,objects[27],{'scripted'})
 assert(calls==2);netcoop_task_handin.enter(prior)
 """)
 print('PASS non-quest and giver-less scripted item effects retain original behavior')
+
+lua.execute(r"""
+-- Rejected authoritative hand-ins inform only the initiating player.
+local notices={}
+function netcoop_send_to_actor(id,channel,data)notices[#notices+1]={id,channel,data}end
+db.actor=a;events.used_npc_id=27;all_items={};server_items={[27]={group_id=65535},[28]={group_id=65535}}
+manager=setmetatable({task_info={}},CRandomTask)
+local job=CGeneralTask('fetch');job.task_giver_id=27;job.stage=0
+manager.task_info.fetch=job;a.vars.fetch_fetch='bandage';a.vars.fetch_fetch_count=2
+assert(not manager:set_task_completed('fetch')and notices[#notices][3]=='objective')
+job.stage=1;assert(not manager:set_task_completed('fetch')and notices[#notices][3]=='items')
+events.used_npc_id=28;assert(not manager:set_task_completed('fetch')and notices[#notices][3]=='giver')
+events.used_npc_id=27;make_item(1401,'bandage');make_item(1402,'bandage');fail_transfer=1402
+assert(not manager:set_task_completed('fetch')and notices[#notices][3]=='changed')
+assert(server_items[1401].parent_id==a:id()and server_items[1402].parent_id==a:id())
+for _,row in ipairs(notices)do assert(row[1]==1 and row[2]=='task_handin_refused')end
+""")
+client=(root/'scripts/netcoop-overlay/client/netcoop_client_compat.script').read_text(encoding='cp1251')
+branch=client[client.index('\telseif channel == "task_handin_refused"'):client.index('\telseif channel == "registration"')]
+ui=LuaRuntime(unpack_returned_tuples=True)
+ui.execute('shown={};function show_text(value)shown[#shown+1]=value end;game={translate_string=function(key)return key end}')
+ui.execute('function receive(channel,data)\n'+branch.replace('elseif','if',1)+'\nend\nend')
+ui.execute("receive('task_handin_refused','items');assert(#shown==1 and shown[1]=='st_lz_task_handin_items');receive('task_handin_refused','unknown');assert(#shown==1)")
+import xml.etree.ElementTree as ET
+for side,name in [('client','st_netcoop.xml'),('server','st_netcoop_server.xml')]:
+ for language in ('rus','eng'):
+  text_file=root/'scripts/netcoop-overlay'/side/'configs/text'/language/name
+  entries=ET.fromstring(text_file.read_bytes()).findall('string')
+  keys={entry.attrib['id']:entry.findtext('text')for entry in entries}
+  assert len(keys)==len(entries),'duplicate translation ID'
+  for key in ('objective','items','giver','changed'):
+   assert keys['st_lz_task_handin_'+key]
+print('PASS hand-in refusal: owner-only reason, actual client message branch and valid CP1251 Russian/English strings without duplicate IDs')

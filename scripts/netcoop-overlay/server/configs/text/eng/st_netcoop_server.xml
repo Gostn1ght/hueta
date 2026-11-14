@@ -3,4 +3,8 @@
 	<string id="st_netcoop_task_taken">
 		<text>Another player is already doing this task.</text>
 	</string>
+  <string id="st_lz_task_handin_objective"><text>The objective is not complete. Finish it and talk to the correct character.</text></string>
+  <string id="st_lz_task_handin_items"><text>The required items, quantity or condition are missing. Quest items must be their original instances.</text></string>
+  <string id="st_lz_task_handin_giver"><text>This character does not accept this task, or the task is no longer active.</text></string>
+  <string id="st_lz_task_handin_changed"><text>Item delivery failed. The hand-in was not accepted; please try again.</text></string>
 </string_table>
