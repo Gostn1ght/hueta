@@ -86,7 +86,7 @@ int main(){
  monster.netcoop_play_motion();assert(model.plays==1&&model.iterations==1&&model.updates==2);
  const unsigned reads=model.definitions_read,updates=model.updates;
  // A foreign library slot or absent cycle must never reach the renderer.
- for(auto pair:{std::pair<u16,u16>{1,0},{0,1},{65534,65534}}){
+ for(auto pair:{std::pair<u16,u16>{u16(1),u16(0)},{u16(0),u16(1)},{u16(65534),u16(65534)}}){
   MotionID bad;bad.slot=pair.first;bad.idx=pair.second;monster.m_netcoop_motion=bad.val;
   monster.netcoop_play_motion();assert(model.definitions_read==reads&&model.updates==updates&&model.plays==1);
  }
