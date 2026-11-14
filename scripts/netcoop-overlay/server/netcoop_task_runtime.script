@@ -46,6 +46,7 @@ function install()
 
     if netcoop_task_handin then netcoop_task_handin.install() end
     if netcoop_task_objectives then netcoop_task_objectives.install() end
+    if netcoop_task_delivery then netcoop_task_delivery.install() end
     local finish = manager.CRandomTask.set_task_completed
     if type(finish) == "function" and not wrapped[finish] then
         local replacement = function(self, id, ...)
@@ -55,13 +56,23 @@ function install()
             local actor = db.actor
             local npc = get_speaker()
             if not (actor and actor.set_task_state and npc and actor:get_task(id, true)) then return false end
+            local recipient = entry.task_giver_id
+            local delivery = entry.status_functor == "delivery_task"
+            if delivery then
+                local var = load_var(actor, id)
+                recipient = type(var) == "table" and var.target_id or nil
+            end
             local se = alife_object and alife_object(npc:id())
-            if npc:id() ~= entry.task_giver_id and not (se and se.group_id == entry.task_giver_id) then return false end
+            if not recipient or (npc:id() ~= recipient and not (se and se.group_id == recipient)) then return false end
             -- A displayed phrase/stage is only a cache. Recheck the actual
             -- server objective and inventory when the hand-in action runs.
             entry.check_time = nil
             entry:check_task()
             local stage = manager.task_ini:r_float_ex(id, "stage_complete") or 254
+            -- Delivery stage 2 is set by the recipient's dialogue, not by
+            -- merely carrying the parcel. Verify carrying stage 1 + recipient
+            -- and exact original parcel, then advance only after consumption.
+            if delivery then stage = 1 end
             if entry._netcoop_check_failed or entry.stage ~= stage or
                 entry.last_check_task == "fail" or entry.last_check_task == "reversed" then
                 entry.forced_status = nil
@@ -73,6 +84,7 @@ function install()
                 note("hand-in refused", id, "ownership or item count changed")
                 return false
             end
+            if delivery then entry.stage = 2 end
             entry._netcoop_fetch_receipt = receipt
             entry._netcoop_handin_npc = npc:id()
             finish(self, id, ...)

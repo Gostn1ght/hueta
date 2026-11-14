@@ -1,0 +1,55 @@
+-- GAMMA stores delivery_task_id once for the process. Resolve the bound
+-- character's active parcel/recipient at each dialogue condition/action.
+local wrapped = setmetatable({}, {__mode = "k"})
+
+local function find()
+    local actor, npc = db.actor, get_speaker()
+    if not (actor and npc) then return end
+    local manager = task_manager.get_task_manager()
+    local candidates = {}
+    for id, entry in pairs(manager.task_info or {}) do
+        if entry.status_functor == "delivery_task" and entry.status ~= "completed" and entry.status ~= "fail" and
+            actor:get_task(id, true) then
+            local var = load_var(actor, id)
+            if type(var) == "table" and var.target_id == npc:id() then candidates[#candidates + 1] = id end
+        end
+    end
+    table.sort(candidates)
+    local id = candidates[1]
+    if id then return id, manager.task_info[id], load_var(actor, id) end
+end
+
+function install()
+    if not dialogs then return end
+    local replacements = {
+        check_delivery_task_npc = function() return find() ~= nil end,
+        actor_has_package = function()
+            local id, entry = find()
+            return id and netcoop_task_handin.prepare(id, entry, db.actor) == true or false
+        end,
+        complete_simulation_task = function()
+            local id, _, var = find()
+            if not id then return false end
+            local accepted = task_manager.get_task_manager():set_task_completed(id)
+            if accepted and var.target_squad_id and sim_offline_combat and sim_offline_combat.task_squads then
+                sim_offline_combat.task_squads[var.target_squad_id] = nil
+            end
+            return accepted
+        end,
+    }
+    for index = 0, 1 do
+        local suffix = tostring(index)
+        replacements["st_simulation_task_stext_" .. suffix] = function()
+            local id, _, var = find()
+            if not id then return "" end
+            local text = game.translate_string("st_" .. id .. "_" .. suffix)
+            return utils_data.parse_string_keys(text, {["name"] = var.task_giver_name})
+        end
+    end
+    for name, replacement in pairs(replacements) do
+        local original = dialogs[name]
+        if type(original) == "function" and not wrapped[original] then
+            wrapped[replacement] = true; dialogs[name] = replacement
+        end
+    end
+end

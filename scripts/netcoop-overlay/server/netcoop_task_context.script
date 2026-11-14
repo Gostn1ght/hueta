@@ -1,5 +1,6 @@
 -- GAMMA modules have process-global caches; character saves must not.
 local current_id, current
+local fetch_save, fetch_load
 
 local function flush()
     if not current then return end
@@ -8,6 +9,10 @@ local function flush()
         current.multifetch = snapshot.multifetch_data or {}
     end
     if axr_task_manager then current.bounties = axr_task_manager.bounties_by_id or {} end
+    if fetch_save then
+        local snapshot = {}; fetch_save(snapshot)
+        current.fetch = snapshot.tasks_fetch_ids or {}
+    end
 end
 
 function capture(actor)
@@ -32,4 +37,14 @@ function bind_actor(actor)
         tasks_multifetch.load_state({multifetch_data = context and context.multifetch or {}})
     end
     if axr_task_manager then axr_task_manager.bounties_by_id = context and context.bounties or {} end
+    if fetch_load then fetch_load({tasks_fetch_ids = context and context.fetch or {}}) end
+end
+
+-- Fetch's DIALOG_ID is private. Retain its real registered save/load handlers
+-- rather than inspecting upvalues or copying GAMMA's item selection code.
+function register_callback(name, handler)
+    if (name ~= "save_state" and name ~= "load_state") or type(handler) ~= "function" then return end
+    local module = rawget(_G, "tasks_fetch")
+    if not module or getfenv(handler) ~= module then return end
+    if name == "save_state" then fetch_save = handler else fetch_load = handler end
 end

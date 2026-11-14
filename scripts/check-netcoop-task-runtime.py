@@ -422,3 +422,102 @@ assert(not netcoop_task_handin.prepare('delivery',{},a),'a saved original delive
 assert(not netcoop_task_handin.prepare('branch',{},a),'never consume both conditional branches')
 """)
 print('PASS multi-section bring/delivery quests: whole set before reward, exact quest IDs, no foreign substitution, original removal outside quest retained, conditional branch refusal')
+
+# Delivery quests finish at their destination, not at the original giver;
+# stage 2 is the result of delivery, not a substitute for the original parcel.
+
+lua.execute((fixtures/'delivery_status.lua').read_text(encoding='utf-8'))
+delivery_source=(root/'scripts/netcoop-overlay/server/netcoop_task_delivery.script').read_text(encoding='utf-8')
+lua.execute('local chunk=assert(loadstring(...));netcoop_task_delivery={};setmetatable(netcoop_task_delivery,{__index=_G});setfenv(chunk,netcoop_task_delivery);chunk()',delivery_source)
+lua.execute(r"""
+function has_alife_info()return true end
+utils_item={has_item_by_id=function(_,id,section)
+ local item=all_items[id];local se=server_items[id]
+ return item and not item.removed and item:section()==section and se and se.parent_id==db.actor:id()
+end}
+function printdbg()end
+objects[28]={id=function()return 28 end,transfer_item=transfer}
+server_items[28]={id=28,group_id=65535}
+sim_offline_combat={task_squads={[701]=true}}
+for _,name in ipairs({'check_delivery_task_npc','actor_has_package','complete_simulation_task','st_simulation_task_stext_0','st_simulation_task_stext_1'})do
+ dialogs[name]=function()error('process-global delivery_task_id must not be used')end
+end
+local previous_ini=task_manager.task_ini.r_float_ex
+task_manager.task_ini.r_float_ex=function(self,id,key)if id=='delivery'and key=='stage_complete'then return 2 end return previous_ini(self,id,key)end
+configs.delivery={on_complete='rep_delivery'}
+local previous_pick=xr_logic.pick_section_from_condlist
+xr_logic.pick_section_from_condlist=function(x,y,value)
+ if value=='rep_delivery'then
+  assert(not server_items[1201]and server_items[1200],'only the original parcel is consumed before any reward')
+  xr_effects.remove_delivery_item(x,y,{'parcel'});db.actor.money=db.actor.money+700;db.actor.rep=db.actor.rep+50;return
+ end
+ return previous_pick(x,y,value)
+end
+netcoop_task_runtime=nil -- global fixture install() is the runtime entry point
+install();db.actor=a;manager=setmetatable({task_info={}},CRandomTask)
+all_items={};server_items={[27]={group_id=65535},[28]={id=28,group_id=65535}}
+local job=CGeneralTask('delivery');job.task_giver_id=27;job.status_functor='delivery_task';job.stage=1;job.repeat_timeout=10
+function job:check_task()task_status_functor.delivery_task(self,self.id)end
+manager.task_info.delivery=job
+-- The generic removal argument is parcel, while task ID is delivery.
+a.vars.delivery={item_1_id=1201,item_1_sec='parcel',target_id=28,target_squad_id=701}
+a.vars.parcel=a.vars.delivery
+make_item(1200,'parcel');events.used_npc_id=27
+assert(not dialogs.check_delivery_task_npc()and not manager:set_task_completed('delivery'))
+events.used_npc_id=28;assert(dialogs.check_delivery_task_npc()and not dialogs.actor_has_package())
+assert(not dialogs.complete_simulation_task()and sim_offline_combat.task_squads[701])
+objects[1201]=make_item(1201,'parcel');local old_money,old_rep=a.money,a.rep
+assert(dialogs.actor_has_package()and dialogs.complete_simulation_task())
+assert(a.money==old_money+700 and a.rep==old_rep+50 and not sim_offline_combat.task_squads[701])
+assert(not dialogs.complete_simulation_task()and a.money==old_money+700)
+db.actor=b;assert(not dialogs.check_delivery_task_npc(),'another actor cannot inherit the old recipient dialogue')
+db.actor=a
+""")
+print('PASS actual GAMMA delivery status: destination NPC instead of issuer, original parcel before stage 2/money/reputation, stale global dialogue removed, cleanup only after success')
+
+# Execute the real dedicated per-player update with unrelated modules throwing.
+aux=LuaRuntime(unpack_returned_tuples=True)
+aux.execute(r"""
+local actor={id=function()return 1 end};db={actor=actor};player_tasks={};updates=0;notices=0
+function printf()notices=notices+1 end
+function server_game_load()end
+function install_hide_hud()end
+function server_debug_file()end
+function server_world_tick()error('unrelated world script')end
+zz_netcoop_sandbox={update=function()error('sandbox')end}
+netcoop_emission={update_player=function()error('emission')end}
+netcoop_psi_storm={update_player=function()error('psi')end}
+netcoop_task_runtime={install=function()end}
+level={object_by_id=function()return nil end}
+task_manager={get_task_manager=function()return {update=function()updates=updates+1 end}end}
+""")
+aux.execute(compat[compat.index('local task_aux_errors = 0'):compat.index('-- axr_main calls on_game_start')])
+aux.execute('update_player_tasks();assert(updates==1 and notices==4);db.actor=nil;update_player_tasks();assert(updates==1)')
+print('PASS actual dedicated task update continues after independent sandbox/world/emission/psi failures and skips absent actor')
+
+# Private fetch offer cache: capture the public GAMMA callback boundary,
+# never copy/splice private upvalues. Two players can preview the same trader.
+lua.execute(r"""
+tasks_fetch={}
+local chunk=assert(loadstring([[
+ local DIALOG_ID={}
+ function save_state(data)data.tasks_fetch_ids=DIALOG_ID end
+ function load_state(data)DIALOG_ID=data.tasks_fetch_ids or {} end
+ function offer(npc,section,count)DIALOG_ID[npc]={section=section,count=count}end
+ function read(npc)return DIALOG_ID[npc]end
+]]));setfenv(chunk,tasks_fetch);chunk()
+netcoop_task_context.register_callback('save_state',tasks_fetch.save_state)
+netcoop_task_context.register_callback('load_state',tasks_fetch.load_state)
+netcoop_task_context.bind_actor(nil);netcoop_task_context.bind_actor(a)
+tasks_fetch.offer(27,'bandage',2)
+netcoop_task_context.bind_actor(b);assert(not tasks_fetch.read(27))
+tasks_fetch.offer(27,'vodka',5)
+netcoop_task_context.bind_actor(a);assert(tasks_fetch.read(27).section=='bandage'and tasks_fetch.read(27).count==2)
+netcoop_task_context.capture(a)
+local checkpoint=db.storage[1].pstor.netcoop_quest_context.fetch
+assert(checkpoint[27].section=='bandage')
+netcoop_task_context.bind_actor(b);assert(tasks_fetch.read(27).section=='vodka')
+netcoop_task_context.bind_actor(nil);assert(not tasks_fetch.read(27))
+""")
+assert 'netcoop_task_context.register_callback(name, handler)' in compat
+print('PASS private GAMMA fetch offer cache uses original callback boundary and stays with the correct character/trader')

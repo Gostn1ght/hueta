@@ -15,3 +15,5 @@ The test stubs engine objects, native task callbacks, inventory ownership and
 condlist execution; it does not replace a real two-client/map integration test.
 
 `bounty_status` and `assault_status` retain the complete GAMMA status functors from tasks_bounty.script and tasks_assault.script (Tronex); ALife/squad evaluation boundaries are mocked.
+
+`delivery_status` is the complete upstream GAMMA tasks_delivery.script status functor; item creation, ownership lookup and recipient world objects are test boundaries.

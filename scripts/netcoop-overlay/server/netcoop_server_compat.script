@@ -81,6 +81,7 @@ local function isolate_callbacks()
 	local set, unset = am.callback_set, am.callback_unset
 	am.callback_set = function(name, handler)
 		if handler == nil then return set(name, handler) end
+        if netcoop_task_context then netcoop_task_context.register_callback(name, handler) end
 		local by_name = wrapped_callbacks[name]
 		if not by_name then
 			by_name = {}
