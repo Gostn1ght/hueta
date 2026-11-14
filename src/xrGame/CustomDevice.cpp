@@ -112,7 +112,7 @@ void CCustomDevice::netcoop_holster()
 	if (m_bWorking) TurnDeviceInternal(false);
 	if (GetState() != eHidden)
 	{
-		if (g_player_hud && netcoop::client_owns_hud_item(&object())) SwitchState(eHidden);
+		if (g_player_hud && netcoop::client_owns_hud_item(this)) SwitchState(eHidden);
 		else
 		{
 			// Dedicated/observer copies have no owner's HUD to animate.
