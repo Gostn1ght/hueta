@@ -12,6 +12,7 @@ def method(path,signature):
 rocket='src/xrGame/RocketLauncher.cpp'
 native=method(rocket,'void CRocketLauncher::AttachRocket(')+'\n'+method(rocket,'void CRocketLauncher::DetachRocket(')
 native+='\n'+method('src/xrGame/PhysicsShellHolder.cpp','static bool netcoop_physics_discontinuous(')
+native+='\n'+method('src/xrGame/CustomRocket.cpp','static bool rocket_penetration_position(')
 missile=(root/'src/xrGame/Missile.cpp').read_text(encoding='utf-8')
 start=missile.index('case GE_OWNERSHIP_TAKE:',missile.index('void CMissile::OnEvent('))
 take=missile[start:missile.index('case GE_OWNERSHIP_REJECT:',start)]
@@ -33,10 +34,17 @@ source=r'''
 #include <cstdio>
 #include <map>
 #include <vector>
+#include <limits>
+#include <cfenv>
 using u16=unsigned short;using u32=unsigned;using LPCSTR=const char*;
 #define VERIFY(v) assert(v)
 template<class...T>void Msg(LPCSTR,T...){}
-struct Fvector{float x=0,y=0,z=0;void set(const Fvector&v){*this=v;}};
+struct Fvector{float x=0,y=0,z=0;void set(const Fvector&v){*this=v;}
+ void set(float a,float b,float c){x=a;y=b;z=c;}};
+constexpr float EPS=.00001f;
+bool _valid(float value){return std::isfinite(value);}
+bool _valid(const Fvector& v){return _valid(v.x)&&_valid(v.y)&&_valid(v.z);}
+float _abs(float value){return std::abs(value);}
 struct SPHNetState{Fvector position,linear_vel;};
 struct CObject{virtual~CObject()=default;u16 fixture_id=1;bool destroyed=false;
  u16 ID(){return fixture_id;}bool getDestroy(){return destroyed;}};
@@ -62,6 +70,26 @@ struct CWeaponRG6:Shotgun{using inheritedSG=Shotgun;int state=0,iAmmoElapsed=1;u
  CGameObject*H_Parent(){return &parent;}void FireStart();};
 '''+native+r'''
 int main(){
+ Fvector impact{1,2,3},direction{1,0,0},corrected=impact;
+ assert(rocket_penetration_position(impact,direction,.5f,.5f,corrected));
+ assert(std::abs(corrected.x+.1f)<.00001f&&corrected.y==2&&corrected.z==3);
+ assert(rocket_penetration_position(impact,direction,.5f,-.5f,corrected));
+ assert(std::abs(corrected.x-2.1f)<.00001f);
+ for(float cosine:{0.f,EPS,-EPS,EPS*.1f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()}){
+  corrected=impact;assert(!rocket_penetration_position(impact,direction,.5f,cosine,corrected));
+  assert(corrected.x==1&&corrected.y==2&&corrected.z==3);
+ }
+ corrected=impact;
+ std::feclearexcept(FE_ALL_EXCEPT);
+ assert(!rocket_penetration_position(impact,direction,std::numeric_limits<float>::max(),EPS*2.f,corrected));
+ assert(!std::fetestexcept(FE_INVALID|FE_DIVBYZERO|FE_OVERFLOW));
+ assert(corrected.x==1&&corrected.y==2&&corrected.z==3);
+ assert(!rocket_penetration_position(impact,direction,std::numeric_limits<float>::infinity(),1,corrected));
+ Fvector invalid{std::numeric_limits<float>::quiet_NaN(),0,0};
+ assert(!rocket_penetration_position(impact,invalid,1,1,corrected));
+ assert(!rocket_penetration_position(invalid,direction,1,1,corrected));
+ assert(rocket_penetration_position(impact,direction,0,1,impact)&&impact.x==1);
+ std::puts("PASS actual rocket impact correction: normal/reverse projections, tangential contact, NaN/Inf and overflow keep the valid impact point");
  CGameObject owner;CCustomRocket rocket;rocket.fixture_id=2;world.Objects.values[u16(2)]=&rocket;
  CRocketLauncher launcher;launcher.AttachRocket(99,&owner);assert(launcher.m_rockets.empty());
  launcher.AttachRocket(2,&owner);launcher.AttachRocket(2,&owner);assert(launcher.m_rockets.size()==1);

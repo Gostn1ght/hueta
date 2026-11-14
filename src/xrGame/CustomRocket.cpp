@@ -18,6 +18,7 @@
 #include "../Include/xrRender/RenderVisual.h"
 //#include "CalculateTriangle.h"
 #include "actor.h"
+#include <limits>
 #ifdef DEBUG
 #include "PHDebug.h"
 #include "game_base_space.h"
@@ -190,6 +191,28 @@ void CCustomRocket::create_physic_shell()
 //////////////////////////////////////////////////////////////////////////
 
 
+static bool rocket_penetration_position(const Fvector& origin, const Fvector& direction,
+                                       float plane_distance, float cosine, Fvector& corrected)
+{
+	// A glancing/tangential contact cannot be projected by dividing by zero.
+	// Preserve the last valid impact point if the correction is undefined.
+	if (!_valid(origin) || !_valid(direction) || !_valid(plane_distance) ||
+		!_valid(cosine) || _abs(cosine) <= EPS) return false;
+	// Check in double before narrowing: float division/multiplication could
+	// otherwise overflow before a later _valid check can reject the result.
+	const double factor = -double(plane_distance) / double(cosine) * 1.1;
+	const double x = double(origin.x) + double(direction.x) * factor;
+	const double y = double(origin.y) + double(direction.y) * factor;
+	const double z = double(origin.z) + double(direction.z) * factor;
+	const double limit = std::numeric_limits<float>::max();
+	if (x < -limit || x > limit || y < -limit || y > limit || z < -limit || z > limit) return false;
+	Fvector candidate;
+	candidate.set(float(x), float(y), float(z));
+	if (!_valid(candidate)) return false;
+	corrected.set(candidate);
+	return true;
+}
+
 void CCustomRocket::ObjectContactCallback(bool& do_colide, bool bo1, dContact& c, SGameMtl* material_1,
                                           SGameMtl* material_2)
 {
@@ -242,7 +265,7 @@ void CCustomRocket::ObjectContactCallback(bool& do_colide, bool bo1, dContact& c
 			l_pos.set(l_this->Position());
 			dxGeomUserData* l_pMYU = bo1 ? l_pUD1 : l_pUD2;
 			VERIFY(l_pMYU);
-			if (l_pMYU->last_pos[0] != -dInfinity)
+			if (l_pMYU->last_pos[0] != -dInfinity && _valid(cast_fv(l_pMYU->last_pos)))
 				l_pos = cast_fv(l_pMYU->last_pos);
 #ifdef DEBUG
 			bool corrected_pos=false;
@@ -265,17 +288,15 @@ void CCustomRocket::ObjectContactCallback(bool& do_colide, bool bo1, dContact& c
 						Triangle neg_tri;
 						CalculateTriangle(l_pUD->neg_tri, g, neg_tri, Level().ObjectSpace.GetStaticVerts());
 						float cosinus = velocity.dotproduct(*((Fvector*)neg_tri.norm));
-						VERIFY(_valid(neg_tri.dist));
-						float dist = neg_tri.dist / cosinus;
-						velocity.mul(dist * 1.1f);
-						l_pos.sub(velocity);
+						const bool corrected = rocket_penetration_position(l_pos, velocity, neg_tri.dist, cosinus, l_pos);
 #ifdef DEBUG
-						corrected_pos=true;
+						corrected_pos = corrected;
 //.	DBG_OpenCashedDraw();
 						//.	const Fvector*	 V_array	= Level().ObjectSpace.GetStaticVerts();
 						//.	DBG_DrawTri(neg_tri.T, V_array, D3DCOLOR_XRGB(255,255,0));
 						//.	DBG_ClosedCashedDraw(50000);
 #endif
+						(void)corrected;
 					}
 				}
 			}
