@@ -566,3 +566,15 @@ characters=(root/'src/xrGame/netcoop_characters.inc').read_text(encoding='utf-8'
 assert characters.index('const u16 original_id = item->ID;') < characters.index('item->ID = item->ID_Phantom = 0xffff;')
 assert 'restore.original_items.push_back(std::make_pair(original_id, spawned->ID))'in characters
 print('PASS quest parcel identity across network ID changes: text UID, exact native legacy migration, same-section copy/foreign/ambiguous rejection and pending unresolved original')
+
+lua.execute(r"""
+-- Runtime hooks target ordinary giver quests, preserving non-quest effects
+-- and scripted tasks without a merchant delivery transaction.
+local calls=0;xr_effects.fetch_reward_and_remove=function()calls=calls+1 end
+netcoop_task_handin.install();local prior=netcoop_task_handin.enter(nil)
+xr_effects.fetch_reward_and_remove(a,objects[27],{'scripted'})
+netcoop_task_handin.enter({id='scripted_without_giver'})
+xr_effects.fetch_reward_and_remove(a,objects[27],{'scripted'})
+assert(calls==2);netcoop_task_handin.enter(prior)
+""")
+print('PASS non-quest and giver-less scripted item effects retain original behavior')

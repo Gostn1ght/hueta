@@ -135,7 +135,7 @@ function install()
                 if entry then entry.last_check_task = nil end
                 return false
             end
-            if result and entry and not entry._netcoop_fetch_receipt and netcoop_task_handin and
+            if result and entry and entry.task_giver_id and not entry._netcoop_fetch_receipt and netcoop_task_handin and
                 netcoop_task_handin.requires_items(id) then
                 -- A legacy/forged forced flag is not evidence that goods
                 -- were delivered. The dialogue action must commit them first.
@@ -153,7 +153,7 @@ function install()
         local replacement = function(tsk, state, ...)
             local entry = task_entry(tsk:get_id())
             if entry and state == task.completed and entry.status == "completed" then return end
-            if entry and state == task.completed and netcoop_task_handin and
+            if entry and entry.task_giver_id and state == task.completed and netcoop_task_handin and
                 netcoop_task_handin.requires_items(tsk:get_id()) and
                 not (entry._netcoop_fetch_receipt and entry._netcoop_fetch_receipt.committed) then
                 error("task completion has no confirmed delivery")

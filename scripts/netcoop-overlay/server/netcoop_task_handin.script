@@ -271,6 +271,9 @@ function install()
         if type(previous) == "function" and not hooked[previous] then
             local method = name
             local replacement = function(actor, npc, params)
+                if not active_entry or (not active_entry.task_giver_id and not active_entry._netcoop_fetch_receipt) then
+                    return previous(actor, npc, params)
+                end
                 local receipt = active_entry and active_entry._netcoop_fetch_receipt
                 if not receipt then error("fetch reward has no confirmed hand-in") end
                 if not receipt.committed or receipt.method ~= method or receipt.variable ~= params[1] then
