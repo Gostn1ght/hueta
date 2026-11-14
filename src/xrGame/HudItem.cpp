@@ -24,6 +24,11 @@
 #include "HUDManager.h"
 #include "../xrEngine/IGame_Persistent.h" // g_dedicated_server
 
+static bool netcoop_hud_script_ui_allowed(const CObject* item)
+{
+	return !g_dedicated_server && (!netcoop::pure_client() || netcoop::client_owns_hud_item(item));
+}
+
 ENGINE_API extern float psHUD_FOV_def;
 int g_nearwall = NW_FOV;
 int g_nearwall_trace = NT_CAM;
@@ -636,7 +641,7 @@ void CHudItem::UpdateCL()
 	// A device's screen (dosimeter, detectors) is a HUD window of the player
 	// holding it; the dedicated server has no HUD and no db.actor (its Lua
 	// Update failed on every frame and took the server down, 2026-10-12).
-	if (script_ui && !g_dedicated_server)
+	if (script_ui && netcoop_hud_script_ui_allowed(&object()))
 		script_ui->Update();
 }
 
@@ -700,8 +705,8 @@ void CHudItem::on_outfit_changed()
 
 void CHudItem::on_a_hud_attach()
 {
-	if (g_dedicated_server)
-		return; // no HUD, no device screens on the dedicated server
+	if (!netcoop_hud_script_ui_allowed(&object()))
+		return; // device screens belong only to the current HUD owner
 	if (script_ui_funct && nullptr == script_ui)
 	{
 		::luabind::functor<CUIDialogWndEx*> funct;
@@ -721,6 +726,7 @@ void CHudItem::on_a_hud_attach()
 
 void CHudItem::render_item_3d_ui()
 {
+	if (!netcoop_hud_script_ui_allowed(&object()) || !g_player_hud || !HudItemData()) return;
 	if (script_ui)
 	{
 		Fmatrix LM;

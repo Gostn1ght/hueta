@@ -1308,7 +1308,10 @@ void CCar::Init()
 
 	CDamageManager::reload("car_definition", "damage", ini);
 
-	HandBreak();
+	// Donor models start parked in single-player. Multiplayer keeps the
+	// physical brakes consistent with the driver's explicit parking latch.
+	if (!netcoop_manual_controls() || netcoop_parking_brake()) HandBreak();
+	else ReleaseHandBreak();
 	Transmission(1);
 }
 

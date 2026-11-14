@@ -7,6 +7,11 @@ from tempfile import TemporaryDirectory
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('Native checks must run in GitHub Actions')
 root = Path(__file__).resolve().parents[1]
+car_source = (root / 'src/xrGame/Car.cpp').read_text(encoding='utf-8')
+initial_start = car_source.index('CDamageManager::reload("car_definition", "damage", ini);')
+initial_start += len('CDamageManager::reload("car_definition", "damage", ini);')
+initial_end = car_source.index('Transmission(1);', initial_start) + len('Transmission(1);')
+initial_brake = car_source[initial_start:initial_end]
 
 
 def method(name):
@@ -72,6 +77,8 @@ struct CCar{
  void processing_activate(){}void netcoop_drive(u8){fwp=false;bkp=false;brp=false;}
  void ResetKeys(){fwp=false;bkp=false;brp=false;}void netcoop_heli_toggle_gear(){}
  bool netcoop_manual_controls()const;void netcoop_shift(bool);void netcoop_toggle(u8);void netcoop_engage(bool);
+ bool netcoop_parking_brake()const{return m_netcoop_parking||brp;}
+ void fixture_initial_brake();
  void PressForward();void PressBack();void PressBreaks();void ReleaseForward();void ReleaseBack();void ReleaseBreaks();
  void UpdatePower();void UpdateBack();
 };
@@ -81,8 +88,13 @@ struct CCar{
     'void CCar::PressForward()', 'void CCar::PressBack()', 'void CCar::PressBreaks()',
     'void CCar::ReleaseForward()', 'void CCar::ReleaseBack()', 'void CCar::ReleaseBreaks()',
     'void CCar::UpdatePower()', 'void CCar::UpdateBack()',
-]) + r'''
+]) + '\nvoid CCar::fixture_initial_brake(){' + initial_brake + '}\n' + r'''
 int main(){
+ CCar fresh;fresh.fixture_initial_brake();assert(!fresh.parked&&!fresh.b_engine_on);
+ fresh.m_netcoop_parking=true;fresh.fixture_initial_brake();assert(fresh.parked);
+ fresh.m_netcoop_parking=false;fresh.brp=true;fresh.fixture_initial_brake();assert(fresh.parked);
+ CCar helicopter;helicopter.m_netcoop_heli.on=true;helicopter.fixture_initial_brake();assert(helicopter.parked);
+ netcoop::active=false;CCar offline;offline.fixture_initial_brake();assert(offline.parked);netcoop::active=true;
  CCar c;c.netcoop_engage(true);assert(!c.parked&&!c.m_netcoop_parking&&!c.driving);
  c.PressForward();assert(!c.b_engine_on&&!c.driving&&!c.started); // ignition is explicit
  c.netcoop_toggle(0);assert(c.b_engine_on&&!c.driving&&!c.parked);c.PressForward();assert(c.driving);
