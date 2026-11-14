@@ -140,6 +140,8 @@ jobs:
         run: python scripts/check-native-open-registration.py
       - name: Check snapshot clock across location connections
         run: python scripts/check-native-session-clock.py
+      - name: Check mutant motion renderer bounds
+        run: python scripts/check-native-monster-motion.py
       - name: Check stale actor, NPC and mutant snapshots
         run: python scripts/check-native-snapshot-order.py
       - name: Check stable NPC motion identity and visual cache
@@ -371,6 +373,8 @@ jobs:
           python scripts/check-native-session-clock.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-snapshot-order.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-monster-motion.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-npc-motion-identity.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

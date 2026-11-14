@@ -92,11 +92,22 @@ void CBaseMonster::net_Export(NET_Packet& P)
 		control().animation_com()->netcoop_global_phase() : 0.f);
 }
 
+// Snapshot MotionID values are local indexes. A missing/different library
+// must never index the renderer's slots or motion definitions unchecked.
+static bool netcoop_monster_motion_valid(IKinematicsAnimated* model, const MotionID& motion)
+{
+    if (!model || !motion.valid() || motion.slot >= model->LL_MotionsSlotCount()) return false;
+    shared_motions motions = model->LL_MotionsSlot(motion.slot);
+    return motion.idx < motions.motion_defs()->size();
+}
+
 void CBaseMonster::netcoop_play_motion()
 {
     IKinematicsAnimated* K = smart_cast<IKinematicsAnimated*>(Visual());
     if (!K || m_netcoop_motion == u32(-1)) return;
     MotionID motion; motion.val = m_netcoop_motion;
+    if (!netcoop_monster_motion_valid(K, motion) ||
+        !_valid(m_netcoop_motion_speed) || !_valid(m_netcoop_phase)) return;
     struct Synchronize : IterateBlendsCallback
     {
         MotionID motion; float phase, speed; bool restart, found = false;
