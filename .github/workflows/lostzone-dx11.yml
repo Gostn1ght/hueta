@@ -49,6 +49,7 @@ jobs:
           python scripts/check-netcoop-reload-input.py
           python scripts/check-netcoop-ambient.py
           python scripts/check-netcoop-task-offers.py
+          python scripts/check-netcoop-task-runtime.py
           python scripts/check-netcoop-trade.py
           python scripts/check-netcoop-trade-cache.py
           python scripts/check-netcoop-death-camera.py
@@ -140,6 +141,8 @@ jobs:
         run: python scripts/check-native-open-registration.py
       - name: Check snapshot clock across location connections
         run: python scripts/check-native-session-clock.py
+      - name: Check task callbacks and cross-location task updates
+        run: python scripts/check-native-task-locations.py
       - name: Check mutant motion renderer bounds
         run: python scripts/check-native-monster-motion.py
       - name: Check stale actor, NPC and mutant snapshots
@@ -428,6 +431,8 @@ jobs:
           python scripts/check-native-replica-relcase.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-task-clear.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-task-locations.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-preview-pool.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1

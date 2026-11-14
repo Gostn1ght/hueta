@@ -561,7 +561,7 @@ static bool character_capture_progress(Character& character, CActor* actor)
 	if (state.size() > 1048576 || writer.size() + 4 + state.size() > 1048576) return false;
 	writer.w_u32(u32(state.size()));
 	if (!state.empty()) writer.w(state.data(), state.size());
-	// Map that gave each task (netcoop_cluster.inc, server_task_here).
+	// Issuing map is preserved as metadata; tasks update on every location.
 	writer.w_u32(task_origin_marker);
 	writer.w_u32(u32(tasks.size()));
 	for (SGameTaskKey& task : tasks)

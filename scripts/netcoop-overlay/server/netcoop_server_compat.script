@@ -54,7 +54,9 @@ function bind_actor(obj)
 		if type(db.storage) == "table" and db.storage[id] == nil then
 			db.storage[id] = { pstor = {}, object = obj }
 		end
+		if netcoop_task_context then netcoop_task_context.bind_actor(obj) end
 	elseif bound then
+		if netcoop_task_context then netcoop_task_context.bind_actor(bound_previous) end
 		db.actor = bound_previous
 		_G.AC_ID = STORY_AC_ID
 		bound_previous = nil
@@ -154,6 +156,7 @@ function install()
 	local server_actor_callbacks = {
 		actor_on_info_callback = true,
 		actor_on_trade = true,
+		actor_on_task_callback = true,
 		actor_on_item_take = true,
 		actor_on_item_take_from_box = true,
 		actor_on_item_put_in_box = true,
@@ -262,18 +265,8 @@ local restored_players = {} -- actor id -> its saved character state was applied
 local first_seen, state_sent = {}, {}
 local send_player_state
 
--- Engine (GameTaskManager, netcoop_cluster.inc): a generated task whose
--- target is on another map cannot be done on this location server. It is
--- cancelled like a player's cancel (on_cancel, no fail penalty).
-function cancel_task_on_other_map(task_id, level_name)
-	local manager = task_manager and task_manager.get_task_manager and task_manager.get_task_manager()
-	if not (manager and manager.task_info and manager.task_info[task_id]) then return false end
-	manager:set_task_cancelled(task_id)
-	printf("[Lost Zone][tasks] %s cancelled: its target is on %s", task_id, tostring(level_name))
-	return true
-end
-
 function capture_character_state(actor)
+    if netcoop_task_context then netcoop_task_context.capture(actor) end
     local id = actor:id()
     local storage = db.storage[id] or {}
     local state = {pstor=storage.pstor or {}, pstor_ctime=storage.pstor_ctime or {}}
@@ -298,6 +291,8 @@ function restore_character_state(actor, encoded, respawn)
     db.storage[id] = db.storage[id] or {object=actor}
     db.storage[id].pstor = state.pstor or {}
     db.storage[id].pstor_ctime = state.pstor_ctime or {}
+    -- Restore module data before constructors evaluate their target functors.
+    if netcoop_task_context then netcoop_task_context.bind_actor(actor) end
     player_tasks[id] = task_manager.CRandomTask()
     task_manager.load_state(state)
     -- A new body must not inherit the lethal radiation/psy state. The
@@ -331,6 +326,7 @@ function character_ready(actor, new_life)
     if new_life then
         local st = db.storage[id] or {object=actor}; db.storage[id] = st
         st.pstor, st.pstor_ctime = {}, {}
+        if netcoop_task_context then netcoop_task_context.bind_actor(actor) end
         player_tasks[id] = task_manager.CRandomTask()
         if netcoop_admin_god_set then netcoop_admin_god_set(id, false) end
         if netcoop_admin_ammo_set then netcoop_admin_ammo_set(id, false) end
@@ -928,15 +924,27 @@ local function server_world_loop()
 	return false
 end
 
+local task_aux_errors = 0
+local function task_aux_error(kind, err)
+    task_aux_errors = task_aux_errors + 1
+    if task_aux_errors <= 30 then printf("! [diag][tasks] %s failed independently: %s", kind, tostring(err)) end
+end
+
 -- Engine (netcoop.cpp) every 0.5 s for each player, with db.actor bound.
 function update_player_tasks()
 	local a = db.actor
 	if not a then return end
 	server_game_load()
-	if zz_netcoop_sandbox then zz_netcoop_sandbox.update() end
+	if zz_netcoop_sandbox then
+		local ok, err = pcall(zz_netcoop_sandbox.update)
+		if not ok then task_aux_error("sandbox update", err) end
+	end
 	install_hide_hud()
-	server_world_tick()
-	netcoop_emission.update_player(a)
+	local world_ok, world_err = pcall(server_world_tick)
+	if not world_ok then task_aux_error("world tick", world_err) end
+	local emission_ok, emission_err = pcall(netcoop_emission.update_player, a)
+	if not emission_ok then task_aux_error("emission player update", emission_err) end
+	if netcoop_task_runtime then netcoop_task_runtime.install() end
 	local psi_ok, psi_err = pcall(netcoop_psi_storm.update_player, a)
 	if not psi_ok then printf("[Lost Zone] psi storm player error: %s", tostring(psi_err)) end
 	server_debug_file()
@@ -1444,6 +1452,7 @@ function on_game_start()
 	install_hide_hud()
 	install_trade_profiles()
 	install_player_tasks()
+	if netcoop_task_runtime then netcoop_task_runtime.install() end
 	if netcoop_backpack_stash then netcoop_backpack_stash.install() end
 	if death_manager and death_manager.init_drop_settings then
 		local ok, err = pcall(death_manager.init_drop_settings)

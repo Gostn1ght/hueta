@@ -1,5 +1,6 @@
 #include "pch_script.h"
 #include "GameTask.h"
+#include "netcoop.h"
 #include "ui/xrUIXmlParser.h"
 #include "encyclopedia_article.h"
 #include "map_location.h"
@@ -139,9 +140,27 @@ void CGameTask::ChangeMapLocation(LPCSTR new_map_location, u16 new_map_object_id
 
 void CGameTask::ChangeStateCallback()
 {
-	// No Actor outside a player's scope on a netcoop dedicated server.
-	if (Actor())
-		Actor()->callback(GameObject::eTaskStateChange)(this, GetTaskState());
+	// Remote server Actors may have no single-player binder callback. Their
+	// authoritative task state still has to run GAMMA completion and rewards.
+	CActor* actor = Actor();
+	if (!actor) return;
+	auto& callback = actor->callback(GameObject::eTaskStateChange);
+	if (netcoop::server_player_copy(actor) && !callback)
+	{
+		netcoop::ServerVictimScope scope(actor);
+		::luabind::functor<void> changed;
+		try
+		{
+			if (ai().script_engine().functor("task_manager.task_callback", changed))
+				changed(this, GetTaskState());
+		}
+		catch (...)
+		{
+			Msg("! [diag][tasks] actor=%u task=%s state=%u callback failed", actor->ID(), m_ID.c_str(), u32(GetTaskState()));
+		}
+		return;
+	}
+	callback(this, GetTaskState());
 }
 
 ETaskState CGameTask::UpdateState()

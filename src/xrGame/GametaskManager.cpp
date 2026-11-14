@@ -195,13 +195,10 @@ void CGameTaskManager::UpdateTasks()
 		for (; I != E; ++I)
 		{
 			CGameTask* const t = (*I).game_task;
-			if (t->GetTaskState() != eTaskStateInProgress)
+			if (!t || t->GetTaskState() != eTaskStateInProgress)
 				continue;
-			if (!netcoop::server_task_here(t->m_netcoop_origin.c_str()))
-				continue;
-			// A generated task whose target lives on another map cannot be
-			// done on this location server: cancel it the GAMMA way.
-			netcoop::server_task_check_target(t->m_ID.c_str(), t->m_map_object_id);
+			// Character tasks travel with their owner. The issuing map is
+			// metadata, not permission to update or cancel a foreign-map job.
 
 			ETaskState const state = t->UpdateState();
 

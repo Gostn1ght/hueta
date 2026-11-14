@@ -396,30 +396,6 @@ static LPCSTR cluster_client_host(const xr_string& host)
 	return host.c_str();
 }
 
-bool server_task_here(const char* origin)
-{
-	return !enabled() || !origin || !origin[0] || !xr_strcmp(origin, cluster_current_level());
-}
-
-static xr_set<xr_string> s_cancelled_foreign_tasks;
-
-void server_task_check_target(const char* task_id, unsigned short object_id)
-{
-	if (!enabled() || pure_client() || !task_id || object_id == u16(-1) || !ai().get_alife() || !ai().get_game_graph()) return;
-	CSE_ALifeObject* target = smart_cast<CSE_ALifeObject*>(ai().alife().objects().object(object_id, true));
-	if (!target || target->m_story_id != INVALID_STORY_ID || !ai().game_graph().valid_vertex_id(target->m_tGraphID)) return;
-	const LPCSTR level = *ai().game_graph().header().level(ai().game_graph().vertex(target->m_tGraphID)->level_id()).name();
-	if (!xr_strcmp(level, cluster_current_level())) return;
-	if (!s_cancelled_foreign_tasks.insert(task_id).second) return;
-	::luabind::functor<bool> cancel;
-	bool done = false;
-	if (ai().script_engine().functor("netcoop_server_compat.cancel_task_on_other_map", cancel))
-		try { done = cancel(task_id, level); } catch (...) {}
-	Msg("[Lost Zone][tasks] %s: target %u is on %s, task %s", task_id, object_id, level, done ? "cancelled" : "left as is");
-	if (!done) return;
-	s_cancelled_foreign_tasks.erase(task_id); // the same id may be given again later
-}
-
 // ---- NPC transit records (netcoop_transit.script) -------------------------
 
 LPCSTR script_cluster_maps()

@@ -1,0 +1,35 @@
+-- GAMMA modules have process-global caches; character saves must not.
+local current_id, current
+
+local function flush()
+    if not current then return end
+    if tasks_multifetch and tasks_multifetch.save_state then
+        local snapshot = {}; tasks_multifetch.save_state(snapshot)
+        current.multifetch = snapshot.multifetch_data or {}
+    end
+    if axr_task_manager then current.bounties = axr_task_manager.bounties_by_id or {} end
+end
+
+function capture(actor)
+    if actor and actor:id() == current_id then flush() end
+end
+
+function bind_actor(actor)
+    local id = actor and actor:id()
+    local storage = id and db.storage[id]
+    local context
+    if storage then
+        storage.pstor = storage.pstor or {}
+        context = storage.pstor.netcoop_quest_context
+        if type(context) ~= "table" then
+            context = {}; storage.pstor.netcoop_quest_context = context
+        end
+    end
+    if current_id == id and current == context then return end
+    flush()
+    current_id, current = id, context
+    if tasks_multifetch and tasks_multifetch.load_state then
+        tasks_multifetch.load_state({multifetch_data = context and context.multifetch or {}})
+    end
+    if axr_task_manager then axr_task_manager.bounties_by_id = context and context.bounties or {} end
+end

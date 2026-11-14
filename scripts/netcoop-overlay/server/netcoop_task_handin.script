@@ -1,0 +1,232 @@
+-- Preflight the whole fetch, move the same instances, then permit rewards.
+local active_entry
+local hooked = setmetatable({}, {__mode = "k"})
+
+function requires_items(id)
+    local text = task_manager.task_ini:r_string_ex(id, "on_complete") or ""
+    return text:find("fetch_reward_and_remove", 1, true) or text:find("remove_fetch_item", 1, true) or
+        text:find("remove_artefact_item", 1, true) or text:find("multifetch_remove", 1, true)
+end
+
+local function number(value)
+    local n = tonumber(value)
+    return n and n == n and math.abs(n) < math.huge and n or nil
+end
+
+local function belongs(item, actor)
+    local parent = item and item:parent()
+    local se = item and alife():object(item:id())
+    return parent and parent:id() == actor:id() and se and se.parent_id == actor:id()
+end
+
+local function collect(actor, section, amount, minimum, portions, used, strict)
+    local found, result, remaining = {}, {}, amount
+    local belt = {}
+    actor:iterate_belt(function(_, item) belt[item:id()] = true end)
+    actor:iterate_inventory(function(_, item)
+        if item:section() == section and not belt[item:id()] and not used[item:id()] and
+            belongs(item, actor) and ((strict and item:condition() > minimum) or
+                (not strict and item:condition() >= minimum)) then found[#found + 1] = item end
+    end, actor)
+    table.sort(found, function(a, b) return a:id() < b:id() end)
+    for _, item in ipairs(found) do
+        local available = portions and item:get_remaining_uses() or 1
+        local take = math.min(remaining, available)
+        if take > 0 then
+            result[#result + 1] = {item = item, id = item:id(), take = take,
+                before = available, partial = take < available, condition = item:condition()}
+            used[item:id()] = true
+            remaining = remaining - take
+        end
+        if remaining == 0 then break end
+    end
+    return remaining == 0 and result or nil
+end
+
+local function multifetch(id, actor)
+    local module = tasks_multifetch
+    if not (module and module.save_state) then return false, "multi-fetch module is unavailable" end
+    local state = {}; module.save_state(state)
+    local recipe = state.multifetch_data and state.multifetch_data[id]
+    if not (recipe and recipe.required_items and next(recipe.required_items)) then
+        return false, "multi-fetch requirements are missing"
+    end
+    local used, items, news, total = {}, {}, {}, 0
+    local function group(list, multiplier)
+        local selected, notices, price = {}, {}, 0
+        local prior = {}; for key, value in pairs(used) do prior[key] = value end
+        for _, row in pairs(list) do
+            local quantity, cost = number(row.num), number(row.cost)
+            if not row.sec or not quantity or quantity < 1 or quantity ~= math.floor(quantity) or not cost or cost < 0 then
+                used = prior; return nil
+            end
+            local found = collect(actor, row.sec, quantity, number(row.cond or row.condition) or -1, false, used, true)
+            if not found then used = prior; return nil end
+            for _, value in ipairs(found) do
+                local c = value.condition
+                local factor = c < .25 and c * .7 or c < .5 and c * .8 or c < .75 and c * .9 or 1
+                local value_cost = cost * factor * multiplier
+                price = price + (multiplier == 1.3 and math.floor(value_cost) or value_cost)
+                selected[#selected + 1] = value
+            end
+            notices[#notices + 1] = {section = row.sec, amount = quantity}
+        end
+        return selected, notices, price
+    end
+    local required, required_news, price = group(recipe.required_items, 1.1)
+    if not required then return false, "not enough eligible multi-fetch items" end
+    items, news, total = required, required_news, price
+    local optional = false
+    if recipe.optional_items and next(recipe.optional_items) then
+        local extra, extra_news, extra_price = group(recipe.optional_items, 1.3)
+        if extra then
+            optional = true
+            for _, value in ipairs(extra) do items[#items + 1] = value end
+            for _, value in ipairs(extra_news) do news[#news + 1] = value end
+            total = total + extra_price
+        end
+    end
+    return true, {method = "multifetch_remove", variable = id, items = items, news = news,
+        base_cost = total, optional_delivered = optional}
+end
+
+function prepare(id, entry, actor)
+    local ini = task_manager.task_ini
+    local text = ini:r_string_ex(id, "on_complete") or ""
+    local method, variable
+    for _, name in ipairs({"fetch_reward_and_remove", "remove_fetch_item", "remove_artefact_item"}) do
+        local var = text:match(name .. "%(([^:%)]+)")
+        if var then method, variable = name, var; break end
+    end
+    if not variable then
+        if text:find("multifetch_remove", 1, true) then
+            return multifetch(id, actor)
+        end
+        return true, nil -- kill/explore/etc. use their freshly checked status functor
+    end
+    local section = load_var(actor, variable)
+    local amount = number(load_var(actor, variable .. "_count") or 1)
+    if method == "remove_fetch_item" then
+        amount = number(text:match("remove_fetch_item%([^:]+:([^%)]+)%)")) or amount
+    elseif method == "remove_artefact_item" then amount = 1 end
+    if not section or not amount or amount < 1 or amount ~= math.floor(amount) then
+        return false, "fetch requirements are missing"
+    end
+    local maximum = IsItem("multiuse", section) or 1
+    local minimum = (id == "esc_2_12_stalker_nimble_task_1" or id == "jup_b220_trapper_task_3") and .9 or
+        entry.status_functor == "actor_has_fetch_weapon_warfare" and .6 or 0
+    local items = collect(actor, section, amount, minimum, maximum > 1 and method == "fetch_reward_and_remove", {})
+    if not items then return false, "not enough eligible fetch items" end
+    local cost = number(ini_sys:r_float_ex(section, "cost"))
+    if not cost or cost < 0 then return false, "fetch item price is invalid" end
+    local total, artefact = 0, false
+    for _, value in ipairs(items) do
+        local condition = value.condition
+        local item = value.item
+        if item:get_weapon_type() ~= 255 and se_load_var then
+            local parts = se_load_var(item:id(), item:name(), "parts") or {}
+            local sum, count = 0, 0
+            for name, quality in pairs(parts) do
+                if name:find("prt_w_", 1, true) and number(quality) then sum, count = sum + quality, count + 1 end
+            end
+            if count > 0 then condition = sum / count / 100 end
+        end
+        local use_condition = maximum == 1 and not IsItem("device", section) and not IsItem("battery", section)
+        if not use_condition then condition = 1 end
+        total = total + cost / maximum * value.take * condition * condition
+        artefact = artefact or (IsArtefact and IsArtefact(item))
+    end
+    return true, {method = method, variable = variable, section = section, amount = amount,
+        items = items, base_cost = total, artefact = artefact}
+end
+
+function commit(receipt, actor, npc)
+    if not receipt then return true end
+    -- No mutation until every instance and partial-use setter is present.
+    for _, value in ipairs(receipt.items) do
+        if not belongs(value.item, actor) or (value.partial and not value.item.set_remaining_uses) then return false end
+    end
+    local moved, reduced = {}, {}
+    local function rollback()
+        for _, value in ipairs(reduced) do value.item:set_remaining_uses(value.before) end
+        for i = #moved, 1, -1 do npc:transfer_item(moved[i].item, actor) end
+    end
+    for _, value in ipairs(receipt.items) do
+        if not value.partial then
+            actor:transfer_item(value.item, npc)
+            local se = alife():object(value.id)
+            if not se or se.parent_id ~= npc:id() then rollback(); return false end
+            moved[#moved + 1] = value
+        end
+    end
+    for _, value in ipairs(receipt.items) do
+        if value.partial then
+            value.item:set_remaining_uses(value.before - value.take)
+            reduced[#reduced + 1] = value
+            if value.item:get_remaining_uses() ~= value.before - value.take then rollback(); return false end
+        end
+    end
+    receipt.committed = true
+    -- Ownership is already confirmed. Failed cleanup leaves the items with
+    -- the recipient, never gives the actor both the items and the reward.
+    for _, value in ipairs(moved) do pcall(alife_release_id, value.id) end
+    return true
+end
+
+function enter(entry)
+    local previous = active_entry
+    active_entry = entry
+    return previous
+end
+
+function install()
+    if not xr_effects then return end
+    for _, name in ipairs({"fetch_reward_and_remove", "remove_fetch_item", "remove_artefact_item", "multifetch_remove"}) do
+        local previous = xr_effects[name]
+        if type(previous) == "function" and not hooked[previous] then
+            local method = name
+            local replacement = function(actor, npc, params)
+                local receipt = active_entry and active_entry._netcoop_fetch_receipt
+                if not receipt then error("fetch reward has no confirmed hand-in") end
+                if not receipt.committed or receipt.method ~= method or receipt.variable ~= params[1] then
+                    error("fetch hand-in does not match its reward")
+                end
+                if receipt.paid then return end
+                if method == "multifetch_remove" then
+                    if params[2] == true or params[2] == "true" or params[2] == "1" then
+                        local money = math.floor(receipt.base_cost)
+                        db.actor:give_money(money)
+                        news_manager.relocate_money(db.actor, "in", money)
+                    end
+                elseif method == "fetch_reward_and_remove" then
+                    local total = math.max(50, receipt.base_cost * (number(params[2]) or 1))
+                    if receipt.artefact then
+                        local eco = game_difficulties.get_eco_factor("type") or .5
+                        total = total * ((eco == 3 and .4) or (eco == 2 and .5) or .6)
+                    end
+                    local delta = math.floor(total * .1)
+                    xr_effects.reward_random_money(actor, npc, {total - delta, total + delta})
+                end
+                receipt.paid = true
+                if receipt.news then
+                    for _, value in ipairs(receipt.news) do news_manager.relocate_item(db.actor, "out", value.section, value.amount) end
+                else news_manager.relocate_item(db.actor, "out", receipt.section, receipt.amount) end
+            end
+            hooked[replacement] = true
+            xr_effects[name] = replacement
+        end
+    end
+    local module = tasks_multifetch
+    local optional = module and module.has_optional_items
+    if type(optional) == "function" and not hooked[optional] then
+        local replacement = function(id)
+            local receipt = active_entry and active_entry._netcoop_fetch_receipt
+            if receipt and receipt.method == "multifetch_remove" and receipt.variable == id then
+                return receipt.optional_delivered
+            end
+            return optional(id)
+        end
+        hooked[replacement] = true
+        module.has_optional_items = replacement
+    end
+end

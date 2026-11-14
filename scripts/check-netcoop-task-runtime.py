@@ -1,0 +1,287 @@
+"""Real GAMMA task callback/rewards/save-load with dedicated runtime hooks."""
+from pathlib import Path
+from lupa.lua51 import LuaRuntime
+
+root=Path(__file__).resolve().parents[1]
+fixtures=root/'scripts/fixtures/task-runtime'
+lua=LuaRuntime(unpack_returned_tuples=True)
+lua.execute(r'''
+function printf() end
+active=true;client=false
+function netcoop_enabled() return active end
+function netcoop_pure_client() return client end
+task={completed=2,fail=0}
+CGeneralTask={};CGeneralTask.__index=CGeneralTask
+setmetatable(CGeneralTask,{__call=function(cls,id)
+ local obj=setmetatable({},cls);obj:__init(id);return obj
+end})
+CRandomTask={};CRandomTask.__index=CRandomTask
+manager=setmetatable({task_info={}},CRandomTask)
+function get_task_manager()return manager end
+task_manager={CRandomTask=CRandomTask,get_task_manager=get_task_manager}
+task_objects={CGeneralTask=CGeneralTask}
+configs={paid={reward_money="5000",on_complete="rep"},items={reward_money="0",reward_item="medkit,medkit"}}
+task_manager.task_ini={r_string_to_condlist=function(_,id,key)return configs[id] and configs[id][key] end}
+events={};function GetEvent(key)return events[key]end
+function SetEvent(key,value)events[key]=value end
+local context={}
+netcoop_server_compat={talk_speaker=function(id)
+ if id==65535 then events.used_npc_id=context[#context].id;table.remove(context)
+ else context[#context+1]={id=events.used_npc_id};events.used_npc_id=id end
+end}
+objects={[27]={id=function()return 27 end}};level={object_by_id=function(id)return objects[id]end}
+function get_speaker()return objects[events.used_npc_id]end
+function actor(id)return {_id=id,money=0,rep=0,items={},vars={},get_task=function()return nil end}end
+a=actor(1);b=actor(2);db={actor=a}
+function device()return {precache_frame=0}end
+function printe()end
+clock={diffSec=function()return 0 end};game={get_game_time=function()return clock end}
+game_statistics={increment_statistic=function()end};news_manager={send_task=function()end}
+function load_var(who,key)return who.vars[key]end
+function save_var(who,key,value)who.vars[key]=value end
+function parse_names(text)local list={} for value in text:gmatch("[^,]+")do list[#list+1]=value end return list end
+xr_logic={pick_section_from_condlist=function(_,_,value)
+ if value=="rep" then assert(get_speaker() and get_speaker():id()==27);db.actor.rep=db.actor.rep+100;return end
+ if value=="throw" then error("injected callback failure") end
+ return value
+end}
+dialogs={relocate_money=function(npc,money,dir)
+ assert(npc:id()==27 and dir=="in");db.actor.money=db.actor.money+money
+end,relocate_item_section=function(npc,section,dir,count)
+ assert(npc:id()==27 and dir=="in" and section=="medkit","money text must never become an item section")
+ db.actor.items[section]=(db.actor.items[section]or 0)+count
+end}
+good_checks=0
+function CGeneralTask:check_task()
+ if self.broken then error("bad optional title/target functor")end
+ good_checks=good_checks+1
+end
+''')
+for name in ('reward_constructor','give_reward','task_complete','update','save_load','object_save_load'):
+    lua.execute((fixtures/(name+'.lua')).read_text(encoding='utf-8'))
+lua.execute((fixtures/'task_callback.lua').read_text(encoding='utf-8'))
+lua.execute('task_manager.task_callback=task_callback')
+lua.execute(r'''
+-- Reproduce the old payout: the native tick no longer has a speaker.
+local old=CGeneralTask("paid");old.reward_item=nil;old:give_reward();assert(a.money==0)
+local typo=CGeneralTask("paid");assert(typo.reward_item=="5000")
+''')
+lua.execute((root/'scripts/netcoop-overlay/server/netcoop_task_runtime.script').read_text(encoding='utf-8'))
+lua.execute(r'''
+install();local check=CGeneralTask.check_task;local callback=task_manager.task_callback
+install();assert(check==CGeneralTask.check_task and callback==task_manager.task_callback)
+local paid=CGeneralTask("paid");assert(paid.reward_money=="5000" and paid.reward_item==nil)
+paid.task_giver_id=27;paid.repeat_timeout=10;paid.on_complete="rep";paid.status="selected"
+manager.task_info.paid=paid
+local tsk={get_id=function()return "paid"end}
+events.used_npc_id=99;task_manager.task_callback(tsk,task.completed)
+assert(a.money==5000 and a.rep==100 and b.money==0 and events.used_npc_id==99)
+task_manager.task_callback(tsk,task.completed);assert(a.money==5000 and a.rep==100,"repeat callback must not pay twice")
+db.actor=b;local second=CGeneralTask("paid");second.task_giver_id=27;second.on_complete="rep";second.repeat_timeout=10
+manager=setmetatable({task_info={paid=second}},CRandomTask)
+task_manager.task_callback(tsk,task.completed);assert(b.money==5000 and b.rep==100 and a.money==5000)
+local items=CGeneralTask("items");items.task_giver_id=27;manager.task_info.items=items
+task_manager.task_callback({get_id=function()return "items"end},task.completed)
+assert(b.items.medkit==2)
+local throwing=CGeneralTask("paid");throwing.task_giver_id=27;throwing.on_complete="throw"
+manager.task_info.paid=throwing;local ok=pcall(task_manager.task_callback,tsk,task.completed)
+assert(not ok and events.used_npc_id==99,"callback errors must unwind the speaker context")
+-- A single invalid quest no longer prevents another quest from updating.
+manager.task_info={setmetatable({id="broken",broken=true},CGeneralTask),setmetatable({id="good"},CGeneralTask)}
+manager:update();assert(good_checks==1)
+-- Complete only after the trader is available on the return map.
+local returning=CGeneralTask("paid");returning.task_giver_id=27;returning.forced_status="complete"
+manager.task_info={paid=returning};objects[27]=nil
+assert(not manager:task_complete("paid") and returning.forced_status=="complete")
+objects[27]={id=function()return 27 end};assert(manager:task_complete("paid"))
+''')
+lua.execute(r'''
+-- The real GAMMA save/load path carries the same stage, target and giver
+-- through A -> B (objective) -> A (hand-in), without another player's state.
+function empty_table(value)for key in pairs(value)do value[key]=nil end return value end
+local function clone(value)
+ if type(value)~="table" then return value end
+ local copy={} for k,v in pairs(value)do copy[k]=clone(v)end return copy
+end
+local source=setmetatable({task_info={}},CRandomTask);manager=source;db.actor=a;a.money=0;a.rep=0
+local job=CGeneralTask("paid");job.status="selected";job.stage=4;job.current_target=501
+job.task_giver_id=27;job.t={};source.task_info.paid=job
+local checkpoint={};save_state(checkpoint)
+manager=setmetatable({task_info={}},CRandomTask);load_state(clone(checkpoint))
+assert(manager.task_info.paid.stage==4 and manager.task_info.paid.current_target==501 and manager.task_info.paid.task_giver_id==27)
+assert(source.task_info.paid==job and checkpoint.task_objects.paid.stage==4)
+local remote=manager.task_info.paid;remote.t={};remote.stage=5;remote.current_target=27
+local return_checkpoint={};save_state(return_checkpoint)
+manager=setmetatable({task_info={}},CRandomTask);load_state(clone(return_checkpoint))
+local returned=manager.task_info.paid;assert(returned.stage==5 and returned.current_target==27 and returned.task_giver_id==27)
+returned.repeat_timeout=10;returned.forced_status="complete"
+assert(manager:task_complete("paid"));local tsk={get_id=function()return "paid"end}
+task_manager.task_callback(tsk,task.completed);task_manager.task_callback(tsk,task.completed)
+assert(a.money==5000 and a.rep==100 and b.money==5000)
+''')
+compat=(root/'scripts/netcoop-overlay/server/netcoop_server_compat.script').read_text(encoding='utf-8')
+assert 'cancel_task_on_other_map' not in compat
+assert 'if netcoop_task_runtime then netcoop_task_runtime.install() end' in compat
+update=compat[compat.index('function update_player_tasks()'):compat.index('-- axr_main calls on_game_start')]
+assert 'pcall(server_world_tick)' in update and 'pcall(netcoop_emission.update_player, a)' in update
+lua.execute(r'''
+-- Native actions are authoritative: a stale "completed" phrase cannot
+-- finish a live objective, use another giver or hand in missing items.
+function CRandomTask:set_task_completed(id)if self.task_info[id]then self.task_info[id].forced_status="complete"end end
+task_manager.task_ini.r_float_ex=function(_,_,key)if key=="stage_complete"then return 1 end end
+task_manager.task_ini.r_string_ex=function(_,id,key)
+ if key=="on_complete"and id=="fetch"then return "%=fetch_reward_and_remove(fetch_fetch:1.25)%"end
+end
+configs.fetch={on_complete="rep_fetch"}
+-- Simulate the world methods at their native boundary, including ownership
+-- events whose Lua parent pointer has not caught up with the server yet.
+server_items={};all_items={};fail_transfer=nil
+function alife()return {object=function(_,id)return server_items[id]end}end
+function alife_object(id)return server_items[id]end
+function IsItem(kind,section)if kind=="multiuse"and section=="medicine"then return 5 end end
+function IsArtefact()return false end
+ini_sys={r_float_ex=function()return 100 end}
+function alife_release_id(id)server_items[id]=nil;all_items[id].removed=true end
+function make_item(id,section,uses,condition)
+ local item={_id=id,_section=section,uses=uses or 1,quality=condition or 1,owner=a}
+ function item:id()return self._id end
+ function item:section()return self._section end
+ function item:parent()return self.owner end
+ function item:condition()return self.quality end
+ function item:get_remaining_uses()return self.uses end
+ function item:set_remaining_uses(value)self.uses=value end
+ function item:get_weapon_type()return 255 end
+ all_items[id]=item;server_items[id]={parent_id=a:id()};return item
+end
+function a:id()return self._id end
+function a:iterate_inventory(fn)
+ for _,item in pairs(all_items)do if item.owner==self and not item.removed then fn(self,item)end end
+end
+function a:iterate_belt(fn)for _,item in pairs(all_items)do if item.belt then fn(self,item)end end end
+function transfer(self,item,to)
+ if item:id()==fail_transfer then return end
+ assert(server_items[item:id()].parent_id==self:id())
+ server_items[item:id()].parent_id=to:id()
+end
+a.transfer_item=transfer;objects[27].transfer_item=transfer
+server_items[27]={group_id=65535}
+function a:set_task_state(state,id)
+ self.completions=(self.completions or 0)+1
+ task_manager.task_callback({get_id=function()return id end},state)
+end
+function a:get_task(id)return manager.task_info[id]end
+news_manager.relocate_item=function()end
+xr_effects={fetch_reward_and_remove=function()error("old delayed fetch must not run")end,
+ reward_random_money=function(_,_,range)
+  assert(server_items[101]==nil and server_items[102]==nil,"pay only after exact instances are handed in")
+  db.actor.money=db.actor.money+math.floor(range[1])
+ end}
+local previous_pick=xr_logic.pick_section_from_condlist
+xr_logic.pick_section_from_condlist=function(x,y,value)
+ if value=="rep_fetch"then
+  assert(server_items[101]==nil and server_items[102]==nil,"reputation also follows confirmed consumption")
+  db.actor.rep=db.actor.rep+50
+  xr_effects.fetch_reward_and_remove(x,y,{"fetch_fetch","1.25"});return
+ end
+ return previous_pick(x,y,value)
+end
+''')
+handin=(root/'scripts/netcoop-overlay/server/netcoop_task_handin.script').read_text(encoding='utf-8')
+lua.execute('local chunk=assert(loadstring(...));netcoop_task_handin={};setmetatable(netcoop_task_handin,{__index=_G});setfenv(chunk,netcoop_task_handin);chunk()',handin)
+lua.execute(r'''
+install();db.actor=a;events.used_npc_id=27;a.money=0;a.rep=0;a.completions=0
+manager=setmetatable({task_info={}},CRandomTask)
+local fetch=CGeneralTask("fetch");fetch.task_giver_id=27;fetch.stage=1
+manager.task_info.fetch=fetch
+a.vars.fetch_fetch="bandage";a.vars.fetch_fetch_count=2
+make_item(101,"bandage");fetch.check_time=999999
+assert(not manager:set_task_completed("fetch"),"a cached finished stage cannot replace the second item")
+assert(server_items[101].parent_id==a:id()and a.money==0 and a.rep==0 and a.completions==0)
+make_item(102,"bandage");fail_transfer=102
+assert(not manager:set_task_completed("fetch"),"failed second transfer rolls back the first before any reward")
+assert(server_items[101].parent_id==a:id()and server_items[102].parent_id==a:id()and a.money==0 and a.rep==0)
+fail_transfer=nil;events.used_npc_id=99;assert(not manager:set_task_completed("fetch"),"wrong NPC cannot accept hand-in")
+events.used_npc_id=27;fetch.stage=0;assert(not manager:set_task_completed("fetch"),"unmet objective cannot be forced complete")
+fetch.stage=1;assert(manager:set_task_completed("fetch"))
+assert(server_items[101]==nil and server_items[102]==nil and a.money>0 and a.rep==50 and a.completions==1)
+local paid=a.money;assert(not manager:set_task_completed("fetch"));assert(a.money==paid and a.rep==50)
+-- Partial medicine use keeps the same physical item and its remainder.
+all_items={};server_items={[27]={group_id=65535}};local medicine=make_item(201,"medicine",5)
+a.vars.fetch_fetch="medicine";a.vars.fetch_fetch_count=3
+local ok,receipt=netcoop_task_handin.prepare("fetch",{},a);assert(ok)
+assert(netcoop_task_handin.commit(receipt,a,objects[27])and medicine.uses==2 and server_items[201].parent_id==a:id())
+-- Belt artefacts and insufficient condition cannot satisfy a fetch.
+all_items={};server_items={[27]={group_id=65535}};make_item(202,"bandage").belt=true
+a.vars.fetch_fetch="bandage";a.vars.fetch_fetch_count=1
+assert(not netcoop_task_handin.prepare("fetch",{},a))
+''')
+lua.execute(r'''
+-- Multi-fetch recipes reserve distinct physical instances. Optional rewards
+-- require the full optional set and cannot reuse a required item.
+local original_ini=task_manager.task_ini.r_string_ex
+task_manager.task_ini.r_string_ex=function(self,id,key)
+ if id=="multi"and key=="on_complete"then return "%=multifetch_remove(multi:true)%"end
+ if id=="quality"and key=="on_complete"then return "%=remove_fetch_item(fetch_fetch)%"end
+ return original_ini(self,id,key)
+end
+local recipe={required_items={{sec="bandage",num=1,cost=100,cond=.5}},optional_items={{sec="bandage",num=1,cost=100}}}
+tasks_multifetch={save_state=function(state)state.multifetch_data={multi=recipe}end,has_optional_items=function()return false end}
+xr_effects.multifetch_remove=function()error("legacy multi-fetch removal must not run")end
+news_manager.relocate_money=function()end
+function a:give_money(value)self.money=self.money+value end
+netcoop_task_handin.install();all_items={};server_items={[27]={group_id=65535}}
+local required=make_item(301,"bandage",1,.5)
+assert(not netcoop_task_handin.prepare("multi",{},a),"condition threshold is strict as configured")
+required.quality=1
+local ok,one=netcoop_task_handin.prepare("multi",{},a)
+assert(ok and #one.items==1 and not one.optional_delivered,"one object must not fulfill both requirements")
+make_item(302,"bandage",1,1)
+local ok,both=netcoop_task_handin.prepare("multi",{},a);assert(ok and #both.items==2 and both.optional_delivered)
+assert(netcoop_task_handin.commit(both,a,objects[27]))
+local prior=netcoop_task_handin.enter({_netcoop_fetch_receipt=both});local before=a.money
+xr_effects.multifetch_remove(a,objects[27],{"multi","true"})
+assert(a.money==before+240 and tasks_multifetch.has_optional_items("multi"))
+xr_effects.multifetch_remove(a,objects[27],{"multi","true"});assert(a.money==before+240)
+netcoop_task_handin.enter(prior)
+-- Low-condition weapons cannot be substituted at hand-in.
+all_items={};server_items={[27]={group_id=65535}};a.vars.fetch_fetch="rifle";a.vars.fetch_fetch_count=1
+local rifle=make_item(303,"rifle",1,.59)
+assert(not netcoop_task_handin.prepare("quality",{status_functor="actor_has_fetch_weapon_warfare"},a))
+rifle.quality=.6;assert(netcoop_task_handin.prepare("quality",{status_functor="actor_has_fetch_weapon_warfare"},a))
+''')
+print('PASS actual GAMMA tasks: cross-map save/load and stage, fresh objective/NPC/inventory checks, whole-batch rollback, exact instance consumption before money/reputation, partial uses retained, no repeat payout and isolated actors/quest errors')
+
+# Use GAMMA's real public cache save/load methods, then switch two characters
+# and deserialize one on another location process. No cache is shared by ID.
+context_source=(root/'scripts/netcoop-overlay/server/netcoop_task_context.script').read_text(encoding='utf-8')
+lua.execute('local chunk=assert(loadstring(...));netcoop_task_context={};setmetatable(netcoop_task_context,{__index=_G});setfenv(chunk,netcoop_task_context);chunk()',context_source)
+lua.execute(r"""
+local _M={}
+tasks_multifetch={save_state=function(m_data)m_data.multifetch_data=_M end,
+ load_state=function(m_data)_M=m_data.multifetch_data or {} end}
+axr_task_manager={bounties_by_id={}}
+db.storage={[1]={pstor={}},[2]={pstor={}}}
+function b:id()return self._id end
+local function read()local state={};tasks_multifetch.save_state(state);return state.multifetch_data end
+local function clone(value)if type(value)~='table'then return value end local out={}for k,v in pairs(value)do out[k]=clone(v)end return out end
+netcoop_task_context.bind_actor(a)
+read().order={required_items={{sec='bandage',num=2}}};axr_task_manager.bounties_by_id.hunt=501
+netcoop_task_context.bind_actor(b)
+assert(not read().order and not axr_task_manager.bounties_by_id.hunt)
+read().order={required_items={{sec='vodka',num=7}}};axr_task_manager.bounties_by_id.hunt=900
+netcoop_task_context.bind_actor(a)
+assert(read().order.required_items[1].sec=='bandage'and axr_task_manager.bounties_by_id.hunt==501)
+netcoop_task_context.capture(a)
+local checkpoint=clone(db.storage[1].pstor)
+netcoop_task_context.bind_actor(nil);assert(not read().order and not axr_task_manager.bounties_by_id.hunt)
+-- Another server restores pstor before creating task objects.
+db.storage[1].pstor=checkpoint;netcoop_task_context.bind_actor(a)
+assert(read().order.required_items[1].num==2 and axr_task_manager.bounties_by_id.hunt==501)
+-- Replacing pstor for the same actor ID must not reuse its previous globals.
+db.storage[1].pstor={};netcoop_task_context.bind_actor(a)
+assert(not read().order and not axr_task_manager.bounties_by_id.hunt)
+netcoop_task_context.bind_actor(b)
+assert(read().order.required_items[1].sec=='vodka'and axr_task_manager.bounties_by_id.hunt==900)
+""")
+assert compat.index('netcoop_task_context.bind_actor(actor)',compat.index('function restore_character_state')) < compat.index('task_manager.load_state(state)',compat.index('function restore_character_state'))
+print('PASS per-character GAMMA recipes/bounty targets: A/B isolation, A->B->A location checkpoint, unbind and fresh life/same-ID restore')

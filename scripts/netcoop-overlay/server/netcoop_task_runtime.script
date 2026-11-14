@@ -1,0 +1,141 @@
+-- Ordinary GAMMA tasks belong to the bound character across location servers.
+local wrapped = setmetatable({}, {__mode = "k"})
+local errors = 0
+
+local function note(kind, id, err)
+    errors = errors + 1
+    if errors <= 30 then
+        printf("! [diag][tasks] %s task=%s: %s", kind, tostring(id), tostring(err))
+    end
+end
+
+local function task_entry(id)
+    local manager = task_manager.get_task_manager()
+    return manager and manager.task_info and manager.task_info[id]
+end
+
+local function giver_object(entry)
+    if not entry then return end
+    local id = entry._netcoop_handin_npc or entry.task_giver_id
+    local object = id and level.object_by_id(id)
+    if object then return object end
+    local se = id and alife_object and alife_object(id)
+    return se and se.commander_id and level.object_by_id(se:commander_id()) or nil
+end
+
+function install()
+    if not (netcoop_enabled and netcoop_enabled()) or
+        (netcoop_pure_client and netcoop_pure_client()) then return end
+    local manager = task_manager
+    local general = task_objects and task_objects.CGeneralTask
+    if not (manager and manager.CRandomTask and general) then return end
+
+    -- A broken optional target/title functor must not stop every other job
+    -- in CRandomTask:update. No failed check is converted to success/failure.
+    local check = general.check_task
+    if type(check) == "function" and not wrapped[check] then
+        local replacement = function(self, ...)
+            self._netcoop_check_failed = false
+            local ok, result = pcall(check, self, ...)
+            if not ok then self._netcoop_check_failed = true; note("check failed", self.id, result); return end
+            return result
+        end
+        wrapped[replacement] = true
+        general.check_task = replacement
+    end
+
+    if netcoop_task_handin then netcoop_task_handin.install() end
+    local finish = manager.CRandomTask.set_task_completed
+    if type(finish) == "function" and not wrapped[finish] then
+        local replacement = function(self, id, ...)
+            local entry = self.task_info[id]
+            if not entry or not entry.task_giver_id then return finish(self, id, ...) end
+            if entry.status == "completed" or entry.status == "fail" then return false end
+            local actor = db.actor
+            local npc = get_speaker()
+            if not (actor and actor.set_task_state and npc and actor:get_task(id, true)) then return false end
+            local se = alife_object and alife_object(npc:id())
+            if npc:id() ~= entry.task_giver_id and not (se and se.group_id == entry.task_giver_id) then return false end
+            -- A displayed phrase/stage is only a cache. Recheck the actual
+            -- server objective and inventory when the hand-in action runs.
+            entry.check_time = nil
+            entry:check_task()
+            local stage = manager.task_ini:r_float_ex(id, "stage_complete") or 254
+            if entry._netcoop_check_failed or entry.stage ~= stage or
+                entry.last_check_task == "fail" or entry.last_check_task == "reversed" then
+                entry.forced_status = nil
+                return false
+            end
+            local ok, receipt = netcoop_task_handin.prepare(id, entry, actor)
+            if not ok then note("hand-in refused", id, receipt); return false end
+            if not netcoop_task_handin.commit(receipt, actor, npc) then
+                note("hand-in refused", id, "ownership or item count changed")
+                return false
+            end
+            entry._netcoop_fetch_receipt = receipt
+            entry._netcoop_handin_npc = npc:id()
+            finish(self, id, ...)
+            -- Consume and complete in the same authoritative dialogue call,
+            -- before a delayed tick can lose its giver or Actor context.
+            actor:set_task_state(task.completed, id)
+            return true
+        end
+        wrapped[replacement] = true
+        manager.CRandomTask.set_task_completed = replacement
+    end
+
+    -- The deployed constructor reads reward_money for reward_item as well.
+    -- Money-only rewards otherwise attempt to spawn an item named "5000".
+    local construct = general.__init
+    if type(construct) == "function" and not wrapped[construct] then
+        local replacement = function(self, id, ...)
+            construct(self, id, ...)
+            self.reward_item = manager.task_ini:r_string_to_condlist(id, "reward_item")
+        end
+        wrapped[replacement] = true
+        general.__init = replacement
+    end
+
+    -- A trader's final hand-in is processed by the native task tick after
+    -- the dialogue callback. Keep it pending until its giver is present.
+    local complete = manager.CRandomTask.task_complete
+    if type(complete) == "function" and not wrapped[complete] then
+        local replacement = function(self, id, ...)
+            local entry = self.task_info[id]
+            if entry and entry.task_giver_id and not giver_object(entry) then
+                return false
+            end
+            local result = complete(self, id, ...)
+            if result and entry and not entry._netcoop_fetch_receipt and netcoop_task_handin and
+                netcoop_task_handin.requires_items(id) then
+                -- A legacy/forged forced flag is not evidence that goods
+                -- were delivered. The dialogue action must commit them first.
+                entry.last_check_task = nil
+                return false
+            end
+            return result
+        end
+        wrapped[replacement] = true
+        manager.CRandomTask.task_complete = replacement
+    end
+
+    local callback = manager.task_callback
+    if type(callback) == "function" and not wrapped[callback] then
+        local replacement = function(tsk, state, ...)
+            local entry = task_entry(tsk:get_id())
+            if entry and state == task.completed and entry.status == "completed" then return end
+            local giver = giver_object(entry)
+            local compat = netcoop_server_compat
+            local bind = giver and compat and compat.talk_speaker
+            if bind then compat.talk_speaker(giver:id()) end
+            local previous = netcoop_task_handin and netcoop_task_handin.enter(entry)
+            local ok, result = pcall(callback, tsk, state, ...)
+            if netcoop_task_handin then netcoop_task_handin.enter(previous) end
+            if bind then compat.talk_speaker(65535) end
+            if not ok then error(result) end
+            return result
+        end
+        wrapped[replacement] = true
+        manager.task_callback = replacement
+    end
+end

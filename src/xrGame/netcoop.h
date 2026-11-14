@@ -433,11 +433,6 @@ void server_on_change_level(xrServer* server, xrClientData* CL, NET_Packet& P);
 bool server_client_leaving(xrClientData* CL);
 // Server: a player's Actor died; Lua netcoop_ranks.on_player_death(victim, killer).
 void server_on_player_death(CObject* victim, CObject* killer);
-// A task given on this map, or one without a recorded map (single server).
-bool server_task_here(const char* origin);
-// Server: cancels a task (task_manager set_task_cancelled) whose target is a
-// non-story object on another map; once per task.
-void server_task_check_target(const char* task_id, unsigned short object_id);
 void client_on_physics(NET_Packet& P);
 // Server: the object is the Actor of a remote player. Local() is not used
 // for this: on the dedicated server it did not tell these copies apart
