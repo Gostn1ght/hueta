@@ -335,7 +335,13 @@ axr_companions={companion_squads={},non_task_companions={},get_companion_count=f
   add_special_squad=function(squad) axr_companions.companion_squads[squad.id]=squad end,
   remove_from_actor_squad=function(npc) axr_companions.companion_squads[npc.squad.id]=nil end}
 sim_squad_scripted={sim_squad_scripted={get_script_target=function(self) if axr_companions.companion_squads[self.id] then return 0 end return 77 end}}
+recruit_timers={}
+function CreateTimeEvent(event,key,delay,callback,...)
+ recruit_timers[key]={callback=callback,args={...}}
+end
 ''')
+companion_fixture=Path(__file__).resolve().parent/'fixtures/companions/individually_recruitable_companions.lua'
+lua.execute('local f=assert(loadstring(...));individually_recruitable_companions={};setmetatable(individually_recruitable_companions,{__index=_G});setfenv(f,individually_recruitable_companions);f()',companion_fixture.read_text(encoding='utf8'))
 start = server.index('-- Companions belong to the player who recruited them')
 start = server.rfind('------', 0, start)
 end = server.index('\nfunction on_game_start()', start)
@@ -365,6 +371,41 @@ assert(axr_companions.get_companion_count()==1,'other player does not fill my re
 db.actor={id=function()return 95 end}
 assert(axr_companions.get_companion_count()==1,'same owner after reconnect still has own companion')
 db.actor=nil;assert(axr_companions.get_companion_count()==99,'unbound world callback retains original count')
+-- Execute the installed addon's actual delayed clone recruitment. Another
+-- player's update drove the world queue before the clone became available.
+local function player(id)return {id=function()return id end,run_talk_dialog=function(self)talked_as=self:id()end}end
+objects[91]=player(91);objects[92]=player(92);objects[95]=player(95)
+local recruit={id=function()return 500 end,squad={id=320}}
+objects[60001]={id=function()return 60001 end,squad={id=321}}
+dialogs={who_is_npc=function(a,b)return b end}
+dialogs_axr_companion={become_actor_companion=function(actor,npc)
+ assert(actor==db.actor and AC_ID==actor:id());recruited_as=actor:id();axr_companions.add_to_actor_squad(npc)end}
+stalker_cloning_utility={clone_stalker=function()return 60001 end}
+function alife_release()end
+txr_paid_companions={register_paid_companion=function(actor)paid_as=actor:id()end}
+local create=CreateTimeEvent
+db.actor=objects[91];AC_ID=91
+individually_recruitable_companions.become_actor_companion_individually(db.actor,recruit)
+assert(CreateTimeEvent==create,'restore scheduler after queuing')
+local timer=recruit_timers.clone_become_companion_60001
+db.actor=objects[92];AC_ID=92;online='92 '
+assert(not timer.callback(unpack(timer.args)) and not recruited_as,'offline recruiter: never recruit for the world-queue player')
+online='92 95 '
+assert(timer.callback(unpack(timer.args)))
+assert(recruited_as==95 and talked_as==95 and companion_owner(321)=='ivan')
+assert(db.actor==objects[92] and AC_ID==92,'restore outer actor after callback')
+db.actor=objects[91];AC_ID=91
+individually_recruitable_companions.become_paid_actor_companion_individually_and_register(db.actor,recruit)
+timer=recruit_timers.clone_become_paid_companion_60001
+db.actor=objects[92];AC_ID=92
+assert(timer.callback(unpack(timer.args)) and paid_as==95)
+dialogs_axr_companion.become_actor_companion=function()error('broken recruit')end
+assert(not pcall(timer.callback,unpack(timer.args)))
+assert(db.actor==objects[92] and AC_ID==92 and CreateTimeEvent==create,'unwind failures without changing outer owner')
+netcoop_task_context={bind_actor=function()error('broken task context')end}
+assert(not pcall(timer.callback,unpack(timer.args)))
+assert(db.actor==objects[92] and AC_ID==92,'task-context exceptions still restore the outer actor')
+netcoop_task_context=nil
 level.object_by_id=lookup
 ''')
 

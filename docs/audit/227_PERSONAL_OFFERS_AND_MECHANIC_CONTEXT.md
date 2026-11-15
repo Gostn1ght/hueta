@@ -58,6 +58,16 @@ World callbacks without a player retain the original count. This addresses
 one concrete recruitment blocker; dialogue/rank/friendship conditions and live
 following across location servers still require verification.
 
+The installed individual-recruitment addon clones an NPC and finishes free or
+paid recruitment from a later time event using `db.actor`. The world event
+queue runs for whichever player was last bound, so a second player's update
+could make that player the recruiter's replacement. Only these two addon
+recruitment events now capture the original login and rebind to that owner's
+current actor for the callback. They wait while the owner is offline; a
+reconnect can change actor ID without changing ownership. The outer actor,
+task context and scheduler are restored on errors as well. The addon's
+original cloning and hire/reputation conditions remain in force.
+
 ## Verification
 
 - Actual GAMMA generator + production context in Lua 5.1: two players, stale

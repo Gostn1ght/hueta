@@ -1378,6 +1378,47 @@ local function install_companions()
 	local class = sim_squad_scripted and sim_squad_scripted.sim_squad_scripted
 	if not (ac and class) or ac.__netcoop_owners then return end
 	ac.__netcoop_owners = true
+    local recruits = individually_recruitable_companions
+    if recruits and CreateTimeEvent then
+        for _, name in ipairs({"become_actor_companion_individually", "become_paid_actor_companion_individually_and_register"}) do
+            local original = recruits[name]
+            if type(original) == "function" then
+                recruits[name] = function(...)
+                    local actor = db.actor
+                    local login = actor and netcoop_actor_login and netcoop_actor_login(actor:id())
+                    if not login or login == "" then return original(...) end
+                    local create = CreateTimeEvent
+                    _G.CreateTimeEvent = function(event, key, delay, callback, ...)
+                        if event == "clone_become_companion_event" or event == "clone_become_paid_companion_event" then
+                            local action = callback
+                            callback = function(...)
+                                local id = online_actor_of(login)
+                                local owner = id and level.object_by_id(id)
+                                if not owner then return false end -- wait for the actual recruiter
+                                local previous, previous_id = db.actor, AC_ID
+                                db.actor, _G.AC_ID = owner, owner:id()
+                                local ok, result = pcall(function(...)
+                                    if netcoop_task_context then netcoop_task_context.bind_actor(owner) end
+                                    return action(...)
+                                end, ...)
+                                local restored, restore_error = true
+                                if netcoop_task_context then restored, restore_error = pcall(netcoop_task_context.bind_actor, previous) end
+                                db.actor, _G.AC_ID = previous, previous_id
+                                if not ok then error(result, 0) end
+                                if not restored then error(restore_error, 0) end
+                                return result
+                            end
+                        end
+                        return create(event, key, delay, callback, ...)
+                    end
+                    local ok, result = pcall(original, ...)
+                    _G.CreateTimeEvent = create
+                    if not ok then error(result, 0) end
+                    return result
+                end
+            end
+        end
+    end
     local count = ac.get_companion_count
     if count then
         ac.get_companion_count = function()
