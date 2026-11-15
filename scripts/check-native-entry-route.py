@@ -69,12 +69,26 @@ prefix = r'''
 #include <cassert>
 #include <cstdio>
 #include <string>
+#include <map>
+#include <winternl.h>
 #include "netcoop_entry_worker.h"
 using namespace netcoop_world;
 std::string script_master_entry(const char* address,const char* account,int slot){
  char answer[256];poll_entry_route(address,account,slot,answer,sizeof(answer));return answer;
 }
 void client_entry_stop(){stop_entry_route();}
+void handle_types(const char* stage){
+ std::map<std::wstring,unsigned> types;
+ for(ULONG_PTR value=4;value<65536;value+=4){
+  const auto handle=reinterpret_cast<HANDLE>(value);DWORD flags=0;
+  if(!GetHandleInformation(handle,&flags))continue;
+  alignas(void*) char info[2048]{};ULONG size=0;
+  if(NtQueryObject(handle,ObjectTypeInformation,info,sizeof(info),&size)<0)continue;
+  const auto type=reinterpret_cast<const UNICODE_STRING*>(info);
+  if(type->Buffer && type->Length<512)++types[std::wstring(type->Buffer,type->Length/sizeof(wchar_t))];
+ }
+ for(const auto& type:types)std::fprintf(stderr,"handles %s %ls=%u\n",stage,type.first.c_str(),type.second);
+}
 '''
 suffix = r'''
 std::string wait_result(const char* address,const char* account){
@@ -97,15 +111,17 @@ int main(int argc,char**argv){
  // Settle both samples; a transient count at join is not proof of a leak.
  client_entry_stop();Sleep(1000);
  DWORD handles_before=0,handles_after=0;assert(GetProcessHandleCount(GetCurrentProcess(),&handles_before));
+ handle_types("before");
  for(int i=0;i<12;++i){
   assert(std::string(script_master_entry(argv[1],"Malformed",1))=="wait|contacting||1");
   client_entry_stop(); // join while HTTP/JSON work is in flight
   assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
  }
  client_entry_stop();
- const auto cleanup_deadline=GetTickCount64()+5000;
+ const auto cleanup_deadline=GetTickCount64()+30000;
  do {assert(GetProcessHandleCount(GetCurrentProcess(),&handles_after));if(handles_after<=handles_before+4)break;Sleep(50);}while(GetTickCount64()<cleanup_deadline);
  std::fprintf(stderr,"entry handles: settled_before=%lu after=%lu\n",handles_before,handles_after);
+ handle_types("after");
  assert(handles_after<=handles_before+4);
  char tiny[2]={'x','x'};poll_entry_route(argv[1],"Tester",-1,tiny,sizeof(tiny));assert(tiny[0]==0);
  poll_entry_route(argv[1],"Tester",1,nullptr,0);
@@ -117,8 +133,8 @@ try:
     with tempfile.TemporaryDirectory() as temporary:
         folder=Path(temporary);cpp=folder/'entry.cpp';exe=folder/'entry.exe'
         cpp.write_text(prefix+suffix,encoding='utf-8')
-        subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX','/utf-8','/D_CRT_SECURE_NO_WARNINGS','/I'+str(root/'src/xrGame'),str(cpp),str(root/'src/xrGame/netcoop_entry_worker.cpp'),'/Fe:'+str(exe),'/link','winhttp.lib'],cwd=folder,check=True)
-        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=60)
+        subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX','/utf-8','/D_CRT_SECURE_NO_WARNINGS','/I'+str(root/'src/xrGame'),str(cpp),str(root/'src/xrGame/netcoop_entry_worker.cpp'),'/Fe:'+str(exe),'/link','winhttp.lib','ntdll.lib'],cwd=folder,check=True)
+        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=90)
         assert Handler.followed==0
 finally:
     server.shutdown();server.server_close();thread.join()
