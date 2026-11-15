@@ -367,14 +367,30 @@ function mechanic(actor_id, npc, action)
 	if not (parent and parent:id() == actor_id) then return "item is not in your inventory" end
 	if not (IsStalker and IsStalker(npc) and npc:alive()) then return "this is not a mechanic" end
 	if not (inventory_upgrades and utils_item) then return "the mechanic is not loaded on the server" end
-	if verb == "mupgrade" then
-		local row, col = string.match(rest, "^(%d+)%.(%d+)$")
-		if not row then return "bad upgrade" end
-		return mechanic_upgrade(npc, obj, tonumber(row), tonumber(col))
-	elseif verb == "mrepair" and rest == "" then
-		return mechanic_repair(npc, obj)
-	end
-	return "bad request"
+    -- GAMMA's rank-pricing patch reads GUI.upgr.sec even in the engine's
+    -- install_upgrade effect functor. A dedicated server has no GUI. Keep
+    -- the selected item's context through validation AND the native call;
+    -- restore it on every exit, including a failed Lua/native effect.
+    local module = ui_inventory
+    local previous = module and module.GUI
+    if module then module.GUI = {upgr = {id = obj:id(), sec = obj:section()}, npc_id = npc:id()} end
+    local ok, result = pcall(as_speaker, npc, function()
+        if verb == "mupgrade" then
+            local row, col = string.match(rest, "^(%d+)%.(%d+)$")
+            if not row then return "bad upgrade" end
+            if inventory_upgrades.can_upgrade_item and
+                not inventory_upgrades.can_upgrade_item(obj:section(), npc:section()) then
+                return game.translate_string("st_upgr_cant_do")
+            end
+            return mechanic_upgrade(npc, obj, tonumber(row), tonumber(col))
+        elseif verb == "mrepair" and rest == "" then
+            return mechanic_repair(npc, obj)
+        end
+        return "bad request"
+    end)
+    if module then module.GUI = previous end
+    if not ok then error(result, 0) end
+    return result
 end
 
 ----------------------------------------------------------------------

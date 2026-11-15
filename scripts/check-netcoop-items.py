@@ -330,7 +330,7 @@ function netcoop_players() return online end
 function netcoop_actor_login(id) return logins[id] or "" end
 squads={}
 function get_object_squad(npc) return npc.squad end
-axr_companions={companion_squads={},
+axr_companions={companion_squads={},non_task_companions={},get_companion_count=function()return 99 end,
   add_to_actor_squad=function(npc) axr_companions.companion_squads[npc.squad.id]=npc.squad end,
   add_special_squad=function(squad) axr_companions.companion_squads[squad.id]=squad end,
   remove_from_actor_squad=function(npc) axr_companions.companion_squads[npc.squad.id]=nil end}
@@ -353,6 +353,19 @@ online="92 95 "
 assert(cls.get_script_target(squad)==95,'owner back with a new Actor')
 axr_companions.remove_from_actor_squad(npc)
 assert(companion_owner(300)==nil and cls.get_script_target(squad)==77)
+local a_npc={squad={id=310}};local b_npc={squad={id=311}}
+local objects={[401]=a_npc,[402]=b_npc}
+local lookup=level.object_by_id
+level.object_by_id=function(id)return objects[id] or lookup(id) end
+db.actor={id=function()return 91 end};axr_companions.add_to_actor_squad(a_npc)
+axr_companions.non_task_companions[401]=true
+db.actor={id=function()return 92 end};axr_companions.add_to_actor_squad(b_npc)
+axr_companions.non_task_companions[402]=true
+assert(axr_companions.get_companion_count()==1,'other player does not fill my recruitment slots')
+db.actor={id=function()return 95 end}
+assert(axr_companions.get_companion_count()==1,'same owner after reconnect still has own companion')
+db.actor=nil;assert(axr_companions.get_companion_count()==99,'unbound world callback retains original count')
+level.object_by_id=lookup
 ''')
 
 print('Item actions Lua: battery swap/unpack and repair on the server, whitelist, client routing, NPC inventory at spawn, item condition and death loot, furniture and stashes, player state, sleep off, companions PASS')

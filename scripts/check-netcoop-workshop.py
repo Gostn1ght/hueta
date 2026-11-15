@@ -420,3 +420,56 @@ up = items[items.index("void client_on_item_upgrade"):items.index("void client_o
 assert 'r_string(upgrade, "section")' in up and "add_upgrade(upgrade, true)" in up and "pre_install_upgrade" not in up.split("No pre_install")[0]
 assert "netcoop::client_on_item_upgrade(*P)" in (src / "xrGame/Level_network_messages.cpp").read_text(encoding="utf-8", errors="replace")
 print("Workshop on the server: GAMMA craft/upgrade headless, stashes, toolkits, recipes from books, disassembly: PASS")
+
+# Actual rank-pricing and MP repair overrides used by the deployed GAMMA.
+# The old server path crashed at ui_inventory.GUI.upgr.sec before installing.
+lua.execute('''
+money=2000
+function actor:money()return money end
+function actor:give_money(v)money=money+v end
+function ini_file()return {r_u32=function()return 100 end,section_exist=function()return false end,
+ line_exist=function()return true end,r_string_ex=function()return 'true' end}end
+ini_sys.r_u32=function()return 1000 end
+smooth_prog_mcm={get_tierdisc=function()return 1 end,get_wpndisc=function()return 2 end}
+game_difficulties={get_eco_factor=function()return 1 end}
+inventory_upgrades.get_price_percent=function()return 1.5 end
+inventory_upgrades.get_global_precondition_functor=function()return 0 end
+inventory_upgrades.can_upgrade_item=function()
+ assert(get_speaker() and ui_inventory.GUI.upgr.sec=='wpn_pm');return true end
+inventory_upgrades.effect_upgrade_item=function()end
+ui_options={get=function()return false end}
+function get_speaker()return level.object_by_id(GetEvent('used_npc_id'))end
+ui_inventory.GUI=nil
+inst3={};tree[1][1].stats='sect_up_firsta_pm'
+utils_item.get_upgrades_installed=function()local t={}for k in pairs(inst3)do t[k]=true end return t end
+''')
+lua.execute((gamma/'upgrade_rank_pricing.lua').read_text(encoding='utf8'))
+lua.execute((gamma/'inventory_upgrades_mp.lua').read_text(encoding='utf8'))
+pm4=item('wpn_pm')
+lua.execute(f'''
+local o=objects[{pm4._id}];o._cond=.4
+function o:force_unload_magazine()end
+function o:set_condition(v)self._cond=v end
+function o:install_upgrade(s)
+ assert(ui_inventory.GUI.upgr.id==self:id())
+ inventory_upgrades.effect_functor_a(nil,tree[1][1].stats,0)
+ inst3[s]=true;return true
+end
+''')
+result=server.mechanic(0,mech,f'mupgrade {pm4._id} 1.1')
+assert result == '', result
+assert g.money==1700 and g.inst3.up_firsta_pm and g.ui_inventory.GUI is None
+assert g.events.used_npc_id is None
+assert server.mechanic(0,mech,f'mrepair {pm4._id}') == ''
+assert g.money==1100 and pm4._cond>0.99 and g.ui_inventory.GUI is None
+lua.execute('money=0;inst3={};ui_inventory.GUI={old=true};events.used_npc_id=777')
+assert server.mechanic(0,mech,f'mupgrade {pm4._id} 1.1') == '<st_upgr_disable>'
+assert g.money==0 and not g.inst3.up_firsta_pm and g.ui_inventory.GUI.old and g.events.used_npc_id==777
+lua.execute('money=2000;inventory_upgrades.precondition_functor_a=function()error("mechanic failed")end')
+try:
+    server.mechanic(0,mech,f'mupgrade {pm4._id} 1.1')
+    raise AssertionError('expected mechanic failure')
+except __import__('lupa.lua51',fromlist=['LuaError']).LuaError:
+    pass
+assert g.ui_inventory.GUI.old and g.events.used_npc_id==777 and g.money==2000
+print('PASS actual GAMMA rank pricing and repair: headless selected item, native effect payment, real repair charge, insufficient funds, GUI/speaker restoration on success/rejection/exception')

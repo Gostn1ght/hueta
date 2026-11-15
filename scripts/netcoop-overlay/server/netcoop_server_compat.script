@@ -367,7 +367,8 @@ local function install_player_tasks()
 	local give = tm.CRandomTask.give_task
 	tm.CRandomTask.give_task = function(self, task_id, giver_id)
 		local a = db.actor
-		if a and netcoop_task_taken(a:id(), tostring(task_id)) then
+		local personal = netcoop_task_context and netcoop_task_context.personal_task(tostring(task_id))
+		if a and not personal and netcoop_task_taken(a:id(), tostring(task_id)) then
 			printf("[Lost Zone] task %s is already taken by another player", tostring(task_id))
 			pcall(function()
 				a:give_game_news(game.translate_string("st_tip"),
@@ -1377,6 +1378,21 @@ local function install_companions()
 	local class = sim_squad_scripted and sim_squad_scripted.sim_squad_scripted
 	if not (ac and class) or ac.__netcoop_owners then return end
 	ac.__netcoop_owners = true
+    local count = ac.get_companion_count
+    if count then
+        ac.get_companion_count = function()
+            local actor = db.actor
+            local login = actor and netcoop_actor_login and netcoop_actor_login(actor:id())
+            if not login or login == "" then return count() end
+            local own = 0
+            for id in pairs(ac.non_task_companions or {}) do
+                local npc = level.object_by_id(id) or (alife_object and alife_object(id))
+                local squad = npc and get_object_squad(npc)
+                if squad and companion_owners()[squad.id] == login then own = own + 1 end
+            end
+            return own
+        end
+    end
 	local add_npc = ac.add_to_actor_squad
 	ac.add_to_actor_squad = function(npc)
 		add_npc(npc)

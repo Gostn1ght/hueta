@@ -1674,6 +1674,8 @@ void CCar::ReleaseBack()
 	{
 		bkp = false;
 		StopBreaking();
+        Unclutch();
+        NeutralDrive();
         if (fwp && b_engine_on && !brp && !m_netcoop_parking)
         {
             if (CurrentTransmission() == 0) { Unclutch(); NeutralDrive(); StartBreaking(); }
