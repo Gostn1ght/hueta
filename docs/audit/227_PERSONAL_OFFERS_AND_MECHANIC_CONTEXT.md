@@ -88,6 +88,18 @@ reconnect can change actor ID without changing ownership. The outer actor,
 task context and scheduler are restored on errors as well. The addon's
 original cloning and hire/reputation conditions remain in force.
 
+Review of the actual native call at the end of that addon found another
+dedicated crash: `CActor::RunTalkDialog` unconditionally accessed
+`CurrentGameUI()->TopInputReceiver()` in its ALife branch. After recruitment
+the addon calls this method to reopen the conversation. Remote actors now
+send an owner-only `open_ui talk` message and return before touching server
+UI or starting an orphaned local conversation. The client uses its existing
+conversation opener, whose UI requests a normal validated server dialogue.
+Headless actors without a remote owner return safely when no UI exists.
+Opening just a conversation does not initialize a trade profile. Original
+client and SP paths are retained. The native fixture executes the actual
+method; the real client reply handler also tests the added talk kind.
+
 ## Verification
 
 - Actual GAMMA generator + production context in Lua 5.1: two players, stale

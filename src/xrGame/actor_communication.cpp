@@ -125,6 +125,16 @@ void CActor::TryToTalk()
 
 void CActor::RunTalkDialog(CInventoryOwner* talk_partner, bool disable_break)
 {
+	// Scripted recruitment reopens a conversation from the server's timer.
+	// A dedicated server has no CUIGameSP; the owning client opens its window
+	// and sends the usual validated M_NETCOOP_TALK request back to the server.
+	if (netcoop::server_player_copy(this))
+	{
+		CGameObject* partner = smart_cast<CGameObject*>(talk_partner);
+		if (partner && !smart_cast<CActor*>(talk_partner))
+			netcoop::server_open_ui(ID(), "talk", partner->ID());
+		return;
+	}
 	// A remote netcoop client has no ALife, so dialogue scripts run on the server
 	// (M_NETCOOP_TALK). The talk window only shows the server's phrases.
 	if (!ai().get_alife() && !Level().Server)
@@ -140,6 +150,7 @@ void CActor::RunTalkDialog(CInventoryOwner* talk_partner, bool disable_break)
 		return;
 	}
 
+	if (!CurrentGameUI()) return;
 	//предложить поговорить с нами
 	if (talk_partner->OfferTalk(this))
 	{

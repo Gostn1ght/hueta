@@ -162,7 +162,8 @@ bool script_send_to_actor(u16 actor_id, LPCSTR channel, LPCSTR data)
 bool server_open_ui(u16 actor_id, LPCSTR kind, u16 partner_id)
 {
 	const bool dialog_trade = kind && !xr_strcmp(kind, "trade");
-	const xr_string refusal = prepare_trade(partner_id, dialog_trade);
+	const bool inventory_ui = dialog_trade || (kind && !xr_strcmp(kind, "upgrade"));
+	const xr_string refusal = inventory_ui ? prepare_trade(partner_id, dialog_trade) : xr_string();
 	// A trade the server would refuse item by item does not open: the
 	// player hears why at once (owner 2026-10-18: "Buy does nothing").
 	if (dialog_trade && !refusal.empty() && enabled() && g_pGameLevel && Level().Server)

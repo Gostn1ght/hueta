@@ -483,10 +483,12 @@ lua.execute(f'''
 local npc=objects[{mech._id}]
 function npc:start_upgrade(a)assert(a==db.actor and get_speaker()==self);opened_mechanic=true end
 function npc:start_trade(a)assert(a==db.actor and get_speaker()==self);opened_trade=true end
+function db.actor:run_talk_dialog(other)assert(other==npc and get_speaker()==other);opened_talk=true end
 events.used_npc_id=777
 open_remote_ui('unknown {mech._id}');assert(events.used_npc_id==777)
 open_remote_ui('upgrade 65534');assert(events.used_npc_id==777)
 open_remote_ui('upgrade {mech._id}');assert(opened_mechanic)
 open_remote_ui('trade {mech._id}');assert(opened_trade)
+open_remote_ui('talk {mech._id}');assert(opened_talk)
 ''')
 print('PASS actual client remote mechanic/trade opener selects the correct GAMMA speaker before opening its window')

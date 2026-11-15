@@ -762,7 +762,7 @@ local function open_ui(data)
 	local npc = id and level.object_by_id(tonumber(id))
 	local a = db.actor
 	if not (npc and a) then return end
-	if kind ~= "trade" and kind ~= "upgrade" then return end
+	if kind ~= "trade" and kind ~= "upgrade" and kind ~= "talk" then return end
 	-- The remote dialogue does not run the local NPC binder's use_callback.
 	-- GAMMA's repair availability/price functors still use get_speaker().
 	if SetEvent then SetEvent("used_npc_id", tonumber(id)) end
@@ -770,6 +770,8 @@ local function open_ui(data)
 		npc:start_trade(a)
 	elseif kind == "upgrade" then
 		npc:start_upgrade(a)
+	elseif kind == "talk" then
+		a:run_talk_dialog(npc)
 	end
 end
 
