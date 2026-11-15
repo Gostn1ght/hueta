@@ -22,14 +22,19 @@ assert 'netcoop_world::poll_entry_route(' in wrapper and 'struct ClientEntryWork
 class Handler(http.server.BaseHTTPRequestHandler):
     calls = 0
     followed = 0
+    transient_calls = 0
     def do_GET(self):
         Handler.calls += 1
-        time.sleep(.2)
+        time.sleep(.2 if 'Malformed' in self.path else .05)
         if self.path == '/followed':
             Handler.followed += 1
             self.send_response(500);self.end_headers();return
         if 'Redirect' in self.path:
             self.send_response(302);self.send_header('Location','/followed');self.send_header('Content-Length','0');self.end_headers();return
+        if 'Transient' in self.path:
+            Handler.transient_calls += 1
+            if Handler.transient_calls == 1:
+                self.send_response(503);self.send_header('Content-Length','0');self.end_headers();return
         if 'Malformed' in self.path:
             status, result = 200, None
         elif 'BoundaryHost' in self.path:
@@ -48,7 +53,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             status, result = 200, None
         elif 'WrongSchema' in self.path:
             status, result = 503, dict(schema=2,state='loading',location='l08_yantar',retry_seconds=3)
-        elif 'TesterTwo' in self.path:
+        elif 'TesterTwo' in self.path or 'Transient' in self.path:
             status, result = 200, dict(schema=1,host='',location='l08_yantar',port=1319)
         elif 'Disabled' in self.path:
             status, result = 503, dict(schema=1,state='disabled',location='l08_yantar',retry_seconds=0)
@@ -59,7 +64,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if 'DeepBody' in self.path: body=b'['*1000+b'0'+b']'*1000
         if 'HugeBody' in self.path: body=b' '*5000
 
-        self.send_response(status);self.send_header('Content-Length', str(len(body)+(10 if 'Truncated' in self.path else 0)));self.end_headers();self.wfile.write(body)
+        self.send_response(status);self.send_header('Content-Length', str(len(body)+(10 if 'Truncated' in self.path else 0)));self.end_headers()
+        try: self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError): pass  # deliberate in-flight shutdown
     def log_message(self, *_): pass
 server = http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
 thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -95,17 +102,29 @@ std::string wait_result(const char* address,const char* account){
  const auto deadline=GetTickCount64()+5000;
  for(;;){const std::string value=script_master_entry(address,account,1);if(value!="wait|contacting||1") return value;assert(GetTickCount64()<deadline);Sleep(10);}
 }
+std::string wait_available(const char* address,const char* account){
+ // Transport unavailability is a retryable protocol state, including after
+ // reopening a menu. Follow its retry delay instead of assuming a LAN reply
+ // can never exceed the production500ms WinHTTP timeout on a hosted runner.
+ const auto deadline=GetTickCount64()+15000;
+ for(;;){
+  auto reply=wait_result(address,account);
+  if(reply!="wait|master_unavailable||3")return reply;
+  assert(GetTickCount64()<deadline);Sleep(3100);
+ }
+}
 int main(int argc,char**argv){
  assert(argc==2);const auto start=GetTickCount64();assert(std::string(script_master_entry(argv[1],"Tester",1))=="wait|contacting||1");
- assert(GetTickCount64()-start<100);assert(wait_result(argv[1],"Tester")=="wait|loading|l08_yantar|3");
- assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
- assert(wait_result(argv[1],"BoundaryHost")==std::string(200,'a')+":1319");
- assert(wait_result(argv[1],"Disabled")=="error|disabled|l08_yantar|1");
+ assert(GetTickCount64()-start<100);assert(wait_available(argv[1],"Tester")=="wait|loading|l08_yantar|3");
+ assert(wait_available(argv[1],"TesterTwo")=="127.0.0.1:1319");
+ assert(wait_available(argv[1],"BoundaryHost")==std::string(200,'a')+":1319");
+ assert(wait_available(argv[1],"Disabled")=="error|disabled|l08_yantar|1");
+ assert(wait_available(argv[1],"Transient")=="127.0.0.1:1319");
  for(const char* bad:{"Malformed","Truncated","LongHost","HugePort","NulHost","DeepBody","HugeBody","WrongSchema","Redirect"}) {
   const auto reply=wait_result(argv[1],bad);
   if(reply!="wait|master_unavailable||3")std::fprintf(stderr,"entry bad case %s reply=%s\n",bad,reply.c_str());
   assert(reply=="wait|master_unavailable||3");
-  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
+  assert(wait_available(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
  }
  // WinHTTP closes its internal work items asynchronously after CloseHandle.
  // Settle both samples; a transient count at join is not proof of a leak.
@@ -115,7 +134,7 @@ int main(int argc,char**argv){
  for(int i=0;i<12;++i){
   assert(std::string(script_master_entry(argv[1],"Malformed",1))=="wait|contacting||1");
   assert(wait_result(argv[1],"Malformed")=="wait|master_unavailable||3");
-  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
+  assert(wait_available(argv[1],"TesterTwo")=="127.0.0.1:1319");
  }
  client_entry_stop();
  const auto cleanup_deadline=GetTickCount64()+5000;
@@ -129,7 +148,7 @@ int main(int argc,char**argv){
   assert(script_master_entry(argv[1],"Malformed",1)=="wait|contacting||1");
   Sleep(50); // the fixture server delays replies200ms, so stop joins real IO
   const auto stopping=GetTickCount64();client_entry_stop();assert(GetTickCount64()-stopping<5000);
-  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
+  assert(wait_available(argv[1],"TesterTwo")=="127.0.0.1:1319");
  }
  client_entry_stop();
  char tiny[2]={'x','x'};poll_entry_route(argv[1],"Tester",-1,tiny,sizeof(tiny));assert(tiny[0]==0);
@@ -143,7 +162,8 @@ try:
         folder=Path(temporary);cpp=folder/'entry.cpp';exe=folder/'entry.exe'
         cpp.write_text(prefix+suffix,encoding='utf-8')
         subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX','/utf-8','/D_CRT_SECURE_NO_WARNINGS','/I'+str(root/'src/xrGame'),str(cpp),str(root/'src/xrGame/netcoop_entry_worker.cpp'),'/Fe:'+str(exe),'/link','winhttp.lib','ntdll.lib'],cwd=folder,check=True)
-        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=90)
+        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=120)
         assert Handler.followed==0
+        assert Handler.transient_calls>=2
 finally:
     server.shutdown();server.server_close();thread.join()
