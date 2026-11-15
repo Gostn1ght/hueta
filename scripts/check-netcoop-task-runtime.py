@@ -110,6 +110,16 @@ local checkpoint={};save_state(checkpoint)
 manager=setmetatable({task_info={}},CRandomTask);load_state(clone(checkpoint))
 assert(manager.task_info.paid.stage==4 and manager.task_info.paid.current_target==501 and manager.task_info.paid.task_giver_id==27)
 assert(source.task_info.paid==job and checkpoint.task_objects.paid.stage==4)
+-- Another restart/transition before the first task tick used to lose the
+-- just-restored Lua entry (upstream skips save when t==nil).
+assert(manager.task_info.paid.t==nil)
+local native={get_id=function()return 'paid' end}
+local lookup=a.get_task
+a.get_task=function(_,id,active)assert(active==true);if id=='paid'then return native end end
+local immediate={};save_state(immediate)
+assert(immediate.task_objects.paid and immediate.task_objects.paid.stage==4)
+assert(manager.task_info.paid.t==native,'reattach the existing native task without rerunning on_init')
+a.get_task=lookup
 local remote=manager.task_info.paid;remote.t={};remote.stage=5;remote.current_target=27
 local return_checkpoint={};save_state(return_checkpoint)
 manager=setmetatable({task_info={}},CRandomTask);load_state(clone(return_checkpoint))

@@ -30,6 +30,15 @@ Accepted task stage/status and material requirements already use the character
 save/restore path described in 222 and 224. This change adds durable personal
 offer selection rather than replacing task saves with new jobs on restart.
 
+A further persistence defect was found in the original save/load sequence:
+`load_state` leaves the Lua task's `t` unset until its first update; `save_state`
+omits tasks with no `t` and no repeat cooldown. Saving or transitioning again
+before that update could lose the restored Lua progress while the native task
+still existed. The dedicated save wrapper now reattaches the existing active
+native task before the original serializer runs. It does not issue a new task,
+rerun `on_init`, replace an objective or reset its stage. The real GAMMA
+save/load fixture covers an immediate second save with no intervening tick.
+
 ## Technician
 
 The deployed `upgrade_rank_pricing` accesses `ui_inventory.GUI.upgr.sec` in

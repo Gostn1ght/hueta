@@ -38,6 +38,19 @@ function install()
     local general = task_objects and task_objects.CGeneralTask
     if not (manager and manager.CRandomTask and general) then return end
 
+    -- load_state restores serialized fields, but GAMMA only reattaches t
+    -- on the first task tick. Saving/restarting/transferring before that
+    -- tick otherwise drops the active task's Lua state from the next save.
+    local save = general.save_state
+    if type(save) == "function" and not wrapped[save] then
+        local replacement = function(self, ...)
+            if not self.t and db.actor then self.t = db.actor:get_task(self.id, true) end
+            return save(self, ...)
+        end
+        wrapped[replacement] = true
+        general.save_state = replacement
+    end
+
     -- A broken optional target/title functor must not stop every other job
     -- in CRandomTask:update. No failed check is converted to success/failure.
     local check = general.check_task
