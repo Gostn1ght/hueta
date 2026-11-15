@@ -91,13 +91,20 @@ int main(int argc,char**argv){
   assert(wait_result(argv[1],bad)=="wait|master_unavailable||3");
   assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
  }
+ // WinHTTP closes its internal work items asynchronously after CloseHandle.
+ // Settle both samples; a transient count at join is not proof of a leak.
+ client_entry_stop();Sleep(1000);
  DWORD handles_before=0,handles_after=0;assert(GetProcessHandleCount(GetCurrentProcess(),&handles_before));
  for(int i=0;i<12;++i){
   assert(std::string(script_master_entry(argv[1],"Malformed",1))=="wait|contacting||1");
   client_entry_stop(); // join while HTTP/JSON work is in flight
   assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
  }
- client_entry_stop();assert(GetProcessHandleCount(GetCurrentProcess(),&handles_after));assert(handles_after<=handles_before+4);
+ client_entry_stop();
+ const auto cleanup_deadline=GetTickCount64()+5000;
+ do {assert(GetProcessHandleCount(GetCurrentProcess(),&handles_after));if(handles_after<=handles_before+4)break;Sleep(50);}while(GetTickCount64()<cleanup_deadline);
+ std::fprintf(stderr,"entry handles: settled_before=%lu after=%lu\n",handles_before,handles_after);
+ assert(handles_after<=handles_before+4);
  char tiny[2]={'x','x'};poll_entry_route(argv[1],"Tester",-1,tiny,sizeof(tiny));assert(tiny[0]==0);
  poll_entry_route(argv[1],"Tester",1,nullptr,0);
  client_entry_stop();assert(std::string(script_master_entry(argv[1],"Tester",1))=="wait|contacting||1");client_entry_stop();

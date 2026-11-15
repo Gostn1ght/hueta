@@ -25,3 +25,9 @@ Local Python syntax/diff checks PASS; remote exact-SHA results and metrics
 must be recorded after CI. Production source remains byte-identical to e49340440.
 No release/install. E10 acceptance stays open until required target-load/game
 frame evidence exists.
+
+First full CI43753138362 failed the entry fixture's immediate process-handle
+comparison after HTTP churn. The actual module compiled, but that failure
+prevents accepting its runtime. Refine the fixture with settled before/after
+samples, a bounded5s cleanup wait and explicit counts; do not change production
+code or relax the handle budget to hide the failure. Await actual results.
