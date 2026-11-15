@@ -7,6 +7,7 @@
 #include <winhttp.h>
 #include <algorithm>
 #include <cctype>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -34,7 +35,7 @@ bool login_valid(const char* account)
         if (!((*c>='a' && *c<='z') || (*c>='A' && *c<='Z') || (*c>='0' && *c<='9') || *c=='_' || *c=='.' || *c=='-')) return false;
     return true;
 }
-static std::string master_entry_query(const char* address, const char* account, int slot)
+static std::string master_entry_query(HINTERNET session, const char* address, const char* account, int slot)
 {
 	char answer[256]{};
 	if (!address || std::strlen(address) > 200) return answer;
@@ -59,10 +60,9 @@ static std::string master_entry_query(const char* address, const char* account, 
 	};
 	if (!valid_host(host) || port < 1 || port > 65535) return answer;
 	std::wstring wide(host.begin(), host.end());
-	InternetHandle session(WinHttpOpen(L"LostZone/1.0", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
-	if (!session.value || !WinHttpSetTimeouts(session.value, 500, 500, 500, 500)) return answer;
+	if (!session) return answer;
 	const ULONGLONG deadline=GetTickCount64()+2000;
-	InternetHandle connection(WinHttpConnect(session.value, wide.c_str(), INTERNET_PORT(port), 0));
+	InternetHandle connection(WinHttpConnect(session, wide.c_str(), INTERNET_PORT(port), 0));
 	// The login is a public name (letters, digits, _ . -): no escaping needed.
 	std::wstring path = L"/v1/entry";
 	if (account && login_valid(account) && slot >= 0 && slot <= 10)
@@ -123,31 +123,67 @@ static std::string master_entry_query(const char* address, const char* account, 
 
 struct ClientEntryWorker
 {
-	std::mutex lock;std::thread thread;bool done=true;
-	std::string identity,result;ULONGLONG completed=0;
-	void stop() {
-		std::thread pending;
-		{std::lock_guard<std::mutex> guard(lock);pending=std::move(thread);}
-		if(pending.joinable()) pending.join();
-		std::lock_guard<std::mutex> guard(lock);done=true;identity.clear();result.clear();completed=0;
-	}
-	~ClientEntryWorker(){stop();}
-	std::string poll(const std::string& address,const std::string& account,int slot) {
-		const auto id=address+"/"+account+"/"+std::to_string(slot);
-		std::lock_guard<std::mutex> guard(lock);
-		if(!done) return "wait|contacting||1";
-		if(thread.joinable()) thread.join();
-		if(identity==id && !result.empty() && GetTickCount64()-completed<3000) return result;
-		identity=id;
-		thread=std::thread([this,address,account,slot]{
-			std::string reply;
-			try {reply=master_entry_query(address.c_str(),account.c_str(),slot);} catch(...) {}
-			if(reply.empty()) reply="wait|master_unavailable||3";
-			std::lock_guard<std::mutex> guard(lock);result=std::move(reply);completed=GetTickCount64();done=true;
-		});
-		done=false;
-		return "wait|contacting||1";
-	}
+    struct Request {std::string address,account;int slot=0;};
+    std::mutex lock;
+    std::condition_variable wake;
+    std::thread thread;
+    bool stopping=false,pending=false,done=true;
+    Request queued;
+    std::string identity,result;
+    ULONGLONG completed=0;
+    void run() noexcept {
+        // One anonymous HTTP session and one thread for this menu lifetime.
+        // Never create a new OS thread/session on every route retry.
+        InternetHandle session(nullptr);
+        for (;;) {
+            Request request;
+            {
+                std::unique_lock<std::mutex> guard(lock);
+                wake.wait(guard,[this]{return stopping || pending;});
+                if(stopping) return;
+                request=std::move(queued);pending=false;
+            }
+            try {
+                if(!session.value) {
+                    session.value=WinHttpOpen(L"LostZone/1.0",WINHTTP_ACCESS_TYPE_NO_PROXY,
+                        WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0);
+                    if(session.value && !WinHttpSetTimeouts(session.value,500,500,500,500)) {
+                        WinHttpCloseHandle(session.value);session.value=nullptr;
+                    }
+                }
+                auto reply=master_entry_query(session.value,request.address.c_str(),request.account.c_str(),request.slot);
+                if(reply.empty()) reply="wait|master_unavailable||3";
+                std::lock_guard<std::mutex> guard(lock);
+                result=std::move(reply);completed=GetTickCount64();done=true;
+            } catch (...) {
+                // Includes allocation/transport/parser failures. A future poll
+                // may retry; the thread must not terminate the whole process.
+                std::lock_guard<std::mutex> guard(lock);result.clear();completed=0;done=true;
+            }
+        }
+    }
+    void stop() {
+        std::thread joining;
+        {
+            std::lock_guard<std::mutex> guard(lock);stopping=true;joining=std::move(thread);
+        }
+        wake.notify_all();
+        if(joining.joinable()) joining.join();
+        std::lock_guard<std::mutex> guard(lock);
+        stopping=false;pending=false;done=true;queued={};identity.clear();result.clear();completed=0;
+    }
+    ~ClientEntryWorker(){stop();}
+    std::string poll(const std::string& address,const std::string& account,int slot) {
+        const auto id=address+"/"+account+"/"+std::to_string(slot);
+        Request request{address,account,slot};
+        std::lock_guard<std::mutex> guard(lock);
+        if(!done) return "wait|contacting||1";
+        if(identity==id && !result.empty() && GetTickCount64()-completed<3000) return result;
+        if(!thread.joinable()) thread=std::thread([this]{run();});
+        identity=id;queued=std::move(request);pending=true;done=false;
+        wake.notify_all();
+        return "wait|contacting||1";
+    }
 };
 static ClientEntryWorker& client_entry_worker() {static ClientEntryWorker worker;return worker;}
 } // namespace
