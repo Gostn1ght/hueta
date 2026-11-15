@@ -15,6 +15,9 @@
 #include "script_storage.h"
 #include <unordered_map>
 #include <set>
+#include <atomic>
+
+static std::atomic<u32> s_lua_stack_thread{0};
 
 #ifdef USE_DEBUGGER
 #	ifndef USE_LUA_STUDIO
@@ -153,6 +156,7 @@ CScriptEngine::CScriptEngine()
 
 CScriptEngine::~CScriptEngine()
 {
+    s_lua_stack_thread.store(0, std::memory_order_release);
 	while (!m_script_processes.empty())
 		remove_script_process(m_script_processes.begin()->first);
 
@@ -276,7 +280,12 @@ void CScriptEngine::lua_error_not_crash(lua_State* L)
 
 void printLuaStack()
 {
-	ai().script_engine().print_stack();
+    // Error reporting must not initialize AI/Lua, and a worker must never
+    // inspect the main thread's VM. Both happen during archive/startup errors.
+    if (s_lua_stack_thread.load(std::memory_order_acquire) != GetCurrentThreadId() || !g_ai_space)
+        return;
+    CScriptEngine* engine = g_ai_space->get_script_engine();
+    if (engine && engine->lua()) engine->print_stack();
 }
 
 int CScriptEngine::lua_pcall_failed(lua_State* L)
@@ -392,6 +401,7 @@ extern bool unlocalizerPassed;
 
 void CScriptEngine::init()
 {
+    s_lua_stack_thread.store(GetCurrentThreadId(), std::memory_order_release);
 #ifdef USE_LUA_STUDIO
     bool lua_studio_connected = !!m_lua_studio_world;
     if (lua_studio_connected)

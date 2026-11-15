@@ -59,6 +59,11 @@ IC const CCoverManager& CAI_Space::cover_manager() const
 	return (*m_cover_manager);
 }
 
+IC CScriptEngine* CAI_Space::get_script_engine() const
+{
+    return m_script_engine;
+}
+
 IC CScriptEngine& CAI_Space::script_engine() const
 {
 	VERIFY(m_script_engine);
