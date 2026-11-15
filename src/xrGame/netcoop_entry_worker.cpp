@@ -77,12 +77,15 @@ static std::string master_entry_query(const char* address, const char* account, 
 	if (!request.value || !WinHttpSetOption(request.value,WINHTTP_OPTION_REDIRECT_POLICY,&redirect,sizeof(redirect))) return answer;
 	std::string body;
 	bool complete=false;
-	DWORD status = 0, size = sizeof(status);
+	DWORD status = 0, size = sizeof(status), expected=0;
 	if (WinHttpSendRequest(request.value, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
 		WinHttpReceiveResponse(request.value, nullptr) &&
 		WinHttpQueryHeaders(request.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
 			&status, &size, WINHTTP_NO_HEADER_INDEX) && (status == 200 || status==503))
 	{
+		size=sizeof(expected);
+		if(!WinHttpQueryHeaders(request.value,WINHTTP_QUERY_CONTENT_LENGTH|WINHTTP_QUERY_FLAG_NUMBER,
+			WINHTTP_HEADER_NAME_BY_INDEX,&expected,&size,WINHTTP_NO_HEADER_INDEX) || !expected || expected>=4096) return answer;
 		char buffer[1024];
 		DWORD read = 0;
 		while (body.size() < 4096 && GetTickCount64()<deadline && WinHttpReadData(request.value, buffer, sizeof(buffer), &read))
@@ -91,7 +94,7 @@ static std::string master_entry_query(const char* address, const char* account, 
 			body.append(buffer,read);
 		}
 	}
-	if (!complete || body.empty() || body.size() >= 4096) {strcpy_s(answer,"wait|master_unavailable||3");return answer;}
+	if (!complete || body.empty() || body.size()!=expected || body.size() >= 4096) {strcpy_s(answer,"wait|master_unavailable||3");return answer;}
 	try
 	{
 		const auto entry = nlohmann::json::parse(body,[](int depth,nlohmann::json::parse_event_t,nlohmann::json&){

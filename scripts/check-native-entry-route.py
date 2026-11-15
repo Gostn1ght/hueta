@@ -88,7 +88,9 @@ int main(int argc,char**argv){
  assert(wait_result(argv[1],"BoundaryHost")==std::string(200,'a')+":1319");
  assert(wait_result(argv[1],"Disabled")=="error|disabled|l08_yantar|1");
  for(const char* bad:{"Malformed","Truncated","LongHost","HugePort","NulHost","DeepBody","HugeBody","WrongSchema","Redirect"}) {
-  assert(wait_result(argv[1],bad)=="wait|master_unavailable||3");
+  const auto reply=wait_result(argv[1],bad);
+  if(reply!="wait|master_unavailable||3")std::fprintf(stderr,"entry bad case %s reply=%s\n",bad,reply.c_str());
+  assert(reply=="wait|master_unavailable||3");
   assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
  }
  // WinHTTP closes its internal work items asynchronously after CloseHandle.
