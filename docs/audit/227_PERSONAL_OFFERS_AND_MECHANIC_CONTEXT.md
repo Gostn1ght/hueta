@@ -58,6 +58,17 @@ SP use callback; otherwise `get_speaker()` could be nil or a different NPC
 while the repair window evaluates available upgrades. Unknown UI kinds and
 missing NPCs do not change the speaker.
 
+Native replication follow-up: `SetCondition` changed the server's actual item,
+but ordinary owner-predicted condition deltas are deliberately filtered out.
+For a mechanic RPC, the old item-action touch marked its NPC argument rather
+than the repaired inventory item. The Lua condition setter now marks the
+actual changed item for an authoritative owner snapshot on the server. Client
+prediction and SP retain their former behavior. A CI-only native fixture
+executes the real setter and inventory clamp, checking exact item ID, repair
+value, bounds, client/SP isolation and invalid-object handling. A new full
+native build is required; the earlier in-progress build alone cannot include
+this follow-up.
+
 ## NPC recruitment
 
 The global non-task companion count previously included other players' hired

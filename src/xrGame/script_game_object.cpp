@@ -1007,6 +1007,11 @@ void CScriptGameObject::SetCondition(float val)
 	}
 	val -= inventory_item->GetCondition();
 	inventory_item->ChangeCondition(val);
+	// Lua repairs and scripted condition changes are authoritative on the
+	// server. The owner normally predicts condition and ignores ordinary
+	// wear deltas; explicitly send this item's corrected state to it too.
+	if (netcoop::enabled() && !netcoop::pure_client())
+		netcoop::server_item_touch(object().ID());
 }
 
 float CScriptGameObject::GetPowerCritical() const

@@ -160,6 +160,8 @@ jobs:
         run: python scripts/check-native-character-restore-damage.py
       - name: Check quest and reward chat without dedicated TalkMenu
         run: python scripts/check-native-talk-news.py
+      - name: Check server-authored scripted repairs reach their item owner
+        run: python scripts/check-native-script-condition.py
       - name: Check original item IDs through character restore
         run: python scripts/check-netcoop-character-restore.py
       - name: Check player corpse loot and reserved originals
@@ -448,6 +450,8 @@ jobs:
           python scripts/check-native-crash-lua-stack.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-talk-news.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-script-condition.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-preview-pool.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
