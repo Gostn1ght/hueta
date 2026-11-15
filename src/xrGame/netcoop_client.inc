@@ -390,129 +390,14 @@ bool client_admin_authorized() { return s_client_role_verified && s_client_role 
 int script_role() { return client_role(); }
 LPCSTR script_account() { return client_login(); }
 
-// Owner 2026-10-17: players enter only the world master's address. Its public
-// entry (TCP, port 5446 by default - owner 2026-10-25) names the location to
-// connect to: for the account and
-// slot (owner 2026-10-24) the map the character was on last, Cordon for a new
-// one. "" when no master answers there (a location address, an older host):
-// the address is then used as it is. At most ~1.5 s, on a button press only.
-static LPCSTR master_entry_query(LPCSTR address, LPCSTR account, int slot)
-{
-	static string256 answer;
-	answer[0] = 0;
-	if (!address || xr_strlen(address) > 200) return answer;
-	xr_string text = address, host;
-	u32 port = 5446;
-	const size_t colon = text.rfind(':');
-	if (colon != xr_string::npos)
-	{
-		host = text.substr(0, colon);
-		port = u32(atoi(text.c_str() + colon + 1));
-	}
-	else host = text;
-	auto valid_host = [](const xr_string& value)
-	{
-		if (value.empty() || value.size() > 253) return false;
-		for (char c : value)
-			if (!isalnum(u8(c)) && c != '.' && c != '-') return false;
-		return true;
-	};
-	if (!valid_host(host) || port < 1 || port > 65535) return answer;
-	std::wstring wide(host.begin(), host.end());
-	HINTERNET session = WinHttpOpen(L"LostZone/1.0", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-	if (!session) return answer;
-	WinHttpSetTimeouts(session, 500, 500, 500, 500);
-	const u64 deadline=GetTickCount64()+2000;
-	HINTERNET connection = WinHttpConnect(session, wide.c_str(), INTERNET_PORT(port), 0);
-	// The login is a public name (letters, digits, _ . -): no escaping needed.
-	std::wstring path = L"/v1/entry";
-	if (account && login_valid(account) && slot >= 0 && slot <= 10)
-	{
-		path += L"?account=";
-		for (const char* c = account; *c; ++c) path += wchar_t(*c);
-		path += L"&slot=" + std::to_wstring(slot);
-	}
-	HINTERNET request = connection ? WinHttpOpenRequest(connection, L"GET", path.c_str(), nullptr,
-		WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0) : nullptr;
-	std::string body;
-	DWORD status = 0, size = sizeof(status);
-	if (request && WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-		WinHttpReceiveResponse(request, nullptr) &&
-		WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
-			&status, &size, WINHTTP_NO_HEADER_INDEX) && (status == 200 || status==503))
-	{
-		char buffer[1024];
-		DWORD read = 0;
-		while (body.size() < 4096 && GetTickCount64()<deadline && WinHttpReadData(request, buffer, sizeof(buffer), &read) && read)
-			body.append(buffer, read);
-	}
-	if (request) WinHttpCloseHandle(request);
-	if (connection) WinHttpCloseHandle(connection);
-	WinHttpCloseHandle(session);
-	if (body.empty() || body.size() >= 4096) {xr_strcpy(answer,"wait|master_unavailable||3");return answer;}
-	try
-	{
-		const auto entry = nlohmann::json::parse(body);
-		if (!entry.is_object()) return answer;
-		if(status==503) {
-			const auto state=entry.value("state",std::string("recovering")),location=entry.value("location",std::string());
-			if(state.size()>32 || location.size()>64 || state.find_first_not_of("abcdefghijklmnopqrstuvwxyz_")!=std::string::npos || location.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_")!=std::string::npos) return answer;
-			const bool terminal=state=="disabled" || state=="failed" || state=="unplanned" || state=="control_error";
-			xr_sprintf(answer,"%s|%s|%s|%d",terminal ? "error":"wait",state.c_str(),location.c_str(),_max(1,_min(30,entry.value("retry_seconds",3))));
-			return answer;
-		}
-		if(entry.value("schema",0)!=1) return answer;
-		const xr_string target = entry.value("host", std::string()).c_str();
-		const int target_port = entry.value("port", 0);
-		const xr_string location = entry.value("location", std::string()).c_str();
-		if(location.size()>64 || location.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_")!=xr_string::npos) return answer;
-		if (target_port < 1 || target_port > 65535 || (!target.empty() && !valid_host(target))) return answer;
-		// No host of its own: the location runs on the master's machine.
-		xr_sprintf(answer, "%s:%d", target.empty() ? host.c_str() : target.c_str(), target_port);
-	}
-	catch (...) { answer[0] = 0; }
-	return answer;
-}
-
-struct ClientEntryWorker
-{
-	std::mutex lock;std::thread thread;bool done=true;
-	std::string identity,result;u64 completed=0;
-	void stop() {
-		std::thread pending;
-		{std::lock_guard<std::mutex> guard(lock);pending=std::move(thread);}
-		if(pending.joinable()) pending.join();
-		std::lock_guard<std::mutex> guard(lock);done=true;identity.clear();result.clear();completed=0;
-	}
-	~ClientEntryWorker(){stop();}
-	std::string poll(const std::string& address,const std::string& account,int slot) {
-		const auto id=address+"/"+account+"/"+std::to_string(slot);
-		std::lock_guard<std::mutex> guard(lock);
-		if(!done) return "wait|contacting||1";
-		if(thread.joinable()) thread.join();
-		if(identity==id && !result.empty() && GetTickCount64()-completed<3000) return result;
-		identity=id;done=false;
-		thread=std::thread([this,address,account,slot]{
-			std::string reply;
-			try {reply=master_entry_query(address.c_str(),account.c_str(),slot);} catch(...) {}
-			if(reply.empty()) reply="wait|master_unavailable||3";
-			std::lock_guard<std::mutex> guard(lock);result=std::move(reply);completed=GetTickCount64();done=true;
-		});
-		return "wait|contacting||1";
-	}
-};
-static ClientEntryWorker& client_entry_worker() {static ClientEntryWorker worker;return worker;}
+// JSON, WinHTTP and std::thread exceptions must unwind outside the engine PCH.
 LPCSTR script_master_entry(LPCSTR address,LPCSTR account,int slot)
 {
-	static string256 answer;
-	if(!address || xr_strlen(address)>200 || (account && xr_strlen(account)>64) || slot<0 || slot>10) {answer[0]=0;return answer;}
-	try {
-		const auto result=client_entry_worker().poll(address,account ? account:"",slot);
-		xr_strcpy(answer,result.c_str());
-	}catch(...) {xr_strcpy(answer,"wait|master_unavailable||3");}
-	return answer;
+    static string256 answer;
+    netcoop_world::poll_entry_route(address,account,slot,answer,sizeof(answer));
+    return answer;
 }
-void client_entry_stop(){client_entry_worker().stop();}
+void client_entry_stop(){netcoop_world::stop_entry_route();}
 int script_account_state() { return !client_has_credentials() || !s_client_remembered ? 0 : s_client_approved ? 2 : 1; }
 static IRenderVisual* s_preview_visual = nullptr;
 static xr_string s_preview_name, s_preview_motion, s_preview_item_name;

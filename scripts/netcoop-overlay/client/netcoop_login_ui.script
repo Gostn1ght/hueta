@@ -140,14 +140,13 @@ local function parse_addr(addr)
 	return ip, port
 end
 
--- Owner 2026-10-17: players enter only the world master's address. Its entry
--- names the location to connect to: the map the character was on last, Cordon
--- for a new one (owner 2026-10-24). Without a master there (a location
--- address) the address is used as it is. The typed address stays the
--- remembered one.
+-- 5446 is the Master's HTTP gateway. Explicit location ports speak game UDP,
+-- not HTTP: authenticate there and let the server's Master admission redirect
+-- the account+slot to its durable home before character_select/spawn.
+-- Keep per-endpoint UI caches isolated; they never define character identity.
 local function route_addr(ip, port, login, slot)
+    if tonumber(port) ~= 5446 then return ip, tostring(port) end
     if not netcoop_master_entry then return ip, port == "5446" and "1267" or port end -- older native binary
-    if port == "1267" then port="5446" end -- remembered pre-gateway address
     local to = netcoop_master_entry(ip .. ":" .. port, login or "", tonumber(slot) or 0) or ""
     local rip, rport = string.match(to, "^([%w%.%-]+):(%d+)$")
     if rip then return rip, rport end

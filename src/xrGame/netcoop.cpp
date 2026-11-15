@@ -19,6 +19,7 @@
 #include "../3rd party/nlohmann/json.hpp"
 #include "netcoop_world_bridge_worker.h"
 #include "netcoop_admission.h"
+#include "netcoop_entry_worker.h"
 #pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "bcrypt.lib")

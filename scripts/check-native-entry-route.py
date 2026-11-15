@@ -11,21 +11,50 @@ import time
 if os.environ.get('GITHUB_ACTIONS') != 'true' or os.name != 'nt':
     raise SystemExit('Native checks must run on Windows GitHub Actions')
 root = Path(__file__).resolve().parents[1]
-text = (root/'src/xrGame/netcoop_client.inc').read_text(encoding='utf-8')
-a = text.index('static LPCSTR master_entry_query(')
-code = text[a:text.index('int script_account_state()', a)]
+project = (root/'src/xrGame/xrGame.vcxproj').read_text(encoding='utf-8-sig')
+import xml.etree.ElementTree as ET
+ns={'m':'http://schemas.microsoft.com/developer/msbuild/2003'}
+unit=next(e for e in ET.fromstring(project).findall('.//m:ClCompile',ns) if e.get('Include')=='netcoop_entry_worker.cpp')
+assert unit.find('m:ExceptionHandling',ns).text=='Sync'
+assert unit.find('m:PrecompiledHeader',ns).text=='NotUsing'
+wrapper=(root/'src/xrGame/netcoop_client.inc').read_text(encoding='utf-8')
+assert 'netcoop_world::poll_entry_route(' in wrapper and 'struct ClientEntryWorker' not in wrapper
 class Handler(http.server.BaseHTTPRequestHandler):
     calls = 0
+    followed = 0
     def do_GET(self):
         Handler.calls += 1
         time.sleep(.2)
-        if 'TesterTwo' in self.path:
+        if self.path == '/followed':
+            Handler.followed += 1
+            self.send_response(500);self.end_headers();return
+        if 'Redirect' in self.path:
+            self.send_response(302);self.send_header('Location','/followed');self.send_header('Content-Length','0');self.end_headers();return
+        if 'Malformed' in self.path:
+            status, result = 200, None
+        elif 'LongHost' in self.path:
+            status, result = 200, dict(schema=1,host='a'*253,location='l08_yantar',port=1319)
+        elif 'HugePort' in self.path:
+            status, result = 200, dict(schema=1,host='',location='l08_yantar',port=4294968615)
+        elif 'NulHost' in self.path:
+            status, result = 200, dict(schema=1,host='127.0.0.1\0other',location='l08_yantar',port=1319)
+        elif 'DeepBody' in self.path:
+            status, result = 200, None
+        elif 'HugeBody' in self.path:
+            status, result = 200, None
+        elif 'WrongSchema' in self.path:
+            status, result = 503, dict(schema=2,state='loading',location='l08_yantar',retry_seconds=3)
+        elif 'TesterTwo' in self.path:
             status, result = 200, dict(schema=1,host='',location='l08_yantar',port=1319)
         elif 'Disabled' in self.path:
             status, result = 503, dict(schema=1,state='disabled',location='l08_yantar',retry_seconds=0)
         else:
             status, result = 503, dict(schema=1,state='loading',location='l08_yantar',retry_seconds=3)
         body = json.dumps(result).encode()
+        if 'Malformed' in self.path: body=b'{invalid json'
+        if 'DeepBody' in self.path: body=b'['*1000+b'0'+b']'*1000
+        if 'HugeBody' in self.path: body=b' '*5000
+
         self.send_response(status);self.send_header('Content-Length', str(len(body)));self.end_headers();self.wfile.write(body)
     def log_message(self, *_): pass
 server = http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
@@ -33,22 +62,15 @@ thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start(
 prefix = r'''
 #define NOMINMAX
 #include <windows.h>
-#include <winhttp.h>
-#include <thread>
-#include <mutex>
-#include <string>
-#include <cstring>
-#include <cstdio>
 #include <cassert>
-#include <algorithm>
-#include "''' + (root/'src/3rd party/nlohmann/json.hpp').as_posix() + r'''"
-using u64=unsigned long long;using u32=unsigned;using u8=unsigned char;using xr_string=std::string;using string256=char[256];
-#define xr_strlen std::strlen
-#define _max std::max
-#define _min std::min
-template<size_t N> void xr_strcpy(char(&to)[N],const char* from){assert(std::strlen(from)<N);strcpy_s(to,from);}
-template<size_t N,class... A> void xr_sprintf(char(&to)[N],const char* format,A...args){assert(std::snprintf(to,N,format,args...)>=0);}
-bool login_valid(const char* name){return name && std::strlen(name)>=3 && std::strlen(name)<=20;}
+#include <cstdio>
+#include <string>
+#include "netcoop_entry_worker.h"
+using namespace netcoop_world;
+std::string script_master_entry(const char* address,const char* account,int slot){
+ char answer[256];poll_entry_route(address,account,slot,answer,sizeof(answer));return answer;
+}
+void client_entry_stop(){stop_entry_route();}
 '''
 suffix = r'''
 std::string wait_result(const char* address,const char* account){
@@ -60,15 +82,29 @@ int main(int argc,char**argv){
  assert(GetTickCount64()-start<100);assert(wait_result(argv[1],"Tester")=="wait|loading|l08_yantar|3");
  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
  assert(wait_result(argv[1],"Disabled")=="error|disabled|l08_yantar|1");
+ for(const char* bad:{"Malformed","LongHost","HugePort","NulHost","DeepBody","HugeBody","WrongSchema","Redirect"}) {
+  assert(wait_result(argv[1],bad)=="wait|master_unavailable||3");
+  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
+ }
+ DWORD handles_before=0,handles_after=0;assert(GetProcessHandleCount(GetCurrentProcess(),&handles_before));
+ for(int i=0;i<12;++i){
+  assert(std::string(script_master_entry(argv[1],"Malformed",1))=="wait|contacting||1");
+  client_entry_stop(); // join while HTTP/JSON work is in flight
+  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
+ }
+ client_entry_stop();assert(GetProcessHandleCount(GetCurrentProcess(),&handles_after));assert(handles_after<=handles_before+4);
+ char tiny[2]={'x','x'};poll_entry_route(argv[1],"Tester",-1,tiny,sizeof(tiny));assert(tiny[0]==0);
+ poll_entry_route(argv[1],"Tester",1,nullptr,0);
  client_entry_stop();assert(std::string(script_master_entry(argv[1],"Tester",1))=="wait|contacting||1");client_entry_stop();
- puts("PASS actual entry worker: nonblocking UI, real WinHTTP 503 loading/disabled states, successful route, account-key isolation, bounded joined shutdown");
+ puts("PASS actual entry worker: nonblocking UI, real WinHTTP 503 loading/disabled states, successful route, account-key isolation, bounded joined shutdown, production EHsc boundary, malformed/deep/oversized responses, oversized/NUL hosts and ports, no HTTP redirect, handle stability and failure recovery");
 }
 '''
 try:
     with tempfile.TemporaryDirectory() as temporary:
         folder=Path(temporary);cpp=folder/'entry.cpp';exe=folder/'entry.exe'
-        cpp.write_text(prefix+code+suffix,encoding='utf-8')
-        subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX','/utf-8','/D_CRT_SECURE_NO_WARNINGS',str(cpp),'/Fe:'+str(exe),'/link','winhttp.lib'],cwd=folder,check=True)
-        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=30)
+        cpp.write_text(prefix+suffix,encoding='utf-8')
+        subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX','/utf-8','/D_CRT_SECURE_NO_WARNINGS','/I'+str(root/'src/xrGame'),str(cpp),str(root/'src/xrGame/netcoop_entry_worker.cpp'),'/Fe:'+str(exe),'/link','winhttp.lib'],cwd=folder,check=True)
+        subprocess.run([str(exe),'127.0.0.1:'+str(server.server_port)],cwd=folder,check=True,timeout=60)
+        assert Handler.followed==0
 finally:
     server.shutdown();server.server_close();thread.join()

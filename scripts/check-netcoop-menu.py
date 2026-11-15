@@ -582,12 +582,25 @@ route='wait|queued|l08_yantar|3'
 w:WithRoute('route.example','5446','Tester',1,function() completed=completed+1 end)
 now=now+600001;w:PollRoute();assert(not w.route_wait and completed==1)
 route='wait|contacting||1'
-w:WithRoute('route.example','1267','Tester',1,function() completed=completed+1 end)
-assert(calls[#calls].address=='route.example:5446' and w.route_wait)
+local gateway_calls=#calls
+for _,port in ipairs({'1267','1319','65535',1319}) do
+    w:WithRoute('route.example',port,'Tester',1,function(ip,p)
+        completed=completed+1;assert(ip=='route.example' and p==tostring(port))
+    end)
+    assert(not w.route_wait and #calls==gateway_calls, 'UDP location ports must not wait for an HTTP gateway')
+end
+-- Both account listing and gameplay use this route, across accounts/slots.
+w:WithRoute('other-world.example','1319','OtherAccount',0,function(ip,p)
+    assert(ip=='other-world.example' and p=='1319');completed=completed+1
+end)
+assert(not w.route_wait and #calls==gateway_calls and #commands==before)
+-- Numeric and string gateway ports must both retain fail-closed waiting.
+w:WithRoute('route.example',5446,'Tester',1,function() error('offline gateway must never connect') end)
+assert(w.route_wait and #calls==gateway_calls+1)
 w:OnBack();assert(not w.route_wait and #commands==before)
 netcoop_master_entry=nil
 ''')
-print('Actual route UI: no fallback to another map, loading/memory wait, automatic resume, cancellation, terminal disabled state, finite timeout and old-port normalization PASS')
+print('Actual route UI: direct UDP location ports incl1267, account/world isolation, fail-closed5446, loading/memory wait, automatic resume, cancellation and finite timeout PASS')
 
 # Run the actual starter-picker completion, including cloud failure and selected stacks.
 lua.execute(r'''
