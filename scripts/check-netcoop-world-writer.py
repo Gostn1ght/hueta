@@ -39,6 +39,7 @@ source = r'''
 #include <set>
 #include <atomic>
 #include <thread>
+#include <chrono>
 using namespace netcoop_world;
 template<class F>void rejects(F f){bool failed=false;try{f();}catch(const std::exception&){failed=true;}assert(failed);}
 #ifdef _WIN32
@@ -222,11 +223,32 @@ void worker_checks(char** argv,const std::string& instance,std::uint64_t epoch,c
  CheckpointWorkerResult result;result.revision=999;
  CheckpointWorker worker;assert(!worker.poll(nullptr,1,result) && result.revision==0);
  assert(!worker.submit(ticket(1,10,5),last_raw.data(),last_raw.size()));
- assert(worker.start(argv[2],root.c_str(),context));
+ assert(worker.start(argv[5],root.c_str(),context)); // real HTTP proxy delays each save request400ms
  eventually([&]{return worker.status().ready;});
  std::uint64_t floor=99;assert(worker.generation_floor(character.c_str(),floor) && floor==0);
  assert(!worker.release(character.c_str(),1));
+ const auto renewals_before=worker.status().lease_renewals;
+ const auto submit_started=std::chrono::steady_clock::now();
  assert(worker.submit(ticket(1,10,5),next_raw.data(),next_raw.size()));
+ const auto submit_us=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-submit_started).count();
+ std::vector<double> poll_us;unsigned peak_captures=0;std::uint64_t peak_bytes=0;bool staged_seen=false;
+ const auto measure_until=GetTickCount64()+2500;
+ do {
+  const auto started=std::chrono::steady_clock::now();
+  const auto status=worker.status();assert(worker.poll(character.c_str(),1,result));
+  poll_us.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-started).count());
+  peak_captures=std::max(peak_captures,status.captures);peak_bytes=std::max(peak_bytes,status.bytes);
+  staged_seen|=result.state==CheckpointCaptureState::Staged;
+  assert(status.ready && !status.authority_lost && status.captures<=outbox_jobs && status.bytes<=outbox_bytes);
+  Sleep(5);
+ }while(GetTickCount64()<measure_until);
+ std::sort(poll_us.begin(),poll_us.end());
+ const auto p95=poll_us[(poll_us.size()-1)*95/100],p99=poll_us[(poll_us.size()-1)*99/100];
+ assert(staged_seen && peak_captures==1 && peak_bytes==next_raw.size());
+ assert(submit_us<100000 && p99<100000 && worker.status().lease_renewals>renewals_before);
+ std::cout<<"METRIC slow_http400ms samples="<<poll_us.size()<<" submit_us="<<submit_us<<" poll_status_p95_us="<<p95
+  <<" poll_status_p99_us="<<p99<<" peak_captures="<<peak_captures<<" peak_bytes="<<peak_bytes
+  <<" heartbeat_delta="<<worker.status().lease_renewals-renewals_before<<"\n";
  eventually([&]{return worker.poll(character.c_str(),1,result) && result.state==CheckpointCaptureState::Durable;});
  assert(result.latest_submitted && result.revision==6 && result.version==11 && result.bytes==next_raw.size());
  // Block publication of a NEW capture while keeping an older durable receipt.
@@ -246,7 +268,9 @@ void worker_checks(char** argv,const std::string& instance,std::uint64_t epoch,c
  eventually([&]{return worker.poll(character.c_str(),2,result) && result.state==CheckpointCaptureState::Durable;});
  assert(result.latest_submitted && result.revision==7 && result.version==12 && std::string(result.sha256)==checkpoint_sha256(last_raw));
  assert(!worker.submit(ticket(1,10,5),next_raw.data(),next_raw.size()));
- assert(worker.stop());
+ const auto stop_started=std::chrono::steady_clock::now();assert(worker.stop());
+ const auto stop_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-stop_started).count();
+ assert(stop_ms<5000);std::cout<<"METRIC slow_http shutdown_ms="<<stop_ms<<"\n";
  // Only the disk-refusal/independent-renewal case deliberately uses3s.
  // Later 32-file/64MiB shutdown-drain cases use the normal15s lease:
  // filesystem staging has no promise to finish inside the short test TTL.
@@ -328,7 +352,7 @@ int main(int argc,char** argv){
  rejects([&]{checkpoint_unbase64("Zm9v",2);});
  std::cout<<"PASS bounded canonical checkpoint codec: binary bytes, padding bits, malformed input and decode limits\n";
 #ifdef _WIN32
- assert(argc==5);
+ assert(argc==6);
  auto read=[](const char* filename){std::ifstream in(filename,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
  auto src=WriterConfig::parse(read(argv[1]),"cordon"),dst=WriterConfig::parse(read(argv[2]),"garbage");
  auto proxy=WriterConfig::parse(read(argv[4]),"garbage");
@@ -646,6 +670,29 @@ class FaultProxyHandler(BaseHTTPRequestHandler):
             self.reply(body)
 
 
+class SlowProxyHandler(BaseHTTPRequestHandler):
+    """Real HTTP latency on save IO only; lease heartbeat has its own connection."""
+    def log_message(self, *args): pass
+    def do_POST(self):
+        size=int(self.headers['Content-Length']);assert 1<=size<=65536
+        payload=self.rfile.read(size)
+        operation=json.loads(payload)['operation']
+        if operation.startswith('native_save_'):
+            self.server.delayed_saves += 1
+            time.sleep(.4)
+        elif operation=='location_renew':
+            self.server.renewals += 1
+        headers={key:self.headers[key] for key in
+                 ('Authorization','X-LostZone-Instance','X-LostZone-World','Content-Type')}
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.upstream_port,timeout=5)
+        try:
+            connection.request('POST',self.path,payload,headers)
+            response=connection.getresponse();body=response.read()
+            self.send_response(response.status);self.send_header('Content-Length',str(len(body)));self.end_headers()
+            self.wfile.write(body)
+        finally: connection.close()
+
+
 class FaultProxy(ThreadingHTTPServer):
     daemon_threads = False
     block_on_close = True
@@ -679,6 +726,9 @@ with TemporaryDirectory(prefix="world-writer-") as tmp:
         proxy = FaultProxy(server.server_address[1])
         proxy_thread = threading.Thread(target=proxy.serve_forever)
         proxy_thread.start()
+        slow_proxy=ThreadingHTTPServer(('127.0.0.1',0),SlowProxyHandler)
+        slow_proxy.upstream_port=server.server_address[1];slow_proxy.delayed_saves=0;slow_proxy.renewals=0
+        slow_thread=threading.Thread(target=slow_proxy.serve_forever);slow_thread.start()
         try:
             config = folder / "private.json"
             create_config(config, ["cordon", "garbage"], world_id=71, seed=0)
@@ -707,7 +757,11 @@ with TemporaryDirectory(prefix="world-writer-") as tmp:
             proxy_body = json.loads(Path(paths[1]).read_bytes())
             proxy_body["port"] = proxy.server_address[1]
             proxy_config.write_text(json.dumps(proxy_body), encoding="utf-8")
-            subprocess.run([str(exe), *paths, str(native), str(proxy_config)], cwd=tmp, check=True)
+            slow_config=folder/'slow-writer.json'
+            slow_body=json.loads(Path(paths[1]).read_bytes());slow_body['port']=slow_proxy.server_address[1]
+            slow_config.write_text(json.dumps(slow_body),encoding='utf-8')
+            subprocess.run([str(exe), *paths, str(native), str(proxy_config),str(slow_config)], cwd=tmp, check=True,timeout=180)
+            assert slow_proxy.delayed_saves>=3 and slow_proxy.renewals>=2
             assert proxy.get_count == 6
             assert proxy.dropped == {"native_save_begin", "native_save_append", "native_save_finish"}
             assert store.db.execute("SELECT COUNT(*) FROM entity WHERE location='garbage'").fetchone()[0] == 4
@@ -719,6 +773,7 @@ with TemporaryDirectory(prefix="world-writer-") as tmp:
             assert store.db.execute("SELECT MAX(revision) FROM native_player_save").fetchone()[0] == 8
             assert store.db.execute("SELECT COUNT(*) FROM world_event WHERE type='NativePlayerSaveCommitted'").fetchone()[0] == 8
         finally:
+            slow_proxy.shutdown();slow_proxy.server_close();slow_thread.join()
             proxy.shutdown()
             proxy.server_close()
             proxy_thread.join()

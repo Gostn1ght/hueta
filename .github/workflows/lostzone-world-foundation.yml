@@ -304,6 +304,8 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-world-writer.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-entry-route.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-admission.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-netcoop-world-store.py

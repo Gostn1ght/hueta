@@ -32,6 +32,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(302);self.send_header('Location','/followed');self.send_header('Content-Length','0');self.end_headers();return
         if 'Malformed' in self.path:
             status, result = 200, None
+        elif 'BoundaryHost' in self.path:
+            status, result = 200, dict(schema=1,host='a'*200,location='l08_yantar',port=1319)
+        elif 'Truncated' in self.path:
+            status, result = 200, dict(schema=1,host='',location='l08_yantar',port=1319)
         elif 'LongHost' in self.path:
             status, result = 200, dict(schema=1,host='a'*253,location='l08_yantar',port=1319)
         elif 'HugePort' in self.path:
@@ -55,7 +59,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if 'DeepBody' in self.path: body=b'['*1000+b'0'+b']'*1000
         if 'HugeBody' in self.path: body=b' '*5000
 
-        self.send_response(status);self.send_header('Content-Length', str(len(body)));self.end_headers();self.wfile.write(body)
+        self.send_response(status);self.send_header('Content-Length', str(len(body)+(10 if 'Truncated' in self.path else 0)));self.end_headers();self.wfile.write(body)
     def log_message(self, *_): pass
 server = http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
 thread = threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -81,8 +85,9 @@ int main(int argc,char**argv){
  assert(argc==2);const auto start=GetTickCount64();assert(std::string(script_master_entry(argv[1],"Tester",1))=="wait|contacting||1");
  assert(GetTickCount64()-start<100);assert(wait_result(argv[1],"Tester")=="wait|loading|l08_yantar|3");
  assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319");
+ assert(wait_result(argv[1],"BoundaryHost")==std::string(200,'a')+":1319");
  assert(wait_result(argv[1],"Disabled")=="error|disabled|l08_yantar|1");
- for(const char* bad:{"Malformed","LongHost","HugePort","NulHost","DeepBody","HugeBody","WrongSchema","Redirect"}) {
+ for(const char* bad:{"Malformed","Truncated","LongHost","HugePort","NulHost","DeepBody","HugeBody","WrongSchema","Redirect"}) {
   assert(wait_result(argv[1],bad)=="wait|master_unavailable||3");
   assert(wait_result(argv[1],"TesterTwo")=="127.0.0.1:1319"); // failure cannot poison lock/thread/cache
  }
