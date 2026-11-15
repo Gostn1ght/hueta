@@ -473,3 +473,20 @@ except __import__('lupa.lua51',fromlist=['LuaError']).LuaError:
     pass
 assert g.ui_inventory.GUI.old and g.events.used_npc_id==777 and g.money==2000
 print('PASS actual GAMMA rank pricing and repair: headless selected item, native effect payment, real repair charge, insufficient funds, GUI/speaker restoration on success/rejection/exception')
+
+# The authoritative UI-open reply must bind the local mechanic too: the
+# remote conversation bypasses the SP NPC binder's used_npc_id callback.
+start=cc.index('local function open_ui(data)')
+end=cc.index('\n-- Trade profile',start)
+lua.execute(cc[start:end]+'''\nopen_remote_ui=open_ui''')
+lua.execute(f'''
+local npc=objects[{mech._id}]
+function npc:start_upgrade(a)assert(a==db.actor and get_speaker()==self);opened_mechanic=true end
+function npc:start_trade(a)assert(a==db.actor and get_speaker()==self);opened_trade=true end
+events.used_npc_id=777
+open_remote_ui('unknown {mech._id}');assert(events.used_npc_id==777)
+open_remote_ui('upgrade 65534');assert(events.used_npc_id==777)
+open_remote_ui('upgrade {mech._id}');assert(opened_mechanic)
+open_remote_ui('trade {mech._id}');assert(opened_trade)
+''')
+print('PASS actual client remote mechanic/trade opener selects the correct GAMMA speaker before opening its window')

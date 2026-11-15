@@ -43,6 +43,12 @@ mechanic discount conditions are evaluated before upgrade validation.
 Repairs retain GAMMA's effect/price and mechanic-feature delay behavior. No
 client-side money or installed-upgrade flag is treated as authoritative.
 
+The owning client's authoritative UI-open reply also sets `used_npc_id` before
+opening trade/repair. Its remote dialogue bypasses the ordinary NPC binder's
+SP use callback; otherwise `get_speaker()` could be nil or a different NPC
+while the repair window evaluates available upgrades. Unknown UI kinds and
+missing NPCs do not change the speaker.
+
 ## NPC recruitment
 
 The global non-task companion count previously included other players' hired
