@@ -1560,8 +1560,12 @@ void CCar::PressForward()
 {
 	if (netcoop_manual_controls())
 	{
-		fwp = true;
-		if (b_engine_on && !bkp && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
+        fwp = true;
+        if (bkp || CurrentTransmission() == 0)
+        {
+            Unclutch(); NeutralDrive(); StartBreaking();
+        }
+        else if (b_engine_on && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
 		return;
 	}
 	if (bkp)
@@ -1670,7 +1674,11 @@ void CCar::ReleaseBack()
 	{
 		bkp = false;
 		StopBreaking();
-		if (fwp && b_engine_on && !brp && !m_netcoop_parking) { Clutch(); Drive(); }
+        if (fwp && b_engine_on && !brp && !m_netcoop_parking)
+        {
+            if (CurrentTransmission() == 0) { Unclutch(); NeutralDrive(); StartBreaking(); }
+            else { Clutch(); Drive(); }
+        }
 		return;
 	}
 	if (b_breaks)
@@ -1802,6 +1810,39 @@ float CCar::GravityFactorImpulse()
 
 void CCar::UpdateBack()
 {
+    if (netcoop_manual_controls() && b_engine_on && !brp && !m_netcoop_parking &&
+        PPhysicsShell() && m_gear_ratious.size() >= 2 && (fwp != bkp))
+    {
+        Fvector velocity;
+        PPhysicsShell()->get_LinearVel(velocity);
+        if (_valid(velocity))
+        {
+            const bool reverse = CurrentTransmission() == 0;
+            const bool wants_reverse = bkp;
+            if (reverse == wants_reverse || velocity.square_magnitude() <= .25f)
+            {
+                // S brakes until a safe stop, then drives in R. W returns
+                // to first gear at a safe stop; higher forward gears remain
+                // manual. Neither pedal starts the engine.
+                if (reverse != wants_reverse)
+                {
+                    Unclutch(); NeutralDrive();
+                    Transmission(wants_reverse ? 0 : 1);
+                }
+                StopBreaking(); Clutch(); Drive();
+            }
+            else
+            {
+                Unclutch(); NeutralDrive();
+                if (!b_breaks) StartBreaking();
+            }
+        }
+        else
+        {
+            Unclutch(); NeutralDrive();
+            if (!b_breaks) StartBreaking();
+        }
+    }
 	if (b_breaks)
 	{
 		float k = 1.f;

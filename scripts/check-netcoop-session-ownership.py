@@ -120,11 +120,12 @@ int main(int argc,char** argv){
  assert(WaitForSingleObject(event,10000)==WAIT_OBJECT_0);
  cluster_lease_release("USER");
  u32 port=0,stamp=0;assert(cluster_lease_holder("user",port,stamp) && port==1277);
+ bool marked=false;assert(cluster_lease_holder("user",port,stamp,&marked)&&marked);
  assert(!cluster_claim_session("user",error));
- // Real process termination releases the OS lock; after the compatibility
- // timestamp lease expires, a new owner can commit the same account.
+ // A marked current owner cannot strand a character after termination:
+ // the real exclusive lock proves it is gone, without waiting for its TTL.
  assert(TerminateProcess(held.process,0));completed(held);CloseHandle(event);
- fixture_now=131;assert(cluster_claim_session("user",error));cluster_lease_release("user");
+ fixture_now=100;assert(cluster_claim_session("user",error));cluster_lease_release("user");
  // Failed create, fsync or rename must never report a successful claim or
  // leak the exclusive handle; retry in another process remains possible.
  for(int fault=0;fault<3;++fault){
@@ -147,8 +148,8 @@ int main(int argc,char** argv){
  Child& losing=loser==0?first:second;Child& winning=loser==0?second:first;
  completed(losing);assert(WaitForSingleObject(winning.process,0)==WAIT_TIMEOUT);
  assert(TerminateProcess(winning.process,0));completed(winning);CloseHandle(start);CloseHandle(won);
- fixture_now=131;assert(cluster_claim_session("user",error));cluster_lease_release("user");
- std::cout<<"PASS actual session ownership: cross-process/local duplicate refusal, stalled owner, independent accounts, crash release, drain ordering, stale release, create/fsync/rename failure and legacy lease expiry\n";
+ fixture_now=100;assert(cluster_claim_session("user",error));cluster_lease_release("user");
+ std::cout<<"PASS actual session ownership: cross-process/local duplicate refusal, stalled owner, independent accounts, crash release, drain ordering, stale release, create/fsync/rename failure immediate marked crash recovery and conservative legacy lease expiry\n";
 }
 '''
 with TemporaryDirectory(prefix="session-ownership-") as tmp:

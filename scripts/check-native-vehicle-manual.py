@@ -104,7 +104,7 @@ int main(){
  c.netcoop_shift(true);assert(c.gear==3);Device.dwTimeGlobal+=200;
  c.netcoop_shift(true);assert(c.gear==3);
  c.PressForward();assert(c.gear==3&&c.driving);
- c.PressBack();assert(c.b_breaks&&!c.driving);c.ReleaseForward();assert(c.gear==3&&c.b_breaks);
+ c.shell.v={0,0,2};c.PressBack();assert(c.b_breaks&&!c.driving);c.ReleaseForward();assert(c.gear==3&&c.b_breaks);
  Device.fTimeGlobal+=1;c.UpdateBack();assert(c.gear==3&&c.b_breaks&&c.m_breaking_wheels[0].last==1);
  c.ReleaseBack();assert(!c.b_breaks&&c.gear==3&&!c.driving);
  c.PressBack();c.PressForward();assert(!c.driving);c.ReleaseBack();assert(c.driving&&c.gear==3);
@@ -124,14 +124,27 @@ int main(){
  c.netcoop_shift(false);assert(c.gear==0);
  c.shell.v={0,0,-1};c.netcoop_shift(true);assert(c.gear==0);
  c.shell.v={std::numeric_limits<float>::quiet_NaN(),0,0};c.netcoop_shift(true);assert(c.gear==0);
- c.shell.v={0,0,0};c.netcoop_toggle(0);c.PressForward();assert(c.gear==0&&c.driving); // W in deliberate R
- c.ReleaseForward();assert(c.gear==0);c.netcoop_shift(true);assert(c.gear==1);
+ c.shell.v={0,0,0};c.netcoop_toggle(0);c.PressForward();assert(c.gear==0&&!c.driving);
+ c.UpdateBack();assert(c.gear==1&&c.driving); // W returns to forward at rest.
+ c.ReleaseForward();assert(c.gear==1);
  c.netcoop_engage(false);assert(!c.m_netcoop_parking&&!c.parked&&!c.driving&&!c.b_engine_on);
  c.netcoop_engage(true);assert(!c.parked);c.netcoop_toggle(5);
  c.netcoop_engage(false);assert(c.m_netcoop_parking&&c.parked);
  c.netcoop_engage(true);assert(c.m_netcoop_parking&&c.parked);
  c.gear=999;Device.dwTimeGlobal+=200;c.netcoop_shift(false);assert(c.gear==999);
  c.m_gear_ratious.clear();c.netcoop_shift(true);assert(c.gear==999);
+ // Engine-off S is a brake; powered S selects R only after stopping.
+ CCar back;back.PressBack();back.UpdateBack();assert(back.gear==1&&!back.driving&&!back.started);
+ back.netcoop_toggle(0);back.shell.v={0,0,2};back.UpdateBack();assert(back.gear==1&&back.b_breaks&&!back.driving);
+ back.shell.v={0,0,0};back.UpdateBack();assert(back.gear==0&&back.driving&&!back.b_breaks&&back.started==1);
+ back.shell.v={0,0,-3};back.UpdateBack();assert(back.gear==0&&back.driving);
+ back.ReleaseBack();assert(!back.driving&&!back.b_breaks); // releasing S stops traction.
+ back.PressForward();back.UpdateBack();assert(back.gear==0&&back.b_breaks&&!back.driving);
+ back.shell.v={0,0,0};back.UpdateBack();assert(back.gear==1&&back.driving&&!back.b_breaks);
+ back.ReleaseForward();back.netcoop_toggle(5);back.PressBack();back.UpdateBack();assert(back.gear==1&&!back.driving&&back.parked);
+ back.netcoop_toggle(5);back.UpdateBack();assert(back.gear==0&&back.driving);
+ back.ReleaseBack();back.shell.v={0,0,1};back.PressForward();back.PressBack();back.UpdateBack();assert(!back.driving&&back.b_breaks);
+ back.ReleaseForward();back.shell.v={std::numeric_limits<float>::quiet_NaN(),0,0};back.UpdateBack();assert(!back.driving);
  CCar heli;heli.m_netcoop_heli.on=true;heli.netcoop_toggle(5);assert(!heli.m_netcoop_parking);
  heli.netcoop_shift(true);assert(heli.gear==1);heli.netcoop_engage(true);assert(!heli.parked);
  netcoop::active=false;CCar sp;sp.netcoop_shift(true);assert(sp.gear==1);

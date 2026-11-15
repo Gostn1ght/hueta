@@ -980,7 +980,14 @@ end
 -- Engine (netcoop.cpp) when the task list from the server adds, completes or
 -- fails a task. The server's own task news arrive as PDA news.
 function on_task(task_id, kind)
-	printf("[Lost Zone] task %s: %s", tostring(task_id), tostring(kind))
+    printf("[Lost Zone] task %s: %s", tostring(task_id), tostring(kind))
+    -- Acceptance/failure and rewards arrive through authoritative GAMMA
+    -- news. Its completion callback does not emit a completion summary.
+    if kind ~= "complete" or not db.actor then return end
+    local tsk = db.actor:get_task(task_id, false)
+    if tsk and news_manager and news_manager.send_task then
+        news_manager.send_task(db.actor, "complete", tsk)
+    end
 end
 
 -- The base-game debug menu runs locally for an admin; its world changes are

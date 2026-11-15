@@ -265,11 +265,16 @@ static xr_string cluster_login_key(LPCSTR login)
 	xr_string key = login; to_lower(key); return key;
 }
 
-static bool cluster_lease_holder(LPCSTR login, u32& port, u32& stamp)
+static bool cluster_lease_holder(LPCSTR login, u32& port, u32& stamp, bool* uses_os_lock = nullptr)
 {
+    if (uses_os_lock) *uses_os_lock = false;
 	string_path path; cluster_file("online", login, -1, path);
 	xr_string line;
-	return cluster_read_line(path, line) && sscanf(line.c_str(), "%u %u", &port, &stamp) == 2;
+    if (!cluster_read_line(path, line)) return false;
+    char format[16] = {};
+    const int fields = sscanf(line.c_str(), "%u %u %15s", &port, &stamp, format);
+    if (uses_os_lock) *uses_os_lock = fields == 3 && !strcmp(format, "oslock1");
+    return fields >= 2;
 }
 
 // durable for the claim at login; the renewals every 10 s are heartbeats.
@@ -277,7 +282,7 @@ static bool cluster_lease_write(LPCSTR login, bool durable = true)
 {
 	if (s_cluster_ownership.find(cluster_login_key(login)) == s_cluster_ownership.end()) return false;
 	string_path path; cluster_file("online", login, -1, path);
-	string64 line; xr_sprintf(line, "%u %u", cluster_port(), cluster_now());
+	string64 line; xr_sprintf(line, "%u %u oslock1", cluster_port(), cluster_now());
 	return cluster_write_line(path, line, durable);
 }
 
@@ -318,9 +323,15 @@ static bool cluster_claim_session(LPCSTR login, xr_string& error)
 		error = "This account is still owned by another location server, or its ownership file is unavailable";
 		return false;
 	}
-	u32 port = 0, stamp = 0;
+    u32 port = 0, stamp = 0;
+    bool uses_os_lock = false;
 	const u32 now = cluster_now();
-	if (cluster_lease_holder(login, port, stamp) && port != cluster_port() && u64(now) < u64(stamp) + cluster_lease_ttl_s)
+    // A marked owner always holds ownership_path exclusively. Having just
+    // acquired it proves that process released/died; a stale heartbeat must
+    // not strand a character after a whole-cluster crash. Legacy timestamp
+    // owners retain their conservative TTL because they may not hold a lock.
+	if (cluster_lease_holder(login, port, stamp, &uses_os_lock) && !uses_os_lock &&
+        port != cluster_port() && u64(now) < u64(stamp) + cluster_lease_ttl_s)
 	{
 		string256 text;
 		xr_sprintf(text, "This character is still on another location server; try again after its lease expires");

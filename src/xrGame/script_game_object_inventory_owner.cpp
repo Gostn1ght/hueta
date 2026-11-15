@@ -87,6 +87,23 @@ void _AddIconedTalkMessage(LPCSTR caption, LPCSTR text, LPCSTR texture_name, LPC
 
 void CScriptGameObject::AddIconedTalkMessage(LPCSTR caption, LPCSTR text, LPCSTR texture_name, LPCSTR templ_name)
 {
+    CActor* actor = smart_cast<CActor*>(&object());
+    if (actor && netcoop::pure_client() && actor != Level().CurrentControlEntity()) return;
+    if (actor && (netcoop::server_player_copy(actor) ||
+        (netcoop::pure_client() && actor == Level().CurrentControlEntity())))
+    {
+        // A dedicated server has no TalkMenu, and netcoop clients use a
+        // routed dialogue window. Preserve GAMMA's quest/item/money message
+        // as an owner-addressed chat entry instead of dropping it silently.
+        GAME_NEWS_DATA news;
+        news.m_type = GAME_NEWS_DATA::eTalk;
+        news.news_caption = caption ? caption : "";
+        news.news_text = text ? text : "";
+        news.texture_name = texture_name && texture_name[0] ? texture_name : "ui_inGame2_PD_Lider";
+        news.show_time = 7000;
+        actor->AddGameNews(news);
+        return;
+    }
 	_AddIconedTalkMessage(caption, text, texture_name, templ_name);
 }
 
