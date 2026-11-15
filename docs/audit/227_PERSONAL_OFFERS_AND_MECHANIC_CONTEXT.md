@@ -117,3 +117,42 @@ method; the real client reply handler also tests the added talk kind.
 Native build/runtime validation remains CI-only. A matched native + resource
 release is necessary: the inspected 000078 server resources still accompany
 the older 12 November native executable (see 225/226).
+
+## Final candidate validation
+
+Full CI **43696650732**, source
+`8af66605c1d865ab666225c7720a9a0d09596a28`, completed successfully:
+DX11, DX8, GCC/MSVC fixtures, actual Lua and shaders. Both renderer build
+steps succeeded, including the new scripted talk/condition fixtures and the
+Windows process-ownership tests. Intermediate native runs 43694313883 and
+43695629758 were superseded, not accepted as builds of the final candidate.
+
+Candidate **000080** is prepared under
+`C:/Users/Mahito/Downloads/LostZone-candidate-000080/`:
+
+- Six protected resource archives, all 23 entries authenticated and extracted
+  bytes compared with staged sources from the same commit.
+- CI DX11 runtime and separate matching symbols downloaded and checked by
+  CI identity, ZIP CRC and every recorded file size/SHA256. Client/server EXEs
+  are identical: `07a7f3db130825961073abb8865d2cbbd0659e0dbceaa3ce586a96dfd2bc7366`.
+- DX8 artifact from the same successful run:
+  `6529ece3bd0856d85d3ec8cdc055950b3e11736d59b9f0965043b673d9e931ea`.
+  Both renderer binaries contain the matching owner archive key; no key bytes
+  were printed or added to verification reports.
+- Static PE import check passed for all 46 images after adding DX8. Nothing
+  was loaded or executed locally.
+- Standalone server candidate ZIP prepared from the existing explicit
+  immutable-file whitelist and new verified native/resources. All 72 files,
+  all CRCs and file hashes verified. No player saves, live databases, host
+  settings, private keys or logs included. ZIP size **2,922,141,749 bytes**,
+  SHA256 `4cd0aa4b1d360739e448f605c50bd0a364c6a5993f84b5fc3e9b4e98df51bfa6`.
+
+The server ZIP is
+`C:/Users/Mahito/Downloads/LostZone-candidate-000080/Lost Zone Server candidate-000080.zip`.
+Its metadata explicitly identifies an unpublished candidate requiring the
+matching client. Candidate 000079 is marked superseded. Verification reports
+are retained beside the candidate. The installed J: client/server and public
+launcher distribution were not changed, and the existing server archives
+were preserved. No live multiplayer acceptance or closure of the entire bug
+backlog is claimed. The owner requested release after the blocking list is
+closed; this candidate has not been published.
