@@ -17,8 +17,14 @@ extern xrSkin2W xrSkin2W_SSE;
 extern xrSkin3W xrSkin3W_SSE;
 extern xrSkin4W xrSkin4W_SSE;
 
+extern xrSkin1W xrSkin1W_thread;
+extern xrSkin2W xrSkin2W_thread;
+extern xrSkin3W xrSkin3W_thread;
 extern xrSkin4W xrSkin4W_thread;
 
+xrSkin1W* skin1W_func = NULL;
+xrSkin2W* skin2W_func = NULL;
+xrSkin3W* skin3W_func = NULL;
 xrSkin4W* skin4W_func = NULL;
 
 extern xrPLC_calc3 PLC_calc3_x86;
@@ -34,6 +40,9 @@ void __cdecl xrBind_PSGP(xrDispatchTable* T, _processor_info* ID)
 	T->skin2W = xrSkin2W_x86;
 	T->skin3W = xrSkin3W_x86;
 	T->skin4W = xrSkin4W_x86;
+	skin1W_func = xrSkin1W_x86;
+	skin2W_func = xrSkin2W_x86;
+	skin3W_func = xrSkin3W_x86;
 	skin4W_func = xrSkin4W_x86;
 	T->PLC_calc3 = PLC_calc3_x86;
 
@@ -50,7 +59,12 @@ void __cdecl xrBind_PSGP(xrDispatchTable* T, _processor_info* ID)
 #endif
 
 	// Several cores: skinning runs on the TBB pool (doc 151).
-	if (std::thread::hardware_concurrency() > 1)
-		T->skin4W = xrSkin4W_thread;
+	if (std::thread::hardware_concurrency() > 1 && !strstr(Core.Params,"-cpu_serial"))
+    {
+        T->skin1W = xrSkin1W_thread;
+        T->skin2W = xrSkin2W_thread;
+        T->skin3W = xrSkin3W_thread;
+        T->skin4W = xrSkin4W_thread;
+    }
 }
 };

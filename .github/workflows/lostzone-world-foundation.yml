@@ -164,6 +164,20 @@ permissions:
   contents: read
 
 jobs:
+  cpu-windows:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compare actual bounded CPU jobs, skin kernels and replication plans
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          python scripts/check-native-cpu-jobs.py
+          if errorlevel 1 exit /b %errorlevel%
   entry-windows:
     runs-on: windows-2022
     timeout-minutes: 5

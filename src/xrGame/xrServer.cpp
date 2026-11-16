@@ -7,6 +7,7 @@
 #include "xrServer.h"
 #include "netcoop_simulation_lod.h"
 #include "netcoop_replication_index.h"
+#include "netcoop_replication_plan.h"
 #include "actor_defs.h"
 #include "actor.h"
 #include "Inventory.h"
@@ -480,16 +481,41 @@ void xrServer::SendUpdatesAOI()
 		bool full_rate; // creature root, including held items; never distance/overload throttled
 		u16 owner_only; // a player's Actor id: only that client gets it; 0xffff: everyone
 		Fvector position;
+		u32 hash; // immutable frame hash; computed once, not once per recipient
 	};
 	static xr_vector<u8> data;
 	static xr_vector<Chunk> chunks;
 	static xr_vector<netcoop_world::ReplicationRecord> index_records;
+	static xr_vector<netcoop_world::PlanRecord> plan_records;
+	static xr_vector<netcoop_world::PlanObserver> observers;
+	static netcoop_world::ReplicationPlan cpu_plan;
 	// Chunk stage 1 (doc 49): the spatial index picks each client's candidates
 	// (same set as the full scan, fixture check-netcoop-replication-index.py).
 	// Opt-in for now: it rebuilds its grid every tick and sorts per client, so
 	// with ~1700 objects and 64 players in one spot the server frame was
 	// 43-48 ms with it and 21-23 ms without (2026-10-06). Speed it up first.
 	const bool use_index = strstr(Core.Params, "-netcoop_chunk_index") != nullptr;
+	observers.clear();plan_records.clear();
+	bool overflow=false;
+	if(!use_index && !strstr(Core.Params,"-cpu_serial"))
+	{
+		struct Collect
+		{
+			xrServer* server;xr_vector<netcoop_world::PlanObserver>* rows;bool* overflow;
+			void operator()(IClient* client)
+			{
+				auto peer=static_cast<xrClientData*>(client);
+				if(client==server->GetServerClient() || !client->flags.bConnected || !peer->gamma_snapshot_ready || !peer->owner)return;
+				if(rows->size()>=512){*overflow=true;return;}
+				const auto& p=peer->owner->o_Position;
+				rows->push_back({peer->ID.value(),peer->owner->ID,p.x,p.y,p.z});
+			}
+		} collect={this,&observers,&overflow};
+		ForEachClientDo(collect);
+		std::sort(observers.begin(),observers.end(),[](const netcoop_world::PlanObserver& a,const netcoop_world::PlanObserver& b){return a.client<b.client;});
+	}
+	const bool plan_inputs=!overflow && observers.size()>=4;
+	u32 world_records=0;
 	data.clear();
 	chunks.clear();
 	index_records.clear();
@@ -541,8 +567,11 @@ void xrServer::SendUpdatesAOI()
 		c.full_rate = c.player || smart_cast<CSE_ALifeCreatureAbstract*>(root) != NULL;
 		c.owner_only = owner_only;
 		c.position = root->o_Position;
+		c.hash=c.full_rate ? 0:aoi_hash(tmp.B.data,tmp.B.count);
 		data.insert(data.end(), tmp.B.data, tmp.B.data + tmp.B.count);
 		chunks.push_back(c);
+		if(plan_inputs)plan_records.push_back({c.id,c.owner_only,c.full_rate,c.position.x,c.position.y,c.position.z});
+		if(!c.full_rate)++world_records;
 		if (use_index) index_records.push_back({c.id,c.full_rate,c.position.x,c.position.y,c.position.z});
 	}
 
@@ -632,6 +661,8 @@ void xrServer::SendUpdatesAOI()
 			Msg("! [chunk-shadow] invalid state/configuration; diagnostics disabled, legacy replication continues");
 		}
 	}
+	const bool planned=plan_inputs && std::size_t(world_records)*observers.size()>=32768 &&
+		cpu_plan.prepare(plan_records.data(),plan_records.size(),observers.data(),observers.size(),m_aoi_tick,far_scale);
 	bool indexed = false;
 	if (use_index)
 	{
@@ -650,6 +681,9 @@ void xrServer::SendUpdatesAOI()
 		u32 *indexed_clients, *fallback_clients;
 		u32 far_scale;
 		u32* unchanged_skipped;
+		bool planned;
+		const xr_vector<netcoop_world::PlanObserver>* observers;
+		netcoop_world::ReplicationPlan* plan;
 		void operator()(IClient* client)
 		{
 			xrClientData* CL = static_cast<xrClientData*>(client);
@@ -664,31 +698,46 @@ void xrServer::SendUpdatesAOI()
 			NET_Packet P;
 			P.w_begin(M_UPDATE_OBJECTS);
 			netcoop_world::ReplicationSelection selection;
+			netcoop_world::PlanSelection decisions;
+			if(planned)
+			{
+				const auto found=std::lower_bound(observers->begin(),observers->end(),CL->ID.value(),
+					[](const netcoop_world::PlanObserver& row,u32 id){return row.client<id;});
+				// A connection/owner/position change after capture safely falls back.
+				if(found!=observers->end() && found->client==CL->ID.value() && found->owner==CL->owner->ID &&
+					found->x==eye.x && found->y==eye.y && found->z==eye.z)
+					decisions=plan->select(std::size_t(found-observers->begin()));
+			}
 			if (indexed)
 				selection = server->m_replication_index->select(CL->owner->ID,eye.x,eye.y,eye.z,server->m_aoi_tick);
-			const std::size_t count = selection.valid ? selection.count : chunks.size();
+			const std::size_t count = decisions.valid ? decisions.count:selection.valid ? selection.count : chunks.size();
 			*candidate_checks += count; *full_checks += chunks.size(); *grid_checks += selection.spatial_candidates;
 			if (selection.valid) ++*indexed_clients; else ++*fallback_clients;
 			for (std::size_t cursor = 0; cursor < count; ++cursor)
 			{
-				const std::size_t i = selection.valid ? selection.indices[cursor] : cursor;
+				const std::size_t i = decisions.valid ? (decisions.entries[cursor]&~netcoop_world::plan_close):selection.valid ? selection.indices[cursor] : cursor;
 				const Chunk& c = chunks[i];
 				if (c.owner_only != 0xffff && c.owner_only != CL->owner->ID)
 					continue;
+				bool close_by=false;
+				if(decisions.valid)close_by=(decisions.entries[cursor]&netcoop_world::plan_close)!=0;
+				else
+				{
 				const float d = c.full_rate || c.id == CL->owner->ID ? 0.f : eye.distance_to(c.position);
 				u32 every = c.full_rate ? 1 : d < 50.f ? 1 : d < 150.f ? 2 : d < 300.f ? 4 : 16;
 				// Overload/budget never defer characters, their equipment or nearby objects.
-				const bool close_by = c.full_rate || d < 50.f;
+				close_by = c.full_rate || d < 50.f;
 				if (!close_by) every *= far_scale;
 				if ((server->m_aoi_tick + c.id) % every)
 					continue;
+				}
 				if (!close_by && client_bytes > aoi_client_budget)
 					continue; // staggered by id and tick, it goes out on a later tick
 				// Full-rate states must repair packet loss next tick. Hash equality
 				// cannot safely suppress creature updates for the 500 ms keep-alive.
 				if (!c.full_rate)
 				{
-					const u32 hash = aoi_hash(&data[c.offset], c.size);
+					const u32 hash = c.hash;
 					AoiSent& last = memory.sent[c.id];
 					if (last.hash == hash && last.time && now - last.time < aoi_keepalive_ms)
 					{
@@ -714,7 +763,7 @@ void xrServer::SendUpdatesAOI()
 			}
 		}
 	} send = {this, &sent_bytes, indexed, &candidate_checks, &full_checks, &grid_checks, &indexed_clients, &fallback_clients, far_scale,
-		&s_aoi_unchanged};
+		&s_aoi_unchanged,planned,&observers,&cpu_plan};
 	ForEachClientDo(send);
 	// Forget clients that left (not served for ~10 s).
 	if (m_aoi_tick % 300 == 0)
@@ -724,6 +773,8 @@ void xrServer::SendUpdatesAOI()
 	{
 		Msg("[Lost Zone][replication] unchanged not resent %.0f/s, frame %.1f ms, far x%u", float(s_aoi_unchanged) / 10.f,
 			s_aoi_frame_ms, far_scale);
+		if(planned && strstr(Core.Params,"-netcoop_cpu_trace"))
+			Msg("[cpu-replication] observers=%u objects=%u slots=%u blocks=%u",u32(observers.size()),u32(chunks.size()),cpu_plan.stats().slots,u32(cpu_plan.stats().blocks));
 		s_aoi_unchanged = 0;
 		s_aoi_log = Device.dwTimeGlobal;
 	}

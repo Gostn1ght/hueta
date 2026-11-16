@@ -13,7 +13,7 @@ game = root / "src/xrGame"
 server = (game / "xrServer.cpp").read_text(encoding="utf-8")
 start = server.index("\t\t\t\tconst float d =")
 end = server.index("\t\t\t\tif ((server->m_aoi_tick + c.id) % every)", start)
-cadence = server[start:end]
+cadence = server[start:end].replace("close_by =", "const bool close_by =", 1)
 reference_path = root / "scripts/fixtures/full-rate-cadence/cadence.cpp"
 reference = reference_path.read_text(encoding="utf-8")
 assert hashlib.sha256(reference.encode("utf-8")).hexdigest() == "cbef7e47e7982084081bb30a8e6eb39a0a6db763cf979febf3af642fdee67537"
