@@ -123,13 +123,13 @@ std::vector<u32> reference(const std::vector<netcoop_world::PlanRecord>& rows,co
 int main(){
  auto z=xr_cpu::parallel_for(0,0,nullptr,nullptr);assert(z.blocks==0);
  // Simultaneous first use of the shared arenas, as client and server batches.
- Probe clients,servers,expected;clients.output.resize(4096);servers.output.resize(4096);expected.output.resize(4096);
+ Probe clients,servers,reference_batch;clients.output.resize(4096);servers.output.resize(4096);reference_batch.output.resize(4096);
  std::atomic<unsigned> start{0};
  auto concurrent=[&](Probe& p,unsigned limit){start.fetch_add(1);while(start.load()!=2)std::this_thread::yield();
   auto s=xr_cpu::parallel_for(p.output.size(),64,Probe::run,&p,limit);assert(s.slots<=xr_cpu::concurrency(limit));};
  std::thread client([&]{concurrent(clients,2);}),server([&]{concurrent(servers,4);});client.join();server.join();
- xr_cpu::parallel_for(expected.output.size(),64,Probe::run,&expected,1);
- assert(clients.output==expected.output && servers.output==expected.output);
+ xr_cpu::parallel_for(reference_batch.output.size(),64,Probe::run,&reference_batch,1);
+ assert(clients.output==reference_batch.output && servers.output==reference_batch.output);
  const auto original_round=std::fegetround();assert(std::fesetround(FE_DOWNWARD)==0);
  Environment environment{FE_DOWNWARD};xr_cpu::parallel_for(2048,1,Environment::run,&environment,4);
  assert(environment.valid.load() && std::fegetround()==FE_DOWNWARD);assert(std::fesetround(original_round)==0);
