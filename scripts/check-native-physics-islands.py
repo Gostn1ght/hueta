@@ -27,6 +27,8 @@ code=r'''
 #include <limits>
 #include <thread>
 #include <vector>
+#undef assert
+#define assert(condition) do { if(!(condition)){std::fprintf(stderr,"FAIL %s:%d: %s\n",__FILE__,__LINE__,#condition);std::fflush(stderr);ExitProcess(2);} } while(false)
 std::atomic<DWORD> owner_thread{0};
 std::atomic<bool> geometry_on_worker{false};
 struct dxGeom;
@@ -128,19 +130,23 @@ DWORD WINAPI small_stack(void*){
  return 0;
 }
 int main(){
+ std::setvbuf(stdout,nullptr,_IONBF,0);
  owner_thread=GetCurrentThreadId();
  assert(xr_physics::step_islands(nullptr,0,.01f).accepted);
  assert(!xr_physics::step_islands(nullptr,4,.01f).accepted);
+ std::puts("CHECK constructing actual ODE scenes");
  Scene baseline(32,true),serial(32,true),parallel(32,true);
  unsigned max_slots=0;
  std::vector<double> timings[2];
  for(unsigned tick=0;tick<120;++tick){
   baseline.prepare(tick);serial.prepare(tick);parallel.prepare(tick);
+  if(tick==0)std::puts("CHECK first direct step");
   baseline.direct();
   for(unsigned mode=0;mode<2;++mode){
    auto& scene=mode?parallel:serial;
    if(mode && tick%17==0)xr_cpu::test_fail_after_blocks(0);
    const auto begin=std::chrono::steady_clock::now();
+   if(tick==0)std::printf("CHECK first batch mode=%u\n",mode);
    const auto stats=xr_physics::step_islands(scene.jobs.data(),scene.jobs.size(),.01f,mode?4:1);
    xr_cpu::test_fail_after_blocks(-1);assert(stats.accepted);
    max_slots=std::max(max_slots,stats.cpu.slots);
@@ -150,6 +156,7 @@ int main(){
   compare(baseline,serial);compare(baseline,parallel);
   assert(dThreadSetGeomNotificationsDeferred(0)==0);
  }
+ std::puts("CHECK frame equality complete");
  // Duplicate/invalid roots reject before touching any world.
  auto invalid=parallel.jobs;invalid[1]=invalid[0];
  const auto body=parallel.bodies.front();std::array<dReal,3> before;
@@ -159,6 +166,7 @@ int main(){
  assert(!xr_physics::step_islands(parallel.jobs.data(),parallel.jobs.size(),std::numeric_limits<dReal>::quiet_NaN()).accepted);
  assert(!std::memcmp(before.data(),dBodyGetPosition(body),3*sizeof(dReal)));
  // Prove bounded worker scratch on a deliberately small reserved stack.
+ std::puts("CHECK bounded stack");
  HANDLE thread=CreateThread(nullptr,512*1024,small_stack,nullptr,STACK_SIZE_PARAM_IS_A_RESERVATION,nullptr);
  assert(thread && WaitForSingleObject(thread,30000)==WAIT_OBJECT_0);
  DWORD code=1;assert(GetExitCodeThread(thread,&code) && code==0);CloseHandle(thread);owner_thread=GetCurrentThreadId();

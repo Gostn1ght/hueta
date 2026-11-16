@@ -54,6 +54,8 @@ preamble = r'''
 #include <mutex>
 #include <thread>
 #include <vector>
+#undef assert
+#define assert(condition) do { if(!(condition)){std::fprintf(stderr,"FAIL %s:%d: %s\n",__FILE__,__LINE__,#condition);std::fflush(stderr);ExitProcess(2);} } while(false)
 #include <xmmintrin.h>
 using u32=unsigned;using u16=unsigned short;
 #define IC inline
@@ -119,6 +121,7 @@ void check(Setup setup){
  }
 }
 int main(){
+ std::setvbuf(stdout,nullptr,_IONBF,0);
  noise3Init();noise_start=0;
 #define CHECK(Name,...) check<serial_ref::Name,PAPI::Name>([&](auto& a){__VA_ARGS__;})
  CHECK(PACopyVertexB,a.copy_pos=1);
