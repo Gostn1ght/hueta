@@ -14,6 +14,7 @@ source=r'''
 #define NOMINMAX
 #include <windows.h>
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <cfenv>
@@ -91,6 +92,14 @@ struct Environment {
   std::fesetround(FE_UPWARD); // Scope must restore the worker/caller environment.
  }
 };
+struct OnceProbe {
+ std::array<std::atomic<unsigned>,8192> calls{};
+ static void run(void* p,std::size_t index)noexcept{
+  static_cast<OnceProbe*>(p)->calls[index].fetch_add(1,std::memory_order_relaxed);
+ }
+ void reset(){for(auto& item:calls)item.store(0);}
+ void verify(){for(auto& item:calls)assert(item.load()==1);}
+};
 template<class V,class Serial,class Parallel>void skins(Serial serial,Parallel parallel){
  for(u32 n:{0u,1u,7u,8u,511u,512u,513u,1023u,1024u,1025u,4097u,8193u,65536u}){
   std::vector<V> input(n);std::vector<CBoneInstance> bones(16);
@@ -122,6 +131,15 @@ std::vector<u32> reference(const std::vector<netcoop_world::PlanRecord>& rows,co
 }
 int main(){
  auto z=xr_cpu::parallel_for(0,0,nullptr,nullptr);assert(z.blocks==0);
+ OnceProbe once;once.reset();
+ xr_cpu::for_each_once(once.calls.size(),OnceProbe::run,&once,4);once.verify();
+ if(xr_cpu::concurrency(4)>1){
+  once.reset();xr_cpu::test_fail_after_blocks(0);
+  auto failed=xr_cpu::for_each_once(once.calls.size(),OnceProbe::run,&once,4);
+  xr_cpu::test_fail_after_blocks(-1);assert(failed.fallback);once.verify();
+ }
+ once.reset();xr_cpu::for_each_once(once.calls.size(),OnceProbe::run,&once,1);once.verify();
+ std::puts("PASS non-idempotent jobs: every index exactly once, including scheduler failure after completed work");
  // Simultaneous first use of the shared arenas, as client and server batches.
  Probe clients,servers,reference_batch;clients.output.resize(4096);servers.output.resize(4096);reference_batch.output.resize(4096);
  std::atomic<unsigned> start{0};
@@ -175,7 +193,7 @@ int main(){
 with TemporaryDirectory(prefix='lz-cpu-jobs-') as directory:
     folder=Path(directory);cpp=folder/'cpu.cpp';exe=folder/'cpu.exe';cpp.write_text(source,encoding='utf-8')
     shutil.copy2(root/'sdk/binaries/tbb.dll',folder/'tbb.dll')
-    subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/O2','/W4','/WX','/D_CRT_SECURE_NO_WARNINGS',
+    subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/O2','/W4','/WX','/D_CRT_SECURE_NO_WARNINGS','/DLZ_CPU_JOB_TESTS',
         '/external:I'+str(root/'src/3rd party'),'/external:W0',
         '/I'+str(root/'src/xrCore'),'/I'+str(root/'src/xrGame'),str(cpp),str(root/'src/xrCore/xr_cpu_jobs.cpp'),
         str(root/'src/xrGame/netcoop_replication_plan.cpp'),'/Fe:'+str(exe),'/link',str(root/'sdk/libraries/x64/tbb.lib')],cwd=folder,check=True)
