@@ -49,14 +49,14 @@ struct Scene {
  std::vector<xr_physics::IslandJob> jobs;
  std::vector<dJointFeedback> feedback;
  unsigned contacts_used=0;
- Scene(unsigned count,bool extremes=false) {
+ Scene(unsigned count,bool extremes=false,bool worker_bound=false) {
   feedback.resize(count*128);
   for(unsigned island=0;island<count;++island){
    auto world=dWorldCreate();worlds.push_back(world);
    dWorldSetGravity(world,0,-9.81f,0);dWorldSetCFM(world,1.e-5f);
    dWorldSetQuickStepNumIterations(world,24);
    bool exact=island%2==0;
-   unsigned n=exact?4:12;
+   unsigned n=worker_bound?64:(exact?4:12);
    if(extremes && island==0)n=65;
    jobs.push_back({world,exact,0});
    dBodyID previous=nullptr;
@@ -72,7 +72,7 @@ struct Scene {
    }
   }
  }
- ~Scene(){clear_contacts();for(auto world:worlds)dWorldDestroy(world);dSpaceDestroy(space);}
+ ~Scene(){clear_contacts();dSpaceDestroy(space);for(auto world:worlds)dWorldDestroy(world);}
  void clear_contacts(){for(auto joint:contacts)dJointDestroy(joint);contacts.clear();}
  void prepare(unsigned tick){
   // This engine's group empty deliberately does NOT unlink world roots:
@@ -125,7 +125,7 @@ void ode_error(int number,const char* format,va_list arguments){
 }
 DWORD WINAPI small_stack(void*){
  owner_thread=GetCurrentThreadId();
- Scene scene(8);
+ Scene scene(8,false,true);
  // Worst six-row joints at the worker exact bound, not only three-row balls.
  for(unsigned i=0;i<scene.worlds.size();++i){
   const auto world=scene.worlds[i];
@@ -133,7 +133,7 @@ DWORD WINAPI small_stack(void*){
   // All rows at the24/128 joint boundary have six constraints.
   while(world->firstjoint)dJointDestroy(world->firstjoint);
   unsigned add=exact?24:128;
-  auto body=scene.bodies[exact ? (i/2)*16:(i/2)*16+4];
+  auto body=scene.bodies[i*64];
   for(unsigned j=0;j<add;++j){auto joint=dJointCreateFixed(world,nullptr);dJointAttach(joint,body,nullptr);dJointSetFixed(joint);}
  }
  auto s=xr_physics::step_islands(scene.jobs.data(),scene.jobs.size(),.01f,1);
@@ -165,6 +165,7 @@ int main(){
    if(tick==0)std::printf("CHECK first batch mode=%u\n",mode);
    const auto stats=xr_physics::step_islands(scene.jobs.data(),scene.jobs.size(),.01f,mode?4:1);
    xr_cpu::test_fail_after_blocks(-1);assert(stats.accepted);
+   if(mode && tick%17==0)assert(stats.cpu.fallback);
    max_slots=std::max(max_slots,stats.cpu.slots);
    timings[mode].push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count());
    scene.check_bounds();
@@ -172,6 +173,7 @@ int main(){
   compare(baseline,serial);compare(baseline,parallel);
   assert(dThreadSetGeomNotificationsDeferred(0)==0);
  }
+ assert(max_slots>1);
  std::puts("CHECK frame equality complete");
  // Duplicate/invalid roots reject before touching any world.
  auto invalid=parallel.jobs;invalid[1]=invalid[0];
