@@ -166,7 +166,7 @@ permissions:
 jobs:
   cpu-windows:
     runs-on: windows-2022
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -177,6 +177,8 @@ jobs:
         run: |
           call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           python scripts/check-native-cpu-jobs.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-physics-islands.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:
     runs-on: windows-2022

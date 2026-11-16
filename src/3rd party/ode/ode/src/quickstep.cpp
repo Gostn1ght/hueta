@@ -35,7 +35,30 @@
 
 #include <algorithm>
 #include <random>
-static thread_local auto rng = std::mt19937(std::random_device()());
+#include <ode/objects.h>
+#include <ode/parallel_step.h>
+namespace
+{
+thread_local std::mt19937* selected_rng=nullptr;
+std::mt19937& solver_rng()
+{
+    if(selected_rng)return *selected_rng;
+    static thread_local std::mt19937 legacy_rng(std::random_device{}());
+    return legacy_rng;
+}
+struct RngScope
+{
+    std::mt19937* previous;
+    explicit RngScope(std::mt19937& rng):previous(selected_rng){selected_rng=&rng;}
+    ~RngScope(){selected_rng=previous;}
+};
+}
+void dWorldQuickStepSeeded(dWorldID world,dReal stepsize,unsigned int seed)
+{
+    std::mt19937 rng(seed);
+    RngScope scope(rng);
+    dWorldQuickStep(world,stepsize);
+}
 
 
 #define ALLOCA dALLOCA16
@@ -426,7 +449,7 @@ static void SOR_LCP (int m, int nb, dRealMutablePtr J, int *jb, dxBody * const *
 #endif
 #ifdef RANDOMLY_REORDER_CONSTRAINTS
 		if ((iteration & 3) == 0) {
-			std::shuffle(order, order + m, rng);
+			std::shuffle(order, order + m, solver_rng());
 			/*
 			for (i=1; i<m; ++i) {
 				IndexError tmp = order[i];

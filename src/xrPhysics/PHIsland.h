@@ -278,6 +278,7 @@ public:
 	void SetPrefereExactIntegration() { m_flags.set_prefere_exact_integration(); }
 	void SetForceExactIntegration() { m_flags.set_force_exact_integration(); }
 	void Step(dReal step);
+	bool UsesExactSolver();
 	void Enable();
 	void Repair();
 protected:

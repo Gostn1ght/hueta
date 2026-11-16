@@ -24,8 +24,23 @@
 #include "objects.h"
 #include "joint.h"
 #include "util.h"
+#include <ode/parallel_step.h>
 
 #define ALLOCA dALLOCA16
+
+static thread_local bool defer_geom_notifications=false;
+int dThreadSetGeomNotificationsDeferred(int deferred)
+{
+    const int previous=defer_geom_notifications;
+    defer_geom_notifications=deferred!=0;
+    return previous;
+}
+void dWorldRefreshGeoms(dWorldID world)
+{
+    dAASSERT(world);
+    for(dxBody* body=world->firstbody;body;body=(dxBody*)body->next)
+        for(dxGeom* geom=body->geom;geom;geom=dGeomGetBodyNext(geom))dGeomMoved(geom);
+}
 
 //****************************************************************************
 // Auto disabling
@@ -163,8 +178,9 @@ dIASSERT(dValid(b->avel[0])&&dValid(b->avel[1])&&dValid(b->avel[2]));
   dQtoR (b->q,b->R);
 
   // notify all attached geoms that this body has moved
-  for (dxGeom *geom = b->geom; geom; geom = dGeomGetBodyNext (geom))
-    dGeomMoved (geom);
+  if(!defer_geom_notifications)
+    for (dxGeom *geom = b->geom; geom; geom = dGeomGetBodyNext (geom))
+      dGeomMoved (geom);
 
 #ifdef DEBUG_VALID
 dIASSERT(dValid(b->avel[0])&&dValid(b->avel[1])&&dValid(b->avel[2]));

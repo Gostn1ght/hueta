@@ -339,6 +339,10 @@
     <ClCompile Include="PHSplitedShell.cpp" />
     <ClCompile Include="PHStaticGeomShell.cpp" />
     <ClCompile Include="phvalide.cpp" />
+    <ClCompile Include="PHIslandBatch.cpp">
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="PHWorld.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="PhysicsExternalCommon.cpp" />

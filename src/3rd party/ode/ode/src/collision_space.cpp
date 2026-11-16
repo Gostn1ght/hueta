@@ -45,6 +45,10 @@ spaces
 
 void dGeomMoved (dxGeom *geom)
 {
+#ifdef LZ_ODE_TESTS
+  extern void lz_ode_test_geom_moved(dxGeom*);
+  lz_ode_test_geom_moved(geom);
+#endif
   dAASSERT (geom);
   
   // from the bottom of the space heirarchy up, process all clean geoms

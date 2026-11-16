@@ -6,6 +6,7 @@
 #include "../xrCore/_noncopyable.h"
 #include "physics_scripted.h"
 #include "../xrEngine/pure.h"
+#include "PHIslandBatch.h"
 // refs
 struct SGameMtlPair;
 //class	CPHCommander;
@@ -54,6 +55,7 @@ class CPHWorld : public pureFrame,
 	PH_OBJECT_STORAGE m_objects;
 	PH_OBJECT_STORAGE m_freezed_objects;
 	PH_OBJECT_STORAGE m_recently_disabled_objects;
+	xr_vector<xr_physics::IslandJob> m_solver_jobs;
 	PH_UPDATE_OBJECT_STORAGE m_update_objects;
 	PH_UPDATE_OBJECT_STORAGE m_freezed_update_objects;
 	dGeomID m_motion_ray;

@@ -398,6 +398,28 @@ void CPHWorld::Step()
 	m_update_callback->update_step();
 	//	m_commander						->update();
 	//////////////////////////////////////////////////////////////////////
+	xr_physics::IslandBatchStats solver_batch;
+#ifndef DEBUG
+	if(!strstr(Core.Params,"-cpu_physics_legacy"))
+	{
+		m_solver_jobs.clear();
+		for(auto* object:m_objects)
+		{
+			auto& island=object->Island();
+			if(!island.IsActive() || !island.nb)continue;
+			const u32 seed=u32(m_steps_num)^((u32(m_solver_jobs.size())+1u)*0x9e3779b9u);
+			m_solver_jobs.push_back({island.DWorld(),island.UsesExactSolver(),seed});
+		}
+		// Collision merging and every gameplay callback have finished. The
+		// synchronous fence completes all solvers before reinit/PhDataUpdate.
+		solver_batch=xr_physics::step_islands(m_solver_jobs.data(),m_solver_jobs.size(),fixed_step,
+			strstr(Core.Params,"-cpu_serial") ? 1:0);
+		if(solver_batch.accepted && m_steps_num%500==0 && strstr(Core.Params,"-cpu_trace"))
+            Msg("[cpu-physics] roots=%u eligible=%u slots=%u blocks=%u",u32(m_solver_jobs.size()),
+                u32(solver_batch.eligible),solver_batch.cpu.slots,u32(solver_batch.cpu.blocks));
+	}
+#endif
+	if(!solver_batch.accepted)
 	for (i_object = m_objects.begin(); m_objects.end() != i_object;)
 	{
 		CPHObject* obj = (*i_object);
