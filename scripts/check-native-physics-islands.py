@@ -42,7 +42,7 @@ void no_contact(void*,dGeomID,dGeomID){}
 struct Scene {
  dSpaceID space=dSimpleSpaceCreate(nullptr);
  dGeomID floor=dCreatePlane(space,0,1,0,0);
- dJointGroupID contacts=dJointGroupCreate(0);
+ std::vector<dJointID> contacts;
  std::vector<dWorldID> worlds;
  std::vector<dBodyID> bodies;
  std::vector<dGeomID> geoms;
@@ -72,9 +72,14 @@ struct Scene {
    }
   }
  }
- ~Scene(){dJointGroupDestroy(contacts);for(auto world:worlds)dWorldDestroy(world);dSpaceDestroy(space);}
+ ~Scene(){clear_contacts();for(auto world:worlds)dWorldDestroy(world);dSpaceDestroy(space);}
+ void clear_contacts(){for(auto joint:contacts)dJointDestroy(joint);contacts.clear();}
  void prepare(unsigned tick){
-  dJointGroupEmpty(contacts);contacts_used=0;std::fill(feedback.begin(),feedback.end(),dJointFeedback{});
+  // This engine's group empty deliberately does NOT unlink world roots:
+  // CPHWorld reinitializes island lists before emptying its contact group.
+  // Our persistent standalone worlds instead destroy ungrouped contacts so
+  // subsequent frames do not traverse freed joints from a stale root list.
+  clear_contacts();contacts_used=0;std::fill(feedback.begin(),feedback.end(),dJointFeedback{});
   // Clean shared parent-space lists, so stale/worker geometry notifications
   // cannot be hidden by every geom already being dirty.
   dSpaceCollide(space,nullptr,no_contact);
@@ -84,7 +89,7 @@ struct Scene {
    for(int i=0;i<count;++i){
     contact[i].surface.mode=dContactBounce|dContactSoftCFM;
     contact[i].surface.mu=.6f;contact[i].surface.bounce=.05f;contact[i].surface.soft_cfm=1.e-5f;
-    auto body=dGeomGetBody(geom);auto joint=dJointCreateContact(body->world,contacts,&contact[i]);
+    auto body=dGeomGetBody(geom);auto joint=dJointCreateContact(body->world,nullptr,&contact[i]);contacts.push_back(joint);
     dJointAttach(joint,body,nullptr);assert(contacts_used<feedback.size());
     dJointSetFeedback(joint,&feedback[contacts_used++]);
    }
