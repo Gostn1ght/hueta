@@ -25,6 +25,9 @@ code=r'''
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <exception>
+#include <cstdlib>
+#include <cstdarg>
 #include <thread>
 #include <vector>
 #undef assert
@@ -112,6 +115,9 @@ void compare(const Scene& a,const Scene& b){
  for(unsigned i=0;i<a.contacts_used;++i)
   assert(!std::memcmp(&a.feedback[i],&b.feedback[i],sizeof(dJointFeedback)));
 }
+void ode_error(int number,const char* format,va_list arguments){
+ std::fprintf(stderr,"ODE failure %d: ",number);std::vfprintf(stderr,format,arguments);std::fflush(stderr);ExitProcess(5);
+}
 DWORD WINAPI small_stack(void*){
  owner_thread=GetCurrentThreadId();
  Scene scene(8);
@@ -131,6 +137,10 @@ DWORD WINAPI small_stack(void*){
 }
 int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
+ std::set_terminate([]{try{auto exception=std::current_exception();if(exception)std::rethrow_exception(exception);}
+  catch(const std::exception& error){std::fprintf(stderr,"TERMINATE %s\n",error.what());}
+  catch(...){std::fprintf(stderr,"TERMINATE unknown exception\n");}std::fflush(stderr);ExitProcess(6);});
+ dSetErrorHandler(ode_error);dSetDebugHandler(ode_error);
  owner_thread=GetCurrentThreadId();
  assert(xr_physics::step_islands(nullptr,0,.01f).accepted);
  assert(!xr_physics::step_islands(nullptr,4,.01f).accepted);
@@ -139,6 +149,7 @@ int main(){
  unsigned max_slots=0;
  std::vector<double> timings[2];
  for(unsigned tick=0;tick<120;++tick){
+  if(tick%10==0)std::printf("CHECK frame=%u\n",tick);
   baseline.prepare(tick);serial.prepare(tick);parallel.prepare(tick);
   if(tick==0)std::puts("CHECK first direct step");
   baseline.direct();
