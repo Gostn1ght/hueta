@@ -152,6 +152,10 @@ void CSkeletonX::_Render_soft(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCou
 	_VertexStream& _VS = RCache.Vertex;
 	if (cache_DiscardID != _VS.DiscardID() || vCount != cache_vCount)
 	{
+		// CalculateBones and visibility changes use this same pose lock. Keep
+		// transforms stable until all CPU skin tasks have joined. Acquire it
+		// before mapping the vertex buffer so waiting never holds a GPU map.
+		xrCriticalSectionGuard pose_guard(Parent->UCalc_Mutex);
 		vertRender* Dest = (vertRender*)_VS.Lock(vCount, hGeom->vb_stride, vOffset);
 		cache_DiscardID = _VS.DiscardID();
 		cache_vCount = vCount;

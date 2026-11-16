@@ -17,6 +17,11 @@ are unchanged. Each task writes disjoint 512-vertex blocks in the already mapped
 vertex buffer; the caller waits before unlock/draw. Fewer than 1024 vertices stay
 serial. This does not parallelize GPU skinning, device calls, Lua or arbitrary
 `seqFrameMT` callbacks. `-cpu_serial` preserves scalar bindings for comparison.
+The soft-skinning caller holds the existing `UCalc_Mutex` before mapping through
+task completion/unmap. `CalculateBones` already uses it; both visibility setters
+now share it, including recursive visibility changes (Windows critical sections
+are recursive). Thus no pose writer may alter matrices consumed by these tasks.
+This is an explicit lifetime/data contract, not evidence for an old crash cause.
 
 Server: `SendUpdatesAOI` snapshots plain serialized-chunk metadata and observer
 positions. `ReplicationPlan` calculates distance/cadence over these immutable

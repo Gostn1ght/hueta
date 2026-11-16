@@ -529,6 +529,7 @@ void CKinematics::Release()
 
 void CKinematics::LL_SetBoneVisible(u16 bone_id, BOOL val, BOOL bRecursive)
 {
+	xrCriticalSectionGuard pose_guard(UCalc_Mutex);
 	VERIFY(bone_id < LL_BoneCount());
 	if (bone_id >= LL_BoneCount())
 		return;
@@ -562,6 +563,7 @@ void CKinematics::LL_SetBoneVisible(u16 bone_id, BOOL val, BOOL bRecursive)
 
 void CKinematics::LL_SetBonesVisible(u64 mask)
 {
+	xrCriticalSectionGuard pose_guard(UCalc_Mutex);
 	visimask.assign(0);
 	for (u32 bone_id = 0; bone_id < bones->size(); bone_id++)
 	{
