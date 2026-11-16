@@ -481,7 +481,8 @@ void xrServer::SendUpdatesAOI()
 		bool full_rate; // creature root, including held items; never distance/overload throttled
 		u16 owner_only; // a player's Actor id: only that client gets it; 0xffff: everyone
 		Fvector position;
-		u32 hash; // immutable frame hash; computed once, not once per recipient
+		u32 hash; // owner-only lazy cache; computed at most once for an eligible chunk
+		bool hash_ready;
 	};
 	static xr_vector<u8> data;
 	static xr_vector<Chunk> chunks;
@@ -567,7 +568,7 @@ void xrServer::SendUpdatesAOI()
 		c.full_rate = c.player || smart_cast<CSE_ALifeCreatureAbstract*>(root) != NULL;
 		c.owner_only = owner_only;
 		c.position = root->o_Position;
-		c.hash=c.full_rate ? 0:aoi_hash(tmp.B.data,tmp.B.count);
+		c.hash=0;c.hash_ready=false;
 		data.insert(data.end(), tmp.B.data, tmp.B.data + tmp.B.count);
 		chunks.push_back(c);
 		if(plan_inputs)plan_records.push_back({c.id,c.owner_only,c.full_rate,c.position.x,c.position.y,c.position.z});
@@ -716,7 +717,7 @@ void xrServer::SendUpdatesAOI()
 			for (std::size_t cursor = 0; cursor < count; ++cursor)
 			{
 				const std::size_t i = decisions.valid ? (decisions.entries[cursor]&~netcoop_world::plan_close):selection.valid ? selection.indices[cursor] : cursor;
-				const Chunk& c = chunks[i];
+				Chunk& c = chunks[i];
 				if (c.owner_only != 0xffff && c.owner_only != CL->owner->ID)
 					continue;
 				bool close_by=false;
@@ -737,6 +738,7 @@ void xrServer::SendUpdatesAOI()
 				// cannot safely suppress creature updates for the 500 ms keep-alive.
 				if (!c.full_rate)
 				{
+					if(!c.hash_ready){c.hash=aoi_hash(&data[c.offset],c.size);c.hash_ready=true;}
 					const u32 hash = c.hash;
 					AoiSent& last = memory.sent[c.id];
 					if (last.hash == hash && last.time && now - last.time < aoi_keepalive_ms)

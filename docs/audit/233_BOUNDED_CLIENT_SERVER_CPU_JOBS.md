@@ -24,8 +24,10 @@ values in parallel, preserving chunk order and private-owner filtering. Full-rat
 creatures/equipment remain full-rate. The owner still performs budget decisions,
 keepalive mutations, entity serialization and sends. It rechecks connection ID,
 actor ID and position before consuming a selection. Changed or invalid inputs
-use the existing serial path. Immutable chunk hashes are computed once per frame
-instead of once per recipient. No persistence/admission/identity rules change.
+use the existing serial path. The owner lazily computes each immutable chunk's
+hash at most once per frame, after cadence and budget eligibility, instead of
+once per recipient. Unsent chunks are not hashed. No persistence/admission/
+identity rules change.
 
 The planner requires at least 4 eligible clients and 32768 world-object/client
 pairs. Output is bounded at 32 MiB, 65536 records and 512 observers; allocation,
