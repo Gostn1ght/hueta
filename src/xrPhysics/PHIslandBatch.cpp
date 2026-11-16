@@ -1,5 +1,6 @@
 // Exception-enabled CPU boundary; no engine/PCH objects or Lua callbacks.
 #include "PHIslandBatch.h"
+#include "../3rd party/ode/include/ode/objects.h"
 #include "../3rd party/ode/ode/src/objects.h"
 #include <algorithm>
 #include <cmath>
