@@ -179,6 +179,7 @@ jobs:
           python scripts/check-native-cpu-jobs.py
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-physics-islands.py
+          python scripts/check-native-particle-cpu.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:
     runs-on: windows-2022
