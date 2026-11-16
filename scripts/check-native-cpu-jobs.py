@@ -18,6 +18,7 @@ source=r'''
 #include <atomic>
 #include <cassert>
 #include <cfenv>
+#include <xmmintrin.h>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -85,11 +86,12 @@ struct Nested {
  }
 };
 struct Environment {
- int expected;std::atomic<bool> valid{true};
+ int expected;unsigned expected_sse;std::atomic<bool> valid{true};
  static void run(void* p,std::size_t,std::size_t)noexcept{
   auto& x=*static_cast<Environment*>(p);
-  if(std::fegetround()!=x.expected)x.valid=false;
+  if(std::fegetround()!=x.expected || (_mm_getcsr()&0xffc0u)!=x.expected_sse)x.valid=false;
   std::fesetround(FE_UPWARD); // Scope must restore the worker/caller environment.
+  _mm_setcsr(_mm_getcsr()^0x8040u); // Perturb FTZ/DAZ, as initialized by the engine.
  }
 };
 struct OnceProbe {
@@ -148,9 +150,12 @@ int main(){
  }
  once.reset();xr_cpu::for_each_once(once.calls.size(),OnceProbe::run,&once,1);once.verify();
  std::puts("PASS non-idempotent jobs: every index exactly once, including scheduler failure after completed work");
- const auto original_round=std::fegetround();assert(std::fesetround(FE_DOWNWARD)==0);
- Environment environment{FE_DOWNWARD};xr_cpu::parallel_for(2048,1,Environment::run,&environment,4);
- assert(environment.valid.load() && std::fegetround()==FE_DOWNWARD);assert(std::fesetround(original_round)==0);
+ const auto original_round=std::fegetround();const auto original_sse=_mm_getcsr();
+ assert(std::fesetround(FE_DOWNWARD)==0);_mm_setcsr(_mm_getcsr()|0x8040u);
+ Environment environment{FE_DOWNWARD,_mm_getcsr()&0xffc0u};xr_cpu::parallel_for(2048,1,Environment::run,&environment,4);
+ assert(environment.valid.load() && std::fegetround()==FE_DOWNWARD && (_mm_getcsr()&0xffc0u)==environment.expected_sse);
+ assert(std::fesetround(original_round)==0);_mm_setcsr(original_sse);
+ std::puts("PASS engine SSE controls: inherited/restored rounding, exception masks, FTZ and DAZ");
  Nested nesting;nesting.output.resize(64);xr_cpu::parallel_for(nesting.output.size(),1,Nested::run,&nesting,4);
  assert(std::all_of(nesting.output.begin(),nesting.output.end(),[](unsigned value){return value==1;}));
  Probe a,b;a.output.resize(16384);b.output.resize(16384);
