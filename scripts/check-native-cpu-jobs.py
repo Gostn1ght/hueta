@@ -96,9 +96,9 @@ std::vector<u32> reference(const std::vector<netcoop_world::PlanRecord>& rows,co
  for(std::size_t i=0;i<rows.size();++i){const auto& r=rows[i];if(r.owner_only!=65535&&r.owner_only!=eye.owner)continue;
   const float x=eye.x-r.x,y=eye.y-r.y,z=eye.z-r.z;
   const float d=r.full_rate||r.id==eye.owner?0:std::sqrt(x*x+y*y+z*z);
-  const bool near=r.full_rate||d<50;
-  unsigned every=r.full_rate?1:d<50?1:d<150?2:d<300?4:16;if(!near)every*=scale;
-  if((tick+r.id)%every==0)out.push_back(u32(i)|(near?netcoop_world::plan_close:0));
+  const bool close_by=r.full_rate||d<50;
+  unsigned every=r.full_rate?1:d<50?1:d<150?2:d<300?4:16;if(!close_by)every*=scale;
+  if((tick+r.id)%every==0)out.push_back(u32(i)|(close_by?netcoop_world::plan_close:0));
  }return out;
 }
 int main(){
