@@ -72,6 +72,25 @@ struct Probe {
   auto& x=*static_cast<Probe*>(p);const auto s=xr_cpu::parallel_for(end-begin,1,run,p,4);assert(s.slots==1);x.nested=true;
  }
 };
+struct Nested {
+ std::vector<unsigned> output;
+ static void inner(void* p,std::size_t begin,std::size_t end)noexcept{
+  static_cast<std::atomic<unsigned>*>(p)->fetch_add(unsigned(end-begin));
+ }
+ static void run(void* p,std::size_t begin,std::size_t end)noexcept{
+  auto& x=*static_cast<Nested*>(p);
+  for(auto i=begin;i<end;++i){std::atomic<unsigned> touched{0};
+   auto s=xr_cpu::parallel_for(8,1,inner,&touched,4);assert(s.slots==1 && touched.load()==8);x.output[i]=1;}
+ }
+};
+struct Environment {
+ int expected;std::atomic<bool> valid{true};
+ static void run(void* p,std::size_t,std::size_t)noexcept{
+  auto& x=*static_cast<Environment*>(p);
+  if(std::fegetround()!=x.expected)x.valid=false;
+  std::fesetround(FE_UPWARD); // Scope must restore the worker/caller environment.
+ }
+};
 template<class V,class Serial,class Parallel>void skins(Serial serial,Parallel parallel){
  for(u32 n:{0u,1u,7u,8u,511u,512u,513u,1023u,1024u,1025u,4097u,8193u,65536u}){
   std::vector<V> input(n);std::vector<CBoneInstance> bones(16);
@@ -103,6 +122,19 @@ std::vector<u32> reference(const std::vector<netcoop_world::PlanRecord>& rows,co
 }
 int main(){
  auto z=xr_cpu::parallel_for(0,0,nullptr,nullptr);assert(z.blocks==0);
+ // Simultaneous first use of the shared arenas, as client and server batches.
+ Probe clients,servers,expected;clients.output.resize(4096);servers.output.resize(4096);expected.output.resize(4096);
+ std::atomic<unsigned> start{0};
+ auto concurrent=[&](Probe& p,unsigned limit){start.fetch_add(1);while(start.load()!=2)std::this_thread::yield();
+  auto s=xr_cpu::parallel_for(p.output.size(),64,Probe::run,&p,limit);assert(s.slots<=xr_cpu::concurrency(limit));};
+ std::thread client([&]{concurrent(clients,2);}),server([&]{concurrent(servers,4);});client.join();server.join();
+ xr_cpu::parallel_for(expected.output.size(),64,Probe::run,&expected,1);
+ assert(clients.output==expected.output && servers.output==expected.output);
+ const auto original_round=std::fegetround();assert(std::fesetround(FE_DOWNWARD)==0);
+ Environment environment{FE_DOWNWARD};xr_cpu::parallel_for(2048,1,Environment::run,&environment,4);
+ assert(environment.valid.load() && std::fegetround()==FE_DOWNWARD);assert(std::fesetround(original_round)==0);
+ Nested nesting;nesting.output.resize(64);xr_cpu::parallel_for(nesting.output.size(),1,Nested::run,&nesting,4);
+ assert(std::all_of(nesting.output.begin(),nesting.output.end(),[](unsigned value){return value==1;}));
  Probe a,b;a.output.resize(16384);b.output.resize(16384);
  auto serial=xr_cpu::parallel_for(a.output.size(),64,Probe::run,&a,1);
  auto parallel=xr_cpu::parallel_for(b.output.size(),64,Probe::run,&b,4);
@@ -137,7 +169,7 @@ int main(){
   timings[mode].push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count());
  }
  for(unsigned mode=0;mode<2;++mode){auto& t=timings[mode];std::sort(t.begin(),t.end());std::printf("METRIC replication observers=64 records=8192 limit=%u p50_us=%.3f p95_us=%.3f\n",mode?4:1,t[16],t[30]);}
- puts("PASS actual CPU pool: bounded slots, multiple OS threads, synchronous/nested fences; actual1-4W kernels exact output/canaries/immutable inputs; replication cadence/private ownership/order/bounds/failure reset match serial");
+ puts("PASS actual CPU pool: simultaneous first-use batches, inherited/restored FP environment, bounded slots, multiple OS threads, synchronous/nested fences; actual1-4W kernels exact output/canaries/immutable inputs; replication cadence/private ownership/order/bounds/failure reset match serial");
 }
 '''
 with TemporaryDirectory(prefix='lz-cpu-jobs-') as directory:

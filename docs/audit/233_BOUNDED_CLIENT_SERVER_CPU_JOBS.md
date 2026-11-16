@@ -42,7 +42,8 @@ compiles the actual new pool and planner, and extracts the actual engine's 1-4W
 scalar kernels and wrappers. Matrix/vector boundary doubles isolate the fixture;
 full DX11/DX8 builds check actual engine types and linkage.
 
-Checks: multiple OS threads, bounded slots, synchronous and nested fences,
+Checks: simultaneous client/server first-use batches, inherited/restored floating
+environment, multiple OS threads, bounded slots, synchronous and nested fences,
 serial/parallel skinning byte equality including boundary counts, output canaries,
 unchanged vertices/bones, planner equality against a scalar oracle, exact distance
 thresholds, unsigned tick wrap, owner-only data, full-rate entities, invalid input,
