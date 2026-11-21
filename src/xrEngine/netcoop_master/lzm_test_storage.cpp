@@ -115,9 +115,9 @@ struct HostControllerFixture {
         assert(!a.process && !b.process); // no executable exists in this fixture
         // A client can coexist with this map when60GiB RAM is free. A later
         // gameplay/cache spike must not make a new load require its old peak.
-        a.loading=true;a.sample_startup_peak=true;a.peak_commit=0;a.loading_peak_commit=0;
+        a.loading=true;a.sample_startup_peak=true;a.peak_commit=0;a.loading_peak_commit=0;a.healthy_at=0;
         controller.observe_memory(a,2,3,3.5);assert(a.peak_commit==3.5);
-        a.loading=false;controller.observe_memory(a,2.5,4,4.5);
+        a.loading=false;a.healthy_at=1;controller.observe_memory(a,2.5,4,4.5);
         assert(!a.sample_startup_peak && a.peak_commit==4.5);
         controller.observe_memory(a,3,40,90);
         assert(a.peak_commit==4.5 && a.private_commit==40 && a.working_set==3);
@@ -128,10 +128,12 @@ struct HostControllerFixture {
         assert(controller.memory_detail(b).find("3.0")!=std::string::npos);
         controller.calculate_budget(60,128,2);controller.need_commit_=controller.launch_commit(a);
         assert(!controller.memory_available()); // genuine Windows commit shortage still blocked
-        a.loading=true;a.sample_startup_peak=true;a.peak_commit=8;a.loading_peak_commit=0;
+        a.loading=true;a.sample_startup_peak=true;a.peak_commit=8;a.loading_peak_commit=0;a.healthy_at=0;
         controller.observe_memory(a,1,2,2);
         assert(a.peak_commit==8); // failed/incomplete reload cannot erase known startup needs
-        a.loading=false;controller.observe_memory(a,1,2,2);
+        a.loading=false;controller.observe_memory(a,1,2,2); // timeout is not a completed startup
+        assert(a.peak_commit==8 && a.sample_startup_peak);
+        a.healthy_at=1;controller.observe_memory(a,1,2,2);
         assert(a.peak_commit==2 && controller.launch_commit(a)==3.0);
         a.peak_commit=0;a.sample_startup_peak=false;
         std::puts("PASS startup-only memory estimate:60GiB free RAM, gameplay peak excluded, adopted history ignored, per-map details and real commit gate; no game started");
@@ -178,6 +180,10 @@ struct HostControllerFixture {
         a.pid=GetCurrentProcessId();a.loading=true;a.state="loading";a.launched=GetTickCount64();
         controller.write(controller.file("host_command_",b),"start");controller.update(b);controller.queue();
         assert(b.state=="queued" && !b.process);
+        a.loading=false;a.healthy_at=0;a.state="loading_timeout";
+        controller.write(controller.folder_+L"\\status_"+std::to_wstring(a.plan.port)+L".txt",std::to_string(time(nullptr))+" 0 129");
+        controller.update(a);
+        assert(a.state=="running" && a.healthy_at!=0); // a late ready heartbeat closes calibration too
         controller.write(controller.file("host_command_",a),"stop");controller.update(a);
         assert(a.state=="saving" && a.expected && a.mode=="off");
         assert(controller.read(controller.folder_+L"\\host_stop_"+std::to_wstring(a.plan.port)+L".txt")=="stop|"+std::to_string(GetCurrentProcessId()));

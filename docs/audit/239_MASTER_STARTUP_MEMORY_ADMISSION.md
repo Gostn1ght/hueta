@@ -11,3 +11,5 @@ A second proven diagnostic bug is fixed: each blocked row previously displayed t
 The actual HostController fixture exercises60GiB available physical RAM, a3.5/4.5GiB loading peak followed by90GiB lifetime peak, adopted-process history, independent row budgets and a genuine low-commit rejection. Only GitHub Actions runs native fixtures; no game is launched. The code fix is demonstrated by this controller case; matching the owner's particular runtime failure still needs fresh hoster evidence.
 
 Client/server multithreading remains pinned to sourceed0ae597010eaed6c4c1911bb331708dd5841e0e / Full44903110418. The small standalone Master receives its own production CI/source/PDB and is integrated separately if that CI passes; do not relabel the engine artifact as built from a later Master-only change. Public rollout is not authorized by this local update request.
+
+Calibration closes on an actual ready heartbeat, not merely on the loading flag clearing after a600second timeout. A late ready heartbeat also initializes the healthy clock. The fixture verifies timeout retention and the actual controller late-ready path without waiting or launching a game.

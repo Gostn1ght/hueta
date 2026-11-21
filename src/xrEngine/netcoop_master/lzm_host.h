@@ -180,7 +180,7 @@ class HostController
         }
         const bool ready=status(m);
         if(ready && !m.expected) {
-            if(m.loading) {m.loading=false;m.healthy_at=GetTickCount64();DeleteFileW(file("wake_",m).c_str());}
+            if(m.loading || !m.healthy_at) {m.loading=false;m.healthy_at=GetTickCount64();DeleteFileW(file("wake_",m).c_str());}
             transition(m,"running","world is responding; master lease is checked separately");
             if(m.healthy_at && GetTickCount64()-m.healthy_at>300000) m.failures=0;
         }
@@ -216,8 +216,9 @@ class HostController
             map.loading_peak_commit=std::max(map.loading_peak_commit,std::max(committed,lifetime_peak));
             // Retain known loading needs if the next process fails before
             // sampling. Only a completed load may replace them with less.
-            map.peak_commit=map.loading ? std::max(map.peak_commit,map.loading_peak_commit):map.loading_peak_commit;
-            if(!map.loading)map.sample_startup_peak=false;
+            const bool ready=map.healthy_at!=0;
+            map.peak_commit=ready ? map.loading_peak_commit:std::max(map.peak_commit,map.loading_peak_commit);
+            if(ready)map.sample_startup_peak=false;
         }
     }
     void budget() {
@@ -252,7 +253,7 @@ class HostController
             m.blocked=true;transition(m,"failed","CreateProcess Win32="+std::to_string(GetLastError()));return;
         }
         CloseHandle(p.hThread);m.process=p.hProcess;m.pid=p.dwProcessId;m.loading=true;m.expected=false;m.launched=GetTickCount64();
-        m.loading_peak_commit=0;m.sample_startup_peak=true;
+        m.loading_peak_commit=0;m.sample_startup_peak=true;m.healthy_at=0;
         transition(m,"loading","native serialized launch");
     }
     void queue() {
