@@ -150,7 +150,8 @@ void CRender::reset_end()
 	if (L_Projector) L_Projector->invalidate();
 
 	// let's reload details while changed details options on vid_restart
-	if (b_loaded && (dm_current_size != dm_size || ps_r__Detail_density != ps_current_detail_density))
+	if (b_loaded && (dm_current_size != dm_size || ps_r__Detail_density != ps_current_detail_density ||
+		ps_r__Detail_height != ps_current_detail_height))
 	{
 		Details = new CDetailManager();
 		Details->Load();

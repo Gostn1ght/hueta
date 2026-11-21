@@ -1,0 +1,11 @@
+# Four verified video options without an application-restart warning
+
+After the CPU kernel work and empty-server retry fix, the next owner request is graphics settings without leaving the game. This change covers resolution and grass density/radius/height, not backend switching or all shader-feature options.
+
+The authenticated deployed options script is preserved as the client overlay, with only four restart=true flags changed to false; vid=true remains. Original authorship/comments and every other option/handler are retained. Provenance: public80 archive99_v2_000047_40_client_scripts_000.db0; original ui_options SHAd84c283a2f26ffff0e912484879bbd6b4494d506ed58b98d067c42f4994a939e. Actual Apply/Cancel already saves settings, restores the menu and executes vid_restart once. Native CCC_VID_Reset calls Device.Reset; both renderers contain detail-resource reload paths.
+
+A concrete DX8 defect prevented height-only live reset: reset_begin deletes Details for size/density/height changes, but reset_end recreated it only for size/density. Height-only changes therefore left Details null. The recreation condition now includes height, matching destruction and the existing R4 path. These resources must be paired with the new native fix, not copied over installed84R1.
+
+The Lua5.1 fixture compiles the full actual script and executes its actual Apply/Cancel handlers with real changed descriptors. Resolution/grass changes and mixed applies produce one cfg_save, one callback, one vid_restart and no quit/disconnect/start or false app-restart warning. Unsupported renderer/SSAO combinations retain their warning; no blanket restart-flag removal is used. The Windows fixture compiles actual R1 reset_begin/end with resource boundary doubles, checking every size/density/height combination, loaded/unloaded and repeated resets, including destruction/recreation exactly once. No GPU/game is executed locally.
+
+DX8 and DX11 remain separate statically linked executables. Seamless backend switching needs a renderer-lifetime/ABI implementation and remains open. Runtime visual/transition/network acceptance is also open; pure handler/resource fixtures do not prove a device reset on target hardware. Publication and local installation remain deferred by the owner.
