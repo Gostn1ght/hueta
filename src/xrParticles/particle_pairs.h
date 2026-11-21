@@ -1,54 +1,30 @@
 #pragma once
-#include "../xrCore/xr_cpu_jobs.h"
-#include <memory>
-#include <new>
+#include "particle_cpu.h"
 
 namespace PAPI
 {
-// Calculate pair forces from immutable positions, then apply them on the
-// owner in the original i/j order. Never use this for velocity-dependent pair
-// actions: earlier velocity updates are part of their input and ordering.
-template<class Evaluate,class Apply>
-bool particle_pairs(unsigned count,Evaluate&& evaluate,Apply&& apply)
+// Pair forces depend only on immutable positions. Each worker accumulates one
+// particle's velocity locally: lower-index -= contributions, then upper-index
+// += contributions, exactly matching the old pair loop's per-particle order.
+// Forces are evaluated twice to avoid a quadratic buffer or serial apply pass.
+// Do not use for forces that depend on earlier velocity updates.
+template<class Read,class Evaluate,class Write>
+bool particle_pair_forces(unsigned count,Read&& read,Evaluate&& evaluate,Write&& write)
 {
     if(count<512 || xr_cpu::concurrency()<3 || strstr(Core.Params,"-cpu_serial") ||
        strstr(Core.Params,"-cpu_particles_legacy"))return false;
-    struct Pair {unsigned first,second;bool active;pVector force;};
-    constexpr std::size_t capacity=65536; // <=1.5 MiB, independent of particle count.
-    static_assert(sizeof(Pair)<=24,"Keep pair scratch bounded");
-    std::unique_ptr<Pair[]> pairs(new(std::nothrow) Pair[capacity]);
-    if(!pairs)return false; // No particle has been changed before allocation.
-    struct Work
+    particle_ranges(count,512,[&](unsigned begin,unsigned end) noexcept
     {
-        Pair* pairs;
-        Evaluate& evaluate;
-        static void run(void* opaque,std::size_t begin,std::size_t end) noexcept
+        for(unsigned index=begin;index<end;++index)
         {
-            auto& work=*static_cast<Work*>(opaque);
-            for(auto index=begin;index<end;++index)
-            {
-                auto& pair=work.pairs[index];
-                pair.active=work.evaluate(pair.first,pair.second,pair.force);
-            }
+            pVector velocity=read(index),force;
+            for(unsigned other=0;other<index;++other)
+                if(evaluate(other,index,force))velocity-=force;
+            for(unsigned other=index+1;other<count;++other)
+                if(evaluate(index,other,force))velocity+=force;
+            write(index,velocity);
         }
-    } work{pairs.get(),evaluate};
-    unsigned first=0,second=1;
-    while(first+1<count)
-    {
-        std::size_t size=0;
-        while(size<capacity && first+1<count)
-        {
-            auto& pair=pairs[size++];pair.first=first;pair.second=second;
-            if(++second==count){++first;second=first+1;}
-        }
-        // Output-only calculation may safely replay after scheduler failure.
-        xr_cpu::parallel_for(size,256,Work::run,&work);
-        for(std::size_t index=0;index<size;++index)
-        {
-            const auto& pair=pairs[index];
-            if(pair.active)apply(pair.first,pair.second,pair.force);
-        }
-    }
+    },128);
     return true;
 }
 }

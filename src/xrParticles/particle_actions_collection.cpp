@@ -867,19 +867,21 @@ void PAGravitate::Execute(ParticleEffect* effect, const float dt, float& tm_max)
 	float magdt = magnitude * dt;
 	float max_radiusSqr = max_radius * max_radius;
 
-	// Only positions are read while calculating forces. Applying each result
-	// on the owner preserves the original floating-point accumulation order.
-	if(particle_pairs(effect->p_count,[&](u32 first,u32 second,pVector& force) noexcept
+	// Positions stay immutable; each particle accumulates its own velocity in
+	// the original pair order, without writing another particle from a worker.
+	if(particle_pair_forces(effect->p_count,[&](u32 index) noexcept
+	{
+		return effect->particles[index].vel;
+	},[&](u32 first,u32 second,pVector& force) noexcept
 	{
 		pVector tohim(effect->particles[second].pos-effect->particles[first].pos);
 		const float distance=tohim.length2()+EPS_S;
 		if(max_radiusSqr<P_MAXFLOAT && !(distance<max_radiusSqr))return false;
 		force=tohim*(magdt/(_sqrt(distance)*(distance+epsilon)));
 		return true;
-	},[&](u32 first,u32 second,const pVector& force) noexcept
+	},[&](u32 index,const pVector& velocity) noexcept
 	{
-		effect->particles[first].vel+=force;
-		effect->particles[second].vel-=force;
+		effect->particles[index].vel=velocity;
 	}))return;
 
 	if (max_radiusSqr < P_MAXFLOAT)
