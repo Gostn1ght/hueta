@@ -1,0 +1,13 @@
+# Master startup memory admission after the client is already running
+
+Owner21November again reports that a server cannot start while the game is open and asks to free memory despite60GiB physical RAM available. The current workstation has no matching fresh failure: its retained master log is from15November; its memory counters are from a different20GiB machine. Do not claim these old records reproduce the new hoster report. Exact current message/entrypoint was requested while work continued.
+
+An independent false-admission defect is present in the actual native controller: every process observation updated the next launch estimate with PeakPagefileUsage over the map's entire lifetime. A post-load temporary allocation/gameplay/cache peak therefore permanently inflated that map's required startup budget, even after the allocation was freed. Adopted already-running processes also had an unknown lifetime history treated as a fresh startup.
+
+Calibration now covers only processes started by this controller, until one final sample after the first ready heartbeat. Runtime resident/private memory remains visible, but later peaks no longer change startup admission. A fresh launch resets the measured loading peak; adopted processes do not calibrate a new startup estimate. Existing physical/Windows-commit reserves and genuine low-memory blocking remain. No pagefile, OS/security/proxy settings, accounts, saves or live processes are changed.
+
+A second proven diagnostic bug is fixed: each blocked row previously displayed the global last-checked map's budget. It now displays that row's own launch requirement and distinguishes physical RAM from Windows allocation headroom. Per-map startup peak and launch budget are included in the native snapshot. No unconditional instruction to close the game/browser is emitted.
+
+The actual HostController fixture exercises60GiB available physical RAM, a3.5/4.5GiB loading peak followed by90GiB lifetime peak, adopted-process history, independent row budgets and a genuine low-commit rejection. Only GitHub Actions runs native fixtures; no game is launched. The code fix is demonstrated by this controller case; matching the owner's particular runtime failure still needs fresh hoster evidence.
+
+Client/server multithreading remains pinned to sourceed0ae597010eaed6c4c1911bb331708dd5841e0e / Full44903110418. The small standalone Master receives its own production CI/source/PDB and is integrated separately if that CI passes; do not relabel the engine artifact as built from a later Master-only change. Public rollout is not authorized by this local update request.

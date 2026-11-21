@@ -94,6 +94,9 @@ struct HostControllerFixture {
             const auto original=controller.exe_;assert(!controller.adopt(observed) && observed.blocked);
             wchar_t self[4096]{};GetModuleFileNameW(nullptr,self,4096);controller.exe_=self;observed.blocked=false;
             assert(controller.adopt(observed) && observed.pid==GetCurrentProcessId());
+            assert(!observed.sample_startup_peak);
+            controller.observe_memory(observed,2,40,90);
+            assert(controller.launch_commit(observed)==3.0); // adopted lifetime is not startup history
             controller.write(controller.file("host_mode_",observed),"on");observed.mode="on";
             controller.write(controller.file("host_command_",observed),"restart");
             controller.reset_startup_request(observed,true);
@@ -110,6 +113,23 @@ struct HostControllerFixture {
         std::puts("PASS startup cancels old on/auto/restart/wake requests, adopts live processes and preserves pending stop; no game started");
         auto& a=controller.maps_[0];auto& b=controller.maps_[1];
         assert(!a.process && !b.process); // no executable exists in this fixture
+        // A client can coexist with this map when60GiB RAM is free. A later
+        // gameplay/cache spike must not make a new load require its old peak.
+        a.loading=true;a.sample_startup_peak=true;a.peak_commit=0;
+        controller.observe_memory(a,2,3,3.5);assert(a.peak_commit==3.5);
+        a.loading=false;controller.observe_memory(a,2.5,4,4.5);
+        assert(!a.sample_startup_peak && a.peak_commit==4.5);
+        controller.observe_memory(a,3,40,90);
+        assert(a.peak_commit==4.5 && a.private_commit==40 && a.working_set==3);
+        controller.calculate_budget(60,128,64);controller.need_commit_=controller.launch_commit(a);
+        assert(controller.memory_available() && controller.need_commit_<5.5);
+        controller.need_commit_=999;
+        assert(controller.memory_detail(a).find("5.4")!=std::string::npos);
+        assert(controller.memory_detail(b).find("3.0")!=std::string::npos);
+        controller.calculate_budget(60,128,2);controller.need_commit_=controller.launch_commit(a);
+        assert(!controller.memory_available()); // genuine Windows commit shortage still blocked
+        a.peak_commit=0;a.sample_startup_peak=false;
+        std::puts("PASS startup-only memory estimate:60GiB free RAM, gameplay peak excluded, adopted history ignored, per-map details and real commit gate; no game started");
         // The screenshot's real 16 GiB PC: 8.68 GiB available used to be
         // reduced to 5.68 and rejected by a hard 6 GiB physical-memory gate.
         controller.calculate_budget(8.68,16,20.38);

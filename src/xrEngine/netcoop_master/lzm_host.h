@@ -27,6 +27,7 @@ class HostController
         HANDLE process=nullptr;DWORD pid=0,exit=0;unsigned failures=0,players=0;
         uint64_t launched=0,retry_at=0,healthy_at=0;bool has_exit=false;
         double peak_commit=0,working_set=0,private_commit=0;
+        bool sample_startup_peak=false;
         uint64_t memory_reported=0;
     };
     std::wstring root_,folder_,exe_;
@@ -101,6 +102,9 @@ class HostController
         const bool same=QueryFullProcessImageNameW(p,0,path,&size) && _wcsicmp(path,exe_.c_str())==0;
         if(!same) {CloseHandle(p);transition(m,"failed","UDP port occupied by another program pid="+std::to_string(pid));m.blocked=true;return false;}
         m.process=p;m.pid=pid;m.loading=true;m.launched=GetTickCount64();
+        // A previously running process has an unknown loading history. Its
+        // lifetime peak must not become this map's next startup requirement.
+        m.sample_startup_peak=false;
         transition(m,"loading","adopted existing dedicated process");return true;
     }
     void stop_map(Map& m) {
@@ -197,19 +201,29 @@ class HostController
     }
     double launch_commit(const Map& map) const {return std::max(3.0,map.peak_commit*1.2);}
     bool memory_available() const {return free_ram_>=need_ram_ && free_commit_>=need_commit_;}
-    std::string memory_detail() const {
-        return format("ОЗУ: доступно %.1f ГБ, нужно %.1f ГБ; резерв ОС %.1f ГБ. Лимит памяти: доступно %.1f ГБ, нужно %.1f ГБ. Освободите память или остановите другую локацию.",
-            free_ram_,need_ram_,reserve_ram_,free_commit_,need_commit_);
+    std::string memory_detail(const Map& map) const {
+        return format("ОЗУ после резерва ОС: доступно %.1f ГБ, для запуска нужно 1.5 ГБ. Доступное выделение памяти Windows: %.1f ГБ, для этой локации нужно %.1f ГБ. Свободная ОЗУ и лимит выделения — разные показатели.",
+            free_ram_,free_commit_,launch_commit(map));
+    }
+    void observe_memory(Map& map,double resident,double committed,double lifetime_peak) {
+        peak_ram_=std::max(peak_ram_,resident);
+        peak_commit_=std::max(peak_commit_,lifetime_peak);
+        map.working_set=resident;map.private_commit=committed;
+        if(map.sample_startup_peak) {
+            // One final sample after the first ready heartbeat includes the
+            // tail of loading. Later gameplay/cache peaks do not inflate the
+            // next launch gate, even after the memory has already been freed.
+            map.peak_commit=std::max(map.peak_commit,std::max(committed,lifetime_peak));
+            if(!map.loading)map.sample_startup_peak=false;
+        }
     }
     void budget() {
         MEMORYSTATUSEX memory{sizeof(memory)};if(!GlobalMemoryStatusEx(&memory)) throw Unavailable("memory counters unavailable");
         for(auto& m:maps_) if(m.process) {PROCESS_MEMORY_COUNTERS_EX counters{};counters.cb=sizeof(counters);
             if(GetProcessMemoryInfo(m.process,reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),sizeof(counters))) {
-                peak_ram_=std::max(peak_ram_,double(counters.PeakWorkingSetSize)/1073741824.0);
-                peak_commit_=std::max(peak_commit_,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
-                m.peak_commit=std::max(m.peak_commit,double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
-                m.working_set=double(counters.WorkingSetSize)/1073741824.0;
-                m.private_commit=double(counters.PrivateUsage)/1073741824.0;
+                observe_memory(m,double(counters.WorkingSetSize)/1073741824.0,
+                    double(counters.PrivateUsage)/1073741824.0,
+                    double(std::max(counters.PrivateUsage,counters.PeakPagefileUsage))/1073741824.0);
                 if(GetTickCount64()-m.memory_reported>=30000) {
                     m.memory_reported=GetTickCount64();
                     log_line(format("[diag][memory] map=%s pid=%lu players=%u resident_gb=%.2f private_commit_gb=%.2f loading=%u",m.plan.name.c_str(),m.pid,m.players,m.working_set,m.private_commit,unsigned(m.loading)));
@@ -235,6 +249,7 @@ class HostController
             m.blocked=true;transition(m,"failed","CreateProcess Win32="+std::to_string(GetLastError()));return;
         }
         CloseHandle(p.hThread);m.process=p.hProcess;m.pid=p.dwProcessId;m.loading=true;m.expected=false;m.launched=GetTickCount64();
+        m.peak_commit=0;m.sample_startup_peak=true;
         transition(m,"loading","native serialized launch");
     }
     void queue() {
@@ -249,8 +264,7 @@ class HostController
             if(paused) {transition(m,exists(folder_+L"\\host_master_paused.txt") ? "master_stopped":"master_wait","waiting for master service and verified world storage");continue;}
             if(m.retry_at>GetTickCount64()) continue;
             if(loading) {transition(m,"queued","another map is loading");continue;}
-            // Working-set peaks are reclaimable pages. Commit is not: keep
-            // its budget, but learn it for THIS map rather than every map.
+            // Learn this map's loading peak, not its lifetime gameplay peak.
             need_ram_=1.5;need_commit_=launch_commit(m);
             if(!memory_available()) {transition(m,"memory","insufficient loading budget; see memory counters");continue;}
             if(exists(file("host_command_",m))) continue; // consume a late stop before launch
@@ -261,7 +275,8 @@ class HostController
         json rows=json::array();
         unsigned active=0;for(const auto& map:maps_) active+=map.process!=nullptr;active_=active;
         for(const auto& m:maps_) rows.push_back({{"map",m.plan.name},{"port",m.plan.port},{"processId",m.pid},{"state",m.state},{"mode",m.mode},
-            {"detail",m.state=="memory" ? memory_detail():m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
+            {"detail",m.state=="memory" ? memory_detail(m):m.detail},{"players",m.players},{"progress",m.state=="running" ? 100:0},{"failures",m.failures},
+            {"startup_peak_commit_gb",m.peak_commit},{"launch_commit_gb",launch_commit(m)},
             {"resident_gb",m.process ? m.working_set:0},{"private_commit_gb",m.process ? m.private_commit:0},
             {"retry_seconds",m.retry_at>GetTickCount64() ? int((m.retry_at-GetTickCount64()+999)/1000):0},
             {"exit_code",m.has_exit ? json(m.exit):json()}});
