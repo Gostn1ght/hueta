@@ -23,7 +23,7 @@ def braced(text, start):
     raise AssertionError('Unclosed source block')
 
 names = re.findall(r'void (PA\w+)::Execute', reference)
-assert len(names) == 16
+assert len(names) == 20
 classes = []
 bodies = []
 for name in names:
@@ -35,6 +35,12 @@ for name in names:
 # Keep the exact engine pVector operators and Particle fields. Core vector/color
 # and the owning effect are boundary doubles; the full engine build checks ABI.
 particle_types = psystem[psystem.index('class pVector'):psystem.index('typedef void (* OnBirthParticleCB')]
+domain_header=(folder_src/'particle_core.h').read_text(encoding='utf-8-sig')
+domain=braced(domain_header,domain_header.index('struct PARTICLES_API pDomain'))+';'
+domain_enum=braced(psystem,psystem.index('enum PDomainEnum'))+';'
+domain_cpp=(folder_src/'particle_core.cpp').read_text(encoding='utf-8-sig')
+domain_impl=braced(domain_cpp,domain_cpp.index('pDomain::pDomain('))+'\n'+braced(domain_cpp,domain_cpp.index('BOOL pDomain::Within('))
+
 noise = (folder_src / 'noise.cpp').read_text(encoding='utf-8-sig')
 noise = noise[noise.index('#include <xmmintrin.h>'):]
 simd = actions[actions.index('__forceinline __m128 _mm_load_fvector'):actions.index('struct TES_PARAMS')]
@@ -53,6 +59,8 @@ preamble = r'''
 #include <set>
 #include <mutex>
 #include <thread>
+#include <type_traits>
+#include <limits>
 #include <vector>
 #undef assert
 #define assert(condition) do { if(!(condition)){std::fprintf(stderr,"FAIL %s:%d: %s\n",__FILE__,__LINE__,#condition);std::fflush(stderr);ExitProcess(2);} } while(false)
@@ -64,17 +72,22 @@ using u32=unsigned;using u16=unsigned short;
 #define ONEOVERSQRT2PI (1.f/2.506628274631000502415765284811045253006f)
 #define STEP_DEFAULT 0.033F
 #define EPS .000010f
+#define EPS_S .0000001f
 #define _sqrt std::sqrt
 #define _sqr(x) ((x)*(x))
 #define _abs std::abs
 #define _sin std::sin
 #define _cos std::cos
 struct Flags16{u16 value;};
+struct Fmatrix;
+float forbidden_random(){assert(false && "Particle workers must not draw shared RNG");return 0;}
+#define drand48() forbidden_random()
 struct Fvector {
  float x,y,z;
  float operator[](unsigned i)const{return (&x)[i];}
  float& operator[](unsigned i){return (&x)[i];}
  void set(float a,float b,float c){x=a;y=b;z=c;}
+ void normalize_safe(){float magnitude=x*x+y*y+z*z;if(magnitude>std::numeric_limits<float>::min()){magnitude=std::sqrt(1/magnitude);x*=magnitude;y*=magnitude;z*=magnitude;}}
  void mad(const Fvector& a,const Fvector& b,float t){x=a.x+b.x*t;y=a.y+b.y*t;z=a.z+b.z*t;}
 };
 struct Fcolor {
@@ -89,8 +102,8 @@ struct CoreDouble{const char* Params="";} Core;
 float ps_particle_update_coeff=1.f;
 static int noise_start=1;
 '''
-types = 'namespace PAPI {\n' + particle_types + '\nstruct ParticleEffect{u32 p_count;Particle* particles;};\n}\nusing namespace PAPI;\n'
-source = preamble + types + noise + simd
+types = 'namespace PAPI {\n' + particle_types + domain_enum + domain + '\nstruct ParticleEffect{u32 p_count;Particle* particles;};\n}\nusing namespace PAPI;\n'
+source = preamble + types + '#include "particle_pairs.h"\n' + domain_impl + noise + simd
 source += '\nnamespace serial_ref {\n' + '\n'.join(classes) + '\n' + reference + '\n}\n'
 source += '\nnamespace PAPI {\n' + '\n'.join(classes) + '\n' + '\n'.join(bodies) + '\n}\n'
 source += r'''
@@ -103,14 +116,20 @@ std::vector<Particle> initial(unsigned n){
  return result;
 }
 template<class Old,class Current,class Setup>
-void check(Setup setup){
- for(unsigned n:{0u,1u,511u,512u,1023u,1024u,4095u,4096u,16383u,16384u,32769u}){
-  auto baseline=initial(n),serial=baseline,parallel=baseline;
+void check(Setup setup,bool collisions=false,unsigned maximum=32769){
+ for(unsigned n:{0u,1u,511u,512u,513u,1023u,1024u,1025u,4095u,4096u,8191u,8192u,8193u,16383u,16384u,32769u}){
+  if(n>maximum)continue;
+  auto baseline=initial(n);
+  if(collisions)for(unsigned i=1;i<=n;++i){auto& particle=baseline[i];
+   particle.pos={float(int(i%23)-11)*.04f,(i%2?.05f:-.05f),float(int(i%17)-8)*.04f};
+   particle.vel={.1f,float(i%3?-3:3),.2f};}
+  auto serial=baseline,parallel=baseline;
   Old old{};Current single{},multi{};setup(old);setup(single);setup(multi);
   ParticleEffect a{n,baseline.data()+1},b{n,serial.data()+1},c{n,parallel.data()+1};
   float ta=2,tb=2,tc=2;
   for(unsigned tick=0;tick<4;++tick){
-   old.Execute(&a,.033f,ta);
+   // The old Follow unsigned bound is undefined for zero particles.
+   if(n || !std::is_same_v<Old,serial_ref::PAFollow>)old.Execute(&a,.033f,ta);
    Core.Params="-cpu_serial";single.Execute(&b,.033f,tb);
    Core.Params="";xr_cpu::test_fail_after_blocks(tick==1?0:-1);multi.Execute(&c,.033f,tc);
    xr_cpu::test_fail_after_blocks(-1);
@@ -124,6 +143,25 @@ int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
  noise3Init();noise_start=0;
 #define CHECK(Name,...) check<serial_ref::Name,PAPI::Name>([&](auto& a){__VA_ARGS__;})
+
+ for(PDomainEnum kind:{PDPlane,PDDisc,PDRectangle,PDTriangle,PDSphere,PDPoint}){
+  pDomain domain;
+  if(kind==PDPlane)domain=pDomain(kind,0,0,0,0,1,0);
+  else if(kind==PDDisc)domain=pDomain(kind,0,0,0,0,1,0,.5f,.1f);
+  else if(kind==PDRectangle)domain=pDomain(kind,-.5f,0,-.5f,1,0,0,0,0,1);
+  else if(kind==PDTriangle)domain=pDomain(kind,-.5f,0,-.5f,.5f,0,-.5f,-.5f,0,.5f);
+  else if(kind==PDSphere)domain=pDomain(kind,0,0,0,.3f,.05f);
+  else domain=pDomain(kind,0,0,0);
+  for(float cutoff:{0.f,100.f})
+   check<serial_ref::PABounce,PAPI::PABounce>([&](auto& a){a.position=domain;a.oneMinusFriction=.8f;a.resilience=.7f;a.cutoffSqr=cutoff;},true);
+  for(float ahead:{.1f,1.f,P_MAXFLOAT})
+   check<serial_ref::PAAvoid,PAPI::PAAvoid>([&](auto& a){a.position=domain;a.magnitude=.01f;a.epsilon=.01f;a.look_ahead=ahead;},true);
+ }
+ for(float radius:{.01f,1.f,100.f,1.e10f}){
+  CHECK(PAFollow,a.magnitude=.001f;a.epsilon=.01f;a.max_radius=radius);
+  check<serial_ref::PAGravitate,PAPI::PAGravitate>([&](auto& a){a.magnitude=.001f;a.epsilon=.01f;a.max_radius=radius;},false,1025);
+ }
+ std::puts("PASS Follow empty-input underflow guard and immutable next-position boundaries");
  CHECK(PACopyVertexB,a.copy_pos=1);
  CHECK(PACopyVertexB,a.copy_pos=0);
  CHECK(PADamping,a.damping={.7f,.8f,.9f};a.vlowSqr=.01f;a.vhighSqr=1.f);
@@ -159,7 +197,17 @@ int main(){
    times.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count());}
   std::sort(times.begin(),times.end());std::printf("METRIC particle turbulence count=32768 mode=%s p50_us=%.3f p95_us=%.3f\n",*mode?"serial":"parallel",times[30],times[57]);
  }
- std::printf("PASS 16 actual particle actions versus frozen serial math, threshold/chunk boundaries, canaries, unchanged counts, partial scheduler failure, slots=%u threads=%zu\n",stats.slots,threads.size());
+
+ for(const char* mode:{"-cpu_serial",""}){
+  Core.Params=mode;std::vector<double> times;
+  auto data=initial(2048);const auto original=data;ParticleEffect gravity_effect{2048,data.data()};
+  PAGravitate gravity{};gravity.magnitude=.001f;gravity.epsilon=.01f;gravity.max_radius=100.f;
+  for(unsigned tick=0;tick<21;++tick){data=original;gravity_effect.particles=data.data();float max=1;
+   auto start=std::chrono::steady_clock::now();gravity.Execute(&gravity_effect,.033f,max);
+   times.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count());}
+  std::sort(times.begin(),times.end());std::printf("METRIC particle gravity count=2048 mode=%s p50_us=%.3f p95_us=%.3f\n",*mode?"serial":"parallel",times[10],times[19]);
+ }
+ std::printf("PASS 20 actual particle actions versus frozen serial math, threshold/chunk boundaries, canaries, unchanged counts, partial scheduler failure, slots=%u threads=%zu\n",stats.slots,threads.size());
 }
 '''
 with TemporaryDirectory(prefix='lz-particle-cpu-') as directory:

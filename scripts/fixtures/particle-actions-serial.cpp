@@ -548,3 +548,757 @@ void PATurbulence::Execute(ParticleEffect* effect, const float dt, float& tm_max
 		_mm_store_fvector(m.vel, _mvel);
 	}
 }
+
+// Frozen remaining actions frombc94549c8; Follow zero-count was undefined.
+void PAAvoid::Execute(ParticleEffect* effect, const float dt, float& tm_max)
+{
+	float magdt = magnitude * dt;
+
+	switch (position.type)
+	{
+	case PDPlane:
+		{
+			if (look_ahead < P_MAXFLOAT)
+			{
+				for (u32 i = 0; i < effect->p_count; i++)
+				{
+					Particle& m = effect->particles[i];
+
+					// p2 stores the plane normal (the a,b,c of the plane eqn).
+					// Old and new distances: dist(p,plane) = n * p + d
+					// radius1 stores -n*p, which is d.
+					float dist = m.pos * position.p2 + position.radius1;
+
+					if (dist < look_ahead)
+					{
+						float vm = m.vel.length();
+						pVector Vn = m.vel / vm;
+						// float dot = Vn * position.p2;
+
+						pVector tmp = (position.p2 * (magdt / (dist * dist + epsilon))) + Vn;
+						m.vel = tmp * (vm / tmp.length());
+					}
+				}
+			}
+			else
+			{
+				for (u32 i = 0; i < effect->p_count; i++)
+				{
+					Particle& m = effect->particles[i];
+
+					// p2 stores the plane normal (the a,b,c of the plane eqn).
+					// Old and new distances: dist(p,plane) = n * p + d
+					// radius1 stores -n*p, which is d.
+					float dist = m.pos * position.p2 + position.radius1;
+
+					float vm = m.vel.length();
+					pVector Vn = m.vel / vm;
+					// float dot = Vn * position.p2;
+
+					pVector tmp = (position.p2 * (magdt / (dist * dist + epsilon))) + Vn;
+					m.vel = tmp * (vm / tmp.length());
+				}
+			}
+		}
+		break;
+	case PDRectangle:
+		{
+			// Compute the inverse matrix of the plane basis.
+			pVector& u = position.u;
+			pVector& v = position.v;
+
+			// The normalized bases are needed inside the loop.
+			pVector un = u / position.radius1Sqr;
+			pVector vn = v / position.radius2Sqr;
+
+			// w = u cross v
+			float wx = u.y * v.z - u.z * v.y;
+			float wy = u.z * v.x - u.x * v.z;
+			float wz = u.x * v.y - u.y * v.x;
+
+			float det = 1 / (wz * u.x * v.y - wz * u.y * v.x - u.z * wx * v.y - u.x * v.z * wy + v.z * wx * u.y + u.z *
+				v.x * wy);
+
+			pVector s1((v.y * wz - v.z * wy), (v.z * wx - v.x * wz), (v.x * wy - v.y * wx));
+			s1 *= det;
+			pVector s2((u.y * wz - u.z * wy), (u.z * wx - u.x * wz), (u.x * wy - u.y * wx));
+			s2 *= -det;
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt * look_ahead);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d.
+				float distold = m.pos * position.p2 + position.radius1;
+				float distnew = pnext * position.p2 + position.radius1;
+
+				// Opposite signs if product < 0
+				// There is no faster way to do this.
+				if (distold * distnew >= 0)
+					continue;
+
+				float nv = position.p2 * m.vel;
+				float t = -distold / nv;
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, p - origin
+				pVector offset(phit - position.p1);
+
+				// Dot product with basis vectors of old frame
+				// in terms of new frame gives position in uv frame.
+				float upos = offset * s1;
+				float vpos = offset * s2;
+
+				// Did it cross plane outside triangle?
+				if (upos < 0 || vpos < 0 || upos > 1 || vpos > 1)
+					continue;
+
+				// A hit! A most palpable hit!
+				// Compute distance to the three edges.
+				pVector uofs = (un * (un * offset)) - offset;
+				float udistSqr = uofs.length2();
+				pVector vofs = (vn * (vn * offset)) - offset;
+				float vdistSqr = vofs.length2();
+
+				pVector foffset((u + v) - offset);
+				pVector fofs = (un * (un * foffset)) - foffset;
+				float fdistSqr = fofs.length2();
+				pVector gofs = (un * (un * foffset)) - foffset;
+				float gdistSqr = gofs.length2();
+
+				pVector S;
+				if (udistSqr <= vdistSqr && udistSqr <= fdistSqr
+					&& udistSqr <= gdistSqr)
+					S = uofs;
+				else if (vdistSqr <= fdistSqr && vdistSqr <= gdistSqr) S = vofs;
+				else if (fdistSqr <= gdistSqr) S = fofs;
+				else S = gofs;
+
+				S.normalize_safe();
+
+				// We now have a vector3 to safety.
+				float vm = m.vel.length();
+				pVector Vn = m.vel / vm;
+
+				// Blend S into V.
+				pVector tmp = (S * (magdt / (t * t + epsilon))) + Vn;
+				m.vel = tmp * (vm / tmp.length());
+			}
+		}
+		break;
+	case PDTriangle:
+		{
+			// Compute the inverse matrix of the plane basis.
+			pVector& u = position.u;
+			pVector& v = position.v;
+
+			// The normalized bases are needed inside the loop.
+			pVector un = u / position.radius1Sqr;
+			pVector vn = v / position.radius2Sqr;
+
+			// f is the third (non-basis) triangle edge.
+			pVector f = v - u;
+			pVector fn(f);
+			fn.normalize_safe();
+
+			// w = u cross v
+			float wx = u.y * v.z - u.z * v.y;
+			float wy = u.z * v.x - u.x * v.z;
+			float wz = u.x * v.y - u.y * v.x;
+
+			float det = 1 / (wz * u.x * v.y - wz * u.y * v.x - u.z * wx * v.y - u.x * v.z * wy + v.z * wx * u.y + u.z *
+				v.x * wy);
+
+			pVector s1((v.y * wz - v.z * wy), (v.z * wx - v.x * wz), (v.x * wy - v.y * wx));
+			s1 *= det;
+			pVector s2((u.y * wz - u.z * wy), (u.z * wx - u.x * wz), (u.x * wy - u.y * wx));
+			s2 *= -det;
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt * look_ahead);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d.
+				float distold = m.pos * position.p2 + position.radius1;
+				float distnew = pnext * position.p2 + position.radius1;
+
+				// Opposite signs if product < 0
+				// Is there a faster way to do this?
+				if (distold * distnew >= 0)
+					continue;
+
+				float nv = position.p2 * m.vel;
+				float t = -distold / nv;
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, p - origin
+				pVector offset(phit - position.p1);
+
+				// Dot product with basis vectors of old frame
+				// in terms of new frame gives position in uv frame.
+				float upos = offset * s1;
+				float vpos = offset * s2;
+
+				// Did it cross plane outside triangle?
+				if (upos < 0 || vpos < 0 || (upos + vpos) > 1)
+					continue;
+
+				// A hit! A most palpable hit!
+				// Compute distance to the three edges.
+				pVector uofs = (un * (un * offset)) - offset;
+				float udistSqr = uofs.length2();
+				pVector vofs = (vn * (vn * offset)) - offset;
+				float vdistSqr = vofs.length2();
+				pVector foffset(offset - u);
+				pVector fofs = (fn * (fn * foffset)) - foffset;
+				float fdistSqr = fofs.length2();
+				pVector S;
+				if (udistSqr <= vdistSqr && udistSqr <= fdistSqr) S = uofs;
+				else if (vdistSqr <= fdistSqr) S = vofs;
+				else S = fofs;
+
+				S.normalize_safe();
+
+				// We now have a vector3 to safety.
+				float vm = m.vel.length();
+				pVector Vn = m.vel / vm;
+
+				// Blend S into V.
+				pVector tmp = (S * (magdt / (t * t + epsilon))) + Vn;
+				m.vel = tmp * (vm / tmp.length());
+			}
+		}
+		break;
+	case PDDisc:
+		{
+			float r1Sqr = _sqr(position.radius1);
+			float r2Sqr = _sqr(position.radius2);
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt * look_ahead);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d. radius1Sqr stores d.
+				float distold = m.pos * position.p2 + position.radius1Sqr;
+				float distnew = pnext * position.p2 + position.radius1Sqr;
+
+				// Opposite signs if product < 0
+				// Is there a faster way to do this?
+				if (distold * distnew >= 0)
+					continue;
+
+				// Find position at the crossing point by parameterizing
+				// p(t) = pos + vel * t
+				// Solve dist(p(t),plane) = 0 e.g.
+				// n * p(t) + D = 0 ->
+				// n * p + t (n * v) + D = 0 ->
+				// t = -(n * p + D) / (n * v)
+				// Could factor n*v into distnew = distold + n*v and save a bit.
+				// Safe since n*v != 0 assured by quick rejection test.
+				// This calc is indep. of dt because we have established that it
+				// will hit before dt. We just want to know when.
+				float nv = position.p2 * m.vel;
+				float t = -distold / nv;
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, phit - origin
+				pVector offset(phit - position.p1);
+
+				float rad = offset.length2();
+
+				if (rad > r1Sqr || rad < r2Sqr)
+					continue;
+
+				// A hit! A most palpable hit!
+				pVector S = offset;
+				S.normalize_safe();
+
+				// We now have a vector3 to safety.
+				float vm = m.vel.length();
+				pVector Vn = m.vel / vm;
+
+				// Blend S into V.
+				pVector tmp = (S * (magdt / (t * t + epsilon))) + Vn;
+				m.vel = tmp * (vm / tmp.length());
+			}
+		}
+		break;
+	case PDSphere:
+		{
+			float rSqr = position.radius1 * position.radius1;
+
+			// See which particles are aimed toward the sphere.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// First do a ray-sphere intersection test and
+				// see if it's soon enough.
+				// Can I do this faster without t?
+				float vm = m.vel.length();
+				pVector Vn = m.vel / vm;
+
+				pVector L = position.p1 - m.pos;
+				float v = L * Vn;
+
+				float disc = rSqr - (L * L) + v * v;
+				if (disc < 0)
+					continue; // I'm not heading toward it.
+
+				// Compute length for second rejection test.
+				float t = v - _sqrt(disc);
+				if (t < 0 || t > (vm * look_ahead))
+					continue;
+
+				// Get a vector3 to safety.
+				pVector C = Vn ^ L;
+				C.normalize_safe();
+				pVector S = Vn ^ C;
+
+				// Blend S into V.
+				pVector tmp = (S * (magdt / (t * t + epsilon))) + Vn;
+				m.vel = tmp * (vm / tmp.length());
+			}
+		}
+		break;
+	}
+}
+
+void PABounce::Execute(ParticleEffect* effect, const float dt, float& tm_max)
+{
+	switch (position.type)
+	{
+	case PDTriangle:
+		{
+			// Compute the inverse matrix of the plane basis.
+			pVector& u = position.u;
+			pVector& v = position.v;
+
+			// w = u cross v
+			float wx = u.y * v.z - u.z * v.y;
+			float wy = u.z * v.x - u.x * v.z;
+			float wz = u.x * v.y - u.y * v.x;
+
+			float det = 1 / (wz * u.x * v.y - wz * u.y * v.x - u.z * wx * v.y - u.x * v.z * wy + v.z * wx * u.y + u.z *
+				v.x * wy);
+
+			pVector s1((v.y * wz - v.z * wy), (v.z * wx - v.x * wz), (v.x * wy - v.y * wx));
+			s1 *= det;
+			pVector s2((u.y * wz - u.z * wy), (u.z * wx - u.x * wz), (u.x * wy - u.y * wx));
+			s2 *= -det;
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d.
+				float distold = m.pos * position.p2 + position.radius1;
+				float distnew = pnext * position.p2 + position.radius1;
+
+				// Opposite signs if product < 0
+				// Is there a faster way to do this?
+				if (distold * distnew >= 0)
+					continue;
+
+				// Find position at the crossing point by parameterizing
+				// p(t) = pos + vel * t
+				// Solve dist(p(t),plane) = 0 e.g.
+				// n * p(t) + D = 0 ->
+				// n * p + t (n * v) + D = 0 ->
+				// t = -(n * p + D) / (n * v)
+				// Could factor n*v into distnew = distold + n*v and save a bit.
+				// Safe since n*v != 0 assured by quick rejection test.
+				// This calc is indep. of dt because we have established that it
+				// will hit before dt. We just want to know when.
+				float nv = position.p2 * m.vel;
+				float t = -distold / nv;
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, p - origin
+				pVector offset(phit - position.p1);
+
+				// Dot product with basis vectors of old frame
+				// in terms of new frame gives position in uv frame.
+				float upos = offset * s1;
+				float vpos = offset * s2;
+
+				// Did it cross plane outside triangle?
+				if (upos < 0 || vpos < 0 || (upos + vpos) > 1)
+					continue;
+
+				// A hit! A most palpable hit!
+
+				// Compute tangential and normal components of velocity
+				pVector vn(position.p2 * nv); // Normal Vn = (V.N)N
+				pVector vt(m.vel - vn); // Tangent Vt = V - Vn
+
+				// Compute new velocity heading out:
+				// Don't apply friction if tangential velocity < cutoff
+				if (vt.length2() <= cutoffSqr)
+					m.vel = vt - vn * resilience;
+				else
+					m.vel = vt * oneMinusFriction - vn * resilience;
+			}
+		}
+		break;
+	case PDDisc:
+		{
+			float r1Sqr = _sqr(position.radius1);
+			float r2Sqr = _sqr(position.radius2);
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d. radius1Sqr stores d.
+				float distold = m.pos * position.p2 + position.radius1Sqr;
+				float distnew = pnext * position.p2 + position.radius1Sqr;
+
+				// Opposite signs if product < 0
+				// Is there a faster way to do this?
+				if (distold * distnew >= 0)
+					continue;
+
+				// Find position at the crossing point by parameterizing
+				// p(t) = pos + vel * t
+				// Solve dist(p(t),plane) = 0 e.g.
+				// n * p(t) + D = 0 ->
+				// n * p + t (n * v) + D = 0 ->
+				// t = -(n * p + D) / (n * v)
+				// Could factor n*v into distnew = distold + n*v and save a bit.
+				// Safe since n*v != 0 assured by quick rejection test.
+				// This calc is indep. of dt because we have established that it
+				// will hit before dt. We just want to know when.
+				float nv = position.p2 * m.vel;
+				float t = -distold / nv;
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, phit - origin
+				pVector offset(phit - position.p1);
+
+				float rad = offset.length2();
+
+				if (rad > r1Sqr || rad < r2Sqr)
+					continue;
+
+				// A hit! A most palpable hit!
+
+				// Compute tangential and normal components of velocity
+				pVector vn(position.p2 * nv); // Normal Vn = (V.N)N
+				pVector vt(m.vel - vn); // Tangent Vt = V - Vn
+
+				// Compute new velocity heading out:
+				// Don't apply friction if tangential velocity < cutoff
+				if (vt.length2() <= cutoffSqr)
+					m.vel = vt - vn * resilience;
+				else
+					m.vel = vt * oneMinusFriction - vn * resilience;
+			}
+		}
+		break;
+	case PDPlane:
+		{
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d.
+				float distold = m.pos * position.p2 + position.radius1;
+				float distnew = pnext * position.p2 + position.radius1;
+
+				// Opposite signs if product < 0
+				if (distold * distnew >= 0)
+					continue;
+
+				// Compute tangential and normal components of velocity
+				float nmag = m.vel * position.p2;
+				pVector vn(position.p2 * nmag); // Normal Vn = (V.N)N
+				pVector vt(m.vel - vn); // Tangent Vt = V - Vn
+
+				// Compute new velocity heading out:
+				// Don't apply friction if tangential velocity < cutoff
+				if (vt.length2() <= cutoffSqr)
+					m.vel = vt - vn * resilience;
+				else
+					m.vel = vt * oneMinusFriction - vn * resilience;
+			}
+		}
+		break;
+	case PDRectangle:
+		{
+			// Compute the inverse matrix of the plane basis.
+			pVector& u = position.u;
+			pVector& v = position.v;
+
+			// w = u cross v
+			float wx = u.y * v.z - u.z * v.y;
+			float wy = u.z * v.x - u.x * v.z;
+			float wz = u.x * v.y - u.y * v.x;
+
+			float det = 1 / (wz * u.x * v.y - wz * u.y * v.x - u.z * wx * v.y - u.x * v.z * wy + v.z * wx * u.y + u.z *
+				v.x * wy);
+
+			pVector s1((v.y * wz - v.z * wy), (v.z * wx - v.x * wz), (v.x * wy - v.y * wx));
+			s1 *= det;
+			pVector s2((u.y * wz - u.z * wy), (u.z * wx - u.x * wz), (u.x * wy - u.y * wx));
+			s2 *= -det;
+
+			// See which particles bounce.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's current and next positions cross plane.
+				// If not, couldn't bounce, so keep going.
+				pVector pnext(m.pos + m.vel * dt);
+
+				// p2 stores the plane normal (the a,b,c of the plane eqn).
+				// Old and new distances: dist(p,plane) = n * p + d
+				// radius1 stores -n*p, which is d.
+				float distold = m.pos * position.p2 + position.radius1;
+				float distnew = pnext * position.p2 + position.radius1;
+
+				// Opposite signs if product < 0
+				if (distold * distnew >= 0)
+					continue;
+
+				// Find position at the crossing point by parameterizing
+				// p(t) = pos + vel * t
+				// Solve dist(p(t),plane) = 0 e.g.
+				// n * p(t) + D = 0 ->
+				// n * p + t (n * v) + D = 0 ->
+				// t = -(n * p + D) / (n * v)
+				float t = -distold / (position.p2 * m.vel);
+
+				// Actual intersection point p(t) = pos + vel t
+				pVector phit(m.pos + m.vel * t);
+
+				// Offset from origin in plane, p - origin
+				pVector offset(phit - position.p1);
+
+				// Dot product with basis vectors of old frame
+				// in terms of new frame gives position in uv frame.
+				float upos = offset * s1;
+				float vpos = offset * s2;
+
+				// Crossed plane outside bounce region if !(0<=[uv]pos<=1)
+				if (upos < 0 || upos > 1 || vpos < 0 || vpos > 1)
+					continue;
+
+				// A hit! A most palpable hit!
+
+				// Compute tangential and normal components of velocity
+				float nmag = m.vel * position.p2;
+				pVector vn(position.p2 * nmag); // Normal Vn = (V.N)N
+				pVector vt(m.vel - vn); // Tangent Vt = V - Vn
+
+				// Compute new velocity heading out:
+				// Don't apply friction if tangential velocity < cutoff
+				if (vt.length2() <= cutoffSqr)
+					m.vel = vt - vn * resilience;
+				else
+					m.vel = vt * oneMinusFriction - vn * resilience;
+			}
+		}
+		break;
+	case PDSphere:
+		{
+			// Sphere that particles bounce off
+			// The particles are always forced out of the sphere.
+			for (u32 i = 0; i < effect->p_count; i++)
+			{
+				Particle& m = effect->particles[i];
+
+				// See if particle's next position is inside domain.
+				// If so, bounce it.
+				pVector pnext(m.pos + m.vel * dt);
+
+				if (position.Within(pnext))
+				{
+					// See if we were inside on previous timestep.
+					BOOL pinside = position.Within(m.pos);
+
+					// Normal to surface. This works for a sphere. Isn't
+					// computed quite right, should extrapolate particle
+					// position to surface.
+					pVector n(m.pos - position.p1);
+					n.normalize_safe();
+
+					// Compute tangential and normal components of velocity
+					float nmag = m.vel * n;
+
+					pVector vn(n * nmag); // Normal Vn = (V.N)N
+					pVector vt = m.vel - vn; // Tangent Vt = V - Vn
+
+					if (pinside)
+					{
+						// Previous position was inside. If normal component of
+						// velocity points in, reverse it. This effectively
+						// repels particles which would otherwise be trapped
+						// in the sphere.
+						if (nmag < 0)
+							m.vel = vt - vn;
+					}
+					else
+					{
+						// Previous position was outside -> particle will cross
+						// surface boundary. Reverse normal component of velocity,
+						// and apply friction (if Vt >= cutoff) and resilience.
+
+						// Compute new velocity heading out:
+						// Don't apply friction if tangential velocity < cutoff
+						if (vt.length2() <= cutoffSqr)
+							m.vel = vt - vn * resilience;
+						else
+							m.vel = vt * oneMinusFriction - vn * resilience;
+					}
+				}
+			}
+		}
+	}
+}
+
+void PAFollow::Execute(ParticleEffect* effect, const float dt, float& tm_max)
+{
+	float magdt = magnitude * dt;
+	float max_radiusSqr = max_radius * max_radius;
+
+	if (max_radiusSqr < P_MAXFLOAT)
+	{
+		for (u32 i = 0; i < effect->p_count - 1; i++)
+		{
+			Particle& m = effect->particles[i];
+
+			// Accelerate toward the particle after me in the list.
+			pVector tohim(effect->particles[i + 1].pos - m.pos); // tohim = p1 - p0
+			float tohimlenSqr = tohim.length2();
+
+			if (tohimlenSqr < max_radiusSqr)
+			{
+				// Compute force exerted between the two bodies
+				m.vel += tohim * (magdt / (_sqrt(tohimlenSqr) * (tohimlenSqr + epsilon)));
+			}
+		}
+	}
+	else
+	{
+		for (u32 i = 0; i < effect->p_count - 1; i++)
+		{
+			Particle& m = effect->particles[i];
+
+			// Accelerate toward the particle after me in the list.
+			pVector tohim(effect->particles[i + 1].pos - m.pos); // tohim = p1 - p0
+			float tohimlenSqr = tohim.length2();
+
+			// Compute force exerted between the two bodies
+			m.vel += tohim * (magdt / (_sqrt(tohimlenSqr) * (tohimlenSqr + epsilon)));
+		}
+	}
+}
+
+// Frozen pairwise gravity frombc94549c8.
+void PAGravitate::Execute(ParticleEffect* effect, const float dt, float& tm_max)
+{
+	float magdt = magnitude * dt;
+	float max_radiusSqr = max_radius * max_radius;
+
+	if (max_radiusSqr < P_MAXFLOAT)
+	{
+		for (u32 i = 0; i < effect->p_count; i++)
+		{
+			Particle& m = effect->particles[i];
+
+			// Add interactions with other particles
+			for (u32 j = i + 1; j < effect->p_count; j++)
+			{
+				Particle& mj = effect->particles[j];
+
+				pVector tohim(mj.pos - m.pos); // tohim = p1 - p0
+				float tohimlenSqr = tohim.length2() + EPS_S;
+
+				if (tohimlenSqr < max_radiusSqr)
+				{
+					// Compute force exerted between the two bodies
+					pVector acc(tohim * (magdt / (_sqrt(tohimlenSqr) * (tohimlenSqr + epsilon))));
+
+					m.vel += acc;
+					mj.vel -= acc;
+				}
+			}
+		}
+	}
+	else
+	{
+		for (u32 i = 0; i < effect->p_count; i++)
+		{
+			Particle& m = effect->particles[i];
+
+			// Add interactions with other particles
+			for (u32 j = i + 1; j < effect->p_count; j++)
+			{
+				Particle& mj = effect->particles[j];
+
+				pVector tohim(mj.pos - m.pos); // tohim = p1 - p0
+				float tohimlenSqr = tohim.length2() + EPS_S;
+
+				// Compute force exerted between the two bodies
+				pVector acc(tohim * (magdt / (_sqrt(tohimlenSqr) * (tohimlenSqr + epsilon))));
+
+				m.vel += acc;
+				mj.vel -= acc;
+			}
+		}
+	}
+}
