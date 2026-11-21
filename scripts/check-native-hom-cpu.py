@@ -37,6 +37,7 @@ code=r'''
 #undef assert
 #define assert(x) do{if(!(x)){std::fprintf(stderr,"FAIL %d: %s\n",__LINE__,#x);ExitProcess(2);}}while(false)
 #define IC inline
+#define _abs std::abs
 using u32=unsigned;using s32=int;using s16=short;
 constexpr float EPS_S=.0000001f;
 int iFloor(float x){return int(std::floor(x));}int iCeil(float x){return int(std::ceil(x));}
