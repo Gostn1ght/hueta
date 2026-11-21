@@ -244,8 +244,18 @@ void CDetailManager::Load()
 	swing_desc[1].rot2 = pSettings->r_float("details", "swing_fast_rot2");
 	swing_desc[1].speed = pSettings->r_float("details", "swing_fast_speed");
 }
+void CDetailManager::CancelPendingTasks()
+{
+	const auto callback=fastdelegate::FastDelegate0<>(this,&CDetailManager::MT_CALC);
+	auto& tasks=Device.seqParallel;
+	tasks.erase(std::remove(tasks.begin(),tasks.end(),callback),tasks.end());
+}
 void CDetailManager::Unload()
 {
+	// Reset/level unload runs on the device owner before the MT queue resumes.
+	// Remove future calls and finish any calculation already using the data.
+	CancelPendingTasks();
+	xrCriticalSectionGuard calculation_guard(MT);
 	if (UseVS()) hw_Unload();
 	else soft_Unload();
 

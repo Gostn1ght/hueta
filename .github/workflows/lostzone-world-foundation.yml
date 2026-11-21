@@ -188,6 +188,8 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-r1-detail-reset.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-detail-lifetime.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-idle-exit.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:

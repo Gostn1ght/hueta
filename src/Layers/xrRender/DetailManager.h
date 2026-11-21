@@ -245,6 +245,7 @@ public:
 	int w2cg_Z(int z) { return cache_cz - dm_size + (dm_cache_line - 1 - z); }
 
 	void Load();
+	void CancelPendingTasks(); // owner only, while the device task queue is paused
 	void Unload();
 	void Render();
 
