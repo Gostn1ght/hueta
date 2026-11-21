@@ -37,6 +37,7 @@ void __stdcall CHOM::MT_RENDER()
 
 CHOM::CHOM()
 {
+	MT_frame_rendered=u32(-1);
 	bEnabled = FALSE;
 	m_pModel = 0;
 	m_pTris = 0;
@@ -73,6 +74,7 @@ IC float Area(Fvector& v0, Fvector& v1, Fvector& v2)
 void CHOM::Load()
 {
 	xrCriticalSectionGuard phase_guard(MT);
+	MT_frame_rendered=u32(-1);
 	// Find and open file
 	// A dedicated server draws nothing: occlusion culling is never used there.
 	if (g_dedicated_server) return;
@@ -140,6 +142,7 @@ void CHOM::Load()
 void CHOM::Unload()
 {
 	xrCriticalSectionGuard phase_guard(MT);
+	MT_frame_rendered=u32(-1);
 	xr_delete(m_pModel);
 	xr_free(m_pTris);
 	bEnabled = FALSE;
