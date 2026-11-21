@@ -26,7 +26,7 @@ class HostController
         bool demand=true,loading=false,expected=false,blocked=false;
         HANDLE process=nullptr;DWORD pid=0,exit=0;unsigned failures=0,players=0;
         uint64_t launched=0,retry_at=0,healthy_at=0;bool has_exit=false;
-        double peak_commit=0,working_set=0,private_commit=0;
+        double peak_commit=0,loading_peak_commit=0,working_set=0,private_commit=0;
         bool sample_startup_peak=false;
         uint64_t memory_reported=0;
     };
@@ -213,7 +213,10 @@ class HostController
             // One final sample after the first ready heartbeat includes the
             // tail of loading. Later gameplay/cache peaks do not inflate the
             // next launch gate, even after the memory has already been freed.
-            map.peak_commit=std::max(map.peak_commit,std::max(committed,lifetime_peak));
+            map.loading_peak_commit=std::max(map.loading_peak_commit,std::max(committed,lifetime_peak));
+            // Retain known loading needs if the next process fails before
+            // sampling. Only a completed load may replace them with less.
+            map.peak_commit=map.loading ? std::max(map.peak_commit,map.loading_peak_commit):map.loading_peak_commit;
             if(!map.loading)map.sample_startup_peak=false;
         }
     }
@@ -249,7 +252,7 @@ class HostController
             m.blocked=true;transition(m,"failed","CreateProcess Win32="+std::to_string(GetLastError()));return;
         }
         CloseHandle(p.hThread);m.process=p.hProcess;m.pid=p.dwProcessId;m.loading=true;m.expected=false;m.launched=GetTickCount64();
-        m.peak_commit=0;m.sample_startup_peak=true;
+        m.loading_peak_commit=0;m.sample_startup_peak=true;
         transition(m,"loading","native serialized launch");
     }
     void queue() {

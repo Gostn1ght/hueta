@@ -115,7 +115,7 @@ struct HostControllerFixture {
         assert(!a.process && !b.process); // no executable exists in this fixture
         // A client can coexist with this map when60GiB RAM is free. A later
         // gameplay/cache spike must not make a new load require its old peak.
-        a.loading=true;a.sample_startup_peak=true;a.peak_commit=0;
+        a.loading=true;a.sample_startup_peak=true;a.peak_commit=0;a.loading_peak_commit=0;
         controller.observe_memory(a,2,3,3.5);assert(a.peak_commit==3.5);
         a.loading=false;controller.observe_memory(a,2.5,4,4.5);
         assert(!a.sample_startup_peak && a.peak_commit==4.5);
@@ -128,6 +128,11 @@ struct HostControllerFixture {
         assert(controller.memory_detail(b).find("3.0")!=std::string::npos);
         controller.calculate_budget(60,128,2);controller.need_commit_=controller.launch_commit(a);
         assert(!controller.memory_available()); // genuine Windows commit shortage still blocked
+        a.loading=true;a.sample_startup_peak=true;a.peak_commit=8;a.loading_peak_commit=0;
+        controller.observe_memory(a,1,2,2);
+        assert(a.peak_commit==8); // failed/incomplete reload cannot erase known startup needs
+        a.loading=false;controller.observe_memory(a,1,2,2);
+        assert(a.peak_commit==2 && controller.launch_commit(a)==3.0);
         a.peak_commit=0;a.sample_startup_peak=false;
         std::puts("PASS startup-only memory estimate:60GiB free RAM, gameplay peak excluded, adopted history ignored, per-map details and real commit gate; no game started");
         // The screenshot's real 16 GiB PC: 8.68 GiB available used to be
