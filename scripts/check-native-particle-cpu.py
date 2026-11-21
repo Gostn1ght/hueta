@@ -103,7 +103,7 @@ float ps_particle_update_coeff=1.f;
 static int noise_start=1;
 '''
 types = 'namespace PAPI {\n' + particle_types + domain_enum + domain + '\nstruct ParticleEffect{u32 p_count;Particle* particles;};\n}\nusing namespace PAPI;\n'
-source = preamble + types + '#include "particle_pairs.h"\n' + domain_impl + noise + simd
+source = preamble + types + '#include "particle_pairs.h"\n' + domain_impl + '\n' + noise + simd
 source += '\nnamespace serial_ref {\n' + '\n'.join(classes) + '\n' + reference + '\n}\n'
 source += '\nnamespace PAPI {\n' + '\n'.join(classes) + '\n' + '\n'.join(bodies) + '\n}\n'
 source += r'''
