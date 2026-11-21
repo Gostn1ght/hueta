@@ -110,14 +110,17 @@ int main(){
   for(unsigned i=0;i<count;++i){const float x=float(int(i%41)-20)*.08f,y=float(int(i%37)-18)*.08f;
    vertices[i*3]={x,y,i%7==0?-.1f:.2f};vertices[i*3+1]={x+.2f,y,i%7==1?-.1f:.3f};vertices[i*3+2]={x,y+.2f,i%7==2?-.1f:.4f};
    if(i%17==0)vertices[i*3+1]=vertices[i*3];
+   if(i%19==0)vertices[i*3].z=0.f;
    faces[i]={{i*3,i*3+1,i*3+2}};order[i]={i};triangles[i].flags=i%3==0;triangles[i].plane.n={0,0,1};triangles[i].plane.d=i%5==0?-3.f:0.f;
    triangles[i].adjacent[0]=i?&triangles[i-1]:reinterpret_cast<occTri*>(-1);triangles[i].adjacent[1]=triangles[i].adjacent[2]=reinterpret_cast<occTri*>(-1);
   }
   std::mt19937 shuffle(111);std::shuffle(order.begin(),order.end(),shuffle);const auto original=triangles;
   xr_hom::Input input{order.data(),faces.data(),vertices.data(),triangles.data(),{0,0,2},{},{},nullptr};input.frustum.planes[0].n={0,0,-1};
+  for(bool perspective:{false,true}){input.transform._14=perspective?.03f:0.f;input.transform._24=perspective?-.02f:0.f;input.transform._34=perspective?1.f:0.f;
   for(unsigned tick=0;tick<8;++tick){triangles=original;input.occluders=triangles.data();const auto baseline=draw(input,count,false,1,tick,slots);
    for(unsigned limit:{1u,4u}){triangles=original;input.occluders=triangles.data();if(limit==4 && count>=1024)xr_cpu::test_fail_after_blocks(0);
     const auto result=draw(input,count,true,limit,tick,slots);xr_cpu::test_fail_after_blocks(-1);equal(baseline,result);}
+  }
   }
   if(count==8192){std::vector<xr_hom::Prepared> output(count);input.output=output.data();
    for(unsigned limit:{1u,4u}){std::vector<double> times;for(unsigned i=0;i<61;++i){auto start=std::chrono::steady_clock::now();xr_hom::prepare(input,count,limit);times.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count());}
