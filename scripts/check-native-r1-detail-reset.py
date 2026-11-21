@@ -19,7 +19,7 @@ code=r'''
 #include <initializer_list>
 unsigned dm_current_size=24,dm_size=24,loads=0,unloads=0,destructions=0;
 float ps_r__Detail_density=.2f,ps_current_detail_density=.2f,ps_r__Detail_height=1,ps_current_detail_height=1;
-struct CDetailManager{~CDetailManager(){++destructions;}void Unload(){++unloads;}void Load(){++loads;dm_size=dm_current_size;ps_current_detail_density=ps_r__Detail_density;ps_current_detail_height=ps_r__Detail_height;}};
+struct CDetailManager{CDetailManager(){dm_size=dm_current_size;ps_r__Detail_density=ps_current_detail_density;ps_r__Detail_height=ps_current_detail_height;}~CDetailManager(){++destructions;}void Unload(){++unloads;}void Load(){++loads;}};
 struct CRenderTarget{};struct Projector{void invalidate(){}};
 template<class T>void xr_delete(T*& p){delete p;p=nullptr;}
 template<class T>T* xr_new(){return new T;}
@@ -30,7 +30,7 @@ int main(){
   dm_size=dm_current_size=24;ps_r__Detail_density=ps_current_detail_density=.2f;ps_r__Detail_height=ps_current_detail_height=1;
   CRender renderer;renderer.b_loaded=loaded;renderer.Details=loaded?new CDetailManager:nullptr;renderer.Target=new CRenderTarget;
   auto* original=renderer.Details;loads=unloads=destructions=0;
-  if(mask&1)dm_current_size=40;if(mask&2)ps_r__Detail_density=.4f;if(mask&4)ps_r__Detail_height=1.5f;
+  if(mask&1)dm_current_size=40;if(mask&2)ps_current_detail_density=.4f;if(mask&4)ps_current_detail_height=1.5f;
   renderer.reset_begin();assert(renderer.Target==nullptr);
   if(loaded && mask)assert(renderer.Details==nullptr && unloads==1 && destructions==1);
   renderer.reset_end();assert(renderer.Target && renderer.m_bFirstFrameAfterReset);
