@@ -922,7 +922,7 @@ static void cluster_idle_exit(xrServer* server, u32 now)
 	if(!receipt) return;
 	fprintf(receipt,"%u",GetCurrentProcessId());
 	if(fclose(receipt)!=0) return;
-	if(!cluster_status_remove()) return;
+	if(!cluster_status_remove()) { DeleteFileA(path); return; } // no cold-exit receipt before a real quit
 	s_cluster_quitting = true;
 	Msg("[Lost Zone][cluster] no players for %u s: world saved, server exits", limit / 1000);
 	FlushLog();

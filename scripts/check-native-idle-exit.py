@@ -67,7 +67,8 @@ int main(){
  assert(GetFileAttributesA("idle_exit_1267.txt")==INVALID_FILE_ATTRIBUTES);
  save_ok=true;cluster_idle_exit(&server,639999);assert(saves==1);
  HANDLE held=CreateFileA("status_1267.txt",GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(held!=INVALID_HANDLE_VALUE);
- cluster_idle_exit(&server,640000);assert(saves==2 && !quits && !s_cluster_quitting);CloseHandle(held);
+ cluster_idle_exit(&server,640000);assert(saves==2 && !quits && !s_cluster_quitting);
+ assert(GetFileAttributesA("idle_exit_1267.txt")==INVALID_FILE_ATTRIBUTES);CloseHandle(held);
  cluster_idle_exit(&server,640001);assert(saves==2 && !quits);
  cluster_idle_exit(&server,700000);assert(saves==3 && quits==1 && s_cluster_quitting);
  assert(GetFileAttributesA("status_1267.txt")==INVALID_FILE_ATTRIBUTES);

@@ -7,3 +7,5 @@ Retry now has an independent monotonic last-attempt timestamp and explicit retry
 CI compiles the actual warm/cold functions with controlled save/client/admission/file-lock inputs. It covers a1second delay, tens of thousands of failed-save ticks, exact60second retry,32bit timer wrap, receipt/status ordering, reconnect wake and admission barriers. Warm trim/sleep are intercepted in the fixture; no real game, process trimming or sleep is executed locally. Evidence pending at this commit. This fixes a concrete retry busy-loop, not every remaining server hibernation/memory issue.
 
 HOM CPU preparation remains under full DX11/DX8 ABI validation on be51ce840/44926913355; new server code is a later source and needs its own full build. Publication stays deferred; installed84/public80 remain unchanged.
+
+A failed status withdrawal removes the just-created PID cold-exit receipt. The process is still running, so a later unrelated clean exit must not be mistaken for completed hibernation. The locked-status fixture checks absence of that premature receipt.
