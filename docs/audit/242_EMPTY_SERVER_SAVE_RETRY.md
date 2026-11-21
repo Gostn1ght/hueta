@@ -9,3 +9,5 @@ CI compiles the actual warm/cold functions with controlled save/client/admission
 HOM CPU preparation remains under full DX11/DX8 ABI validation on be51ce840/44926913355; new server code is a later source and needs its own full build. Publication stays deferred; installed84/public80 remain unchanged.
 
 A failed status withdrawal removes the just-created PID cold-exit receipt. The process is still running, so a later unrelated clean exit must not be mistaken for completed hibernation. The locked-status fixture checks absence of that premature receipt.
+
+Final subsequent validation: exact d5771f6a6b532ed5acc4ac6df8ec9c124f7e2c6b passed Foundation44929269770 all4 jobs and Full44929418758 both DX11/DX8 builds; source/hash/CRC/PDB checks passed. See [244_CPU_IDLE_VIDEO_CI_VALIDATION.md](244_CPU_IDLE_VIDEO_CI_VALIDATION.md). No install/publication/game acceptance.
