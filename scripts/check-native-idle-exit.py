@@ -47,6 +47,16 @@ ConsoleStub* Console=&console;
 '''+counter+remove+idle+r'''
 int main(){
  xrServer server;xrClientData local,connecting;local.flags.bLocal=true;server.clients={&local,&connecting};
+ Core.Params="-netcoop_idle_exit=1";cluster_idle_exit(&server,0);server.clients={&local};
+ cluster_idle_exit(&server,1000);save_ok=false;cluster_idle_exit(&server,2000);assert(saves==1);
+ for(u32 now=2001;now<62000;++now)cluster_idle_exit(&server,now);
+ assert(saves==1 && !quits);cluster_idle_exit(&server,62000);assert(saves==2 && !quits);
+ server.clients={&local,&connecting};cluster_idle_exit(&server,0xfffffa00u);
+ server.clients={&local};cluster_idle_exit(&server,0xfffffff0u);assert(saves==3);
+ cluster_idle_exit(&server,10);assert(saves==3);cluster_idle_exit(&server,59984);assert(saves==4);
+ server.clients={&local,&connecting};Core.Params="-netcoop_idle_exit=180";
+ cluster_idle_exit(&server,0);saves=quits=0;save_ok=true;Core.Params="";
+
  cluster_idle_exit(&server,1000);assert(!quits && !saves);
  Core.Params="-netcoop_idle_exit=180";
  cluster_idle_exit(&server,1000);cluster_idle_exit(&server,200000);assert(!quits && !saves);
@@ -58,7 +68,8 @@ int main(){
  save_ok=true;cluster_idle_exit(&server,639999);assert(saves==1);
  HANDLE held=CreateFileA("status_1267.txt",GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(held!=INVALID_HANDLE_VALUE);
  cluster_idle_exit(&server,640000);assert(saves==2 && !quits && !s_cluster_quitting);CloseHandle(held);
- cluster_idle_exit(&server,640001);assert(saves==3 && quits==1 && s_cluster_quitting);
+ cluster_idle_exit(&server,640001);assert(saves==2 && !quits);
+ cluster_idle_exit(&server,700000);assert(saves==3 && quits==1 && s_cluster_quitting);
  assert(GetFileAttributesA("status_1267.txt")==INVALID_FILE_ATTRIBUTES);
  std::ifstream in("idle_exit_1267.txt");std::string pid;in>>pid;assert(pid==std::to_string(GetCurrentProcessId()));
  cluster_idle_exit(&server,999999);assert(saves==3 && quits==1);

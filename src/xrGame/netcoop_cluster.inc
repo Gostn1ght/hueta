@@ -900,16 +900,20 @@ static bool cluster_status_remove()
 // exits after that long without players (the watchdog starts it again).
 static void cluster_idle_exit(xrServer* server, u32 now)
 {
+	static bool retrying=false;
+	static u32 last_attempt=0;
 	LPCSTR option = strstr(Core.Params, "-netcoop_idle_exit=");
 	if (!option || s_cluster_quitting) return;
 	const u32 limit = u32(atoi(option + xr_strlen("-netcoop_idle_exit="))) * 1000;
 	u32 players = 0;
 	ClusterCountOnline count = {&players};
 	server->ForEachClientDo(count);
-	if (players || !world_store_admission_open()) { s_cluster_idle_since = now; return; }
+	if (players || !world_store_admission_open()) { s_cluster_idle_since = now; retrying=false; return; }
 	if (!s_cluster_idle_since) s_cluster_idle_since = now;
 	if (!limit || now - s_cluster_idle_since < limit) return;
-	if (!world_store_save_now("idle exit")) { s_cluster_idle_since = now - limit + 60000; return; } // retry in a minute
+	if (retrying && u32(now-last_attempt)<60000) return;
+	last_attempt=now;retrying=true;
+	if (!world_store_save_now("idle exit")) return; // all failed stages retry after a minute
 	// The native host distinguishes a saved cold sleep from a deliberate
 	// stop. Only this matching PID may leave its map armed for demand wakeup.
 	string64 key; xr_sprintf(key,"%u",cluster_port());
@@ -987,6 +991,8 @@ static void cluster_host_stop(xrServer* server, u32 now)
 
 static void cluster_hibernate(xrServer* server, u32 now)
 {
+	static bool retrying=false;
+	static u32 last_attempt=0;
 	LPCSTR option = strstr(Core.Params, "-netcoop_hibernate=");
 	if (!option || s_cluster_quitting) return;
 	const u32 after = u32(atoi(option + xr_strlen("-netcoop_hibernate="))) * 1000;
@@ -1001,13 +1007,17 @@ static void cluster_hibernate(xrServer* server, u32 now)
 			Msg("[Lost Zone][cluster] a player is coming: the server wakes up");
 		}
 		s_cluster_empty_since = now;
+		retrying=false;
 		return;
 	}
 	if (!s_cluster_empty_since) s_cluster_empty_since = now;
 	if (!s_cluster_hibernating)
 	{
 		if (!after || now - s_cluster_empty_since < after) return;
-		if (!world_store_save_now("hibernate")) { s_cluster_empty_since = now - after + 60000; return; }
+		if (retrying && u32(now-last_attempt)<60000) return;
+		last_attempt=now;retrying=true;
+		if (!world_store_save_now("hibernate")) return;
+		retrying=false;
 		s_cluster_hibernating = true;
 		s_cluster_trimmed = 0;
 		Msg("[Lost Zone][cluster] no players for %u s: world saved, the server hibernates", after / 1000);

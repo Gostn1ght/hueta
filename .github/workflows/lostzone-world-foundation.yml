@@ -184,6 +184,10 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-hom-cpu.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-hibernate-retry.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-idle-exit.py
+          if errorlevel 1 exit /b %errorlevel%
   entry-windows:
     runs-on: windows-2022
     timeout-minutes: 5
