@@ -11,6 +11,9 @@
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include "hom_cpu.h"
+#include <memory>
+#include <new>
 
 float psOSSR = .001f;
 
@@ -69,6 +72,7 @@ IC float Area(Fvector& v0, Fvector& v1, Fvector& v2)
 
 void CHOM::Load()
 {
+	xrCriticalSectionGuard phase_guard(MT);
 	// Find and open file
 	// A dedicated server draws nothing: occlusion culling is never used there.
 	if (g_dedicated_server) return;
@@ -135,6 +139,7 @@ void CHOM::Load()
 
 void CHOM::Unload()
 {
+	xrCriticalSectionGuard phase_guard(MT);
 	xr_delete(m_pModel);
 	xr_free(m_pTris);
 	bEnabled = FALSE;
@@ -210,12 +215,47 @@ void CHOM::Render_DB(CFrustum& base)
 	tris_in_frame_visible		= 0;
 #endif
 
+	std::unique_ptr<xr_hom::Prepared[]> prepared;
+	const auto preparation_count=std::size_t(end-it);
+	if(clip.p_count==1 && preparation_count>=1024 && preparation_count<=65536 &&
+		xr_cpu::concurrency()>1 && !strstr(Core.Params,"-cpu_serial") && !strstr(Core.Params,"-cpu_hom_legacy"))
+	{
+		prepared.reset(new(std::nothrow) xr_hom::Prepared[preparation_count]);
+		if(prepared)
+		{
+			xr_hom::Input input{it,m_pModel->get_tris(),m_pModel->get_verts(),m_pTris,COP,m_xform,clip,prepared.get()};
+			const auto stats=xr_hom::prepare(input,preparation_count);
+			for(std::size_t index=0;index<preparation_count;++index)
+				if(prepared[index].count>4){prepared.reset();break;}
+			if(prepared && _frame%500==0 && strstr(Core.Params,"-cpu_trace"))
+				Msg("[cpu-hom] triangles=%u slots=%u blocks=%u",u32(preparation_count),stats.slots,u32(stats.blocks));
+		}
+	}
+	std::size_t preparation_index=0;
+
 	// Perfrom selection, sorting, culling
-	for (; it != end; it++)
+	for (; it != end; it++,++preparation_index)
 	{
 		// Control skipping
 		occTri& T = m_pTris[it->id];
 		u32 next = _frame + ::Random.randI(3, 10);
+
+		if(prepared)
+		{
+			const auto& polygon=prepared[preparation_index];
+			if(!polygon.count){T.skip=next;continue;}
+#ifdef DEBUG
+			++tris_in_frame_visible;
+#endif
+			u32 pixels=0;
+			for(unsigned vertex=1;vertex+1<polygon.count;++vertex)
+			{
+				T.raster[0]=polygon.points[0];T.raster[1]=polygon.points[vertex];T.raster[2]=polygon.points[vertex+1];
+				pixels+=Raster.rasterize(&T);
+			}
+			if(!pixels)T.skip=next;
+			continue;
+		}
 
 		// Test for good occluder - should be improved :)
 		if (!(T.flags || (T.plane.classify(COP) > 0)))
@@ -262,6 +302,7 @@ void CHOM::Render_DB(CFrustum& base)
 
 void CHOM::Render(CFrustum& base)
 {
+	xrCriticalSectionGuard phase_guard(MT);
 	if (!bEnabled) return;
 
 	Device.Statistic->RenderCALC_HOM.Begin();
