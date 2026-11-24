@@ -1,0 +1,11 @@
+# Owner gameplay backlog intake,24November
+
+The owner's repeated15November list and vehicle/PDA/transit additions are recorded in the private Obsidian vault as OWNER-20261124-B03. The machine-readable source maps58 items to73 distinct results:43 repeated B02 source items plus15 addition paragraphs,17 new canonical tasks and56 existing tasks reaffirmed without resetting their current status. The earlier B02 port/identity supplement is preserved in its original batch even though it was not repeated in this message.
+
+New tasks cover vehicle driver/passenger HUD; separate tires, removable parts, windows, gradual steering and body deformation; pistol holster and physical sling; four addon maps, transition-zone editor, global discovered transitions and unavailable-map fog; permanent private PDA data, weekly public history, discovery, guide information purchases and knowledge sharing. Existing broad vehicle physics and mechanic repair/upgrade cards are extended instead of duplicated. Historical task IDs remain history/refinements, not extra independent completed bugs.
+
+No new screenshots were attached: text image labels do not produce image evidence. Four addon names are blank; GP meaning, guide prices and weekly cutoff anchor remain unspecified. Discovery is recorded as the later visibility condition for transitions on global maps; this interpretation is explicit. Requests for GTA/RDR/Cyberpunk-like features are targets, not evidence that compatible models/physics exist.
+
+Vault check passes with112 tasks:102 open,9 in progress,1 prior technical done,0 broken links. Both old B02 and new B03 mappings have complete source coverage; existing18 screenshots remain B02 evidence. All prior personal checkbox states are preserved and17 unchecked canonical entries are added. No stage readiness or game acceptance is raised for intake; overall remains36. Original live accounts/saves/database, runtime processes, installed packages and public distribution were not changed.
+
+The ongoing native checkpoint fix6669c0764 / Foundation45429931777 all4 PASS is recorded separately in audit248. Its full-engine/game/installed status remains false. This intake does not publish or deploy that change. Next work should follow P0 gameplay safety, then functional P1, using actual deployed entrypoints and evidence rather than presumed fixes for every listed symptom.
