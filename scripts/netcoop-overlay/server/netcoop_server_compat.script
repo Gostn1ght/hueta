@@ -518,17 +518,27 @@ end
 local game_loaded = false
 -- Anomalies hurt players in their whole field (owner 2026-10-18: "anomalies
 -- do no damage"). GAMMA's NPC pathfinding fix (aaaa_script_fixes_mp)
--- ignores everyone but the single-player Actor (id 0) outside the field's
--- radius minus 1.1 m; every player here has another id, so a small field
--- never touched him. Living players get the single-player Actor's rule.
+-- uses AC_ID to distinguish the player from NPCs. S_ACTOR has
+-- clsid.script_actor on this server. Use the actual player ID for the call
+-- so unrelated vetoes still apply.
 local zone_players_installed = false
 function install_zone_players()
 	if zone_players_installed or type(_G.CCustomZone_BeforeActivateCallback) ~= "function" then return end
 	zone_players_installed = true
 	local decide = _G.CCustomZone_BeforeActivateCallback
 	_G.CCustomZone_BeforeActivateCallback = function(zone, obj)
-		local result = decide(zone, obj)
-		if not result and obj and obj.clsid and obj:clsid() == clsid.actor and obj.alive and obj:alive() then return true end
+		if not (obj and obj:clsid() == clsid.script_actor and obj:alive()) then
+			return decide(zone, obj)
+		end
+		local id = obj:id()
+		if id == 0 or not netcoop_actor_character or netcoop_actor_character(id) == "" then
+			return decide(zone, obj)
+		end
+		local previous = _G.AC_ID
+		_G.AC_ID = id
+		local ok, result = pcall(decide, zone, obj)
+		_G.AC_ID = previous
+		if not ok then error(result, 0) end
 		return result
 	end
 end

@@ -33,6 +33,78 @@ db.storage[7].ini={};cooperative=false
 assert(not physics_door_binder_ready(7))
 ''')
 print("Actual door binder classifier: initialized ph_door only, no Actor/idle/bootstrap/single-player PASS")
+server = (root / "scripts/netcoop-overlay/server/netanomaly_server.script").read_text(encoding="utf-8")
+door_lua.execute(server)
+door_lua.execute(r'''
+clock=1000;calls=0;gestures=0;handled=true
+function time_global()return clock end
+function alife()return {object=function()end}end
+function netcoop_broadcast(channel,data)
+    assert(channel=="netcoop_consumption" and data=="8|255|Player|anim_door_open")
+    gestures=gestures+1
+end
+local gap=2
+local player={id=function()return 8 end,alive=function()return true end,name=function()return "Player" end,
+    position=function()return {distance_to=function()return gap end}end}
+objects[8]=player
+objects[7]={position=function()return {}end,use=function(_,actor)
+    assert(actor==player and db.actor:id()==8)
+    calls=calls+1
+    return handled
+end}
+db.level_doors={[7]=true}
+local function command(target)on_client_command("cid","Player",8,"door "..target,"player")end
+db.actor={id=function()return 0 end}
+command("7");assert(calls==0 and gestures==0)
+db.actor=player
+command("7.0");assert(calls==0)
+gap=4;command("7");assert(calls==0)
+gap=2;db.level_doors[7]=nil;command("7");assert(calls==0)
+db.level_doors[7]=true
+handled=false;command("7");assert(calls==1 and gestures==0)
+handled=true;clock=1599;command("7");assert(calls==1)
+clock=1600;command("7");assert(calls==2 and gestures==1)
+''')
+print("PASS door use command: requesting actor, real registered target, range, cooldown and gesture only after accepted use")
+compat = (root / "scripts/netcoop-overlay/server/netcoop_server_compat.script").read_text(encoding="utf-8")
+zone_lua = LuaRuntime(unpack_returned_tuples=True)
+start = compat.index("local zone_players_installed")
+end = compat.index("local function server_game_load", start)
+zone_lua.execute(r'''
+AC_ID=0;clsid={script_actor=1,actor=2,script_stalker=3}
+function netcoop_actor_character(id)return (id==8 or id==9) and "tracked" or "" end
+function entity(i,c,alive)
+    return {id=function()return i end,clsid=function()return c end,alive=function()return alive end}
+end
+local veto,broken=false,false
+function set_zone_mode(reject,raise)veto,broken=reject,raise end
+function CCustomZone_BeforeActivateCallback(_,obj)
+    if broken then error("zone callback failed") end
+    if veto then return false end
+    return obj:id()==AC_ID -- original pathfinding's player exception
+end
+''' + compat[start:end])
+zone_lua.execute(r'''
+local a=entity(8,clsid.script_actor,true)
+local b=entity(9,clsid.script_actor,true)
+local callback=CCustomZone_BeforeActivateCallback
+assert(not callback(nil,a))
+install_zone_players()
+local wrapped=CCustomZone_BeforeActivateCallback
+install_zone_players();assert(wrapped==CCustomZone_BeforeActivateCallback)
+assert(wrapped(nil,a) and AC_ID==0)
+AC_ID=8
+assert(wrapped(nil,b) and AC_ID==8)
+assert(not wrapped(nil,entity(10,clsid.script_actor,true)))
+assert(not wrapped(nil,entity(11,clsid.actor,true)))
+assert(not wrapped(nil,entity(9,clsid.script_actor,false)))
+assert(not wrapped(nil,entity(12,clsid.script_stalker,true)))
+assert(not wrapped(nil,entity(0,clsid.script_actor,true)))
+set_zone_mode(true,false);assert(not wrapped(nil,b) and AC_ID==8)
+set_zone_mode(false,true);local ok,err=pcall(wrapped,nil,b)
+assert(not ok and err:find("zone callback failed",1,true) and AC_ID==8)
+''')
+print("PASS anomaly activation: tracked S_ACTOR gets its own AC_ID; NPC, dead, anchor and unrelated vetoes preserved")
 lua = LuaRuntime(unpack_returned_tuples=True)
 lua.execute(r'''
 cooperative = true; spawns = 0; initial = 0; quest = 0; callbacks = {}

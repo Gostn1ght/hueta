@@ -1194,9 +1194,10 @@ u32 xrServer::OnMessage(NET_Packet& P, ClientID sender) // Non-Zero means broadc
 			{
 				try
 				{
-					// The PDA task board runs GAMMA task scripts: db.actor, the
-					// engine Actor and the task list are the asking player's.
-					CActor* na_actor = !strncmp(na_text, "taskboard ", 10) && na_eid != 65535 ?
+					// Task and door scripts evaluate conditions against the
+					// requesting player, not the dedicated story actor.
+					const bool uses_player_context = !strncmp(na_text, "taskboard ", 10) || !strncmp(na_text, "door ", 5);
+					CActor* na_actor = uses_player_context && na_eid != 65535 ?
 						smart_cast<CActor*>(Level().Objects.net_Find(u16(na_eid))) : NULL;
 					netcoop::ServerVictimScope na_scope(na_actor && na_actor->g_Alive() ? na_actor : NULL);
 					LPCSTR na_res = na_f((LPCSTR)na_cid, na_name, na_eid, (LPCSTR)na_text, na_role);

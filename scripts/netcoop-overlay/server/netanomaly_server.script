@@ -38,14 +38,15 @@ local DOOR_REACH, DOOR_EVERY = 3.5, 600
 local door_next = {}
 local function use_door(entity_id, args)
 	local obj = server_actor(entity_id)
-	local id = tonumber(args)
+	local id = tonumber(string.match(args, "^%d+$"))
 	local door = id and id >= 0 and id < 65535 and level.object_by_id(id)
-	if not (obj and obj:alive() and door and db.level_doors and db.level_doors[id]) then return end
+	if not (obj and obj:alive() and db.actor and db.actor:id() == entity_id and
+		door and db.level_doors and db.level_doors[id]) then return end
 	if obj:position():distance_to(door:position()) > DOOR_REACH then return end
 	local now = time_global()
 	if now < (door_next[entity_id] or 0) then return end
 	door_next[entity_id] = now + DOOR_EVERY
-	door:use(obj)
+	if not door:use(obj) then return end
 	if netcoop_broadcast then
 		netcoop_broadcast("netcoop_consumption", string.format("%d|255|%s|anim_door_open", entity_id, obj:name()))
 	end
