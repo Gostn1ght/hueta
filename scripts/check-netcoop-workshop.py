@@ -441,6 +441,31 @@ view = load("netcoop_workshop_view", root / "client/netcoop_workshop_view.script
 view.on_game_start()
 g.callbacks.actor_on_first_update()
 assert g.commands[1] == "recipes get"
+lua.execute(r'''
+local configured={charcoal={[42]=1}}
+local control={
+    Update=function(self)self.updates=(self.updates or 0)+1 end,
+    On_CC_Mouse1=function(self)
+        self.fuel_ready = self.objs.charcoal and self.objs.charcoal[42]==1
+        return "selection handled"
+    end,
+}
+item_cooking={UICook=control}
+callbacks.actor_on_first_update()
+local update=control.Update
+callbacks.actor_on_first_update();assert(control.Update==update)
+local panel=setmetatable({
+    objs={kerosene={[41]=1}},
+    item_info={Update=function(self)self.cleared=(self.cleared or 0)+1 end},
+    GetSelectedMeal=function(self)return self.meal end,
+    Load_ActorItems=function(self)for k,v in pairs(configured)do self.objs[k]=v end end,
+},{__index=control})
+assert(panel:On_CC_Mouse1()=="selection handled" and panel.fuel_ready and not panel.objs.kerosene)
+configured={};panel:On_CC_Mouse1();assert(not panel.fuel_ready and not panel.objs.charcoal)
+panel:Update();assert(panel.item_info.cleared==1 and panel.updates==1)
+panel.meal={};panel:Update();assert(panel.item_info.cleared==1 and panel.updates==2)
+''')
+print("PASS cooking preview refreshes fuel from current inventory before the original checks and clears stale tooltips")
 g.workshop_tool.start_workshop_basic(kit)
 assert g.opened == "basic" and view.opened_from.kind == 1 and view.opened_from.id == kit._id
 win = lua.eval("{craft_allow_r = true, last_type = 1, selected_index = 2, recipes={{false,ammo_recipe}}, btn_craft = {Enable = function() end}}")

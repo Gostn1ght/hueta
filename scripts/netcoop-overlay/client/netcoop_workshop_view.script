@@ -188,6 +188,28 @@ local function install_disassembly()
 	end
 end
 
+local function install_cooking_preview()
+	local cook = item_cooking and item_cooking.UICook
+	if not cook or cook.__netcoop_preview or type(cook.Update) ~= "function" or
+		type(cook.On_CC_Mouse1) ~= "function" then return end
+	cook.__netcoop_preview = true
+	local update, select_meal = cook.Update, cook.On_CC_Mouse1
+	cook.Update = function(self, ...)
+		-- The base hover path returns early if a refresh removed the meal.
+		if self.item_info and not self:GetSelectedMeal() then self.item_info:Update() end
+		return update(self, ...)
+	end
+	cook.On_CC_Mouse1 = function(self, ...)
+		-- Fuel/ingredient IDs can change while the network inventory updates.
+		-- Rebuild the snapshot before the original kit and fuel-tier checks.
+		if self.objs and db and db.actor then
+			for section in pairs(self.objs) do self.objs[section] = nil end
+			self:Load_ActorItems()
+		end
+		return select_meal(self, ...)
+	end
+end
+
 local function install()
 	if not netcoop_item_action then return end
 	install_recipes()
@@ -195,6 +217,7 @@ local function install()
 	install_upgrades()
 	install_mechanic()
 	install_disassembly()
+	install_cooking_preview()
 	if netcoop_command then netcoop_command("recipes get") end
 end
 
