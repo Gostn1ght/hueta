@@ -153,6 +153,8 @@ void CGameTask::ChangeStateCallback()
 		{
 			if (ai().script_engine().functor("task_manager.task_callback", changed))
 				changed(this, GetTaskState());
+			if (GetTaskState() == eTaskStateInProgress)
+				netcoop::server_task_arrived(*actor, *this);
 		}
 		catch (...)
 		{

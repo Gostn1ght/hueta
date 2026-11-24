@@ -192,6 +192,10 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-character-world-order.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-talk-news.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-task-locations.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-idle-exit.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:

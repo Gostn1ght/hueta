@@ -88,6 +88,8 @@
 #include "GameTask.h"
 #include "alife_registry_wrappers.h"
 #include "UIGameCustom.h"
+#include "UIGameSP.h"
+#include "ui/UITalkWnd.h"
 #include "ui/UIPdaWnd.h"
 #include "game_news.h"
 #include "../xrPhysics/PhysicsShell.h"

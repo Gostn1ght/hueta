@@ -16,6 +16,7 @@ class xrServer;
 struct GAME_NEWS_DATA;
 class CWeapon;
 class CActor;
+class CGameTask;
 namespace netcoop { void client_entry_stop(); }
 class CSE_Abstract;
 class CZoneCampfire;
@@ -221,6 +222,8 @@ bool server_task_taken_by_other(u16 actor_id, LPCSTR task_id);
 void client_on_tasks(NET_Packet& P);
 // PDA news the server scripts give a player's Actor, shown on that player's client.
 void server_forward_news(u16 actor_id, const GAME_NEWS_DATA& news);
+void server_task_arrived(CActor& actor, CGameTask& task);
+bool client_present_talk_news(CActor& actor, const GAME_NEWS_DATA& news, u16 npc_id);
 void client_on_news(NET_Packet& P);
 
 // Server Lua -> client Lua: netcoop_broadcast(channel, data) on the server

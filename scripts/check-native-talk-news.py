@@ -8,17 +8,36 @@ root=Path(__file__).resolve().parents[1]
 s=(root/'src/xrGame/script_game_object_inventory_owner.cpp').read_text(encoding='utf-8')
 a=s.index('void CScriptGameObject::AddIconedTalkMessage(');b=s.index('void _AddIconedTalkMessage(',a)
 function=s[a:b]
+news=(root/'src/xrGame/netcoop_news.inc').read_text(encoding='utf-8')
+present=news[news.index('bool client_present_talk_news('):news.index('void client_on_news(')]
 source=r"""
 #include <cassert>
 #include <cstdio>
 #include <string>
 #include <vector>
 using LPCSTR=const char*;
+using u16=unsigned short;
 struct GAME_NEWS_DATA{enum{eTalk=1};int m_type=0,show_time=0;std::string news_caption,news_text,texture_name;};
 struct CObject{virtual ~CObject()=default;};
-struct CActor:CObject{bool remote=true;std::vector<GAME_NEWS_DATA>news;void AddGameNews(const GAME_NEWS_DATA& value){news.push_back(value);}};
+struct Partner{u16 id;u16 object_id()const{return id;}};
+struct CActor:CObject{
+ bool remote=true;Partner* partner=nullptr;std::vector<GAME_NEWS_DATA>news;
+ Partner* GetTalkPartner(){return partner;}
+ void AddGameNews(const GAME_NEWS_DATA& value){news.push_back(value);}
+};
 template<class T>T smart_cast(CObject* obj){return dynamic_cast<T>(obj);}
-namespace netcoop{bool client=false,enabled=true;bool pure_client(){return client;}bool server_player_copy(CActor* actor){return enabled&&!client&&actor&&actor->remote;}}
+struct TalkWindow{
+ bool shown=true;Partner* partner=nullptr;unsigned entries=0;
+ bool IsShown()const{return shown;}Partner* OthersInvOwner()const{return partner;}
+ void AddIconedMessage(LPCSTR,LPCSTR,LPCSTR,LPCSTR){++entries;}
+};
+struct CUIGameSP:CObject{TalkWindow* TalkMenu=nullptr;};
+CUIGameSP ui;CObject* current_ui=nullptr;CObject* CurrentGameUI(){return current_ui;}
+namespace netcoop{
+ bool client=false,enabled=true;bool pure_client(){return client;}
+ bool server_player_copy(CActor* actor){return enabled&&!client&&actor&&actor->remote;}
+"""+present+r"""
+}
 struct World{CObject* owner=nullptr;CObject* CurrentControlEntity(){return owner;}}world;World& Level(){return world;}
 unsigned legacy=0;void _AddIconedTalkMessage(LPCSTR,LPCSTR,LPCSTR,LPCSTR){++legacy;}
 struct CScriptGameObject{CObject& value;explicit CScriptGameObject(CObject& obj):value(obj){}CObject& object(){return value;}
@@ -35,6 +54,16 @@ int main(){
  netcoop::client=true;world.owner=&first;
  a.AddIconedTalkMessage("task","complete","icon",nullptr);assert(first.news.size()==3);
  b.AddIconedTalkMessage("foreign","hidden","icon",nullptr);assert(second.news.size()==1&&!legacy);
+ Partner first_npc{27},other_npc{28};TalkWindow window;ui.TalkMenu=&window;current_ui=&ui;
+ first.partner=&first_npc;window.partner=&first_npc;
+ a.AddIconedTalkMessage("reward","5000","money",nullptr);assert(window.entries==1&&first.news.size()==3);
+ GAME_NEWS_DATA remote;remote.m_type=GAME_NEWS_DATA::eTalk;
+ assert(netcoop::client_present_talk_news(first,remote,27)&&window.entries==2);
+ assert(!netcoop::client_present_talk_news(first,remote,28));
+ assert(!netcoop::client_present_talk_news(first,remote,u16(-1)));
+ window.partner=&other_npc;assert(!netcoop::client_present_talk_news(first,remote,27));
+ window.partner=&first_npc;window.shown=false;assert(!netcoop::client_present_talk_news(first,remote,27));
+ a.AddIconedTalkMessage("reward","5000","money",nullptr);assert(window.entries==2&&first.news.size()==4);
  netcoop::client=false;netcoop::enabled=false;a.AddIconedTalkMessage("sp","original","icon",nullptr);assert(legacy==1);
  CObject npc;CScriptGameObject n(npc);n.AddIconedTalkMessage("npc","original","icon",nullptr);assert(legacy==2);
  puts("PASS actual GAMMA talk news: dedicated owner routing, separate actors, local routed dialogue, foreign actor exclusion, safe icon, SP/NPC path retained");

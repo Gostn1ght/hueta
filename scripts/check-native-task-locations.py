@@ -42,7 +42,7 @@ struct {bool paused=false;bool Paused(){return paused;}}Device;
 struct Map{unsigned disables=0;void DisableAllPointers(){++disables;}};
 struct World{Map map;Map& MapManager(){return map;}}world;
 World& Level(){return world;}
-int fallback_calls=0,scope_depth=0;bool callback_available=true,callback_throws=false;
+int fallback_calls=0,scope_depth=0,arrival_notices=0;bool callback_available=true,callback_throws=false;
 namespace GameObject{enum{eTaskStateChange=1};}
 struct LegacyCallback{bool valid=false;int calls=0;explicit operator bool()const{return valid;}
  void operator()(CGameTask*,ETaskState){if(valid)++calls;}};
@@ -50,6 +50,7 @@ struct CActor{bool server=true;LegacyCallback legacy;unsigned ID(){return 7;}Leg
 CActor* current_actor=nullptr;CActor* Actor(){return current_actor;}
 namespace netcoop{bool client=false;bool pure_client(){return client;}
  bool server_player_copy(CActor* value){return value&&value->server&&!client;}
+ void server_task_arrived(CActor&,CGameTask& task){assert(scope_depth==1&&task.state==eTaskStateInProgress);++arrival_notices;}
  struct ServerVictimScope{explicit ServerVictimScope(CActor*){++scope_depth;}~ServerVictimScope(){--scope_depth;}};
 }
 namespace luabind{template<class T>struct functor{void operator()(CGameTask*,ETaskState){assert(scope_depth==1);++fallback_calls;if(callback_throws)throw 1;}};}
@@ -88,6 +89,10 @@ int main(){
  callback_available=true;actor.server=false;actor.legacy.valid=true;local.ChangeStateCallback();assert(actor.legacy.calls==2&&fallback_calls==2);
  actor.server=true;netcoop::client=true;local.ChangeStateCallback();assert(actor.legacy.calls==3&&fallback_calls==2);
  current_actor=nullptr;local.ChangeStateCallback();assert(fallback_calls==2);
+ assert(arrival_notices==0);
+ current_actor=&actor;actor.legacy.valid=false;netcoop::client=false;
+ returning.ChangeStateCallback();assert(arrival_notices==1&&fallback_calls==3);
+ actor.legacy.valid=true;returning.ChangeStateCallback();assert(arrival_notices==1&&fallback_calls==3);
  puts("PASS actual task state callback: missing dedicated binder fallback, existing callback once, correct actor scope, error/missing handler, offline/client/null actor");
  puts("PASS actual task manager: local and cross-location jobs update/complete, null entries safe, no repeat rewards, client/paused guards retained");
 }

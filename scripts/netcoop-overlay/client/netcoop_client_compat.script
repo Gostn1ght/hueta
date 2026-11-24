@@ -849,6 +849,12 @@ function on_script_message(channel, data)
 			db.actor:give_game_news("Lost Zone",string.format(game.translate_string("st_lz_car_lives"),lives),"ui_inGame2_Pered_zadaniyami_voennih",0,7000)
 		end
 		return
+	elseif channel == "task_arrival_sound" then
+		local actor = db and db.actor
+		if actor and xr_sound and xr_sound.set_sound_play then
+			pcall(xr_sound.set_sound_play, actor:id(), "pda_task")
+		end
+		return
 	elseif channel == "task_handin_refused" then
         local keys = {
             objective = "st_lz_task_handin_objective", items = "st_lz_task_handin_items",

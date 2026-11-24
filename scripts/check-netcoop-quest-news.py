@@ -30,6 +30,9 @@ lua.execute('news_manager={};setmetatable(news_manager,{__index=_G});local fn=as
 client=(root/'scripts/netcoop-overlay/client/netcoop_client_compat.script').read_text(encoding='cp1251')
 a=client.index('function on_task(task_id, kind)');b=client.index('-- The base-game debug menu',a)
 lua.execute(client[a:b])
+a=client.index('function on_script_message(channel, data)')
+b=client.index('-- Engine (netcoop.cpp) when the task list',a)
+lua.execute(client[a:b])
 lua.execute(r"""
 news_manager.send_task(first,'new',task_object)
 assert(#first.chat==1 and first.chat[1].text=='job_title.' and first.chat[1].icon=='quest_icon')
@@ -44,6 +47,12 @@ on_task('job','fail');assert(#first.chat==before)
 db.actor=second;AC_ID=2;news_manager.relocate_money(second,'in',7000)
 assert(#second.chat==1 and second.chat[1].text=='7000'and #first.chat==before)
 second.talking=false;news_manager.send_task(second,'new',task_object);assert(#second.pda==1)
+local sounds={}
+second.id=function()return 2 end
+xr_sound.set_sound_play=function(id,name)sounds[#sounds+1]={id,name}end
+on_script_message('task_arrival_sound','')
+assert(#sounds==1 and sounds[1][1]==2 and sounds[1][2]=='pda_task')
 db.actor=nil;on_task('job','complete')
+on_script_message('task_arrival_sound','');assert(#sounds==1)
 """)
 print('PASS actual GAMMA task/reward news: acceptance, completion, money, item amount, failure, actor separation, normal PDA path and no duplicate acceptance/failure')

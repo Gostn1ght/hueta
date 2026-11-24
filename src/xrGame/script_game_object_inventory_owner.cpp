@@ -101,6 +101,12 @@ void CScriptGameObject::AddIconedTalkMessage(LPCSTR caption, LPCSTR text, LPCSTR
         news.news_text = text ? text : "";
         news.texture_name = texture_name && texture_name[0] ? texture_name : "ui_inGame2_PD_Lider";
         news.show_time = 7000;
+        if (netcoop::pure_client())
+        {
+            auto* partner = actor->GetTalkPartner();
+            if (partner && netcoop::client_present_talk_news(*actor, news, partner->object_id()))
+                return;
+        }
         actor->AddGameNews(news);
         return;
     }
