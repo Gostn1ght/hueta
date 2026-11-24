@@ -11,12 +11,14 @@ enum ETalkOp : u8
 	talk_start = 0,
 	talk_choose = 1,
 	talk_stop = 2,
+	talk_upgrade = 3,
 };
 
 enum ETalkFlags : u8
 {
 	talk_flag_open = 1,
 	talk_flag_trade = 2,
+	talk_flag_mechanic = 4,
 };
 
 static const u32 talk_max_text = 1024;
@@ -56,6 +58,16 @@ void client_talk_stop()
 	Level().Send(P, net_flags(TRUE, TRUE));
 }
 
+void client_talk_upgrade()
+{
+	if (!g_pGameLevel)
+		return;
+	NET_Packet P;
+	P.w_begin(M_NETCOOP_TALK);
+	P.w_u8(talk_upgrade);
+	Level().Send(P, net_flags(TRUE, TRUE));
+}
+
 void client_on_talk_state(NET_Packet& P)
 {
 	if (P.r_elapsed() < 2 + 1 + 2)
@@ -65,6 +77,7 @@ void client_on_talk_state(NET_Packet& P)
 	const u8 flags = P.r_u8();
 	state.open = !!(flags & talk_flag_open);
 	state.trade = !!(flags & talk_flag_trade);
+	state.mechanic = !!(flags & talk_flag_mechanic);
 	Msg("[Lost Zone] talk state from server: NPC %u open=%d trade=%d", state.npc, state.open ? 1 : 0, state.trade ? 1 : 0);
 
 	string1024 text;

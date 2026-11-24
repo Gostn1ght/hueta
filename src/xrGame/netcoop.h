@@ -128,6 +128,7 @@ struct TalkState
 	u16 npc;
 	bool open;
 	bool trade;
+	bool mechanic = false;
 	xr_vector<TalkLine> lines;
 	xr_vector<TalkChoice> choices;
 };
@@ -135,6 +136,7 @@ struct TalkState
 void client_talk_start(u16 npc_id);
 void client_talk_choose(LPCSTR id);
 void client_talk_stop();
+void client_talk_upgrade();
 void client_on_talk_state(NET_Packet& P);
 bool client_take_talk_state(TalkState& out); // oldest unapplied state
 

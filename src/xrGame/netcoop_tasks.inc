@@ -212,7 +212,8 @@ static void send_talk_state(xrServer* server, xrClientData* CL, const TalkState&
 	NET_Packet P;
 	P.w_begin(M_NETCOOP_TALK_STATE);
 	P.w_u16(state.npc);
-	P.w_u8(u8((state.open ? talk_flag_open : 0) | (state.trade ? talk_flag_trade : 0)));
+	P.w_u8(u8((state.open ? talk_flag_open : 0) | (state.trade ? talk_flag_trade : 0) |
+		(state.mechanic ? talk_flag_mechanic : 0)));
 	P.w_u16((u16)lines.size());
 	for (u32 i = 0; i < lines.size(); ++i)
 	{
@@ -248,6 +249,13 @@ static void talk_speaker(u16 npc_id)
 	if (!ai().script_engine().functor("netcoop_server_compat.talk_speaker", f)) return;
 	try { f(int(npc_id)); }
 	catch (...) { Msg("! [Lost Zone] netcoop_server_compat.talk_speaker failed"); }
+}
+
+static bool can_open_talk_upgrade(CActor* actor, CInventoryOwner* npc)
+{
+	return actor->IsTalking() && actor->GetTalkPartner() == npc &&
+		npc->IsTalking() && npc->GetTalkPartner() == actor &&
+		npc->IsTalkEnabled() && npc->SpecificCharacter().upgrade_mechanic();
 }
 
 static void server_on_talk_dialogue(xrServer* server, xrClientData* CL, NET_Packet& P);
@@ -319,6 +327,15 @@ static void server_on_talk_dialogue(xrServer* server, xrClientData* CL, NET_Pack
 	const bool valid = npc && npc_alive && npc_alive->g_Alive() && actor->g_Alive() && our && other &&
 		!smart_cast<CActor*>(npc_object) &&
 		actor->Position().distance_to(npc_object->Position()) <= talk_max_distance;
+	if (op == talk_upgrade)
+	{
+		if (valid && found != s_talk_sessions.end() && can_open_talk_upgrade(actor, npc))
+		{
+			ServerVictimScope scope(actor);
+			server_open_ui(actor->ID(), "upgrade", npc_id);
+		}
+		return;
+	}
 	if (!valid || (op == talk_choose && found == s_talk_sessions.end()) || op > talk_stop)
 	{
 		Msg("! [Lost Zone] talk op %u with %u from '%s' rejected: npc=%d alive=%d distance=%.1f session=%d",
@@ -411,6 +428,7 @@ static void server_on_talk_dialogue(xrServer* server, xrClientData* CL, NET_Pack
 	// A dialogue script may have ended the conversation (break_dialog).
 	state.open = actor->IsTalking() && npc->IsTalking();
 	state.trade = actor->IsTradeEnabled() && npc->IsTradeEnabled();
+	state.mechanic = state.open && can_open_talk_upgrade(actor, npc);
 	if (!state.open)
 		talk_close(CL, actor, npc);
 	send_talk_state(server, CL, state);

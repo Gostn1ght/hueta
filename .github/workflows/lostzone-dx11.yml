@@ -456,6 +456,8 @@ jobs:
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-talk-news.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
+          python scripts/check-native-mechanic-dialog.py
+          if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-script-condition.py
           if errorlevel 1 set LZ_WINDOWS_CHECKS_FAILED=1
           python scripts/check-native-talk-open.py

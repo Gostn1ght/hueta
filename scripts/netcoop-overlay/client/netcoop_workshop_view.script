@@ -146,10 +146,9 @@ local function install_mechanic()
 	if not ui or ui.__netcoop_mechanic then return end
 	ui.__netcoop_mechanic = true
 	ui.RMode_UpgradeYes = function(self)
-		local row, col, ii = self.upgr_last_row, self.upgr_last_col, self.upgr_last_ii
+		local row, col = self.upgr_last_row, self.upgr_last_col
 		if not (row and col and self.npc_id and self.upgr and self.upgr.id) then return end
 		if netcoop_item_action(2, self.npc_id, 65535, string.format("mupgrade %d %d.%d", self.upgr.id, row, col)) then
-			if self.upx and self.upx[ii] and self.upx[ii].btn then self.upx[ii].btn:SetCheck(true) end
 			refresh_later(self)
 		end
 	end

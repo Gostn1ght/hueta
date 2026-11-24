@@ -226,6 +226,8 @@ void CUITalkWnd::UpdateNetcoopRemote()
 	netcoop::TalkState state;
 	while (netcoop::client_take_talk_state(state))
 	{
+		if (state.npc != u16(-1) && (!m_pOthersInvOwner || state.npc != m_pOthersInvOwner->object_id()))
+			continue;
 		m_netcoop_waiting = false;
 		m_netcoop_clear_questions = false;
 		for (u32 i = 0; i < state.lines.size(); ++i)
@@ -236,12 +238,15 @@ void CUITalkWnd::UpdateNetcoopRemote()
 			AddQuestion(state.choices[i].text, state.choices[i].id, i, state.choices[i].finalizer);
 
 		m_netcoop_trade = state.trade;
+		UITalkDialogWnd->mechanic_mode = state.mechanic;
 		if (!state.open)
 		{
 			Msg("[Lost Zone] talk window closed: the server ended the dialogue");
 			StopTalk();
 			return;
 		}
+		if (m_pOthersInvOwner)
+			UITalkDialogWnd->SetOsoznanieMode(m_pOthersInvOwner->NeedOsoznanieMode());
 	}
 }
 
@@ -265,7 +270,7 @@ void CUITalkWnd::Update()
 			return;
 		inherited::Update();
 		UpdateCameraDirection(smart_cast<CGameObject*>(m_pOthersInvOwner));
-		UITalkDialogWnd->UpdateButtonsLayout(b_disable_break, m_netcoop_trade);
+		UITalkDialogWnd->UpdateButtonsLayout(b_disable_break, m_netcoop_trade || UITalkDialogWnd->mechanic_mode);
 		return;
 	}
 
@@ -439,7 +444,11 @@ void CUITalkWnd::SwitchToTrade()
 void CUITalkWnd::SwitchToUpgrade()
 {
 	if (m_netcoop_remote)
-		return; // item upgrades are not server-owned yet
+	{
+		if (UITalkDialogWnd->mechanic_mode)
+			netcoop::client_talk_upgrade();
+		return;
+	}
 
 	//if ( m_pOurInvOwner->IsInvUpgradeEnabled() && m_pOthersInvOwner->IsInvUpgradeEnabled() )
 	{

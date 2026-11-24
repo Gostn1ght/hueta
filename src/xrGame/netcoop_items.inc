@@ -820,6 +820,12 @@ void server_on_item_action(xrServer* server, xrClientData* CL, NET_Packet& P)
 		CObject* object = Level().Objects.net_Find(item);
 		if (!object || object->getDestroy()) failure = "object is not available";
 		else if (actor->Position().distance_to(object->Position()) > 5.f) failure = "too far away";
+		else if (!strncmp(action, "mrepair ", 8) || !strncmp(action, "mupgrade ", 9))
+		{
+			const auto* mechanic = smart_cast<CInventoryOwner*>(object);
+			if (!mechanic || !mechanic->SpecificCharacter().upgrade_mechanic())
+				failure = "this is not a mechanic";
+		}
 	}
 	else if (!carried(item)) failure = "item is not in your inventory";
 	else if (target != 0xffff && !carried(target)) failure = "target is not in your inventory";
