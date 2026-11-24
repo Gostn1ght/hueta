@@ -1,7 +1,7 @@
 -- The workshop on a netcoop client (server: netcoop_workshop). GAMMA's
 -- windows and checks stay; where GAMMA would create or release items the
 -- client asks the server, which runs the same GAMMA code for this player:
--- - crafting: "craft <type> <index>" from the workshop the window was opened
+-- - crafting: "craft_recipe <type> <key>" from the workshop the window was opened
 --   with (a toolkit in the inventory, a mechanic's vise, a furniture workshop);
 -- - disassembly: GAMMA picks the tool and asks for confirmation as before,
 --   the server takes the item apart;
@@ -81,7 +81,11 @@ local function install_craft()
 		if not self.craft_allow_r then return end
 		local from = opened_from
 		if not (from and self.last_type and self.selected_index) then tip("st_netcoop_workshop_unknown") return end
-		if not netcoop_item_action(from.kind, from.id, 65535, string.format("craft %d %d", self.last_type, self.selected_index)) then return end
+		local tab = self.recipes and self.recipes[self.last_type]
+		local recipe = tab and tab[self.selected_index]
+		local key = netcoop_workshop_recipe and netcoop_workshop_recipe.key(recipe)
+		if not key then tip("st_netcoop_workshop_unknown") return end
+		if not netcoop_item_action(from.kind, from.id, 65535, string.format("craft_recipe %d %s", self.last_type, key)) then return end
 		if self.btn_craft then self.btn_craft:Enable(false) end
 		-- refresh the window once the server's result has arrived
 		if self.UpdateUi and self.last_cont and self.last_idx and CreateTimeEvent then

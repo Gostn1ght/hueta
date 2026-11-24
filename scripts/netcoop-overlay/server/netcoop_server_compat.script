@@ -2179,7 +2179,8 @@ function item_action(actor_id, kind, item_id, target_id, action, login)
 	elseif kind == 1 and (action == "arty_pack" or action == "arty_unpack" or action == "combine" or action == "package" or string.match(action, "^withdraw %d+$")) then
 		if target and item_id == target_id then return "invalid target" end
 		return netcoop_item_use.container_action(action, item, target) or "unknown item action"
-	elseif (kind == 1 or kind == 2) and string.match(action, "^craft %d+ %d+$") and not target then
+	elseif (kind == 1 or kind == 2) and not target and
+		(string.match(action, "^craft %d+ %d+$") or string.match(action, "^craft_recipe %d+ [0-9a-f]+$")) then
 		-- workshop crafting from a toolkit (1) or a vise / furniture workshop nearby (2)
 		return netcoop_workshop.craft(actor_id, kind, item, action)
 	elseif kind == 2 and string.match(action, "^m%a+ %d+") and not target then

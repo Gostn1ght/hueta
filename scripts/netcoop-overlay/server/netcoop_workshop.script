@@ -188,12 +188,14 @@ local function craft_window(stash_id, kits)
 	}, { __index = function() return stub end })
 end
 
--- "craft <type> <index>" from the workshop object (kind 1: a toolkit carried,
+-- "craft_recipe <type> <key>" from the workshop object (kind 1: a toolkit carried,
 -- kind 2: a vise or furniture workshop within reach).
 function craft(actor_id, kind, obj, action)
 	local t, i = string.match(action, "^craft (%d+) (%d+)$")
+	local key
+	if not t then t, key = string.match(action, "^craft_recipe (%d+) ([0-9a-f]+)$") end
 	t, i = tonumber(t), tonumber(i)
-	if not (t and i) then return "bad recipe" end
+	if not t or (not i and (not key or #key ~= 16 or not netcoop_workshop_recipe)) then return "bad recipe" end
 	local ws = ui_workshop and ui_workshop.UIWorkshopCraft
 	if not (ws and ws.LoadRecipes and ws.UpdateItem and ws.Craft) then return "the workshop is not loaded on the server" end
 	local flags, stash_or_err = source(kind, obj)
@@ -201,7 +203,16 @@ function craft(actor_id, kind, obj, action)
 	local stash_id = stash_or_err
 	local w = craft_window(stash_id, toolkits_state(flags, stash_id))
 	quietly(ws.LoadRecipes, w)
-	local r = w.recipes[t] and w.recipes[t][i]
+	local tab = w.recipes[t]
+	local r = tab and i and tab[i]
+	if tab and key then
+		for _, candidate in ipairs(tab) do
+			if netcoop_workshop_recipe.key(candidate) == key then
+				if r then return "ambiguous recipe" end
+				r = candidate
+			end
+		end
+	end
 	if not r then return "no such recipe" end
 	if not knows(actor_id, r.rsp) then return game.translate_string("craft_warning_2") end
 	for n = 1, 4 do

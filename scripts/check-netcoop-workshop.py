@@ -105,6 +105,7 @@ created = {}
 function alife_create_item(sec, owner, t)
     local o = make(sec, owner:id(), {})
     if t and t.cond then o._cond = t.cond end
+    if t and t.ammo then o._ammo = t.ammo end
     created[#created + 1] = sec
     return o
 end
@@ -166,6 +167,9 @@ lua.execute("function RegisterScriptCallback() end")
 for m in (nearby, low, low2):
     m.on_game_start()
 server = load("netcoop_workshop", root / "server/netcoop_workshop.script")
+recipe_name = "netcoop_workshop_recipe.script"
+assert (root / "server" / recipe_name).read_bytes() == (root / "client" / recipe_name).read_bytes()
+recipe_keys = load("netcoop_workshop_recipe", root / "server" / recipe_name)
 
 def inv():
     return sorted(o._sec for o in g.objects.values() if o._parent == 0)
@@ -226,6 +230,33 @@ lua.execute("bind_awr = {access = function(o) return o:name() == 'awr_tiski_bar'
 assert server.craft(0, 2, vise, "craft 1 9") == "no such recipe"
 lua.execute("bind_awr.access = function() return false end")
 assert server.craft(0, 2, vise, "craft 1 1") == "the mechanic has not given you access"
+
+# The same displayed recipe can have different row numbers on the two
+# Lua states when workshop_autoinject inserts its overrides in hash order.
+lua.execute(r'''
+local is_item=IsItem
+function IsItem(kind,sec,obj)
+    if kind=="ammo" and (sec=="ammo_9x18_fmj" or sec=="ammo_9x18_fmj_bad") then return 10 end
+    return is_item(kind,sec,obj)
+end
+functors.itm_ammokit="workshop_tool.start_workshop_ammo"
+SECTIONS.ammo_9x18_fmj="ammo";SECTIONS.ammo_9x18_fmj_bad="ammo";SECTIONS.prt_i_ammo="part"
+craft_lines[#craft_lines+1]={"x_ammo_9x18_fmj","5,recipe_ammo_0,ammo_9x18_fmj_bad,1,prt_i_ammo,3"}
+ammo_recipe={sec="ammo_9x18_fmj",tool=5,rsp="recipe_ammo_0",{"ammo_9x18_fmj_bad",1},{"prt_i_ammo",3}}
+''')
+ammo_kit = item("itm_ammokit")
+bad_box = item("ammo_9x18_fmj_bad")
+lua.execute("local o=objects[...];function o:ammo_get_count()return 10 end;function o:ammo_box_size()return 10 end", bad_box._id)
+parts = [item("prt_i_ammo") for _ in range(3)]
+ammo_key = recipe_keys.key(g.ammo_recipe)
+assert server.craft(0, 1, ammo_kit, "craft_recipe 1 0000000000000000") == "no such recipe"
+assert bad_box._id in g.objects and all(p._id in g.objects for p in parts)
+assert server.craft(0, 1, ammo_kit, f"craft_recipe 1 {ammo_key}") == ""
+assert bad_box._id not in g.objects and all(p._id not in g.objects for p in parts)
+boxes = [o for o in g.objects.values() if o._sec == "ammo_9x18_fmj"]
+assert len(boxes) == 1 and boxes[0]._ammo == 10
+assert server.craft(0, 1, ammo_kit, f"craft_recipe 1 {ammo_key}") == "<craft_warning_4>"
+print("PASS actual ammo crafting: recipe key independent of row, invalid key changes nothing, one full output box and exact parts consumed")
 
 # 7. disassembly: GAMMA's leaf for the item kind, after the tool check
 lua.execute("""
@@ -379,7 +410,7 @@ assert server.mechanic(0, mech, f"mrepair {foreign._id}") == "item is not in you
 
 # 8. server routing (netcoop_server_compat.item_action) and the command
 compat = (root / "server/netcoop_server_compat.script").read_text(encoding="utf-8")
-assert 'string.match(action, "^craft %d+ %d+$") and not target' in compat
+assert 'string.match(action, "^craft_recipe %d+ [0-9a-f]+$")' in compat
 assert "netcoop_workshop.disassemble(item, target)" in compat and "netcoop_workshop.read_recipe(actor_id, item)" in compat
 assert 'cmd == "recipes"' in (root / "server/netanomaly_server.script").read_text(encoding="utf-8")
 
@@ -412,15 +443,15 @@ g.callbacks.actor_on_first_update()
 assert g.commands[1] == "recipes get"
 g.workshop_tool.start_workshop_basic(kit)
 assert g.opened == "basic" and view.opened_from.kind == 1 and view.opened_from.id == kit._id
-win = lua.eval("{craft_allow_r = true, last_type = 1, selected_index = 2, btn_craft = {Enable = function() end}}")
+win = lua.eval("{craft_allow_r = true, last_type = 1, selected_index = 2, recipes={{false,ammo_recipe}}, btn_craft = {Enable = function() end}}")
 g.ui_workshop.UIWorkshopCraft.Craft(win)
-assert g.actions[1] == f"1 {kit._id} 65535 craft 1 2", g.actions[1]
+assert g.actions[1] == f"1 {kit._id} 65535 craft_recipe 1 {ammo_key}", g.actions[1]
 g.ui_furniture_workshop.OpenWorkshop(stash._id)
 g.ui_workshop.UIWorkshopCraft.Craft(win)
-assert g.actions[2] == f"2 {stash._id} 65535 craft 1 2"
+assert g.actions[2] == f"2 {stash._id} 65535 craft_recipe 1 {ammo_key}"
 g.callbacks.physic_object_on_use_callback(vise, g.actor)
 g.ui_workshop.UIWorkshopCraft.Craft(win)
-assert g.actions[3] == f"2 {vise._id} 65535 craft 1 2"
+assert g.actions[3] == f"2 {vise._id} 65535 craft_recipe 1 {ammo_key}"
 g.item_parts.disassembly_weapon(pm, kit)
 assert g.actions[4] == f"1 {pm._id} {kit._id} disassemble"
 book3 = item("recipe_basic_1")
