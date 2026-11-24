@@ -298,7 +298,13 @@ function upgrade(actor_id, obj, action)
 		quietly(U.EvaluateUpgrades, w)
 		if not w.inst_upgr[info.section] then return game.translate_string("st_upgr_disable") end
 	end
-	quietly(U.Upgrade, w)
+	-- GAMMA sets this shared flag before native installation, then resets it
+	-- only on its normal return. A failed install must not make the next
+	-- actor's mechanic request skip price/precondition checks.
+	local previous_force = inventory_upgrades.force_upgrade
+	local ok, err = pcall(quietly, U.Upgrade, w)
+	inventory_upgrades.force_upgrade = previous_force
+	if not ok then error(err, 0) end
 	printf("[Lost Zone][workshop] %s upgraded %s", tostring(actor_id), obj:section())
 	return ""
 end

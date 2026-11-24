@@ -288,6 +288,55 @@ assert server.upgrade(0, kit, "upgrade 0 1.1") == "this item has no upgrades"
 assert server.upgrade(0, pm2, "upgrade 77 1.2") == "this is not a workshop"
 assert server.upgrade(0, pm2, "upgrade 0") == "nothing to install"
 
+# A native-install exception happens after GAMMA sets the shared free-upgrade
+# flag and before its normal reset. Preserve the caller's exact nil/false/true
+# value, and ensure the existing UI helper restoration also survives.
+server_upgrade_leaf = g.ui_workshop.UIWorkshopUpgrade.Upgrade
+def failed_workshop(previous=None):
+    failed = item("wpn_pm")
+    remaining = item("itm_upgrade_kit")
+    g.inventory_upgrades.force_upgrade = previous
+    lua.execute(f'''
+    installed={{}};inst3={{}}
+    local o=objects[{failed._id}]
+    function o:force_unload_magazine()end
+    function o:install_upgrade()error('fixture native install failed')end
+    saved_icon=utils_xml.set_icon;saved_sound=utils_obj.play_sound;saved_element=ui_workshop.list_element
+    ''')
+    current_leaf = g.ui_workshop.UIWorkshopUpgrade.Upgrade
+    g.ui_workshop.UIWorkshopUpgrade.Upgrade = server_upgrade_leaf
+    try:
+        server.upgrade(0, failed, "upgrade 0 1.1")
+        raise AssertionError("native install failure was swallowed")
+    except __import__('lupa.lua51', fromlist=['LuaError']).LuaError as error:
+        assert 'fixture native install failed' in str(error)
+    finally:
+        g.ui_workshop.UIWorkshopUpgrade.Upgrade = current_leaf
+    assert g.inventory_upgrades.force_upgrade is previous
+    lua.execute('assert(utils_xml.set_icon==saved_icon and utils_obj.play_sound==saved_sound and ui_workshop.list_element==saved_element)')
+    assert remaining._id in g.objects
+
+for previous in (None, False, True):
+    failed_workshop(previous)
+    # Normal completion restores the same caller context too; exactly one
+    # upgrade kit is spent and a replay cannot install or charge again.
+    recovered = item("wpn_pm")
+    lua.execute(f'''
+    installed={{}};native_calls=0
+    local o=objects[{recovered._id}]
+    function o:force_unload_magazine()end
+    function o:install_upgrade(s)native_calls=native_calls+1;installed[s]=true;return true end
+    ''')
+    g.inventory_upgrades.force_upgrade = previous
+    before_kits = inv().count("itm_upgrade_kit")
+    assert server.upgrade(0, recovered, "upgrade 0 1.1") == ""
+    assert g.inventory_upgrades.force_upgrade is previous
+    assert g.native_calls == 1 and inv().count("itm_upgrade_kit") == before_kits - 1
+    assert server.upgrade(0, recovered, "upgrade 0 1.1") == "this upgrade is installed"
+    assert g.native_calls == 1 and inv().count("itm_upgrade_kit") == before_kits - 1
+g.inventory_upgrades.force_upgrade = None
+print('PASS workshop forced-install scope: exceptions and success restore nil/false/true; one kit per new upgrade, replay unchanged')
+
 # 7c. a mechanic NPC's repair and upgrades: the mechanic is the speaker
 lua.execute("""
 events = {}
@@ -463,6 +512,9 @@ assert g.events.used_npc_id is None
 assert server.mechanic(0,mech,f'mrepair {pm4._id}') == ''
 assert g.money==1100 and pm4._cond>0.99 and g.ui_inventory.GUI is None
 lua.execute('money=0;inst3={};ui_inventory.GUI={old=true};events.used_npc_id=777')
+# Exercise the actual GAMMA pricing functor after the failed workshop, not
+# merely a fake predicate that ignores the leaked shared flag.
+failed_workshop()
 assert server.mechanic(0,mech,f'mupgrade {pm4._id} 1.1') == '<st_upgr_disable>'
 assert g.money==0 and not g.inst3.up_firsta_pm and g.ui_inventory.GUI.old and g.events.used_npc_id==777
 lua.execute('money=2000;inventory_upgrades.precondition_functor_a=function()error("mechanic failed")end')
