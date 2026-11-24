@@ -15,6 +15,7 @@ def block(signature):
     return text[start:end]
 counter=block('struct ClusterCountOnline')+';'
 remove=block('static bool cluster_status_remove(')
+receipt=block('static bool cluster_idle_receipt(')
 idle=block('static void cluster_idle_exit(')
 update=text[text.index('static void cluster_update('):]
 after=update.split('cluster_idle_exit(server, now);',1)[1].split('cluster_hibernate(',1)[0]
@@ -44,8 +45,58 @@ struct xrClientData:IClient{struct {bool bLocal=false;}flags;};
 struct xrServer{std::vector<IClient*> clients;template<class F>void ForEachClientDo(F f){for(auto* c:clients)f(c);}};
 struct ConsoleStub{void Execute(LPCSTR command){assert(std::string(command)=="quit");++quits;}}console;
 ConsoleStub* Console=&console;
+enum class Fault{none,open,write,short_write,flush,close,publish};
+Fault fault=Fault::none;unsigned open_handles=0;
+HANDLE receipt_create(LPCSTR name,DWORD access,DWORD share,LPSECURITY_ATTRIBUTES security,DWORD mode,DWORD attrs,HANDLE base){
+ if(fault==Fault::open)return INVALID_HANDLE_VALUE;
+ HANDLE h=CreateFileA(name,access,share,security,mode,attrs,base);if(h!=INVALID_HANDLE_VALUE)++open_handles;return h;
+}
+BOOL receipt_write(HANDLE h,LPCVOID data,DWORD size,LPDWORD written,LPOVERLAPPED overlapped){
+ if(fault==Fault::write){*written=0;return FALSE;}
+ if(fault==Fault::short_write)return WriteFile(h,data,size-1,written,overlapped);
+ return WriteFile(h,data,size,written,overlapped);
+}
+BOOL receipt_flush(HANDLE h){return fault==Fault::flush ? FALSE:FlushFileBuffers(h);}
+BOOL receipt_close(HANDLE h){const BOOL result=CloseHandle(h);assert(open_handles);--open_handles;return fault==Fault::close ? FALSE:result;}
+BOOL receipt_publish(LPCSTR from,LPCSTR to,DWORD flags){
+ std::ifstream in(from);std::string pid;in>>pid;in.close();assert(pid==std::to_string(GetCurrentProcessId()));
+ if(fault==Fault::publish)return FALSE;
+ return MoveFileExA(from,to,flags);
+}
+#define CreateFileA receipt_create
+#define WriteFile receipt_write
+#define FlushFileBuffers receipt_flush
+#define CloseHandle receipt_close
+#define MoveFileExA receipt_publish
+'''+receipt+r'''
+#undef CreateFileA
+#undef WriteFile
+#undef FlushFileBuffers
+#undef CloseHandle
+#undef MoveFileExA
 '''+counter+remove+idle+r'''
+void receipt_failures(){
+ const char* path="receipt.txt";string_path temporary;xr_sprintf(temporary,"%s.tmp.%u",path,GetCurrentProcessId());
+ for(auto failure:{Fault::open,Fault::write,Fault::short_write,Fault::flush,Fault::close,Fault::publish}){
+  for(bool previous:{false,true}){
+   DeleteFileA(path);if(previous){std::ofstream out(path);out<<"previous";}
+   fault=failure;assert(!cluster_idle_receipt(path));assert(!open_handles);
+   assert(GetFileAttributesA(temporary)==INVALID_FILE_ATTRIBUTES);
+   if(previous){std::ifstream in(path);std::string value;in>>value;assert(value=="previous");}
+   else assert(GetFileAttributesA(path)==INVALID_FILE_ATTRIBUTES);
+  }
+ }
+ fault=Fault::none;
+ assert(cluster_idle_receipt(path));assert(!open_handles);
+ std::ifstream in(path);std::string value;in>>value;in.close();assert(value==std::to_string(GetCurrentProcessId()));
+ assert(GetFileAttributesA(temporary)==INVALID_FILE_ATTRIBUTES);DeleteFileA(path);
+ {std::ofstream out(path);out<<"previous";}
+ HANDLE held=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);assert(held!=INVALID_HANDLE_VALUE);
+ assert(!cluster_idle_receipt(path));assert(!open_handles);assert(GetFileAttributesA(temporary)==INVALID_FILE_ATTRIBUTES);
+ CloseHandle(held);DeleteFileA(path);
+}
 int main(){
+ receipt_failures();
  xrServer server;xrClientData local,connecting;local.flags.bLocal=true;server.clients={&local,&connecting};
  Core.Params="-netcoop_idle_exit=1";cluster_idle_exit(&server,0);server.clients={&local};
  cluster_idle_exit(&server,1000);save_ok=false;cluster_idle_exit(&server,2000);assert(saves==1);
@@ -70,14 +121,18 @@ int main(){
  cluster_idle_exit(&server,640000);assert(saves==2 && !quits && !s_cluster_quitting);
  assert(GetFileAttributesA("idle_exit_1267.txt")==INVALID_FILE_ATTRIBUTES);CloseHandle(held);
  cluster_idle_exit(&server,640001);assert(saves==2 && !quits);
- cluster_idle_exit(&server,700000);assert(saves==3 && quits==1 && s_cluster_quitting);
+ fault=Fault::flush;cluster_idle_exit(&server,700000);assert(saves==3 && !quits && !s_cluster_quitting);
+ assert(GetFileAttributesA("idle_exit_1267.txt")==INVALID_FILE_ATTRIBUTES);
+ assert(GetFileAttributesA("status_1267.txt")!=INVALID_FILE_ATTRIBUTES);
+ fault=Fault::none;cluster_idle_exit(&server,759999);assert(saves==3 && !quits);
+ cluster_idle_exit(&server,760000);assert(saves==4 && quits==1 && s_cluster_quitting);
  assert(GetFileAttributesA("status_1267.txt")==INVALID_FILE_ATTRIBUTES);
  std::ifstream in("idle_exit_1267.txt");std::string pid;in>>pid;assert(pid==std::to_string(GetCurrentProcessId()));
- cluster_idle_exit(&server,999999);assert(saves==3 && quits==1);
+ cluster_idle_exit(&server,999999);assert(saves==4 && quits==1);
 }
 '''
 with TemporaryDirectory(prefix='cold-idle-') as tmp:
     folder=Path(tmp);cpp=folder/'check.cpp';exe=folder/'check.exe';cpp.write_text(source,encoding='utf8')
     subprocess.run(['cl','/nologo','/std:c++17','/EHsc','/W4','/WX',str(cpp),'/Fe:'+str(exe),'/Fo:'+str(folder/'check.obj')],cwd=tmp,check=True)
     subprocess.run([str(exe)],cwd=tmp,check=True,timeout=30)
-print('PASS actual idle stop: connecting clients, admission, failed world save/retry, locked status/retry, PID receipt and no dead-port advertisement')
+print('PASS actual idle stop: atomic PID receipt, open/write/short/flush/close/publish failures, locked target, no handle leaks; save/admission/status/retry guards and no dead-port advertisement')

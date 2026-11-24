@@ -896,6 +896,27 @@ static bool cluster_status_remove()
 	return false;
 }
 
+// Publish a complete PID receipt only after its write/flush/close succeeded.
+// A partial receipt must never tell the host that a running process slept.
+static bool cluster_idle_receipt(LPCSTR path)
+{
+	string_path temporary; xr_sprintf(temporary,"%s.tmp.%u",path,GetCurrentProcessId());
+	string64 pid; xr_sprintf(pid,"%u",GetCurrentProcessId());
+	const DWORD size=DWORD(xr_strlen(pid));
+	HANDLE file=CreateFileA(temporary,GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+	if(file==INVALID_HANDLE_VALUE) return false;
+	DWORD written=0;
+	const bool complete=WriteFile(file,pid,size,&written,nullptr) && written==size;
+	const bool flushed=complete && FlushFileBuffers(file);
+	const bool closed=CloseHandle(file)!=FALSE;
+	if(!flushed || !closed || !MoveFileExA(temporary,path,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
+	{
+		DeleteFileA(temporary);
+		return false;
+	}
+	return true;
+}
+
 // -netcoop_idle_exit=<seconds>: an on-demand server saves its world and
 // exits after that long without players (the watchdog starts it again).
 static void cluster_idle_exit(xrServer* server, u32 now)
@@ -918,10 +939,7 @@ static void cluster_idle_exit(xrServer* server, u32 now)
 	// stop. Only this matching PID may leave its map armed for demand wakeup.
 	string64 key; xr_sprintf(key,"%u",cluster_port());
 	string_path path; cluster_file("idle_exit",key,-1,path);
-	FILE* receipt=fopen(path,"wb");
-	if(!receipt) return;
-	fprintf(receipt,"%u",GetCurrentProcessId());
-	if(fclose(receipt)!=0) return;
+	if(!cluster_idle_receipt(path)) return;
 	if(!cluster_status_remove()) { DeleteFileA(path); return; } // no cold-exit receipt before a real quit
 	s_cluster_quitting = true;
 	Msg("[Lost Zone][cluster] no players for %u s: world saved, server exits", limit / 1000);
