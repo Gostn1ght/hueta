@@ -1019,8 +1019,11 @@ static bool character_save_actor(u16 actor_id, const CharacterDestination* desti
 	if (!world_store_takes_committed(actor_id))
 	{
 		if (background) { world_store_request_save(); return false; }
-		world_store_save_now("player items");
-		if (!world_store_takes_committed(actor_id)) Msg("! [Lost Zone] world save before character save failed; saving the character anyway");
+		if (!world_store_save_now("player items") || !world_store_takes_committed(actor_id))
+		{
+			Msg("! [Lost Zone] character save refused: world item removals are not committed (actor %u)", actor_id);
+			return false;
+		}
 	}
 	Character& character = *tracked;
 	xrServer* server = Level().Server;
