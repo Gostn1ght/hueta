@@ -1020,6 +1020,15 @@ BOOL CActor::net_Spawn(CSE_Abstract* DC)
 	if (!inherited::net_Spawn(DC)) return FALSE;
 
 	CSE_ALifeTraderAbstract* pTA = smart_cast<CSE_ALifeTraderAbstract*>(e);
+	// The server stamps the selected name into both spawn fields. Apply it
+	// after loading client_data, which may contain the old body's name.
+	// The ASPLAYER flag is removed from spawn packets sent to observers.
+	if (netcoop::enabled() && E->ID != 0 && E->name_replace()[0] && pTA->m_character_name_str == E->name_replace())
+	{
+		m_game_name_str = pTA->m_character_name_str;
+		m_game_name = m_game_name_str;
+	}
+
 	set_money(pTA->m_dwMoney, false);
 
 	//.	if(	TRUE == E->s_flags.test(M_SPAWN_OBJECT_LOCAL) && TRUE == E->s_flags.is(M_SPAWN_OBJECT_ASPLAYER))

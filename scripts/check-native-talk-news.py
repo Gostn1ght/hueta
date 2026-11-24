@@ -32,7 +32,7 @@ struct TalkWindow{
  void AddIconedMessage(LPCSTR,LPCSTR,LPCSTR,LPCSTR){++entries;}
 };
 struct CUIGameSP:CObject{TalkWindow* TalkMenu=nullptr;};
-CUIGameSP ui;CObject* current_ui=nullptr;CObject* CurrentGameUI(){return current_ui;}
+CUIGameSP fixture_ui;CObject* current_ui=nullptr;CObject* CurrentGameUI(){return current_ui;}
 namespace netcoop{
  bool client=false,enabled=true;bool pure_client(){return client;}
  bool server_player_copy(CActor* actor){return enabled&&!client&&actor&&actor->remote;}
@@ -54,7 +54,7 @@ int main(){
  netcoop::client=true;world.owner=&first;
  a.AddIconedTalkMessage("task","complete","icon",nullptr);assert(first.news.size()==3);
  b.AddIconedTalkMessage("foreign","hidden","icon",nullptr);assert(second.news.size()==1&&!legacy);
- Partner first_npc{27},other_npc{28};TalkWindow window;ui.TalkMenu=&window;current_ui=&ui;
+ Partner first_npc{27},other_npc{28};TalkWindow window;fixture_ui.TalkMenu=&window;current_ui=&fixture_ui;
  first.partner=&first_npc;window.partner=&first_npc;
  a.AddIconedTalkMessage("reward","5000","money",nullptr);assert(window.entries==1&&first.news.size()==3);
  GAME_NEWS_DATA remote;remote.m_type=GAME_NEWS_DATA::eTalk;

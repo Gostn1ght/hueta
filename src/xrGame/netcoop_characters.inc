@@ -779,11 +779,12 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor)
 	CSE_ALifeTraderAbstract* trader = smart_cast<CSE_ALifeTraderAbstract*>(actor);
 	if (trader)
 	{
-		trader->m_character_name = character->name;
-		trader->m_character_name_str = character->name;
 		if (!character->initialized)
 		{
 			trader->set_character_profile(shared_str((xr_string("actor_") + character->faction).c_str()));
+			// Profile selection can generate a name and starting money.
+			// Resolve it before applying the character's authoritative values.
+			trader->specific_character();
 			// A fresh life receives starter money, preserving account credentials
 			// and role but never the wallet of the dead character.
 			Account* account = account_find(CL->netcoop_login.c_str());
@@ -809,6 +810,8 @@ bool server_character_load_actor(xrClientData* CL, CSE_Abstract* actor)
 				shared_str((xr_string("actor_") + character->faction).c_str()), CHARACTER_COMMUNITY_INDEX(-1), true);
 			if (index != CHARACTER_COMMUNITY_INDEX(-1)) trader->m_community_index = index;
 		}
+		trader->m_character_name = character->name;
+		trader->m_character_name_str = character->name;
 	}
 	CSE_ALifeCreatureActor* creature = smart_cast<CSE_ALifeCreatureActor*>(actor);
 	// Saves from another server map retain inventory and progress, but use
