@@ -749,6 +749,18 @@ function netcoop_login_wnd:SelectCharacter(slot)
 end
 
 local call_sign_valid
+local function hide_online_loadout_options(menu)
+    for _, name in ipairs({"btn_random", "btn_faction", "list_difficulty", "list_difficulty_cap",
+                           "list_economy", "list_economy_cap"}) do
+        local control = menu[name] or menu.dialog:FindChild(name)
+        if control then
+            control:Enable(false)
+            control:Show(false)
+        end
+    end
+    if menu.PopupFaction_Show then menu:PopupFaction_Show(false) end
+end
+
 function netcoop_login_wnd:ShowLoadout(slot)
     if not ui_mm_faction_select or not ui_mm_faction_select.UINewGame then
         return self:SetMsg("! Character creation menu is unavailable")
@@ -778,10 +790,9 @@ function netcoop_login_wnd:ShowLoadout(slot)
     self.creator.netcoop_creation_owner = self
     self.creator.netcoop_status:TextControl():SetText("")
 	-- A new life always starts as a loner, at the server's fixed economy.
-	self.creator.selected_faction, self.creator.selected_economy = "stalker", "st_econ_1"
-	self.creator:AddCallback("btn_faction", ui_events.BUTTON_CLICKED, function() end, self.creator)
-	if self.creator.PopupFaction_Show then self.creator:PopupFaction_Show(false) end
-	if self.creator.list_economy then self.creator.list_economy:Enable(false) end
+	self.creator.selected_faction = "stalker"
+	self.creator.selected_economy = "st_econ_1"
+	self.creator.selected_difficulty = "st_diff_1"
 	self.creator.character_name:Enable(false)
 	if self.creator.netcoop_creation_name ~= (self.profile_data and self.profile_data.name) then rebuild = true end
 	self.creator.netcoop_creation_name = self.profile_data and self.profile_data.name
@@ -797,6 +808,7 @@ function netcoop_login_wnd:ShowLoadout(slot)
     pcall(craft_tooltip_ready)
     self.creator:ShowDialog(true)
     self.creator:Show(true)
+    hide_online_loadout_options(self.creator)
 end
 
 -- Called before the freeplay menu writes any global new-game settings.

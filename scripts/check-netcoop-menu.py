@@ -625,6 +625,44 @@ assert(drafts[1].name==nickname and drafts[1].loadout==joined[5])
 ''')
 print('Actual starter completion: selected items/stacks, fixed loner economy, Russian name, rejected points/faction and failed cloud save hold entry PASS')
 
+lua.execute(r'''
+local function control()
+ return {
+   shown=true, enabled=true,
+   Show=function(self,value)self.shown=value end,
+   Enable=function(self,value)self.enabled=value end,
+ }
+end
+local controls={}
+for _,name in ipairs({"btn_random","btn_faction","btn_icon","list_map","list_difficulty","list_difficulty_cap","list_economy","list_economy_cap"}) do
+ controls[name]=control()
+end
+local owner={profile_data={name=string.char(193,238,240,232,241)},HideDialog=function()end}
+local creator={
+ netcoop_creation_slot=1,
+ netcoop_creation_name=owner.profile_data.name,
+ netcoop_status={TextControl=function(self)return self end,SetText=function()end},
+ character_name={SetText=function(self,s)self.name=s end,Enable=function()end},
+ dialog={FindChild=function(_,name)return controls[name]end},
+ scroll_options=control(), list_map=controls.list_map,
+ list_difficulty=controls.list_difficulty,list_difficulty_cap=controls.list_difficulty_cap,
+ list_economy=controls.list_economy,list_economy_cap=controls.list_economy_cap,
+ PopupFaction_Show=function(self,shown)self.popup=shown end,
+ ShowDialog=function()end,Show=function()end,
+}
+owner.creator=creator
+ui_mm_faction_select={UINewGame={}}
+netcoop_login_wnd.ShowLoadout(owner,1)
+for _,name in ipairs({"btn_random","btn_faction","list_difficulty","list_difficulty_cap","list_economy","list_economy_cap"}) do
+ assert(not controls[name].shown and not controls[name].enabled,name)
+end
+assert(controls.btn_icon.shown and controls.btn_icon.enabled)
+assert(not creator.popup and not creator.list_map.shown and not creator.scroll_options.shown)
+assert(creator.selected_faction=="stalker" and creator.selected_difficulty=="st_diff_1" and creator.selected_economy=="st_econ_1")
+assert(creator.character_name.name==owner.profile_data.name)
+''')
+print('PASS online loadout hides and disables random, faction, difficulty and economy; fixed choices and selected name remain')
+
 # New default uses the SAME authenticated character and route methods without
 # constructing a room, waiting for a room camera, or playing radio audio.
 (cache/'netcoop_menu_theme.txt').unlink()

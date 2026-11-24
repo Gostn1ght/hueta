@@ -57,8 +57,7 @@ void server_open_ui(u16 actor,const char* kind,u16 npc){
     ++opened;
 }
 """ + policy + r"""
-void request(CActor* actor,CInventoryOwner* npc,bool valid,bool session){
-    const int op=talk_upgrade;
+void request(CActor* actor,CInventoryOwner* npc,bool valid,bool session,int op=talk_upgrade){
     const u16 npc_id=15;
     const auto found=session ? s_talk_sessions.begin():s_talk_sessions.end();
 """ + dispatch + r"""
@@ -78,6 +77,7 @@ int main(){
     technician.talk_enabled=false;
     request(&actor,&technician,true,true);assert(opened==0);
     technician.talk_enabled=true;
+    request(&actor,&technician,true,true,0);assert(opened==0);
     actor.talking=false;
     request(&actor,&technician,true,true);assert(opened==0);
     actor.talking=true;
