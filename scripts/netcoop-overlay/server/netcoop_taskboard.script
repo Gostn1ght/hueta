@@ -178,8 +178,10 @@ end
 
 -- Take the record out of the store (compare-and-swap): only one server
 -- pays or refunds it.
-local function take_out(job_id)
-	local text = netcoop_store_read("jobs", job_id) or ""
+local function take_out(job_id, expected)
+	-- A finish command must remove exactly the image it authorized. Reading
+	-- again here could silently replace a concurrently dropped/changed taker.
+	local text = expected or ""
 	local job = de(text)
 	if not job or not netcoop_store_swap("jobs", job_id, text, "") then return nil end
 	index_set(job_id, false)
@@ -187,9 +189,9 @@ local function take_out(job_id)
 end
 
 -- Jobs past their time return the reward to the poster.
-local function expired(job)
+local function expired(job, expected)
 	if os.time() - (tonumber(job.at) or 0) < JOB_DAYS * 86400 then return false end
-	local gone = take_out(job.id)
+	local gone = take_out(job.id, expected)
 	if gone then credit(gone.by, tonumber(gone.reward) or 0) end
 	return true
 end
@@ -197,9 +199,10 @@ end
 function jobs_view(char)
 	local out = {}
 	for _, id in ipairs(index_ids()) do
-		local j = de(netcoop_store_read("jobs", id))
+		local text = netcoop_store_read("jobs", id) or ""
+		local j = de(text)
 		if not j then index_set(id, false)
-		elseif not expired(j) and #out < JOBS_SHOWN then
+		elseif not expired(j, text) and #out < JOBS_SHOWN then
 			out[#out + 1] = { id = j.id, title = j.title, text = j.text, reward = j.reward, by_name = j.by_name, level = j.level,
 				at = j.at, taker_name = j.taker_name, mine = j.by == char, taken = j.taker ~= nil, by_me = j.taker == char }
 		end
@@ -215,8 +218,15 @@ local function post_job(id, rest)
 	reward = tonumber(reward)
 	title, text = clean(title, JOB_TITLE), clean(text, JOB_TEXT)
 	if char == "" or not reward or reward < 0 or reward > JOB_MAX_REWARD or title == "" then return job_reply(id, false, "bad") end
+	-- The visible board is capped at JOBS_SHOWN; ownership limits must include
+	-- records beyond that display page as well.
 	local mine = 0
-	for _, j in ipairs(jobs_view(char)) do if j.mine then mine = mine + 1 end end
+	for _, existing_id in ipairs(index_ids()) do
+		local text = netcoop_store_read("jobs", existing_id) or ""
+		local j = de(text)
+		if j and j.by == char and not expired(j, text) then mine = mine + 1 end
+		if mine >= JOBS_PER_PLAYER then break end
+	end
 	if mine >= JOBS_PER_PLAYER then return job_reply(id, false, "limit") end
 	if a:money() < reward then return job_reply(id, false, "money") end
 	local job_id
@@ -258,11 +268,12 @@ end
 -- done: the taker is paid; cancel: the poster gets the reward back.
 local function finish_job(id, verb, job_id)
 	local char = char_of(id)
-	local j = de(netcoop_store_read("jobs", job_id or ""))
+	local text = netcoop_store_read("jobs", job_id or "") or ""
+	local j = de(text)
 	if not j then return job_reply(id, false, "gone") end
 	if j.by ~= char then return job_reply(id, false, "own") end
 	if verb == "done" and not j.taker then return job_reply(id, false, "notaken") end
-	j = take_out(job_id)
+	j = take_out(job_id, text)
 	if not j then return job_reply(id, false, "busy") end
 	local reward = tonumber(j.reward) or 0
 	local to = verb == "done" and j.taker or j.by

@@ -1,0 +1,11 @@
+# Preserve authorized job snapshots during completion and expiry
+
+Obsidian TASK-E02-005 tracks the PDA job money transfer/recovery blocker. This pass continues the interrupted working-tree changes to netcoop_taskboard.script and its fixture, preserving their pre-pass copies in private validation work. The completed scope is concurrent record integrity and the display-cap ownership count, not crash-atomic payout.
+
+Server command checks db.actor against the authenticated entity; poster-only finish authorizes the owner/taker from a serialized cluster-store job. Previously take_out reread the key and CAS-deleted that newer image rather than the authorized one. A concurrent taker drop could therefore remove the job and pass a nil payee to credit. An isolated Lua counterfactual using committed ea29b9595 reproduces removal without reward credit. Finish now carries the exact authorized bytes to CAS; changed records return busy without deletion/payment. Expiry also carries the exact image whose timestamp was evaluated, preserving a concurrently replaced fresh job.
+
+The inherited per-player limit fix counts all indexed active jobs rather than only the first60 displayed rows. A fifth owned job hidden behind60 foreign rows still prevents a sixth. This is not a multi-record atomic quota across simultaneous posts and does not recover orphaned/unindexed jobs.
+
+Actual Lua5.1 server/client code and transit serializer run locally against controlled in-memory CAS and actor/store boundaries. Regression cases cover drop after authorization, replacement owner on cancel, replacement timestamp/owner/reward during expiry, fresh retry and repeated completion/expiry without duplicate credit, hidden own jobs, expired limits and existing access rules. Hooks model deterministic location interleaving; no real concurrent cluster, OS crash or power-loss test is claimed.
+
+Jobs deletion→pda_pay credit, payout deletion→Actor money→durable character save, and posting/index/debit atomicity remain open in TASK-E02-005. A durable intent/receipt design is still required; these CAS fixes must not be described as solving all payment recovery. No live player data, installation, Master/launcher, native code, provider or public release changed. CI evidence follows for the exact resource source.

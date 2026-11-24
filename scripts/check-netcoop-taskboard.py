@@ -13,7 +13,11 @@ lua = LuaRuntime(unpack_returned_tuples=True)
 g = lua.globals()
 lua.execute(r'''
 store = {}
-function netcoop_store_read(b, k) return (store[b] or {})[k] or "" end
+function netcoop_store_read(b, k)
+    local value = (store[b] or {})[k] or ""
+    if read_hook then read_hook(b, k, value) end
+    return value
+end
 function netcoop_store_swap(b, k, old, new)
     store[b] = store[b] or {}
     if (store[b][k] or "") ~= old then return false end
@@ -118,3 +122,92 @@ rows = client.get_rows()
 assert rows.fetch[1].task_id == "esc_task_1" and rows.fetch[1].details.task_title == "Meat" and rows.fetch[1].npc_id == 7
 assert client.get_jobs()[1].title == "x"
 print("PASS task board: players' jobs escrow, one taker, poster confirms, pda_pay reward once, cancel/drop/limit/expiry; client decodes offers")
+
+# Two location servers can interleave between authorization and removal.
+# Drop the taker immediately after the author reads the accepted job image.
+lua.execute('store={};players[1].money=1000;players[2].money=100')
+assert 'job|posted' in cmd(1, 'post 100|Race|test')
+race_id = jobs(1)[0].id
+assert 'job|take' in cmd(2, f'take {race_id}')
+lua.execute('''
+local target = ...
+read_hook=function(bucket,key,text)
+ if bucket=='jobs' and key==target then
+  read_hook=nil
+  local changed=netcoop_transit.deserialize(text)
+  changed.taker=nil;changed.taker_name=nil
+  store.jobs[key]=netcoop_transit.serialize(changed)
+ end
+end
+''', race_id)
+assert 'jobfail|busy' in cmd(1, f'done {race_id}')
+assert len(jobs(1)) == 1 and not jobs(1)[0].taken
+assert not g.store.pda_pay and money(1) == 900 and money(2) == 100
+# A later fresh confirmation succeeds once after a new acceptance.
+assert 'job|take' in cmd(2, f'take {race_id}')
+assert 'job|done' in cmd(1, f'done {race_id}')
+assert g.netcoop_transit.deserialize(g.store.pda_pay.b_1).sum == 100
+assert 'jobfail|gone' in cmd(1, f'done {race_id}')
+
+# A replacement record under the same key cannot inherit old authorization.
+assert 'job|posted' in cmd(1, 'post 30|Old owner|test')
+replacement_id = jobs(1)[0].id
+before_cancel = money(1)
+lua.execute('''
+local target=...
+read_hook=function(bucket,key,text)
+ if bucket=='jobs' and key==target then
+  read_hook=nil
+  local changed=netcoop_transit.deserialize(text);changed.by='other'
+  store.jobs[key]=netcoop_transit.serialize(changed)
+ end
+end
+''', replacement_id)
+assert 'jobfail|busy' in cmd(1, f'cancel {replacement_id}')
+assert money(1) == before_cancel
+assert g.netcoop_transit.deserialize(g.store.jobs[replacement_id]).by == 'other'
+
+# Five own jobs sorted behind sixty other jobs must still prevent a sixth.
+lua.execute('''
+store={jobs={}};local ids={}
+for i=1,65 do
+ local id='j'..tostring(10000000+i)
+ ids[id]=true
+ store.jobs[id]=netcoop_transit.serialize({id=id,by=i<=60 and 'other' or 'a_1',
+  by_name='Poster',title='Fixture',text='',reward=0,at=clock,level='l01_escape'})
+end
+store.jobs.index=netcoop_transit.serialize({ids=ids})
+''')
+assert len(jobs(1)) == 60 and not any(j.mine for j in jobs(1))
+assert 'jobfail|limit' in cmd(1, 'post 0|Sixth|hidden own records')
+assert sum(1 for _ in g.netcoop_transit.deserialize(g.store.jobs.index).ids.items()) == 65
+lua.execute('clock=clock+8*86400')
+assert 'job|posted' in cmd(1, 'post 0|After expiry|allowed')
+print('PASS task board: exact authorized CAS image survives concurrent drop; per-player limit includes jobs beyond the display cap')
+
+# Expiry must remove the expired image, not a newer replacement at that key.
+lua.execute('''
+store={jobs={}};local id='j12345678'
+store.jobs[id]=netcoop_transit.serialize({id=id,by='a_1',reward=75,
+ title='Old',text='',at=clock-8*86400})
+store.jobs.index=netcoop_transit.serialize({ids={[id]=true}})
+read_hook=function(bucket,key,text)
+ if bucket=='jobs' and key==id then
+  read_hook=nil
+  local fresh=netcoop_transit.deserialize(text)
+  fresh.by='b_1';fresh.at=clock;fresh.reward=125;fresh.title='Fresh'
+  store.jobs[key]=netcoop_transit.serialize(fresh)
+ end
+end
+''')
+jobs(1)
+fresh = g.netcoop_transit.deserialize(g.store.jobs.j12345678)
+assert fresh.by == 'b_1' and fresh.reward == 125 and fresh.title == 'Fresh'
+assert g.netcoop_transit.deserialize(g.store.jobs.index).ids.j12345678
+assert not g.store.pda_pay
+assert len(jobs(1)) == 1 and jobs(1)[0].title == 'Fresh'
+lua.execute('clock=clock+8*86400')
+assert len(jobs(1)) == 0
+assert g.netcoop_transit.deserialize(g.store.pda_pay.b_1).sum == 125
+assert len(jobs(1)) == 0 and g.netcoop_transit.deserialize(g.store.pda_pay.b_1).sum == 125
+print('PASS expiry uses the evaluated image: concurrent replacement survives, fresh expiry refunds once')
