@@ -125,7 +125,6 @@ local function search_corpse(scheme, npc)
 	local count = tonumber(load_var(npc, "s_loot_count")) or 0
 	save_var(npc, "s_loot_count", math.min(count + 1, 255))
 	if game_statistics then game_statistics.increment_npc_statistic(npc, "corpse_looted") end
-	settle(npc:id())
 end
 
 local function hook_corpses(scheme)
