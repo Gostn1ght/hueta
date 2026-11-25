@@ -529,21 +529,43 @@ static bool vehicle_swept_hit(const Fbox& box, const Fvector& point, const Fvect
 
 static void vehicle_run_over(CCar* car, VehicleRuntime& v, u32 now)
 {
-	if (now - v.run_over_check < 100) return;
-	const float elapsed=v.run_over_check ? _min(.25f,float(now-v.run_over_check)/1000.f):.1f;
-	v.run_over_check = now;
 	CPhysicsShell* shell = car->PPhysicsShell();
-	if (!shell || !shell->isActive() || !car->Visual()) return;
+	const Fvector position = car->Position();
+	if (!shell || !shell->isActive() || !car->Visual() || !_valid(position))
+	{
+		v.run_over_sampled = false;
+		return;
+	}
+	const u32 elapsed_ms = now - v.run_over_check;
+	if (v.run_over_sampled && elapsed_ms < 100) return;
+	const bool have_segment = v.run_over_sampled && elapsed_ms <= 250;
+	const Fvector previous = v.run_over_position;
+	v.run_over_position = position;
+	v.run_over_check = now;
+	v.run_over_sampled = true;
+	if (!have_segment) return;
+
+	// A contact can give the shell a velocity before the chassis actually
+	// moves. Use the distance travelled between authoritative samples.
+	const float elapsed = float(elapsed_ms) / 1000.f;
+	Fvector world_travel;
+	world_travel.sub(position, previous);
+	const float distance = world_travel.magnitude();
 	Fvector velocity;
 	shell->get_LinearVel(velocity);
-	const float speed = velocity.magnitude();
-	if (!_valid(speed) || speed < RUN_OVER_SPEED) return;
+	const float shell_speed = velocity.magnitude();
+	if (!_valid(distance) || !_valid(shell_speed) || shell_speed < RUN_OVER_SPEED) return;
+	// A discontinuous position correction is not a traversed path.
+	if (distance > 2.f * shell_speed * elapsed + .5f || world_travel.dotproduct(velocity) <= 0.f) return;
+	const float speed = _min(distance / elapsed, shell_speed);
+	if (speed < RUN_OVER_SPEED) return;
 	Fbox box = car->Visual()->getVisData().box;
 	box.grow(0.65f); // player capsule, including the contact solver's separation
 	Fmatrix to_car;
 	to_car.invert(car->XFORM());
-	Fvector world_travel,travel;world_travel.mul(velocity,elapsed);to_car.transform_dir(travel,world_travel);
-	Fvector way = velocity;
+	Fvector travel;
+	to_car.transform_dir(travel, world_travel);
+	Fvector way = world_travel;
 	way.normalize_safe();
 	CActor* driver = !v.seats.empty() && v.seats[0] != vehicle_seat_free ?
 		smart_cast<CActor*>(Level().Objects.net_Find(v.seats[0])) : nullptr;

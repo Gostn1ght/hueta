@@ -39,7 +39,10 @@ template<class T>T _max(T a,T b){return std::max(a,b);}
 float _abs(float a){return std::abs(a);}bool _valid(float a){return std::isfinite(a);}
 struct Fvector{float x=0,y=0,z=0;float&operator[](unsigned i){return (&x)[i];}float operator[](unsigned i)const{return (&x)[i];}
  Fvector&set(float a,float b,float c){x=a;y=b;z=c;return *this;}void mul(Fvector v,float k){x=v.x*k;y=v.y*k;z=v.z*k;}
+ void sub(Fvector a,Fvector b){x=a.x-b.x;y=a.y-b.y;z=a.z-b.z;}
+ float dotproduct(Fvector v)const{return x*v.x+y*v.y+z*v.z;}
  float magnitude()const{return std::sqrt(x*x+y*y+z*z);}void normalize_safe(){float m=magnitude();if(m){x/=m;y/=m;z/=m;}}};
+bool _valid(Fvector v){return _valid(v.x)&&_valid(v.y)&&_valid(v.z);}
 struct Fbox{Fvector min{-1,-1,-2},max{1,1,2};void grow(float k){for(unsigned i=0;i<3;++i){min[i]-=k;max[i]+=k;}}};
 struct Fmatrix{Fvector c;void invert(Fmatrix b){c={-b.c.x,-b.c.y,-b.c.z};}
  void transform_tiny(Fvector&o,Fvector p){o={p.x+c.x,p.y+c.y,p.z+c.z};}void transform_dir(Fvector&o,Fvector p){o=p;}};
@@ -55,33 +58,47 @@ struct SHit{NET_Packet p;u16 whoID=0,weaponID=0;
 struct CPhysicsShell{Fvector v;bool active=true;bool isActive(){return active;}void get_LinearVel(Fvector&o){o=v;}};
 struct VisualData{Fbox box;};struct Visual{VisualData data;VisualData&getVisData(){return data;}};
 struct CCar:CObject{CPhysicsShell shell;::Visual visual;Fmatrix matrix;std::vector<NET_Packet>hits;
- CPhysicsShell*PPhysicsShell(){return &shell;}::Visual*Visual(){return &visual;}Fmatrix XFORM(){return matrix;}void u_EventSend(NET_Packet p){hits.push_back(p);}};
+ CPhysicsShell*PPhysicsShell(){return &shell;}::Visual*Visual(){return &visual;}Fmatrix XFORM(){return matrix;}
+ Fvector Position(){return matrix.c;}void u_EventSend(NET_Packet p){hits.push_back(p);}};
 constexpr u16 vehicle_seat_free=65535;
-struct VehicleRuntime{u32 run_over_check=0;std::vector<u16>seats;};
+struct VehicleRuntime{u32 run_over_check=0;std::vector<u16>seats;bool run_over_sampled=false;Fvector run_over_position;};
 struct Objects{std::vector<CObject*>all;u32 o_count(){return (u32)all.size();}CObject*o_get_by_iterator(u32 i){return all[i];}
  CObject*net_Find(u16 id){for(auto p:all)if(p->ID()==id)return p;return nullptr;}};
 struct World{::Objects Objects;}world;World&Level(){return world;}void Msg(const char*,...){}
 ''' + native[native.index('static const float RUN_OVER_SPEED'):native.index('static bool vehicle_swept_hit')] + method('static bool vehicle_swept_hit(') + method('static void vehicle_run_over(') + r'''
 int main(){
  CCar car;car.id=5;CActor player;player.id=7;world.Objects.all={&player};VehicleRuntime v;
- vehicle_run_over(&car,v,1000);assert(car.hits.empty()); // overlapping a parked wheel/body
- car.shell.v={0,0,2.99f};vehicle_run_over(&car,v,1100);assert(car.hits.empty());
- car.shell.v={0,0,10};vehicle_run_over(&car,v,1200);assert(car.hits.size()==1);
- auto hit=car.hits.back();assert(hit.target==7&&hit.who==5&&hit.weapon==5&&hit.power>.5f&&hit.impulse==600);
- vehicle_run_over(&car,v,1300);assert(car.hits.size()==1); // one impact, not frame-rate damage
- vehicle_run_over(&car,v,2000);assert(car.hits.size()==2);
+ auto tick=[&](u32 now,float z,float offset=0.f){
+    car.matrix.c.z=z;player.pos={0,0,z+offset};vehicle_run_over(&car,v,now);
+ };
+ car.shell.v={0,0,10};
+ tick(1000,0);assert(car.hits.empty()); // no segment yet
+ tick(1100,0,2.5f);assert(car.hits.empty()); // near front, shell spike without motion
+ tick(1200,0,-2.5f);assert(car.hits.empty()); // near rear, still parked
+ tick(1300,.1f);assert(car.hits.empty()); // small contact displacement, below threshold
+ tick(1400,1);assert(car.hits.size()==1);
+ auto hit=car.hits.back();assert(hit.target==7&&hit.who==5&&hit.weapon==5&&hit.power>.4f&&hit.impulse>530&&hit.impulse<550);
+ tick(1500,2);assert(car.hits.size()==1); // repeat cooldown
+ tick(2200,9);assert(car.hits.size()==1); // stale sample gap
+ tick(2300,10);assert(car.hits.size()==2);
  CActor driver;driver.id=8;driver.m_netcoop_seat_car=5;world.Objects.all.push_back(&driver);v.seats={8};
- vehicle_run_over(&car,v,2800);assert(car.hits.size()==3&&car.hits.back().who==8);
- player.m_netcoop_seat_car=5;vehicle_run_over(&car,v,3600);assert(car.hits.size()==3);
- player.m_netcoop_seat_car=65535;player.m_netcoop_platform_car=5;player.m_netcoop_platform_time=4000;
- vehicle_run_over(&car,v,4000);assert(car.hits.size()==3);
- player.m_netcoop_platform_car=65535;player.alive=false;vehicle_run_over(&car,v,5000);assert(car.hits.size()==3);
- player.alive=true;player.removed=true;vehicle_run_over(&car,v,5100);assert(car.hits.size()==3);player.removed=false;
- player.pos={10,0,0};vehicle_run_over(&car,v,5200);assert(car.hits.size()==3);
- // A player crossed between two snapshots is still hit behind the final box.
- player.pos={0,0,-4};vehicle_run_over(&car,v,5450);assert(car.hits.size()==4);
- car.shell.v={0,0,0};player.pos={0,0,0};vehicle_run_over(&car,v,6300);assert(car.hits.size()==4);
- puts("PASS actual run-over: parked/slow contacts harmless, moving empty car hits, swept path, driver credit, rate limit, rider exclusions");
+ tick(3100,20);assert(car.hits.size()==2);
+ tick(3200,21);assert(car.hits.size()==3&&car.hits.back().who==8);
+ tick(4000,30);player.m_netcoop_seat_car=5;
+ tick(4100,31);assert(car.hits.size()==3);
+ player.m_netcoop_seat_car=65535;player.m_netcoop_platform_car=5;player.m_netcoop_platform_time=4200;
+ tick(4200,32);assert(car.hits.size()==3);
+ player.m_netcoop_platform_car=65535;player.alive=false;tick(4300,33);assert(car.hits.size()==3);
+ player.alive=true;player.removed=true;tick(4400,34);assert(car.hits.size()==3);player.removed=false;
+ tick(4500,130,-4);assert(car.hits.size()==3); // rejected coordinate jump
+ tick(4750,132.5f,-4);assert(car.hits.size()==4); // player behind final box, in observed sweep
+ car.shell.active=false;tick(4800,132.5f);car.shell.active=true;
+ tick(4850,133);assert(car.hits.size()==4); // reactivation starts a fresh sample
+ car.shell.v={0,0,-10};tick(5750,125);tick(5850,124,3.4f);assert(car.hits.size()==5);
+ // Unsigned elapsed time remains valid across the 32-bit clock wrap.
+ v.run_over_sampled=false;s_run_over_last.clear();car.shell.v={0,0,10};
+ tick(0xffffffc0u,0);tick(36u,1);assert(car.hits.size()==6);
+ puts("PASS actual vehicle impact uses observed movement: parked shell spikes, cooldown, empty/driver/reverse sweep, teleport and stale samples, rider exclusion and timer wrap");
 }
 '''
 with TemporaryDirectory() as tmp:

@@ -305,6 +305,8 @@ struct VehicleRuntime
 	u32 gun_last = 0;
 	float gun_budget = 3.f;
 	u32 run_over_check = 0; // players in the car's way (spec 2.3)
+	bool run_over_sampled = false;
+	Fvector run_over_position = {};
 };
 static xr_map<u16, VehicleRuntime> s_vehicles_sv;
 

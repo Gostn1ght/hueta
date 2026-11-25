@@ -200,6 +200,8 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-mechanic-dialog.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-vehicle-impact.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-idle-exit.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:
