@@ -153,6 +153,46 @@ assert(netcoop_mutant_loot.action(player,fresh,'mloot_take all')=='' and #made==
 assert(store[70].looted)
 ''')
 
+lua.execute(r'''
+local npc = {id=function() return 69 end, alive=function() return true end, get_total_weight=function() return 29 end}
+local original_roll, original_spawn = ui_mutant_loot.loot_mutant, alife_create_item
+local roll_count, spawned = 0, 0
+function printf() end
+ini_sys = {r_float_ex=function(_, _, key) assert(key == "inv_weight"); return 0.6 end}
+ui_mutant_loot.loot_mutant = function(sec, cls, loot, who, dont_create)
+    assert(who == npc and db.actor == npc and dont_create)
+    roll_count = roll_count + 1
+    loot.meat_dog = {count = 3}
+end
+local spawn_fails = true
+function alife_create_item(sec, who, props)
+    assert(sec == "meat_dog" and who == npc and props.cond_ct == "part")
+    if spawn_fails then return nil end
+    spawned = spawned + 1
+    return {id=110+spawned}
+end
+local fresh = body(73, false, true)
+netcoop_mutant_loot.npc_take(npc, fresh)
+assert(db.actor == player and roll_count == 1 and spawned == 0 and valuable[73] == true)
+assert(store[73].netcoop_mutant_loot.meat_dog.count == 3)
+spawn_fails = false
+netcoop_mutant_loot.npc_take(npc, fresh)
+assert(db.actor == player and roll_count == 1 and spawned == 1)
+assert(store[73].netcoop_mutant_loot.meat_dog.count == 2 and valuable[73] == true)
+assert(netcoop_mutant_loot.action(player, fresh, "mloot_open") == "")
+assert(sent[#sent][3] == "73|ok|meat_dog*2")
+npc.get_total_weight=function() return 26 end
+netcoop_mutant_loot.npc_take(npc, fresh)
+assert(roll_count == 1 and spawned == 3 and store[73].looted and not valuable[73])
+netcoop_mutant_loot.npc_take(npc, fresh)
+assert(spawned == 3)
+ui_mutant_loot.loot_mutant = function() error("roll failed") end
+netcoop_mutant_loot.npc_take(npc, body(71, false, true))
+assert(db.actor == player and not store[71])
+ui_mutant_loot.loot_mutant, alife_create_item = original_roll, original_spawn
+''')
+print("PASS NPC and player share one mutant loot roll, failed spawn preserves parts, NPC respects carry limit")
+
 # Client window.
 lua.execute(r'''
 requests = {}

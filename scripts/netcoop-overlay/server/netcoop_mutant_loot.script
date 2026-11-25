@@ -55,23 +55,69 @@ local function loot_of(obj)
 	return se_load_var(obj:id(), obj:name(), "netcoop_mutant_loot")
 end
 
-local function open(actor, obj)
+local function prepare_loot(obj, npc)
 	local id = obj:id()
 	local loot = loot_of(obj)
 	if not loot then
 		if se_load_var(id, obj:name(), "looted") then
-			return payload(id, "empty")
+			return nil, "empty"
 		end
 		local st = db.storage[id]
 		if st and st.death_time and game.get_game_time():diffSec(st.death_time) > decay_time() then
-			return payload(id, "decayed")
+			return nil, "decayed"
 		end
 		loot = {}
-		ui_mutant_loot.loot_mutant(obj:section(), obj:clsid(), loot, nil, true, obj)
+		ui_mutant_loot.loot_mutant(obj:section(), obj:clsid(), loot, npc, true, obj)
 		se_save_var(id, obj:name(), "netcoop_mutant_loot", loot)
 	end
-	if #sorted_sections(loot) == 0 then return payload(id, "empty") end
-	return payload(id, "ok", loot)
+	return loot
+end
+
+local function open(obj)
+	local loot, status = prepare_loot(obj)
+	if not loot or #sorted_sections(loot) == 0 then return payload(obj:id(), status or "empty") end
+	return payload(obj:id(), "ok", loot)
+end
+
+local function update_looted(obj, loot)
+	local id = obj:id()
+	local left = #sorted_sections(loot) > 0
+	se_save_var(id, obj:name(), "looted", not left)
+	if xr_corpse_detection and xr_corpse_detection.set_valuable_loot then xr_corpse_detection.set_valuable_loot(id, left) end
+	return left
+end
+
+function npc_take(npc, obj)
+	if not (npc and npc:alive() and is_corpse(obj)) then return end
+	-- GAMMA reads the recipient's hunting kit through db.actor when rolling.
+	local previous = db.actor
+	db.actor = npc
+	local ok, loot = pcall(prepare_loot, obj, npc)
+	db.actor = previous
+	if not ok then
+		printf("! [Lost Zone][loot] mutant loot roll failed: %s", tostring(loot))
+		return
+	end
+	if not loot then
+		if xr_corpse_detection and xr_corpse_detection.set_valuable_loot then xr_corpse_detection.set_valuable_loot(obj:id(), false) end
+		return
+	end
+	local weight = npc:get_total_weight()
+	local taken = 0
+	for _, sec in ipairs(sorted_sections(loot)) do
+		local part_weight = ini_sys:r_float_ex(sec, "inv_weight") or 0
+		while loot[sec] and weight < 30 and weight + part_weight <= 30 do
+			local spawned, created = pcall(alife_create_item, sec, npc, ITEM_PROPS)
+			if not spawned or not created then break end
+			weight = weight + part_weight
+			taken = taken + 1
+			loot[sec].count = loot[sec].count - 1
+			if loot[sec].count <= 0 then loot[sec] = nil end
+			se_save_var(obj:id(), obj:name(), "netcoop_mutant_loot", loot)
+		end
+	end
+	update_looted(obj, loot)
+	if taken > 0 and game_statistics then game_statistics.increment_npc_statistic(npc, "field_dressings") end
 end
 
 -- counts: "all" or "n,n,n" in the order of the list the client was sent
@@ -113,9 +159,7 @@ local function take(actor, obj, counts)
 	end
 	if taken == 0 and failed then return tool_refusal and game.translate_string(tool_refusal) or "item creation failed; parts remain on the body" end
 	if taken == 0 then return "nothing selected" end
-	local left = #sorted_sections(loot) > 0
-	se_save_var(id, obj:name(), "looted", not left)
-	if xr_corpse_detection and xr_corpse_detection.set_valuable_loot then xr_corpse_detection.set_valuable_loot(id, left) end
+	local left = update_looted(obj, loot)
 	netcoop_send_to_actor(actor:id(), "mutant_loot", payload(id, left and "ok" or "empty", left and loot or nil))
 	return tool_refusal and game.translate_string(tool_refusal) or failed and "item creation failed; remaining parts stay on the body" or ""
 end
@@ -126,7 +170,7 @@ function action(actor, obj, request)
 	local denied = netcoop_butchering.check(actor, obj:section())
 	if denied then return game.translate_string(denied) end
 	if request == "mloot_open" then
-		netcoop_send_to_actor(actor:id(), "mutant_loot", open(actor, obj))
+		netcoop_send_to_actor(actor:id(), "mutant_loot", open(obj))
 		return ""
 	end
 	local counts = string.match(request or "", "^mloot_take (.+)$")

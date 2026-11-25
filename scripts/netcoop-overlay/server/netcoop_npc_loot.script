@@ -10,6 +10,7 @@
 -- GAMMA's "don't loot near the actor" (npc_loot_distance) measured to the
 -- server's own Actor, never to a player, so NPCs searched corpses in front
 -- of players: it is measured to the nearest living player here.
+-- The dedicated completion path uses the selected corpse and NPC directly.
 ----------------------------------------------------------------------
 
 local MAX_WEIGHT = 30 -- utils_item.is_overweight
@@ -19,6 +20,11 @@ local taken = {} -- npc id -> { corpse = id, items = { id, ... } }
 local function value(obj)
 	local ok, v = pcall(function() return obj:cost() * obj:condition() end)
 	return ok and v or 0
+end
+
+local function owner_id(item)
+	local entity = alife_object(item:id())
+	return entity and entity.parent_id
 end
 
 -- after GAMMA's search: give back what does not fit, least valuable first
@@ -33,16 +39,17 @@ function settle(npc_id)
 	local items = {}
 	for _, id in ipairs(t.items) do
 		local it = level.object_by_id(id)
-		local p = it and it:parent()
-		if p and p:id() == npc_id then items[#items + 1] = it end
+		if it and owner_id(it) == npc_id then items[#items + 1] = it end
 	end
 	table.sort(items, function(a, b) return value(a) < value(b) end)
 	local back = 0
 	for _, it in ipairs(items) do
 		if weight <= MAX_WEIGHT then break end
-		weight = weight - (it:weight() or 0)
 		npc:transfer_item(it, corpse)
-		back = back + 1
+		if owner_id(it) == corpse:id() then
+			weight = weight - (it:weight() or 0)
+			back = back + 1
+		end
 	end
 	if back > 0 then printf("[Lost Zone][loot] %s left %s item(s) in %s: no room", npc:name(), tostring(back), corpse:name()) end
 	return true
@@ -71,6 +78,72 @@ function near_player(obj)
 		if p and p:alive() and p:position():distance_to(pos) < dist then return true end
 	end
 	return false
+end
+
+local function available(corpse, item, lootable)
+	return lootable[item:section()] and owner_id(item) == corpse:id()
+end
+
+local function search_corpse(scheme, npc)
+	local storage = db.storage[npc:id()]
+	local state = storage and storage.corpse_detection
+	local id = state and state.selected_corpse_id
+	if not id then return end
+	local corpse_state = db.storage[id]
+	local corpse = level.object_by_id(id)
+	if corpse_state then corpse_state.corpse_already_selected = nil end
+	state.selected_corpse_id, state.__stimer, state.mutant_analysed = nil, nil, nil
+	state.vertex_id, state.vertex_position, state.state = nil, nil, nil
+	state.nearest_id, state.nearest_corpse_dist = nil, nil
+	state.nearest_corpse_vertex, state.nearest_corpse_position = nil, nil
+	state.index = 1
+	if not (corpse and corpse:id() ~= 0 and not corpse:alive() and npc:alive()) or near_player(corpse) then return end
+	-- Same squared tolerance as the original corpse vertex selection.
+	if npc:position():distance_to_sqr(corpse:position()) > 16 then return end
+	if corpse:is_monster() then
+		if netcoop_mutant_loot then netcoop_mutant_loot.npc_take(npc, corpse) end
+		return
+	end
+	if not IsStalker(corpse) then return end
+	local class = corpse:clsid()
+	-- Player bodies use the character restore and reservation flow.
+	if class == clsid.script_actor or class == clsid.actor then return end
+	scheme.set_valuable_loot(id, false)
+	local lootable = scheme.lootable_table or {}
+	local ids = {}
+	corpse:iterate_inventory(function(_, item)
+		if available(corpse, item, lootable) then ids[#ids + 1] = item:id() end
+	end, corpse)
+	for _, item_id in ipairs(ids) do
+		local item = level.object_by_id(item_id)
+		if item and available(corpse, item, lootable) then
+			SendScriptCallback("npc_on_get_all_from_corpse", npc, corpse, item, true)
+			corpse:transfer_item(item, npc)
+		end
+	end
+	if item_money then item_money.npc_on_loot_money(npc, corpse) end
+	local count = tonumber(load_var(npc, "s_loot_count")) or 0
+	save_var(npc, "s_loot_count", math.min(count + 1, 255))
+	if game_statistics then game_statistics.increment_npc_statistic(npc, "corpse_looted") end
+	settle(npc:id())
+end
+
+local function hook_corpses(scheme)
+	if not scheme or scheme.__netcoop_search or not scheme.get_all_from_corpse then return end
+	local original = scheme.get_all_from_corpse
+	scheme.__netcoop_search = true
+	scheme.near_actor = near_player
+	scheme.get_all_from_corpse = function(npc) search_corpse(scheme, npc) end
+	-- Some animations capture the function before the scripts start.
+	local animations = state_mgr_animation_list and state_mgr_animation_list.animations
+	for _, name in ipairs({"search_corpse", "field_dress"}) do
+		local animation = animations and animations[name]
+		for _, sequence in pairs(animation and animation.into or {}) do
+			for _, command in ipairs(sequence) do
+				if type(command) == "table" and command.f == original then command.f = scheme.get_all_from_corpse end
+			end
+		end
+	end
 end
 
 ----------------------------------------------------------------------
@@ -151,7 +224,7 @@ end
 function on_game_start()
 	if not (netcoop_enabled and netcoop_enabled()) or (netcoop_pure_client and netcoop_pure_client()) then return end
 	RegisterScriptCallback("npc_on_get_all_from_corpse", on_get)
-	if xr_corpse_detection then xr_corpse_detection.near_actor = near_player end
+	hook_corpses(xr_corpse_detection)
 	if xr_gather_items then
 		xr_gather_items.near_actor = near_player
 		hook_gather(xr_gather_items)
