@@ -1,0 +1,68 @@
+-- The multiplayer roster comes from the location that owns the NPCs.
+-- Use the existing sidebar widgets with locally replicated characters.
+local owner, received_at
+local roster = {}
+local hooked = setmetatable({}, {__mode = "k"})
+local registered = false
+
+local function clear()
+    owner, received_at = nil, nil
+    roster = {}
+end
+
+local function install_view()
+    local view = axr_companions and axr_companions.UICompanionList
+    if not view or type(view.Update) ~= "function" or hooked[view] then return end
+    hooked[view] = true
+    view.Update = function(self, force)
+        CUIScriptWnd.Update(self)
+        local now = time_global()
+        if not force and now <= self._tmr then return end
+        self._tmr = now + self.update_rate
+        local actor = db and db.actor
+        local visible = actor and owner == actor:id() and received_at and now - received_at < 10000 and main_hud_shown()
+        for i = 1, 8 do
+            local row = roster[i]
+            local npc = visible and row and level.object_by_id(row.id)
+            local widget = self.companion_info[i]
+            if npc and npc:clsid() == clsid.script_stalker and npc:alive() then
+                local icon = npc:character_icon()
+                widget.icon:InitTexture(icon and icon ~= "" and icon or "ui\\ui_noise")
+                widget.distance:SetText(string.format("%.2f M", npc:position():distance_to(actor:position())))
+                local symbol = row.leader and "ui_minimap_squad_leader" or "ui_minimap_point"
+                widget.team_role:InitTexture(symbol)
+                widget.team_role_shadow:InitTexture(symbol)
+                widget.team_role:SetTextureColor(self.clr_list[npc:character_community()] or self.clr_list.def)
+                local health = tonumber(npc.health) or 0
+                widget.prog_health:SetProgressPos(math.max(0, math.min(1, health)))
+                widget.danger_indicator:Show(false)
+                widget.base:Show(true)
+            else
+                widget.base:Show(false)
+            end
+        end
+    end
+    if not registered then
+        RegisterScriptCallback("actor_on_net_destroy", clear)
+        registered = true
+    end
+end
+
+function receive(data)
+    if not (netcoop_pure_client and netcoop_pure_client() and db and db.actor) or not data or #data > 128 then return end
+    local id, text = data:match("^(%d+)|([%d.,]*)$")
+    if tonumber(id) ~= db.actor:id() then return end
+    local next_roster, seen = {}, {}
+    if text ~= "" then
+        for row in (text .. ","):gmatch("([^,]*),") do
+            local npc, leader = row:match("^(%d+)%.([01])$")
+            npc = tonumber(npc)
+            if not npc or npc <= 0 or npc >= 65535 or seen[npc] or #next_roster >= 8 then return end
+            seen[npc] = true
+            next_roster[#next_roster + 1] = {id = npc, leader = leader == "1"}
+        end
+    end
+    owner, received_at, roster = tonumber(id), time_global(), next_roster
+    install_view()
+    if axr_companions and axr_companions.update_hud then axr_companions.update_hud() end
+end

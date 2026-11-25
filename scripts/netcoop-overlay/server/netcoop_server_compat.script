@@ -1472,6 +1472,65 @@ local function install_companions()
 	printf("[Lost Zone] companions follow the player who recruited them")
 end
 
+local companion_roster_next, companion_roster_previous = 0, {}
+local function companion_roster_update()
+	local now = time_global()
+	if now < companion_roster_next then return false end
+	companion_roster_next = now + 1000
+	if not (axr_companions and netcoop_players and netcoop_actor_login and netcoop_send_to_actor) then return false end
+
+	local owners = {}
+	for id in string.gmatch(netcoop_players(), "%d+") do
+		id = tonumber(id)
+		local login = netcoop_actor_login(id)
+		if login and login ~= "" then owners[login] = {id = id, members = {}} end
+	end
+	if not next(owners) then
+		companion_roster_previous = {}
+		return false
+	end
+	local recorded = companion_owners()
+	for squad_id in pairs(axr_companions.companion_squads or {}) do
+		local owner = owners[recorded[squad_id]]
+		local squad = owner and alife_object(squad_id)
+		if squad and squad.squad_members and squad.commander_id then
+			local commander = squad:commander_id()
+			local hostage = axr_task_manager and axr_task_manager.hostages_by_id
+			if not (hostage and hostage[commander]) then
+				for member in squad:squad_members() do
+					local npc = level.object_by_id(member.id)
+					if npc and npc:clsid() == clsid.script_stalker and npc:alive() then
+						owner.members[member.id] = member.id == commander and 1 or 0
+					end
+				end
+			end
+		end
+	end
+
+	local current = {}
+	for login, owner in pairs(owners) do
+		local ids, rows = {}, {}
+		for id in pairs(owner.members) do ids[#ids + 1] = id end
+		table.sort(ids)
+		for i = 1, math.min(#ids, 8) do
+			local id = ids[i]
+			rows[#rows + 1] = string.format("%d.%d", id, owner.members[id])
+		end
+		local data = tostring(owner.id) .. "|" .. table.concat(rows, ",")
+		local previous = companion_roster_previous[login]
+		if #rows > 0 or previous then
+			local changed = not previous or previous.data ~= data
+			local heartbeat = #rows > 0 and previous and now - previous.sent >= 5000
+			if (changed or heartbeat) and netcoop_send_to_actor(owner.id, "companions_roster", data) then
+				previous = #rows > 0 and {data = data, sent = now} or nil
+			end
+			current[login] = previous
+		end
+	end
+	companion_roster_previous = current
+	return false
+end
+
 local function install_world_glowsticks()
 	local glow = zz_glowstick_mcm
 	if not glow or type(glow.spawn_glowstick) ~= "function" or glow.__netcoop_world_glow then return end
@@ -1543,6 +1602,7 @@ function on_game_start()
 	if AddUniqueCall and ProcessEventQueue then
 		AddUniqueCall(server_event_queue)
 		AddUniqueCall(server_world_loop)
+		AddUniqueCall(companion_roster_update)
 		AddUniqueCall(function() process_pending_inventory(); owned_objects_update(); stash_visits_update(); stash_fill_update(); keep_switch_distance(); if netcoop_transit then netcoop_transit.update() end; if netcoop_factions then netcoop_factions.update_online() end; if netcoop_ranks then netcoop_ranks.update() end; if netcoop_squads then netcoop_squads.update() end; if netcoop_corpses then netcoop_corpses.update() end; if netcoop_traders then netcoop_traders.update() end; if netcoop_box_contents then netcoop_box_contents.update() end; if netcoop_mines then netcoop_mines.update() end; return false end)
 		printf("[Lost Zone] server time event queue installed")
 	end
