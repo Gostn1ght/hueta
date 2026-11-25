@@ -66,6 +66,7 @@ has_lock = false    -- the PDA has a password
 requests = {}       -- friend requests: list of { uid, name, icon, t } (players who added me)
 chats = {}          -- list of chat summaries (server order is any; sorted here)
 general = {}        -- newest last, at most KEEP
+local general_week
 opened = nil        -- { id, summary, msgs }
 typing = {}         -- chat id -> { uid, until }
 members = {}        -- group id -> list of { uid, name, icon, online, own } ("Состав")
@@ -153,6 +154,7 @@ end
 
 local function clear_device()
  me,contacts,chats,requests,general,notes,typing,members={uid="",name="",icon=""},{},{},{},{},{},{},{}
+ general_week=nil
  opened,dump,slot_device=nil,nil,nil
  locked,has_lock,foreign=false,false,false
  storage,library={tools={},archive={}},{photos={},records={},settings={}}
@@ -192,9 +194,22 @@ local function apply(verb, v)
 		chats = list(v.chats)
 		sort_chats()
 	elseif verb == "general" and type(v) == "table" then
-		for _, m in ipairs(v) do
-			if not general[#general] or m.s > general[#general].s then general[#general + 1] = m end
+		local week = tonumber(v.week)
+		if week and general_week and week < general_week then return end
+		if week and week ~= general_week then
+			general_week = week
+			general = {}
+			if opened and opened.id == "general" then opened = nil end
 		end
+		local seen = {}
+		for _, m in ipairs(general) do seen[m.s] = true end
+		for _, m in ipairs(v) do
+			if type(m) == "table" and type(m.s) == "number" and not seen[m.s] then
+				seen[m.s] = true
+				general[#general + 1] = m
+			end
+		end
+		table.sort(general, function(a, b) return a.s < b.s end)
 		while #general > KEEP do table.remove(general, 1) end
 	elseif verb == "chat" and type(v) == "table" then
 		opened = { id = v.id, summary = v.summary, msgs = list(v.msgs) }

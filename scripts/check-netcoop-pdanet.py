@@ -471,4 +471,53 @@ got = poll_for(12, [3])[3]
 assert any(k == "spot" and v.id == 77 and not v.add for k, v in got), "the mark goes once it is opened"
 assert lua.eval("netcoop_store_read('pda_stash', 'u503')") in ("", lua.eval("netcoop_transit.serialize({})"))
 print("netcoop pdanet devices: serial, foreign PDA, hack, owner's data until it left him, reset, interrupted hack, NPC PDA, stash")
+
+# Rollover is Monday UTC, with the same boundary on both location servers.
+# Connect after more than 60 posts and recover the full retained snapshot.
+week_seconds, offset = 7 * 86400, 3 * 86400
+cutoff = ((int(g.clock) + offset) // week_seconds + 2) * week_seconds - offset
+g.clock = cutoff - 1
+lua.execute('''
+players[12]={char="pda_red",name="Red",server=1,pda=512}
+players[13]={char="pda_blue",name="Blue",server=2,pda=513}
+make_item(512,"device_pda_1","u512");items[512].owner=12
+make_item(513,"device_pda_1","u513");items[513].owner=13
+''')
+assert len(last(cmd(0, 12, "pdanet hello"), "general")) == 0
+assert len(last(cmd(1, 13, "pdanet hello"), "general")) == 0
+for i in range(75):
+    assert not any(k == "err" for k, _ in cmd(0, 12, f"pdanet say 0 message {i}"))
+retained = last(cmd(1, 13, "pdanet hello"), "general")
+assert len(retained) == 75 and retained[1].x == "message 0" and retained[75].x == "message 74"
+old_week = retained.week
+private_before = g.store.pda_chat[cid]
+assert private_before
+
+# First poll after the boundary commits an empty week without resetting seq.
+g.clock = cutoff
+poll(1)
+rolled = last([tuple(x.values()) for x in take(13).values()], "general")
+assert rolled.week == old_week + 1 and len(rolled) == 0
+assert g.netcoop_transit.deserialize(g.store.pda_chat.general).seq == retained[75].s
+assert g.store.pda_chat[cid] == private_before
+poll(0)
+assert len(last(cmd(0, 12, "pdanet hello"), "general")) == 0
+cmd(0, 12, "pdanet say 0 new week")
+newest = last(cmd(1, 13, "pdanet hello"), "general")
+assert len(newest) == 1 and newest[1].x == "new week" and newest[1].s == retained[75].s + 1
+
+# An empty rollover clears the client even without a fresh message; an old
+# snapshot arriving later must not restore last week's messages.
+def show_general(value):
+    client.receive("1/1|general|" + g.netcoop_transit.serialize(value))
+show_general(retained)
+assert len(client.general) == 75
+show_general(rolled)
+assert len(client.general) == 0
+show_general(newest)
+show_general(retained)
+show_general(newest)
+assert len(client.general) == 1 and client.general[1].x == "new week"
+assert g.store.pda_chat[cid] == private_before
+print("PASS PDA general history: offline catch-up beyond 60, Monday UTC rollover, cross-location polling, client clears and rejects old week, private chat unchanged")
 print("netcoop pdanet: OK")

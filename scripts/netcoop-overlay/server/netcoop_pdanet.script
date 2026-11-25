@@ -61,6 +61,35 @@ local function read(bucket, key) return de(netcoop_store_read(bucket, key)) end
 local held_device, device_view -- assigned below; used by physical profiles
 local function char_of(id) return netcoop_actor_character and netcoop_actor_character(id) or "" end
 local function now() return os.time() end
+local WEEK_SECONDS = 7 * 86400
+local MONDAY_OFFSET = 3 * 86400  -- 1970-01-01 was a Thursday.
+local function general_week() return math.floor((now() + MONDAY_OFFSET) / WEEK_SECONDS) end
+
+local function roll_general(chat, week)
+	if not chat or chat.kind ~= "general" or (tonumber(chat.week) or -1) >= week then return false end
+	local cutoff = week * WEEK_SECONDS - MONDAY_OFFSET
+	local kept = {}
+	for _, message in ipairs(chat.msgs or {}) do
+		if (tonumber(message.t) or 0) >= cutoff then kept[#kept + 1] = message end
+	end
+	chat.msgs = kept
+	chat.week = week
+	-- Keep seq monotonic across weeks and across old clients.
+	return true
+end
+
+local function general_history()
+	local week = general_week()
+	local chat = read("pda_chat", "general")
+	if chat and (tonumber(chat.week) or -1) < week then
+		chat = update("pda_chat", "general", function(current)
+			if roll_general(current, week) then return current end
+		end)
+	end
+	if not chat or (tonumber(chat.week) or -1) < week then return nil end
+	return chat
+end
+
 local function game_minutes()
 	local base = game.CTime()
 	if base.set then base:set(2012, 1, 1, 0, 0, 0, 0) end
@@ -178,9 +207,10 @@ end
 -- readers by polling). Returns the stored message or nil, reason.
 local function post(cid, from_uid, kind, text, data)
 	local msg
-	local chat = update("pda_chat", cid, function(c)
+	local chat, applied = update("pda_chat", cid, function(c)
 		if not c then return nil end
 		if c.kind ~= "general" and not c.members[from_uid] then return nil end
+		if cid == "general" then roll_general(c, general_week()) end
 		c.seq = (c.seq or 0) + 1
 		msg = { s = c.seq, f = from_uid, k = kind, x = string.sub(text or "", 1, TEXT), d = data, t = now(), g = game_minutes() }
 		c.msgs = c.msgs or {}
@@ -188,7 +218,7 @@ local function post(cid, from_uid, kind, text, data)
 		while #c.msgs > HISTORY do table.remove(c.msgs, 1) end
 		return c
 	end)
-	if not chat or not msg then return nil, "no such chat" end
+	if not applied or not chat or not msg then return nil, "message was not saved" end
 	if chat.kind ~= "general" then
 		for uid in pairs(chat.members) do
 			local char = netcoop_store_read("pda_uid", uid)
@@ -200,7 +230,7 @@ end
 
 local function ensure_general()
 	if netcoop_store_read("pda_chat", "general") == "" then
-		netcoop_store_swap("pda_chat", "general", "", ser({ seq = 0, kind = "general", members = {}, msgs = {} }))
+		netcoop_store_swap("pda_chat", "general", "", ser({ seq = 0, kind = "general", members = {}, msgs = {}, week = general_week() }))
 	end
 end
 
@@ -301,6 +331,12 @@ local function shown(me, msgs, from)
 	return out
 end
 
+local function send_general(id, me, chat, after)
+	local messages = shown(me, chat.msgs, after)
+	messages.week = chat.week
+	send(id, "general", messages)
+end
+
 local function mark_read(char, cid, seq)
 	update("pda_prof", char, function(p)
 		if not p or (p.chats[cid] or 0) >= seq then return nil end
@@ -319,8 +355,8 @@ function handlers.hello(id, me, char)
 	state(id, me)
 	local d = holding(id, char_of(id))
 	if not d or (not d.own and not d.rec.hacked[char_of(id)]) or is_locked(id, d.uid) then return end
-	local g = read("pda_chat", "general")
-	send(id, "general", shown(me, g and g.msgs, math.max(0, (g and g.seq or 0) - 60)))
+	local g = general_history()
+	if g then send_general(id, me, g) end
 end
 
 function handlers.add(id, me, char, args)
@@ -381,7 +417,8 @@ function handlers.say(id, me, char, args)
 	local anon, text = string.match(args, "^([01]) (.+)$")
 	if not text then return "empty message" end
 	ensure_general()
-	post("general", anon == "1" and "" or me.uid, "text", text)
+	local _, failure = post("general", anon == "1" and "" or me.uid, "text", text)
+	return failure
 end
 
 -- dm <uid> : open (or make) the private chat with a UID
@@ -438,7 +475,9 @@ end
 -- open <cid> : history, marked read
 function handlers.open(id, me, char, args)
 	local cid = string.match(args, "^([%w_]+)$")
-	local c = cid and read("pda_chat", cid)
+	local c
+	if cid == "general" then c = general_history()
+	elseif cid then c = read("pda_chat", cid) end
 	if not c or (c.kind ~= "general" and not c.members[me.uid]) then return "no such chat" end
 	send(id, "chat", { id = cid, summary = summary(me, cid), msgs = shown(me, c.msgs) })
 	if c.kind ~= "general" then mark_read(char, cid, c.seq or 0) end
@@ -1325,6 +1364,7 @@ end
 -- Polling (every 2 s): new messages for players here, from any server
 ----------------------------------------------------------------------
 local next_poll, general_seq, pushed = 0, nil, {}
+local seen_general_week
 local next_state, shown_requests = {}, {}
 
 -- Money sent to a player here: taken from the store (compare-and-swap, so
@@ -1356,15 +1396,21 @@ function update_world()
 	end
 	local here = local_players()
 	-- the general channel
-	local g = read("pda_chat", "general")
-	local seq = g and g.seq or 0
-	if general_seq == nil then general_seq = seq end
-	if seq > general_seq then
-		for char, id in pairs(here) do
-			local me = read("pda_prof", char)
-			if me and not is_locked(id,char) and not foreign_held[id] then send(id, "general", shown(me, g.msgs, general_seq)) end
+	local g = general_history()
+	if g then
+		local seq = g.seq or 0
+		local new_week = seen_general_week ~= g.week
+		if new_week or seq > (general_seq or 0) then
+			for char, id in pairs(here) do
+				local me = read("pda_prof", char)
+				if me and not is_locked(id,char) and not foreign_held[id] then
+					local after
+					if not new_week then after = general_seq end
+					send_general(id, me, g, after)
+				end
+			end
+			general_seq, seen_general_week = seq, g.week
 		end
-		general_seq = seq
 	end
 	-- private and group chats
 	for char, id in pairs(here) do
