@@ -95,7 +95,7 @@ std::wstring span(double ms)
 }
 
 struct LocationRow { std::string id; std::wstring name, state, address, detail; unsigned process=0; int players = 0; bool online = false, planned = false; };
-struct PlayerRow { std::string login, name, location, faction, role, ping, state; };
+struct PlayerRow { std::string login, name, location, faction, role, ping, state; int slot = 0; };
 
 struct View
 {
@@ -109,7 +109,8 @@ struct View
 };
 
 struct Button { int id; std::wstring text; RECT rc{}; bool accent = false; COLORREF color = 0; };
-enum { B_EMISSION = 1, B_PSI, B_WEATHER, B_SPEED, B_LOGS, B_TOGGLE, B_RUN, B_LOC_ON, B_LOC_OFF, B_NODE_LOG, B_DIAGNOSTICS, B_ROLE_ADMIN, B_ROLE_PLAYER, T_LOCATIONS = 100, T_PLAYERS, T_JOURNAL, T_CONSOLE };
+enum { B_EMISSION = 1, B_PSI, B_WEATHER, B_SPEED, B_LOGS, B_TOGGLE, B_RUN, B_LOC_ON, B_LOC_OFF, B_NODE_LOG, B_DIAGNOSTICS, B_ROLE_ADMIN, B_ROLE_PLAYER, B_PLAYER_ACTIONS, T_LOCATIONS = 100, T_PLAYERS, T_JOURNAL, T_CONSOLE };
+enum class PlayerAction { ban = 1, unban, appoint_leader, revoke_leader };
 
 struct State
 {
@@ -167,6 +168,33 @@ bool font_exists(const wchar_t* face)
 }
 
 // -- the view, read off the UI thread --------------------------------------------------------------------------
+bool moderation_login(const std::string& login)
+{
+    return login.size() >= 3 && login.size() <= 20 &&
+        std::all_of(login.begin(), login.end(), [](unsigned char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
+        });
+}
+
+void add_banned_roster_rows(std::vector<PlayerRow>& players, const std::string& encoded)
+{
+    std::string image;
+    if (encoded.size() > 90000 || !base64_decode(encoded, image) || image.size() > 65536) return;
+    std::map<std::string, size_t> seen;
+    for (size_t i = 0; i < players.size(); ++i) seen.emplace(lower(players[i].login), i);
+    for (const auto& line : split(image, '\n'))
+    {
+        const auto end = line.find('|');
+        if (end == std::string::npos) continue;
+        const auto login = line.substr(0, end);
+        if (!moderation_login(login)) continue;
+        const auto [entry, inserted] = seen.emplace(lower(login), players.size());
+        if (inserted) players.push_back({login, "", "", "", "", "", "BANNED"});
+        else players[entry->second].state = "BANNED";
+    }
+}
+
 std::vector<PlayerRow> read_rosters(const std::wstring& folder, const std::map<int, std::string>& ports)
 {
     std::vector<PlayerRow> rows;
@@ -193,7 +221,14 @@ std::vector<PlayerRow> read_rosters(const std::wstring& folder, const std::map<i
             auto f = split(line, '|');
             if (f.size() < 6 || f[0].empty()) continue;
             auto it = ports.find(port);
-            rows.push_back({ f[0], f[1], it == ports.end() ? "порт " + std::to_string(port) : it->second, f[3], f[4], f[5], "" });
+            int slot = 0;
+            try
+            {
+                const auto value = parse_int(f[2]);
+                if (value >= 1 && value <= 10) slot = int(value);
+            }
+            catch (...) {}
+            rows.push_back({ f[0], f[1], it == ports.end() ? "порт " + std::to_string(port) : it->second, f[3], f[4], f[5], "", slot });
         }
     } while (FindNextFileW(find, &data));
     FindClose(find);
@@ -282,6 +317,71 @@ bool write_host_command(const std::wstring& folder, const std::string& map, cons
     return MoveFileExW(temporary.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 }
 
+std::string moderation_command(PlayerAction action, const PlayerRow& target)
+{
+    if (!moderation_login(target.login)) return {};
+    if (action == PlayerAction::ban) return "sv_ban " + target.login;
+    if (action == PlayerAction::unban) return "sv_unban " + target.login;
+    if (target.slot < 1 || target.slot > 10) return {};
+    const std::string base = "sv_leader " + target.login + " " + std::to_string(target.slot) + " ";
+    if (action == PlayerAction::revoke_leader) return base + "off";
+    if (action == PlayerAction::appoint_leader && !target.faction.empty() && target.faction.size() <= 32 &&
+        target.faction != "off" && std::all_of(target.faction.begin(), target.faction.end(),
+            [](char c) { return (c >= 'a' && c <= 'z') || c == '_'; }))
+        return base + target.faction;
+    return {};
+}
+
+bool queue_moderation(const std::wstring& folder, int port, PlayerAction action, const PlayerRow& target)
+{
+    const auto command = moderation_command(action, target);
+    if (folder.empty() || port < 1 || port >= 65535 || command.empty()) return false;
+    const auto path = folder + L"\\command_" + std::to_wstring(port) + L".txt";
+    std::wstring temporary;
+    try { temporary = path + L"." + widen(uuid4_hex()) + L".tmp"; }
+    catch (...) { return false; }
+    const auto file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    const auto size = DWORD(command.size());
+    DWORD written = 0;
+    const bool flushed = WriteFile(file, command.data(), size, &written, nullptr) && written == size && FlushFileBuffers(file);
+    const bool closed = CloseHandle(file) != FALSE;
+    // Never replace an earlier operator request that the location has not taken.
+    if (flushed && closed && MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH)) return true;
+    DeleteFileW(temporary.c_str());
+    return false;
+}
+
+bool moderation_selftest(const std::wstring& root)
+{
+    const PlayerRow target{"fixture", "", "k00_marsh", "dolg", "player", "", "", 2};
+    if (moderation_command(PlayerAction::ban, target) != "sv_ban fixture" ||
+        moderation_command(PlayerAction::appoint_leader, target) != "sv_leader fixture 2 dolg" ||
+        moderation_command(PlayerAction::revoke_leader, target) != "sv_leader fixture 2 off")
+        return false;
+    auto invalid = target;
+    invalid.login = "fixture;quit";
+    if (!moderation_command(PlayerAction::ban, invalid).empty()) return false;
+    invalid = target;
+    invalid.slot = 0;
+    if (!moderation_command(PlayerAction::appoint_leader, invalid).empty()) return false;
+    std::vector<PlayerRow> players{target};
+    add_banned_roster_rows(players, base64("FIXTURE||1\nPlayer_offline||2\nbad user||3\nPLAYER_OFFLINE||2"));
+    if (players.size() != 2 || players[0].state != "BANNED" || players[1].state != "BANNED" ||
+        players[1].login != "Player_offline") return false;
+
+    const std::wstring folder = root + L"\\moderation-test-" + widen(uuid4_hex());
+    if (!CreateDirectoryW(folder.c_str(), nullptr)) return false;
+    const std::wstring path = folder + L"\\command_1267.txt";
+    const bool wrote = queue_moderation(folder, 1267, PlayerAction::unban, players[1]);
+    const bool kept = !queue_moderation(folder, 1267, PlayerAction::ban, target);
+    std::ifstream in(path, std::ios::binary);
+    const std::string received((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+    const bool removed = DeleteFileW(path.c_str()) && RemoveDirectoryW(folder.c_str());
+    return wrote && kept && removed && received == "sv_unban Player_offline";
+}
+
 // The watchdog reads the commands; it is started from here when it is not
 // running (its view is not fresh), at most once a minute.
 bool ensure_watchdog(State& s, bool fresh)
@@ -305,6 +405,7 @@ View build_view(Service& service, const WindowOptions& options)
     Store& store = service.store();
     World& world = service.world();
     std::vector<json> leases, sessions;
+    std::string bans;
     {
         std::lock_guard<std::recursive_mutex> guard(store.lock);
         store.require_epoch(store.db);
@@ -322,6 +423,8 @@ View build_view(Service& service, const WindowOptions& options)
         leases = store.db.all("SELECT location, expires_ms FROM location_lease ORDER BY location LIMIT 256");
         sessions = store.db.all("SELECT s.account AS account, s.state AS state, e.location AS location FROM player_session s "
                                 "JOIN entity e ON e.id=s.character_id WHERE s.state IN ('ACTIVE','FROZEN') ORDER BY e.location, s.account LIMIT 512");
+        const auto ban_record = store.db.one("SELECT data FROM master_record WHERE bucket='_system' AND key='bans'");
+        if (!ban_record.is_null()) bans = ban_record["data"].get<std::string>();
     }
     int64_t real = world.real_ms();
     auto plan = read_cluster(options.service.cluster);
@@ -335,6 +438,7 @@ View build_view(Service& service, const WindowOptions& options)
         if (it == players.end()) players.push_back({ account, "", s["location"].get<std::string>(), "", "", "", s["state"].get<std::string>() });
         else it->state = s["state"].get<std::string>();
     }
+    if (!bans.empty()) add_banned_roster_rows(players, bans);
     std::sort(players.begin(), players.end(), [](const PlayerRow& a, const PlayerRow& b) {
         return a.location != b.location ? a.location < b.location : lower(a.login) < lower(b.login);
     });
@@ -582,6 +686,10 @@ void layout(State& s)
             b.rc={x,s.content.bottom-line,x+px(s,244),s.content.bottom};b.color=C_ACCENT;
             s.buttons.push_back(b);x=b.rc.right+px(s,8);
         }
+        Button actions{B_PLAYER_ACTIONS,L"Действия с игроком"};
+        actions.rc={x,s.content.bottom-line,x+px(s,188),s.content.bottom};
+        actions.color=C_ACCENT;
+        s.buttons.push_back(actions);
     }
     for (HWND list : { s.locations, s.players })
     {
@@ -640,7 +748,8 @@ void paint(State& s, HDC target)
         int online = 0;
         for (auto& l : view.locations) online += l.online;
         card(s, dc, at(4), L"МИР", std::to_wstring(online) + L" из " + std::to_wstring(view.locations.size()) + L" локаций",
-             L"игроков в мире: " + std::to_wstring(view.players.size()));
+             L"игроков в мире: " + std::to_wstring(std::count_if(view.players.begin(), view.players.end(),
+                 [](const PlayerRow& player) { return !player.location.empty(); })));
     }
     else
         for (int i = 0; i < 5; ++i) card(s, dc, at(i), i == 0 ? L"КАЛЕНДАРЬ ЗОНЫ" : i == 1 ? L"ПОГОДА" : i == 2 ? L"ВЫБРОС" : i == 3 ? L"ПСИ-ШТОРМ" : L"МИР", L"—", L"");
@@ -895,7 +1004,7 @@ bool preservation_selftest(State& s)
 bool operator==(const LocationRow& a, const LocationRow& b) { return a.id == b.id && a.state == b.state && a.address == b.address && a.players == b.players && a.process==b.process && a.detail==b.detail; }
 bool operator==(const PlayerRow& a, const PlayerRow& b)
 {
-    return a.login == b.login && a.name == b.name && a.location == b.location && a.faction == b.faction && a.role == b.role && a.ping == b.ping && a.state == b.state;
+    return a.login == b.login && a.name == b.name && a.location == b.location && a.faction == b.faction && a.role == b.role && a.ping == b.ping && a.state == b.state && a.slot == b.slot;
 }
 
 void refresh_lists(State& s)
@@ -925,6 +1034,7 @@ void refresh_lists(State& s)
         for (auto& p : view.players)
         {
             std::wstring role = p.role == "admin" ? L"Админ" : p.role == "leader" ? L"Лидер" : p.role == "player" ? L"Игрок" : p.role.empty() ? L"—" : widen(p.role);
+            if (p.state == "BANNED") role = L"Заблокирован";
             rows.push_back({ widen(p.login), p.name.empty() ? L"—" : widen(p.name), map_name(p.location), p.faction.empty() ? L"—" : widen(p.faction), role,
                              p.ping.empty() ? L"—" : widen(p.ping) + L" мс" });
             tags.push_back(p.state == "FROZEN" ? 3 : p.role == "admin" ? 2 : 1);
@@ -1078,6 +1188,91 @@ void switch_locations(State& s, bool on, const std::vector<std::string>& maps)
     else set_status(s, narrow((on ? L"Запуск запрошен (состояние — в списке): " : L"Выключаются (с сохранением мира): ") + names), on ? C_AMBER:C_GREEN);
 }
 
+void player_actions(State& s)
+{
+    const int selected = ListView_GetNextItem(s.players, -1, LVNI_SELECTED);
+    if (selected < 0 || size_t(selected) >= s.shown_players.size())
+    {
+        set_status(s, "Выберите игрока в списке.", C_AMBER);
+        return;
+    }
+    const auto target = s.shown_players[size_t(selected)];
+    HMENU menu = CreatePopupMenu();
+    if (!menu) return;
+    const bool banned = target.state == "BANNED";
+    const auto add = [&](PlayerAction action, const wchar_t* label, bool allowed) {
+        AppendMenuW(menu, MF_STRING | (allowed ? MF_ENABLED : MF_GRAYED), UINT_PTR(action), label);
+    };
+    add(PlayerAction::ban, L"Заблокировать аккаунт", !banned && !target.location.empty());
+    add(PlayerAction::unban, L"Разблокировать аккаунт", banned);
+    add(PlayerAction::appoint_leader, L"Назначить лидером своей группировки", !banned && target.slot > 0 && !target.faction.empty());
+    add(PlayerAction::revoke_leader, L"Снять лидерство группировки", !banned && target.slot > 0);
+    POINT anchor{};
+    for (const auto& b : s.buttons)
+        if (b.id == B_PLAYER_ACTIONS) anchor = {b.rc.left, b.rc.bottom};
+    ClientToScreen(s.hwnd, &anchor);
+    const auto choice = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, anchor.x, anchor.y, 0, s.hwnd, nullptr);
+    DestroyMenu(menu);
+    if (!choice) return;
+    const auto action = PlayerAction(choice);
+    if (moderation_command(action, target).empty()) return;
+    const bool leader = action == PlayerAction::appoint_leader || action == PlayerAction::revoke_leader;
+    const std::wstring name = widen(target.login) + (leader ? L" · персонаж " + std::to_wstring(target.slot) : L"");
+    const wchar_t* verb = action == PlayerAction::ban ? L"Заблокировать " :
+        action == PlayerAction::unban ? L"Разблокировать " :
+        action == PlayerAction::appoint_leader ? L"Назначить лидером " : L"Снять лидерство у ";
+    if (MessageBoxW(s.hwnd, (verb + name + L"?").c_str(), L"Lost Zone — мастер", MB_YESNO | MB_ICONQUESTION) != IDYES)
+        return;
+
+    View view;
+    {
+        std::lock_guard<std::mutex> lock(s.view_lock);
+        if (s.view) view = *s.view;
+    }
+    if (!s.service || !s.service->running() || !view.ready || s.stop_pending)
+    {
+        set_status(s, "Мастер ещё не готов принимать действия.", C_AMBER);
+        return;
+    }
+    const auto live = std::find_if(view.players.begin(), view.players.end(),
+        [&](const PlayerRow& player) { return lower(player.login) == lower(target.login); });
+    if (live == view.players.end() || (action == PlayerAction::unban && live->state != "BANNED") ||
+        (action != PlayerAction::unban && (live->state == "BANNED" || live->location != target.location)) ||
+        (leader && (live->slot != target.slot || live->faction != target.faction)))
+    {
+        set_status(s, "Состояние игрока изменилось. Выберите его снова.", C_AMBER);
+        return;
+    }
+
+    const auto host = read_host_view(s.options.roster_folder);
+    int port = 0;
+    for (const auto& map : read_cluster(s.options.service.cluster))
+    {
+        if (action != PlayerAction::unban && map.name != target.location) continue;
+        const auto hosted = host.maps.find(map.name);
+        const auto location = std::find_if(view.locations.begin(), view.locations.end(),
+            [&](const LocationRow& row) { return row.id == map.name; });
+        if (hosted != host.maps.end() && hosted->second.state == "running" && hosted->second.process &&
+            location != view.locations.end() && location->online && location->process == hosted->second.process)
+        {
+            port = map.port;
+            break;
+        }
+    }
+    if (!port)
+    {
+        set_status(s, "Нет готовой локальной локации для этого действия.", C_AMBER);
+        return;
+    }
+    if (!queue_moderation(s.options.roster_folder, port, action, target))
+    {
+        set_status(s, "Запрос не записан. Проверьте очередь и доступ к папке локаций.", C_RED);
+        return;
+    }
+    log_line("[console] operator request: " + moderation_command(action, target) + " via " + std::to_string(port));
+    set_status(s, "Запрос передан локации. Результат появится в журнале.", C_AMBER);
+}
+
 void click(State& s, int id)
 {
     if (id >= T_LOCATIONS && id <= T_JOURNAL)
@@ -1146,6 +1341,7 @@ void click(State& s, int id)
         SendMessageW(s.players,LVM_GETITEMTEXTW,row,reinterpret_cast<LPARAM>(&item));
         command(s,"role "+narrow(login)+(id==B_ROLE_ADMIN ? " admin":" player"));break;
     }
+    case B_PLAYER_ACTIONS: player_actions(s); break;
     case B_TOGGLE:
         if(s.stop_pending) {set_status(s,"Ожидаем сохранения локаций. Подробности — в их журналах.",C_AMBER);break;}
         if (s.service && s.service->running())
@@ -1305,10 +1501,12 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpar
                 std::ifstream command(s->options.roster_folder + L"\\host_command_k00_marsh.txt", std::ios::binary);
                 std::string action((std::istreambuf_iterator<char>(command)), std::istreambuf_iterator<char>());
                 const bool preserved=preservation_selftest(*s);
+                const bool moderation=moderation_selftest(s->options.roster_folder);
                 s->selftest = { { "status", split(status, '\n')[0] }, { "quit", refused }, { "locations", view.locations.size() },
                                 { "host_command", written && action == "start" }, {"pid_json",pids_ok}, {"scroll_selection",preserved},
+                                { "moderation_commands", moderation },
                                 { "calendar", calendar_text(view.world_ms) }, { "api_port", s->service->api_port() } };
-                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start" && pids_ok && preserved, "");
+                finish_selftest(*s, status.rfind("Мастер: готов", 0) == 0 && view.locations.size() >= 33 && written && action == "start" && pids_ok && preserved && moderation, "");
             }
             else if ((monotonic_ns() - s->started_ns) > 90000000000LL)
                 finish_selftest(*s, false, "timeout");
