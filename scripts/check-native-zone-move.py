@@ -25,6 +25,11 @@ def method(text, signature):
     return text[start:end]
 
 
+methods = "\n".join((
+    method(restr, "void CSpaceRestrictor::spatial_move("),
+    method(zone, "void CCustomZone::MoveScript("),
+    method(zone, "void CCustomZone::AffectObjects("),
+))
 source = r"""
 #include <cassert>
 #include <cmath>
@@ -63,7 +68,7 @@ struct CCustomZone:CSpaceRestrictor {
     void MoveScript(Fvector pos);
     void AffectObjects();
 };
-""" + method(restr, "void CSpaceRestrictor::spatial_move(") + "\n" + +    method(zone, "void CCustomZone::MoveScript(") + "\n" + method(zone, "void CCustomZone::AffectObjects(") + r"""
+""" + methods + r"""
 int main(){
     CCustomZone item;
     CGameObject old_contact{{0,0,0}},remaining{{15,0,0}},destroyed{{15,0,0},true};
