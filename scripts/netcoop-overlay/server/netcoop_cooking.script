@@ -148,7 +148,7 @@ local function cook(actor, section, plan)
     if not ok then
         -- Never refund while a failed result is still owned by the actor.
         if result_id and not release_item(result_id) then
-            printf("! [Lost Zone][cooking] failed to withdraw result %u before refund", result_id)
+            printf("! [Lost Zone][cooking] failed to withdraw result %s before refund", tostring(result_id))
             return "could not withdraw cooking result"
         end
         for i = #reduced, 1, -1 do
@@ -158,21 +158,21 @@ local function cook(actor, section, plan)
                 assert(row.item:get_remaining_uses() == row.before)
             end)
             if not restored then
-                printf("! [Lost Zone][cooking] failed to restore portions of item %u for actor %u", row.id, actor_id)
+                printf("! [Lost Zone][cooking] failed to restore portions of item %s for actor %s", tostring(row.id), tostring(actor_id))
             end
         end
         for i = #moved, 1, -1 do
             local row = moved[i]
             if parent_of(row.id) == 0 then pcall(function() holder:transfer_item(row.item, actor) end) end
             if parent_of(row.id) ~= actor_id then
-                printf("! [Lost Zone][cooking] failed to return ingredient %u to actor %u", row.id, actor_id)
+                printf("! [Lost Zone][cooking] failed to return ingredient %s to actor %s", tostring(row.id), tostring(actor_id))
             end
         end
         return "cooking failed"
     end
     for _, row in ipairs(moved) do
         if parent_of(row.id) == 0 and not release_item(row.id) then
-            printf("! [Lost Zone][cooking] consumed item %u could not be cleared", row.id)
+            printf("! [Lost Zone][cooking] consumed item %s could not be cleared", tostring(row.id))
         end
     end
     return ""
@@ -218,7 +218,7 @@ function request(actor_id, kind, tool, key, login, serial)
     cache.order[#cache.order + 1] = serial
     if #cache.order > 32 then cache.replies[table.remove(cache.order, 1)] = nil end
     local ok, result = pcall(prepare, actor, kind, tool, key, login)
-    if not ok then printf("! [Lost Zone][cooking] actor %u: %s", actor_id, tostring(result)) end
+    if not ok then printf("! [Lost Zone][cooking] actor %s: %s", tostring(actor_id), tostring(result)) end
     reply.failure = ok and result or "cooking failed"
     return reply.failure
 end
