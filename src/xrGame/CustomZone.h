@@ -227,6 +227,7 @@ protected:
 	void AffectObjects();
 
 	u32 m_dwAffectFrameNum;
+	bool m_script_moved_since_touch = false;
 
 	//параметры для выброса, с какой задержкой 
 	//включать эффекты и логику

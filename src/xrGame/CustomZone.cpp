@@ -372,6 +372,7 @@ BOOL CCustomZone::net_Spawn(CSE_Abstract* DC)
 	if (!inherited::net_Spawn(DC))
 		return (FALSE);
 
+	m_script_moved_since_touch = false;
 	CSE_Abstract* e = (CSE_Abstract*)(DC);
 	CSE_ALifeCustomZone* Z = smart_cast<CSE_ALifeCustomZone*>(e);
 	VERIFY(Z);
@@ -604,6 +605,7 @@ void CCustomZone::shedule_Update(u32 dt)
 		XFORM().transform_tiny(P, s.P);
 
 		// update
+		m_script_moved_since_touch = false;
 		feel_touch_update(P, s.R);
 
 		//пройтись по всем объектам в зоне
@@ -1197,7 +1199,8 @@ void CCustomZone::AffectObjects()
 	OBJECT_INFO_VEC_IT it;
 	for (it = m_ObjectInfoMap.begin(); m_ObjectInfoMap.end() != it; ++it)
 	{
-		if (!(*it).object->getDestroy())
+		CGameObject* object = it->object;
+		if (object && !object->getDestroy() && (!m_script_moved_since_touch || feel_touch_contact(object)))
 			Affect(&(*it));
 	}
 }
@@ -1288,8 +1291,14 @@ void CCustomZone::OnMove()
 
 void CCustomZone::MoveScript(Fvector pos)
 {
+	if (!_valid(pos)) return;
+	const auto& current = Position();
+	if (current.x == pos.x && current.y == pos.y && current.z == pos.z) return;
 	XFORM().translate_over(pos);
-
+	spatial_move();
+	// Do not mutate the touch list from a script callback, but recheck its
+	// existing contacts before a hit until the next scheduled refresh.
+	m_script_moved_since_touch = true;
 	OnMove();
 }
 
