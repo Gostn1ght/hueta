@@ -249,6 +249,9 @@ function on_client_command(cid, name, entity_id, text, role)
 		use_door(entity_id, args)
 		return ""
 	end
+	if cmd == "companion_move" then
+		return netcoop_server_compat.companion_move(entity_id, args)
+	end
 	-- Barter between players (netcoop_barter): no reply, the module answers.
 	if cmd == "barter" then
 		if netcoop_barter then netcoop_barter.command(entity_id, args) end

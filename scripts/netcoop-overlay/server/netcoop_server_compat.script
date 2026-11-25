@@ -1500,7 +1500,9 @@ local function companion_roster_update()
 				for member in squad:squad_members() do
 					local npc = level.object_by_id(member.id)
 					if npc and npc:clsid() == clsid.script_stalker and npc:alive() then
-						owner.members[member.id] = member.id == commander and 1 or 0
+						local leader = member.id == commander and 1 or 0
+						local waiting = npc:has_info("npcx_beh_wait") and 1 or 0
+						owner.members[member.id] = string.format("%d.%d", leader, waiting)
 					end
 				end
 			end
@@ -1514,7 +1516,7 @@ local function companion_roster_update()
 		table.sort(ids)
 		for i = 1, math.min(#ids, 8) do
 			local id = ids[i]
-			rows[#rows + 1] = string.format("%d.%d", id, owner.members[id])
+			rows[#rows + 1] = string.format("%d.%s", id, owner.members[id])
 		end
 		local data = tostring(owner.id) .. "|" .. table.concat(rows, ",")
 		local previous = companion_roster_previous[login]
@@ -1529,6 +1531,53 @@ local function companion_roster_update()
 	end
 	companion_roster_previous = current
 	return false
+end
+
+local companion_move_at = {}
+function companion_move(actor_id, args)
+	local mode = args == "wait" and 1 or args == "follow" and 2
+	local actor = mode and level.object_by_id(actor_id)
+	local ac = axr_companions
+	if not (actor and actor:clsid() == clsid.script_actor and actor:alive() and ac and ac.set_companion_squad_move_mode) then
+		return "! companion order unavailable"
+	end
+	local login = netcoop_actor_login and netcoop_actor_login(actor_id)
+	if not login or login == "" then return "! companion order unavailable" end
+	local now = time_global()
+	if now < (companion_move_at[actor_id] or 0) then return "" end
+	companion_move_at[actor_id] = now + 500
+	local position = actor:position()
+	local squads = {}
+	for id in pairs(ac.companion_squads or {}) do
+		local squad = companion_owners()[id] == login and alife_object(id)
+		if squad and squad.commander_id and squad.squad_members then
+			local leader = squad:commander_id()
+			local hostage = axr_task_manager and axr_task_manager.hostages_by_id
+			if not (hostage and hostage[leader]) then
+				for member in squad:squad_members() do
+					local npc = level.object_by_id(member.id)
+					if npc and npc:clsid() == clsid.script_stalker and npc:alive() and position:distance_to(npc:position()) <= 30 then
+						squads[#squads + 1] = squad
+						break
+					end
+				end
+			end
+		end
+	end
+	if #squads == 0 then return "! no companions nearby" end
+
+	local previous, previous_id = db.actor, _G.AC_ID
+	db.actor, _G.AC_ID = actor, actor_id
+	local ok, err = pcall(function()
+		for _, squad in ipairs(squads) do ac.set_companion_squad_move_mode(mode, nil, squad) end
+	end)
+	db.actor, _G.AC_ID = previous, previous_id
+	if not ok then
+		printf("! [Lost Zone][companions] movement order failed: %s", tostring(err))
+		return "! companion order failed"
+	end
+	companion_roster_next = 0 -- publish the new authoritative mode on the next tick
+	return ""
 end
 
 local function install_world_glowsticks()

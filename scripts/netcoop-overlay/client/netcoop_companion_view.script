@@ -4,6 +4,7 @@ local owner, received_at
 local roster = {}
 local hooked = setmetatable({}, {__mode = "k"})
 local registered = false
+local control_hook
 
 local function clear()
     owner, received_at = nil, nil
@@ -48,6 +49,19 @@ local function install_view()
     end
 end
 
+local function install_move_control()
+    local companions = axr_companions
+    if not companions or type(companions.cycle_companions_move_mode) ~= "function" or
+        companions.cycle_companions_move_mode == control_hook then return end
+    control_hook = function(force_mode)
+        if not (netcoop_command and db and db.actor and owner == db.actor:id() and received_at and
+            time_global() - received_at < 10000 and roster[1]) then return end
+        local wait = force_mode == 1 or (not force_mode and not roster[1].waiting)
+        netcoop_command(wait and "companion_move wait" or "companion_move follow")
+    end
+    companions.cycle_companions_move_mode = control_hook
+end
+
 function receive(data)
     if not (netcoop_pure_client and netcoop_pure_client() and db and db.actor) or not data or #data > 128 then return end
     local id, text = data:match("^(%d+)|([%d.,]*)$")
@@ -55,14 +69,15 @@ function receive(data)
     local next_roster, seen = {}, {}
     if text ~= "" then
         for row in (text .. ","):gmatch("([^,]*),") do
-            local npc, leader = row:match("^(%d+)%.([01])$")
+            local npc, leader, waiting = row:match("^(%d+)%.([01])%.([01])$")
             npc = tonumber(npc)
             if not npc or npc <= 0 or npc >= 65535 or seen[npc] or #next_roster >= 8 then return end
             seen[npc] = true
-            next_roster[#next_roster + 1] = {id = npc, leader = leader == "1"}
+            next_roster[#next_roster + 1] = {id = npc, leader = leader == "1", waiting = waiting == "1"}
         end
     end
     owner, received_at, roster = tonumber(id), time_global(), next_roster
     install_view()
+    install_move_control()
     if axr_companions and axr_companions.update_hud then axr_companions.update_hud() end
 end
