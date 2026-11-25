@@ -25,37 +25,59 @@ function UIVehicleStatus:__init() super()
 	self:SetWndRect(Frect():set(0,0,1024,768))
 	local xml=CScriptXmlInit();xml:ParseFile("ui_netcoop_vehicle_status.xml")
 	local panel=xml:InitFrame("dashboard",self)
+	self.panel=panel
 	self.speed=xml:InitTextWnd("dashboard:speed",panel)
 	self.details=xml:InitTextWnd("dashboard:details",panel)
 	self.engine=xml:InitTextWnd("dashboard:engine",panel)
 	self.condition=xml:InitTextWnd("dashboard:condition",panel)
+	self.fuel=xml:InitTextWnd("dashboard:fuel",panel)
+	self.fuel_bar=xml:InitProgressBar("dashboard:fuel_bar",panel)
+	self.condition_bar=xml:InitProgressBar("dashboard:condition_bar",panel)
 	self.parking=xml:InitTextWnd("dashboard:parking",panel)
 	self.controls=xml:InitTextWnd("dashboard:controls",panel)
 	self.shown=false
 end
-function UIVehicleStatus:Set(data)
+function UIVehicleStatus:Set(data, seat)
+	local hud = get_hud()
+	if not hud then self.shown = false; return end
 	local speed,fuel,health,rpm,gear,flags=string.match(data or "","^(%S+)|(%S+)|(%S+)|(%S+)|(%d+)|(%d+)$")
-	if not speed then
-		if self.shown then get_hud():RemoveDialogToRender(self);self.shown=false end
+	speed,fuel,health,rpm,gear,flags=tonumber(speed),tonumber(fuel),tonumber(health),tonumber(rpm),tonumber(gear),tonumber(flags)
+	local driver = seat == "seated_driver" or seat == "seated_pilot"
+	local function finite(value) return value and value == value and math.abs(value) < math.huge end
+	if not ((driver or seat == "seated") and finite(speed) and finite(fuel) and finite(health)
+		and finite(rpm) and finite(gear) and finite(flags)) then
+		if self.shown then hud:RemoveDialogToRender(self);self.shown=false end
 		return
 	end
-	speed,fuel,health,rpm,gear,flags=tonumber(speed),tonumber(fuel),tonumber(health),tonumber(rpm),tonumber(gear),tonumber(flags)
+	local helicopter = math.floor(flags/64)%2==1
+	if self.driver ~= driver then
+		self.panel:SetHeight(driver and 196 or 110)
+		self.driver = driver
+	end
+	self.details:Show(driver)
+	self.engine:Show(driver)
+	self.parking:Show(driver and not helicopter)
+	self.controls:Show(driver and not helicopter)
 	self.speed:SetText(string.format("%03d  %s",math.floor(speed+.5),tr("st_lz_car_kmh")))
 	self.details:SetText(string.format("%s %s   /   %s %d",tr("st_lz_car_gear"),gear==0 and "R" or tostring(gear),tr("st_lz_car_rpm"),rpm))
 	self.engine:SetText(string.format("%s: %s",tr("st_lz_car_engine"),flags%2==1 and tr("st_lz_car_on") or tr("st_lz_car_off")))
 	self.parking:SetText("");self.controls:SetText("")
-	if math.floor(flags/64)%2==1 then
+	if helicopter then
 		local gear=tr(math.floor(flags/32)%2==1 and "st_lz_heli_gear_down" or "st_lz_heli_gear_up")
 		if flags>=128 then gear=tr("st_lz_heli_gear_moving") end
 		self.details:SetText(string.format("%s: %s   /   %s %d",tr("st_lz_heli_gear"),gear,tr("st_lz_car_rpm"),rpm))
 	end
-	if math.floor(flags/64)%2==0 then
+	if driver and not helicopter then
 		self.parking:SetText(string.format("%s: %s [%s]",tr("st_lz_car_parking"),tr(math.floor(flags/32)%2==1 and "st_lz_car_on" or "st_lz_car_off"),key("kJUMP","SPACE")))
 		self.controls:SetText(string.format("%s/%s: %s",key("kACCEL","SHIFT"),key("kCROUCH","CTRL"),tr("st_lz_car_shift")))
 	end
-	self.condition:SetText(string.format("%s %d%%  /  %s %d%%",tr("st_lz_car_fuel"),math.max(0,math.min(100,fuel)),tr("st_lz_car_condition"),math.max(0,math.min(100,health))))
-	self.condition:SetTextColor((fuel<15 or health<30) and GetARGB(255,220,145,90) or GetARGB(255,205,199,179))
-	if not self.shown then get_hud():AddDialogToRender(self);self.shown=true end
+	fuel = math.max(0, math.min(100, fuel))
+	health = math.max(0, math.min(100, health))
+	self.fuel:SetText(string.format("%s %d%%",tr("st_lz_car_fuel"),fuel))
+	self.condition:SetText(string.format("%s %d%%",tr("st_lz_car_condition"),health))
+	self.fuel_bar:SetProgressPos(fuel)
+	self.condition_bar:SetProgressPos(health)
+	if not self.shown then hud:AddDialogToRender(self);self.shown=true end
 end
 
 
@@ -181,6 +203,13 @@ local function actor_on_update()
 	local ok, err = pcall(function()
 		local state = netcoop_vehicle_prompt and netcoop_vehicle_prompt() or ""
 		local seated = state == "seated_driver" or state == "seated" or state == "seated_pilot"
+		if netcoop_vehicle_status and (seated or dashboard) then
+			local data = seated and netcoop_vehicle_status() or ""
+			if data ~= "" or dashboard then
+				dashboard = dashboard or UIVehicleStatus()
+				dashboard:Set(data, state)
+			end
+		end
 		-- At a car: the mark by its door.
 		local screen
 		if (VERBS[state] or state == "taken") and netcoop_vehicle_prompt_point then
@@ -215,11 +244,6 @@ function on_game_start()
 		if mark then mark:Set(nil) end
 		if prompt then prompt:Set(nil) end
 		seated_since=nil
-	end)
-	RegisterScriptCallback("actor_on_update",function()
-		if not netcoop_vehicle_status then return end
-		local data=netcoop_vehicle_status()
-		if data~="" or dashboard then dashboard=dashboard or UIVehicleStatus();dashboard:Set(data) end
 	end)
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 end

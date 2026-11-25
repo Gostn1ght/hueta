@@ -1,6 +1,7 @@
 """Vehicles (doc 100): the actual netcoop_vehicle_client prompts and the
 server's car trunks (netcoop_vehicles.script) with host stubs."""
 from pathlib import Path
+import xml.etree.ElementTree as ET
 from lupa.lua51 import LuaRuntime
 
 root = Path(__file__).resolve().parents[1]
@@ -47,22 +48,29 @@ function GetARGB(a,r,g,b)return {a,r,g,b}end
 function get_hud()return {AddDialogToRender=function()added=added+1 end,RemoveDialogToRender=function()removed=removed+1 end}end
 function CScriptXmlInit()return {
  ParseFile=function(_,name)assert(name=="ui_netcoop_vehicle_status.xml")end,
- InitFrame=function(_,name,parent)assert(name=="dashboard" and parent);frames=frames+1;return {}end,
- InitTextWnd=function(_,name,parent)assert(parent);return {SetText=function(self,value)self.text=value end,SetTextColor=function(self,value)self.color=value end}end,
+ InitFrame=function(_,name,parent)assert(name=="dashboard" and parent);frames=frames+1;return {SetHeight=function(self,h)self.height=h end}end,
+ InitTextWnd=function(_,name,parent)assert(parent);return {SetText=function(self,value)self.text=value end,Show=function(self,value)self.visible=value end}end,
+ InitProgressBar=function(_,name,parent)assert(parent);return {SetProgressPos=function(self,value)self.value=value end}end,
 }end
 local hud=setmetatable({SetWndRect=function()end},{__index=UIVehicleStatus})
 hud:__init();assert(frames==1)
-hud:Set("64.0|72.0|86.0|2400|3|1")
+hud:Set("64.0|72.0|86.0|2400|3|1","seated_driver")
 assert(hud.speed.text=="064  <st_lz_car_kmh>" and hud.details.text:find("2400",1,true))
-assert(hud.condition.text:find("72%",1,true) and hud.condition.color[2]==205 and added==1)
-hud:Set("0|9|24|0|0|0");assert(hud.condition.color[2]==220 and added==1)
+assert(hud.fuel.text:find("72%",1,true) and hud.fuel_bar.value==72 and hud.condition_bar.value==86 and added==1)
+assert(hud.panel.height==196 and hud.engine.visible and hud.parking.visible and hud.controls.visible)
+hud:Set("0|-9|124|0|0|0","seated_driver");assert(hud.fuel_bar.value==0 and hud.condition_bar.value==100 and added==1)
 assert(hud.engine.text:find("<st_lz_car_off>",1,true) and hud.details.text:find(" R",1,true))
-hud:Set("0|100|100|850|1|33")
+hud:Set("0|100|100|850|1|33","seated_driver")
 assert(hud.parking.text:find("<st_lz_car_on>",1,true) and hud.controls.text:find("RSHIFT/RCTRL",1,true))
-hud:Set("0|100|100|850|1|1");assert(hud.parking.text:find("<st_lz_car_off>",1,true))
-hud:Set("0|100|100|850|1|97");assert(hud.parking.text=="" and hud.controls.text=="" and hud.details.text:find("<st_lz_heli_gear_down>",1,true))
-hud:Set("0|100|100|850|1|65");assert(hud.details.text:find("<st_lz_heli_gear_up>",1,true))
-hud:Set("");assert(removed==1 and not hud.shown)
+hud:Set("0|100|100|850|1|1","seated_driver");assert(hud.parking.text:find("<st_lz_car_off>",1,true))
+hud:Set("0|100|100|850|1|97","seated_pilot");assert(not hud.parking.visible and not hud.controls.visible and hud.details.text:find("<st_lz_heli_gear_down>",1,true))
+hud:Set("0|100|100|850|1|65","seated_pilot");assert(hud.details.text:find("<st_lz_heli_gear_up>",1,true))
+hud:Set("32|55|25|850|1|1","seated")
+assert(hud.panel.height==110 and hud.fuel_bar.value==55 and hud.condition_bar.value==25 and added==1)
+assert(not hud.details.visible and not hud.engine.visible and not hud.controls.visible and not hud.parking.visible)
+hud:Set("speed|55|25|850|1|1","seated");assert(removed==1 and not hud.shown)
+hud:Set("32|55|25|850|1|1","seated_driver");assert(hud.shown and hud.details.visible)
+hud:Set("32|55|25|850|1|1","");assert(removed==2 and not hud.shown)
 -- Construct the real prompt using the actual exported TextWnd API. The
 -- two control rows must fit below the viewport and left of the dashboard.
 function GetFontLetterica18Russian()return {}end
@@ -79,6 +87,13 @@ assert(prompt.shown);prompt:Set(nil);assert(not prompt.shown)
 ''')
 bindings=(root/'src/xrGame/ui/UIStatic_script.cpp').read_text(encoding='utf-8')
 assert '.def("SetTextComplexMode", &CUITextWnd::SetTextComplexMode)' in bindings
+dashboard = ET.parse(root / "scripts/netcoop-overlay/client/configs/ui/ui_netcoop_vehicle_status.xml").getroot().find("dashboard")
+for name in ("fuel_bar", "condition_bar"):
+    bar = dashboard.find(name)
+    assert bar.get("mode") == "horz" and bar.get("min") == "0" and bar.get("max") == "100"
+    assert int(bar.get("y")) + int(bar.get("height")) <= 110
+    assert bar.findtext("progress/texture")
+print("PASS actual vehicle HUD: fuel and condition bars, separate seat controls, seat changes and malformed snapshots")
 
 srv = LuaRuntime(unpack_returned_tuples=True)
 srv.execute(r'''
