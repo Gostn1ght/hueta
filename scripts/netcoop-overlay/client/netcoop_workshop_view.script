@@ -7,6 +7,7 @@
 --   the server takes the item apart;
 -- - recipes from books: the server learns and keeps them with the character
 --   and sends the list ("recipes" channel), the encyclopedia unlocks them here.
+-- - cooking: the server confirms inventory changes for the selected kit.
 
 local function tip(id)
 	if actor_menu and actor_menu.set_msg then actor_menu.set_msg(1, game.translate_string(id), 3) end
@@ -188,13 +189,59 @@ local function install_disassembly()
 	end
 end
 
-local function install_cooking_preview()
+local cooking_pending
+local cooking_request
+
+local function refresh_cooking(request)
+	local menu = request.menu
+	if not menu:IsShown() then return false end
+	local tool = level.object_by_id(request.tool)
+	if not tool or (request.spent_tool and not request.failed) or
+		(menu.cooking_limited and tool:get_remaining_uses() == 0) then
+		menu:Close()
+		return false
+	elseif menu.last_cont and menu.last_idx then
+		menu:On_CC_Mouse1(menu.last_cont, menu.last_idx)
+	end
+	return true
+end
+
+function on_cooking_result(data)
+	local id, result = string.match(data or "", "^(%d+)|(%a+)$")
+	local request = cooking_pending
+	if not request or tonumber(id) ~= request.id or request.replied or (result ~= "ok" and result ~= "failed") then return end
+	request.replied = true
+	request.failed = result == "failed"
+	request.expires = time_global() + 300
+	if result == "ok" and request.menu:IsShown() then
+		request.menu.hasCraftedItem = true
+	end
+end
+
+local function install_cooking()
 	local cook = item_cooking and item_cooking.UICook
-	if not cook or cook.__netcoop_preview or type(cook.Update) ~= "function" or
+	if not cook or cook.__netcoop_cooking or type(cook.Update) ~= "function" or
 		type(cook.On_CC_Mouse1) ~= "function" then return end
-	cook.__netcoop_preview = true
-	local update, select_meal = cook.Update, cook.On_CC_Mouse1
+	cook.__netcoop_cooking = true
+	local eat = _G.CInventory__eat
+	if eat and item_cooking.start then
+		-- Opening the kit is a UI action, so it costs no uses.
+		_G.CInventory__eat = function(item, ...)
+			if item and IsItem("cook", item:section()) then
+				item_cooking.start(item, item:section())
+				return false
+			end
+			return eat(item, ...)
+		end
+	end
+	local update, select_meal, close = cook.Update, cook.On_CC_Mouse1, cook.Close
 	cook.Update = function(self, ...)
+		local request = cooking_pending
+		if request and request.menu == self and time_global() >= request.expires then
+			cooking_pending = nil
+			if not request.replied then request.failed = true end
+			if not refresh_cooking(request) then return end
+		end
 		-- The base hover path returns early if a refresh removed the meal.
 		if self.item_info and not self:GetSelectedMeal() then self.item_info:Update() end
 		return update(self, ...)
@@ -206,7 +253,61 @@ local function install_cooking_preview()
 			for section in pairs(self.objs) do self.objs[section] = nil end
 			self:Load_ActorItems()
 		end
-		return select_meal(self, ...)
+		if self.cooking_campfire and bind_campfire then
+			local fire = bind_campfire.get_nearby_campfire(1.5, true)
+			self.is_campfire = fire and fire:is_on() or false
+		end
+		local result = select_meal(self, ...)
+		local meal = self:GetSelectedMeal()
+		if self.btn_cook and self.CheckAvail_main then
+			local usable = self.obj and (not self.cooking_limited or self.obj:get_remaining_uses() > 0)
+			self.btn_cook:Enable(not cooking_pending and usable and meal ~= nil and self:CheckAvail_main(meal) or false)
+		end
+		return result
+	end
+	-- The server consumes carried items. Match its inventory view instead
+	-- of promising fuel from a stash the player has not taken it out of.
+	cook.Load_ActorItems = function(self)
+		local needed = {}
+		for _, meal in ipairs(self.meals or {}) do
+			for _, ingredient in ipairs(meal) do needed[ingredient.sec] = true end
+		end
+		if not (db and db.actor and db.actor.iterate_inventory) then return end
+		db.actor:iterate_inventory(function(_, item)
+			local section = item:section()
+			if needed[section] or self.fuel[section] then
+				local uses = IsItem("multiuse", nil, item) and item:get_remaining_uses() or 1
+				if uses and uses > 0 then
+					self.objs[section] = self.objs[section] or {}
+					self.objs[section][item:id()] = uses
+				end
+			end
+		end, nil)
+	end
+	cook.OnCook = function(self)
+		if cooking_pending then return end
+		local meal = self:GetSelectedMeal()
+		local tool = self.obj
+		if not (meal and tool and netcoop_workshop_recipe) then return end
+		local recipe = {sec = meal.sec, tool = meal.fuel_tier, rsp = ""}
+		for _, row in ipairs(meal) do recipe[#recipe + 1] = {row.sec, row.amt} end
+		local key = netcoop_workshop_recipe.key(recipe)
+		if not key then return end
+		local section = tool:section()
+		local kind = (section == "placeable_stove1" or section == "placeable_stove2") and 2 or 1
+		cooking_request = ((cooking_request or time_global()) % 999999999) + 1
+		local id = tool:id()
+		if netcoop_item_action(kind, id, 65535, string.format("cook %d %s", cooking_request, key)) then
+			cooking_pending = {menu = self, id = cooking_request, tool = id, expires = time_global() + 3000,
+				spent_tool = self.cooking_limited and tool:get_remaining_uses() == 1}
+			if self.btn_cook then self.btn_cook:Enable(false) end
+		end
+	end
+	if close then
+		cook.Close = function(self, ...)
+			if cooking_pending and cooking_pending.menu == self then cooking_pending = nil end
+			return close(self, ...)
+		end
 	end
 end
 
@@ -217,7 +318,7 @@ local function install()
 	install_upgrades()
 	install_mechanic()
 	install_disassembly()
-	install_cooking_preview()
+	install_cooking()
 	if netcoop_command then netcoop_command("recipes get") end
 end
 

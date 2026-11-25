@@ -118,6 +118,7 @@ jobs:
           python scripts/check-netcoop-pda-media.py
           python scripts/check-newway-pda-assets.py
           python scripts/check-netcoop-workshop.py
+          python scripts/check-netcoop-cooking.py
           python scripts/check-netcoop-npc-loot.py
           python scripts/check-netcoop-npc-gather.py
           python scripts/check-netcoop-backpack-anim.py

@@ -1,0 +1,224 @@
+-- Authoritative cooking for a carried kit or a nearby accessible stove.
+local settings
+local stoves = {placeable_stove1 = true, placeable_stove2 = true}
+
+local function portion_count(item)
+    if not IsItem("multiuse", nil, item) then return 1 end
+    return item:get_remaining_uses() or 0
+end
+
+local function find_meal(key, actor_id)
+    local meals
+    for i = 0, (settings:line_count("meal_list") or 0) - 1 do
+        local _, row, text = settings:r_line_ex("meal_list", i, "", "")
+        local section = row and row:sub(3)
+        if section and text and ini_sys:section_exist(section) then
+            local values = str_explode(text, ",")
+            local tier = tonumber(values[1])
+            local meal = {sec = section, tool = tier, rsp = ""}
+            local valid = tier and tier >= 1 and tier <= 16 and (#values == 4 or #values == 6)
+            if valid then
+                for column = 3, #values, 2 do
+                    local item, amount = values[column], tonumber(values[column + 1])
+                    if not (amount and amount >= 1 and amount <= 64 and amount == math.floor(amount) and ini_sys:section_exist(item)) then
+                        valid = false
+                        break
+                    end
+                    meal[#meal + 1] = {item, amount}
+                end
+            end
+            if valid and netcoop_workshop_recipe.key(meal) == key then
+                local note = values[2]
+                if note == "false" then return meal end
+                meals = meals or {}
+                local book = note and note:match("^encyclopedia__notes_([%w_]+)$")
+                if book then meals[#meals + 1] = {book = book, meal = meal} end
+            end
+        end
+    end
+    if not meals then return nil, "unknown cooking recipe" end
+    local known = netcoop_workshop.known_recipes(actor_id)
+    for _, entry in ipairs(meals) do
+        if known[entry.book] then return entry.meal end
+    end
+    return nil, "cooking recipe is not learned"
+end
+
+local function parent_of(id)
+    local item = alife_object(id)
+    return item and item.parent_id
+end
+
+local function consume_plan(actor, tool, section, meal, limited)
+    local inventory = {}
+    local seen = {}
+    local actor_id = actor:id()
+    actor:iterate_inventory(function(_, item)
+        local id = item:id()
+        if id ~= tool:id() and not seen[id] and parent_of(id) == actor_id then
+            seen[id] = true
+            local uses = portion_count(item)
+            if uses > 0 then
+                inventory[#inventory + 1] = {id = id, item = item, section = item:section(), before = uses, take = 0}
+            end
+        end
+    end)
+    table.sort(inventory, function(a, b) return a.id < b.id end)
+    local function reserve(name, count)
+        for _, row in ipairs(inventory) do
+            if row.section == name then
+                -- The engine treats 255 uses as infinite.
+                if row.before == 255 then return true end
+                local take = math.min(count, row.before - row.take)
+                row.take = row.take + take
+                count = count - take
+                if count == 0 then return true end
+            end
+        end
+        return false
+    end
+
+    for _, cost in ipairs(meal) do
+        if not reserve(cost[1], cost[2]) then return nil, "missing cooking ingredients" end
+    end
+    local uses_fire = false
+    if ini_sys:r_bool_ex(section, "cooking_campfire", false) and bind_campfire and
+        meal.tool <= (settings:r_float_ex("settings", "campfire_cook_tier") or 1) then
+        local fire = bind_campfire.get_nearby_campfire(1.5, true)
+        uses_fire = fire and fire:is_on() or false
+    end
+    if not uses_fire then
+        local fuel = parse_list(ini_sys, section, "cooking_fuel", true) or {}
+        local ordered = {}
+        for name in pairs(fuel) do
+            local tier = settings:r_float_ex("fuel", name)
+            if tier and tier >= meal.tool then ordered[#ordered + 1] = {name = name, tier = tier} end
+        end
+        table.sort(ordered, function(a, b) return a.tier < b.tier or (a.tier == b.tier and a.name < b.name) end)
+        local supplied = false
+        for _, entry in ipairs(ordered) do
+            if reserve(entry.name, 1) then supplied = true break end
+        end
+        if not supplied then return nil, "no compatible cooking fuel in inventory" end
+    end
+    local plan = {}
+    for _, row in ipairs(inventory) do
+        if row.take > 0 then plan[#plan + 1] = row end
+    end
+    if limited then
+        local uses = tool:get_remaining_uses()
+        if not uses or uses == 0 then return nil, "cooking kit is exhausted" end
+        if uses < 255 then plan[#plan + 1] = {id = tool:id(), item = tool, before = uses, take = 1} end
+    end
+    return plan
+end
+
+local function release_item(id)
+    if not alife_object(id) then return true end
+    -- The native online destroy is a queued event.
+    local ok, queued = pcall(alife_release_id, id)
+    return ok and queued == true
+end
+
+local function cook(actor, section, plan)
+    -- Full items stay in the invisible, non-player server inventory until
+    -- the result is confirmed. Failed spawns then restore the same item IDs.
+    local actor_id = actor:id()
+    local holder = level.object_by_id(0)
+    local moved, reduced = {}, {}
+    local result_id
+    local ok = pcall(function()
+        for _, row in ipairs(plan) do
+            assert(parent_of(row.id) == actor_id and portion_count(row.item) == row.before)
+            if row.take == row.before then
+                assert(holder and holder:id() == 0)
+                moved[#moved + 1] = row
+                actor:transfer_item(row.item, holder)
+                assert(parent_of(row.id) == 0)
+            else
+                reduced[#reduced + 1] = row
+                row.item:set_remaining_uses(row.before - row.take)
+                assert(row.item:get_remaining_uses() == row.before - row.take)
+            end
+        end
+        local result = alife_create_item(section, actor)
+        result_id = result and result.id
+        assert(result_id and result.parent_id == actor_id and result:section_name() == section)
+    end)
+    if not ok then
+        -- Never refund while a failed result is still owned by the actor.
+        if result_id and not release_item(result_id) then
+            printf("! [Lost Zone][cooking] failed to withdraw result %u before refund", result_id)
+            return "could not withdraw cooking result"
+        end
+        for i = #reduced, 1, -1 do
+            local row = reduced[i]
+            local restored = pcall(function()
+                row.item:set_remaining_uses(row.before)
+                assert(row.item:get_remaining_uses() == row.before)
+            end)
+            if not restored then
+                printf("! [Lost Zone][cooking] failed to restore portions of item %u for actor %u", row.id, actor_id)
+            end
+        end
+        for i = #moved, 1, -1 do
+            local row = moved[i]
+            if parent_of(row.id) == 0 then pcall(function() holder:transfer_item(row.item, actor) end) end
+            if parent_of(row.id) ~= actor_id then
+                printf("! [Lost Zone][cooking] failed to return ingredient %u to actor %u", row.id, actor_id)
+            end
+        end
+        return "cooking failed"
+    end
+    for _, row in ipairs(moved) do
+        if parent_of(row.id) == 0 and not release_item(row.id) then
+            printf("! [Lost Zone][cooking] consumed item %u could not be cleared", row.id)
+        end
+    end
+    return ""
+end
+
+local function prepare(actor, kind, tool, key, login)
+    local section = tool:section()
+    if kind == 2 and stoves[section] then
+        local access = netcoop_server_compat and netcoop_server_compat.can_access
+        if not (access and access(tool:id(), login)) or actor:position():distance_to(tool:position()) > 5 then
+            return "cooking stove is not accessible"
+        end
+        section = "fieldcooker"
+    elseif kind ~= 1 or not ini_sys:r_bool_ex(section, "cooking_tool", false) or parent_of(tool:id()) ~= actor:id() then
+        return "this is not an available cooking kit"
+    end
+    settings = settings or ini_file("items\\settings\\cook.ltx")
+    local meal, error_text = find_meal(key, actor:id())
+    if not meal then return error_text end
+    local plan, refused = consume_plan(actor, tool, section, meal, ini_sys:r_bool_ex(section, "cooking_limited", false))
+    if not plan then return refused end
+    return cook(actor, meal.sec, plan)
+end
+
+function request(actor_id, kind, tool, key, login, serial)
+    local actor = db.actor
+    local storage = db.storage[actor_id]
+    if not (actor and actor:id() == actor_id and actor:alive() and storage and netcoop_workshop_recipe and netcoop_workshop) then
+        return "cooking is not available"
+    end
+    local cache = storage.netcoop_cooking_requests
+    if not cache then
+        cache = {order = {}, replies = {}}
+        storage.netcoop_cooking_requests = cache
+    end
+    local old = cache.replies[serial]
+    if old then
+        if old.kind ~= kind or old.tool ~= tool:id() or old.key ~= key then return "cooking request changed" end
+        return old.failure
+    end
+    local reply = {kind = kind, tool = tool:id(), key = key, failure = "cooking already in progress"}
+    cache.replies[serial] = reply
+    cache.order[#cache.order + 1] = serial
+    if #cache.order > 32 then cache.replies[table.remove(cache.order, 1)] = nil end
+    local ok, result = pcall(prepare, actor, kind, tool, key, login)
+    if not ok then printf("! [Lost Zone][cooking] actor %u: %s", actor_id, tostring(result)) end
+    reply.failure = ok and result or "cooking failed"
+    return reply.failure
+end

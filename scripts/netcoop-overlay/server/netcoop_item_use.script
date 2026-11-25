@@ -13,7 +13,7 @@
 --   bolts_pack          -> 20-30 bolts
 --   multiuse_r          -> the use comes back (uses + 1 up to max)
 --   money (kind)        -> its amount (or a random one in its range)
--- Mines/IEDs, scopes, cooking and map kits keep their own client state and
+-- Mines/IEDs, scopes, cooking and map kits use separate interaction paths and
 -- are not handled here.
 
 local syringe_items

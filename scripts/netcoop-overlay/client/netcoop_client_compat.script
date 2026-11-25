@@ -849,6 +849,9 @@ function on_script_message(channel, data)
 			db.actor:give_game_news("Lost Zone",string.format(game.translate_string("st_lz_car_lives"),lives),"ui_inGame2_Pered_zadaniyami_voennih",0,7000)
 		end
 		return
+	elseif channel == "cooking_result" then
+		if netcoop_workshop_view then netcoop_workshop_view.on_cooking_result(data) end
+		return
 	elseif channel == "companions_roster" then
 		if netcoop_companion_view then netcoop_companion_view.receive(data) end
 		return
