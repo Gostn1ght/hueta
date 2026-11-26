@@ -16,7 +16,13 @@ lua.execute(r'''
 function printf() end
 game={translate_string=function(s) return s end}
 created={}; released={}
-function alife_create_item(sec, parent, t) created[#created+1]={sec=sec, parent=parent, cond=t and t.cond} end
+function alife_create_item(sec, parent, t)
+  if spawn_error then error("injected spawn failure") end
+  if spawn_refused then return nil end
+  local result={sec=sec, parent=parent, cond=t and t.cond}
+  created[#created+1]=result
+  return result
+end
 function alife_release(obj) released[#released+1]=obj:id() end
 local function item(id, sec, cond)
   local o={_id=id,_sec=sec,_cond=cond}
@@ -45,12 +51,23 @@ assert(item_action(91,1,5,6,'battery_swap')=='')
 assert(pda:condition()==0.8,'device takes the battery charge')
 assert(#released==1 and released[1]==5,'the battery is used up')
 assert(#created==1 and created[1].cond==0.12 and created[1].parent==db.actor,'the old charge comes back as a battery')
+local replacement=make_item(11,'batteries_dead',0.9); objects[11]=replacement
+local charged=make_item(12,'device_pda_1',0.4); objects[12]=charged
+for _,mode in ipairs({'refuse','error'}) do
+  spawn_refused=mode=='refuse'; spawn_error=mode=='error'
+  local made,spent=#created,#released
+  assert(item_action(91,1,11,12,'battery_swap')=='could not return the device battery')
+  assert(#created==made and #released==spent and replacement:condition()==0.9 and charged:condition()==0.4)
+end
+spawn_refused,spawn_error=false,false
+assert(item_action(91,1,11,12,'battery_swap')=='' and charged:condition()==0.9)
+assert(#created==2 and created[2].cond==0.4 and #released==2 and released[2]==11)
 local weak=make_item(7,'batteries_dead',0.3); objects[7]=weak
 assert(item_action(91,1,7,6,'battery_swap')=='ui_st_battery_more_power','a weaker battery is refused')
-assert(#released==1)
+assert(#released==2)
 local flat=make_item(8,'device_pda_1',0.05); objects[8]=flat
 local full=make_item(9,'batteries_dead',1.0); objects[9]=full
-assert(item_action(91,1,9,8,'battery_swap')=='' and #created==1,'a flat device returns no battery')
+assert(item_action(91,1,9,8,'battery_swap')=='' and #created==2,'a flat device returns no battery')
 assert(item_action(91,0,6,65535,'item_device.func_battery')=='' and unpacked==6,'whitelisted menu action runs')
 assert(item_action(91,0,6,65535,'item_device.other')~='','unlisted functor is refused')
 functors.device_pda_1.use2_action_functor=nil

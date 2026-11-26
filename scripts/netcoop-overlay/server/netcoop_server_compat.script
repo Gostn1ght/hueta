@@ -1715,7 +1715,8 @@ local function battery_swap(battery, device)
 	local con_b, con_d = battery:condition(), device:condition()
 	if con_d > con_b then return game.translate_string("ui_st_battery_more_power") end
 	if con_d > (dev.dev_critical[sec_d] or 0) then
-		alife_create_item(dev.device_battery, db.actor, { cond = con_d })
+		local ok, returned = pcall(alife_create_item, dev.device_battery, db.actor, { cond = con_d })
+		if not ok or not returned then return "could not return the device battery" end
 	end
 	alife_release(battery)
 	device:set_condition(con_b)
