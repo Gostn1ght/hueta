@@ -81,7 +81,28 @@ function near_player(obj)
 end
 
 local function available(corpse, item, lootable)
-	return lootable[item:section()] and owner_id(item) == corpse:id()
+	return lootable[item:section()] and owner_id(item) == corpse:id() and
+		not (netcoop_survival and netcoop_survival.item_reserved(corpse:id(), item:id()))
+end
+
+local function is_player(corpse)
+	local class = corpse:clsid()
+	return class == clsid.script_actor or class == clsid.actor
+end
+
+function note_player_death(actor)
+	local scheme = xr_corpse_detection
+	if not (scheme and scheme.set_valuable_loot) then return end
+	local id = actor:id()
+	local storage = db.storage[id] or {}
+	db.storage[id] = storage
+	storage.object = actor
+	se_save_var(id, actor:name(), "netcoop_loot_prepared", true)
+	local found = false
+	actor:iterate_inventory(function(_, item)
+		if available(actor, item, scheme.lootable_table or {}) then found = true end
+	end, actor)
+	scheme.set_valuable_loot(id, found)
 end
 
 local function search_corpse(scheme, npc)
@@ -105,9 +126,9 @@ local function search_corpse(scheme, npc)
 		return
 	end
 	if not IsStalker(corpse) then return end
-	local class = corpse:clsid()
-	-- Player bodies use the character restore and reservation flow.
-	if class == clsid.script_actor or class == clsid.actor then return end
+	local player = is_player(corpse)
+	if player and not (netcoop_survival and
+		se_load_var(id, corpse:name(), "netcoop_loot_prepared") and not corpse:deadbody_closed_status()) then return end
 	scheme.set_valuable_loot(id, false)
 	local lootable = scheme.lootable_table or {}
 	local ids = {}
@@ -121,7 +142,7 @@ local function search_corpse(scheme, npc)
 			corpse:transfer_item(item, npc)
 		end
 	end
-	if item_money then item_money.npc_on_loot_money(npc, corpse) end
+	if not player and item_money then item_money.npc_on_loot_money(npc, corpse) end
 	local count = tonumber(load_var(npc, "s_loot_count")) or 0
 	save_var(npc, "s_loot_count", math.min(count + 1, 255))
 	if game_statistics then game_statistics.increment_npc_statistic(npc, "corpse_looted") end
@@ -141,6 +162,12 @@ local function hook_corpses(scheme)
 			for _, command in ipairs(sequence) do
 				if type(command) == "table" and command.f == original then command.f = scheme.get_all_from_corpse end
 			end
+		end
+	end
+	local release = death_manager and death_manager.create_release_item
+	if release then
+		death_manager.create_release_item = function(corpse, ...)
+			if not is_player(corpse) then return release(corpse, ...) end
 		end
 	end
 end

@@ -43,6 +43,7 @@ function make(id, extra)
   function o:transfer_item(it, to) if to:id() ~= it._refused then it._parent = to:id() end end
   function o:section() return self._section or "item" end
   function o:clsid() return self._class or 1 end
+  function o:deadbody_closed_status() return self._closed == true end
   function o:is_monster() return self._monster == true end
   function o:iterate_inventory(fn, context)
     for _, it in pairs(objects) do if it._parent == id then fn(context, it) end end
@@ -70,6 +71,8 @@ xr_corpse_detection = {
     set_valuable_loot=function(id,v) valuable[id]=v end,
 }
 xr_gather_items = {}
+deaths = 0
+death_manager = {create_release_item=function() deaths=deaths+1 end}
 function SendScriptCallback(name, ...) callbacks[name](...) end
 function load_var(npc,key) return vars[npc:id()] end
 function save_var(npc,key,v) assert(key == "s_loot_count"); vars[npc:id()]=v end
@@ -187,3 +190,62 @@ search(npc)
 assert(saved._parent == 66 and stats[60] == 1)
 ''')
 print("PASS dedicated corpse completion and both animation callbacks work without a player context")
+
+g.netcoop_npc_loot = mod
+g.netcoop_survival = lua.table()
+lua.execute("local env = ...; setfenv(assert(loadstring(select(2, ...))), setmetatable(env,{__index=_G}))()",
+            g.netcoop_survival, (root / "server/netcoop_survival.script").read_text(encoding="utf-8"))
+lua.execute(r'''
+local world, saved_vars = {}, {}
+alife_storage_manager={get_state=function() return world end}
+function se_save_var(id, name, key, value)
+    saved_vars[id]=saved_vars[id] or {}
+    saved_vars[id][key]=value
+end
+function se_load_var(id, name, key) return saved_vars[id] and saved_vars[id][key] end
+function netcoop_actor_character(id) return (id==66 or id==76) and "owner" or "" end
+local corpse=objects[66]
+function corpse:character_name() return "Chosen name" end
+local pda=make(72, {_parent=66, _w=1})
+local loot=make(71, {_parent=66, _w=2})
+function corpse:item_in_slot(slot) return slot==8 and pda or nil end
+assert(netcoop_survival.prepare(corpse,4))
+assert(db.storage[66].object==corpse and valuable[66])
+local record=world.netcoop_survival.owner
+assert(#record.items==2 and netcoop_survival.item_reserved(66,72))
+local npc=make(75, {_alive=true, _pos=vec(5,0)})
+local retained, ordinary
+for _,id in ipairs({67,71}) do
+    if netcoop_survival.item_reserved(66,id) then retained=objects[id] else ordinary=objects[id] end
+end
+assert(retained and ordinary)
+local function select()
+    db.storage[75]={corpse_detection={selected_corpse_id=66}}
+    db.storage[66].corpse_already_selected=75
+end
+death_manager.create_release_item(corpse)
+assert(deaths==0)
+death_manager.create_release_item(objects[61])
+assert(deaths==1)
+select()
+corpse._closed=true
+xr_corpse_detection.get_all_from_corpse(npc)
+assert(ordinary._parent==66 and retained._parent==66 and pda._parent==66)
+corpse._closed=false
+select()
+xr_corpse_detection.get_all_from_corpse(npc)
+assert(ordinary._parent==75 and retained._parent==66 and pda._parent==66)
+run_events()
+select()
+xr_corpse_detection.get_all_from_corpse(npc)
+assert(ordinary._parent==75 and retained._parent==66)
+local fresh=make(76,{_alive=true})
+fresh.character_name=corpse.character_name
+function fresh:item_in_slot() return nil end
+assert(netcoop_survival.claim(fresh)~="pending")
+netcoop_survival.complete(fresh)
+assert(retained._parent==76 and pda._parent==76 and ordinary._parent==75)
+assert(not netcoop_survival.protected_body(66))
+assert(netcoop_survival.prepare(fresh,0) and valuable[76])
+''')
+print("PASS actual death reservation, NPC ordinary loot, blocked retained originals, repeat and next-life claim")

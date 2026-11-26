@@ -11,8 +11,15 @@ function prepare(actor, remaining)
  if char=="" then return false end
  local list=records()
  local prior=list[char]
- if prior and prior.body==actor:id() then return true end
- if remaining==0 then list[char]=nil; return true end
+ if prior and prior.body==actor:id() then
+  if netcoop_npc_loot then netcoop_npc_loot.note_player_death(actor) end
+  return true
+ end
+ if remaining==0 then
+  list[char]=nil
+  if netcoop_npc_loot then netcoop_npc_loot.note_player_death(actor) end
+  return true
+ end
  local pda=actor:item_in_slot(8)
  if not pda then actor:iterate_inventory(function(_,item)
   if not pda and item.section and item:section():find("^device_pda_") then pda=item end
@@ -30,6 +37,7 @@ function prepare(actor, remaining)
  for i=1,math.ceil(#candidates/2) do keep[#keep+1]=candidates[i] end
  table.sort(keep)
  list[char]={body=actor:id(),name=actor:character_name(),remaining=remaining,items=keep,slots=slots}
+ if netcoop_npc_loot then netcoop_npc_loot.note_player_death(actor) end
  printf("[diag][survival] actor=%s remaining=%s retained=%s dropped=%s pda=%s",actor:id(),remaining,#keep,#candidates-math.ceil(#candidates/2),pda and pda:id() or "none")
  return true
 end

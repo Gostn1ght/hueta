@@ -632,14 +632,6 @@ void CScriptGameObject::TransferItem(CScriptGameObject* pItem, CScriptGameObject
 		ai().script_engine().script_log(ScriptStorage::eLuaMessageTypeError, "cannot transfer NULL item");
 		return;
 	}
-	if(netcoop::enabled() && !netcoop::pure_client()) {
-		::luabind::functor<bool> allowed;
-		if(ai().script_engine().functor("netcoop_survival.can_transfer",allowed)) {
-			try {if(!allowed(object().ID(),pForWho->object().ID()))return;}
-			catch(...) {return;}
-		}
-	}
-
 	CInventoryItem* pIItem = smart_cast<CInventoryItem*>(&pItem->object());
 
 	if (!pIItem)

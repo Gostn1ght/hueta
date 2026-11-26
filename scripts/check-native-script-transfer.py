@@ -11,6 +11,7 @@ binding = (root/'src/xrGame/script_game_object_inventory_owner.cpp').read_text(e
 start = binding.index('void CScriptGameObject::TransferItem(')
 body = binding[start:binding.index('\nvoid CScriptGameObject::TakeItem(',start)]
 assert body.index('server_script_transfer(') < body.index('u_EventGen(P, GE_TRADE_SELL')
+assert 'netcoop_survival.can_transfer' not in body, 'per-item reservation belongs to server_script_transfer'
 source = r'''
 #include <cassert>
 #include <cstdio>

@@ -204,6 +204,10 @@ jobs:
           if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-zone-move.py
           if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-script-transfer.py
+          if errorlevel 1 exit /b %errorlevel%
+          python scripts/check-native-corpse-loot-access.py
+          if errorlevel 1 exit /b %errorlevel%
           python scripts/check-native-idle-exit.py
           if errorlevel 1 exit /b %errorlevel%
   entry-windows:
